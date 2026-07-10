@@ -6,7 +6,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from oscprecon.models import DiscoveredService, Proto, Target
+from oscprecon import creds
+from oscprecon.models import Credential, DiscoveredService, Proto, Target
 
 SCHEMA_VERSION = 1
 
@@ -165,3 +166,19 @@ class Profile:
 
     def touch(self) -> None:
         self.status["last_active"] = _now_iso()
+
+    @property
+    def creds_path(self) -> Path:
+        return self.directory / "creds.json"
+
+    def credentials(self) -> list[Credential]:
+        return creds.load_creds(self.creds_path)
+
+    def add_credential(self, cred: Credential) -> None:
+        creds.add_credential(self.creds_path, cred)
+
+    def add_reference_visited(self, service: str, url: str) -> None:
+        if any(entry.get("url") == url for entry in self.references_visited):
+            return
+        self.references_visited.append({"service": service, "url": url, "visited_at": _now_iso()})
+        self.touch()

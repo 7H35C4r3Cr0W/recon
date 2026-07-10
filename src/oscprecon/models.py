@@ -95,6 +95,17 @@ class Suggestion:
 
 
 @dataclass
+class Credential:
+    username: str
+    secret: str
+    secret_type: str = "password"
+    domain: str = ""
+    source: str = ""
+    tested_against: list[str] = field(default_factory=list)
+    notes: str = ""
+
+
+@dataclass
 class ScanResults:
     target: Target
     services: list[DiscoveredService] = field(default_factory=list)
