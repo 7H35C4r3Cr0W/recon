@@ -1,0 +1,6 @@
+Nmap scan report for 10.10.10.100
+Host is up (0.020s latency).
+
+PORT    STATE         SERVICE VERSION
+123/udp open|filtered ntp
+161/udp open          snmp    SNMPv1 server; net-snmp SNMPv3 server

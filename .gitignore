@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Runtime scan data lives outside the repo (~/oscprecon/), never committed
+/oscprecon/
+
+# Walkthroughs — third-party writeups stay local (§21)
+walkthroughs/*
+!walkthroughs/README.md
+!walkthroughs/_sample-*.md
+
+# OS / editor
+.DS_Store
+*.swp

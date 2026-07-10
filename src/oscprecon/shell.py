@@ -1,0 +1,212 @@
+from __future__ import annotations
+
+import logging
+import shlex
+import shutil
+import subprocess
+import threading
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+
+logger = logging.getLogger("oscprecon.shell")
+
+# why: shell.run is the sole exec chokepoint, so it is where CLAUDE.md §2 exam-legality is
+# enforced. Only these binaries may run; anything else is refused before execution.
+ALLOWED_TOOLS: frozenset[str] = frozenset(
+    {
+        "nmap",
+        "feroxbuster",
+        "gobuster",
+        "ffuf",
+        "dirsearch",
+        "dirb",
+        "nikto",
+        "whatweb",
+        "curl",
+        "wget",
+        "wpscan",
+        "enum4linux-ng",
+        "smbclient",
+        "smbmap",
+        "rpcclient",
+        "netexec",
+        "crackmapexec",
+        "ldapsearch",
+        "snmpwalk",
+        "onesixtyone",
+        "dnsrecon",
+        "dig",
+        "dnsenum",
+        "wfuzz",
+        "ike-scan",
+        "nmblookup",
+        "nbtscan",
+        "ntpq",
+        "ntpdate",
+        "showmount",
+        "rsync",
+        "finger",
+        "searchsploit",
+        "GetADUsers.py",
+        "GetNPUsers.py",
+        "GetUserSPNs.py",
+        "impacket-GetADUsers.py",
+        "impacket-GetNPUsers.py",
+        "impacket-GetUserSPNs.py",
+    }
+)
+
+# why: forbidden even on an allowed binary — brute/spray is banned (§2). '--rid-brute' is NOT
+# here: RID cycling is recon (§11), so the check is precise, not a blanket 'brute' match.
+_FORBIDDEN_FLAGS: frozenset[str] = frozenset({"--continue-on-success", "--passwords"})
+
+_INSTALL_HINTS: dict[str, str] = {
+    "nmap": "apt install nmap",
+    "feroxbuster": "apt install feroxbuster",
+    "gobuster": "apt install gobuster",
+    "ffuf": "apt install ffuf",
+    "nikto": "apt install nikto",
+    "whatweb": "apt install whatweb",
+    "smbclient": "apt install smbclient",
+    "netexec": "apt install netexec",
+    "enum4linux-ng": "apt install enum4linux-ng",
+    "snmpwalk": "apt install snmp",
+    "onesixtyone": "apt install onesixtyone",
+    "searchsploit": "apt install exploitdb",
+}
+
+
+def install_hint(tool: str) -> str:
+    return _INSTALL_HINTS.get(tool, f"apt install {tool}")
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _script_values(argv: list[str]) -> list[str]:
+    values: list[str] = []
+    for index, token in enumerate(argv):
+        if token == "--script" and index + 1 < len(argv):
+            values.append(argv[index + 1])
+        elif token.startswith("--script="):
+            values.append(token.split("=", 1)[1])
+    return values
+
+
+def policy_violation(argv: list[str]) -> str | None:
+    if not argv:
+        return "empty command"
+    tool = argv[0]
+    if tool not in ALLOWED_TOOLS:
+        return f"{tool} is not on the OSCP-allowed tool list"
+    for token in argv[1:]:
+        if token.lower() in _FORBIDDEN_FLAGS:
+            return f"{token} is a credential brute/spray flag (forbidden)"
+    if tool == "nmap":
+        for value in _script_values(argv):
+            if "brute" in value.lower():
+                return f"nmap --script {value} is credential brute force (forbidden)"
+    return None
+
+
+@dataclass
+class ShellResult:
+    shell_line: str
+    exit_code: int
+    output_file: Path
+    started_at: str
+    finished_at: str
+    duration_s: float
+    missing_tool: str | None = None
+    blocked: str | None = None
+
+
+def run(
+    shell_line: str,
+    output_file: Path,
+    *,
+    cwd: Path | None = None,
+    timeout: float | None = None,
+    on_line: Callable[[str], None] | None = None,
+) -> ShellResult:
+    argv = shlex.split(shell_line)
+    tool = argv[0] if argv else ""
+    output_file = Path(output_file)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    started = _now_iso()
+    start = time.monotonic()
+
+    violation = policy_violation(argv)
+    if violation is not None:
+        message = f"[blocked] {violation}: {shell_line}"
+        logger.warning(message)
+        output_file.write_text(message + "\n", encoding="utf-8")
+        if on_line is not None:
+            on_line(message)
+        return ShellResult(
+            shell_line, 126, output_file, started, _now_iso(), 0.0, blocked=violation
+        )
+
+    if shutil.which(tool) is None:
+        message = f"[missing] {tool} — install with: {install_hint(tool)}"
+        logger.warning(message)
+        output_file.write_text(message + "\n", encoding="utf-8")
+        if on_line is not None:
+            on_line(message)
+        return ShellResult(
+            shell_line, 127, output_file, started, _now_iso(), 0.0, missing_tool=tool
+        )
+
+    logger.info("run: %s", shell_line)
+    proc = subprocess.Popen(
+        argv,
+        cwd=str(cwd) if cwd is not None else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+
+    timed_out = False
+    watchdog: threading.Timer | None = None
+    if timeout is not None:
+        # why: the streaming read blocks until the child closes stdout, so proc.wait(timeout=)
+        # can never bound a hung tool — an independent timer that kills the process is the only
+        # way to make `timeout` a real deadline.
+        def _kill() -> None:
+            nonlocal timed_out
+            timed_out = True
+            proc.kill()
+
+        watchdog = threading.Timer(timeout, _kill)
+        watchdog.start()
+
+    exit_code = -1
+    try:
+        with output_file.open("w", encoding="utf-8") as handle:
+            stream = proc.stdout
+            assert stream is not None
+            for line in stream:
+                handle.write(line)
+                if on_line is not None:
+                    on_line(line.rstrip("\n"))
+        exit_code = proc.wait()
+    finally:
+        if watchdog is not None:
+            watchdog.cancel()
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+
+    if timed_out and on_line is not None:
+        on_line(f"[timeout] killed after {timeout}s")
+
+    return ShellResult(
+        shell_line, exit_code, output_file, started, _now_iso(), time.monotonic() - start
+    )
