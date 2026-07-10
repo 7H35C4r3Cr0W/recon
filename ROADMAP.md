@@ -23,7 +23,16 @@ Delivered:
 
 ---
 
-## Phase 1 — Full GUI shell + wordlist subsystem + references — ⬜
+## Phase 1 — Full GUI shell + wordlist subsystem + references — ✅ feature-complete
+
+Delivered across 6 chunks: `wordlists.py` (+ password-list filtering), `references/` (services.yaml
+matcher + Exploit-DB lookup), `creds.json` (0600) + references-visited, three-pane GUI
+(`service_tree` / `tool_panel` / `reference_pane`), HackTricks `QWebEngineView` + live searchsploit
+EDB list, and the `wordlist_picker` / notes pane / credentials dialog. Exit path verified live
+(select service → HackTricks + EDB load, tool hints populate). Remaining before "done" per §23:
+run it on ≥3 real boxes.
+
+### Original plan
 
 - Three-pane layout: `service_tree.py`, `tool_panel.py`, `reference_pane.py`.
 - `wordlists.py` + `wordlist_picker.py` (favorites, recent; filters out `seclists/Passwords/`).

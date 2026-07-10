@@ -6,10 +6,13 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 1, chunk 6** — `wordlist_picker` widget + notes pane (`<profile>/notes.md`) +
-credentials dialog (writes `creds.json`). Chunk 6 finishes Phase 1; its exit check is
-"scan an easy box → services in tree → click a service → HackTricks + Exploit-DB load,
-tool hints populate" (chunks 4+5 already cover the click-to-load path).
+**Phase 2 — core service modules.** Phase 1 is feature-complete (all 6 chunks committed;
+exit path verified live). Phase 2 builds one service module per chunk in this order:
+`http` (granular controls + non-standard ports) → `vhost` → `smb` (tiered, §11) → `ftp` →
+`ssh` → `dns` → `ldap` → `smtp` → `nfs` → `snmp` → `tftp` → `netbios` → `ike` → `ntp`.
+Each ships: parser fixture + test, ≥3 pattern-library entries, `services.yaml` tools, a
+`manual_commands.yaml` (≥5 Tier-2 entries), and auto-walk where §12 permits. **Start with the
+`http` module** — show its wrapped commands before writing (all must be on the §2 allowlist).
 
 ## How to resume
 
@@ -20,7 +23,15 @@ tool hints populate" (chunks 4+5 already cover the click-to-load path).
 
 ## Log (newest first)
 
-### Phase 1 · chunk 5 — GUI references integration (this commit)
+### Phase 1 · chunk 6 — wordlist picker + notes + credentials (this commit) — Phase 1 COMPLETE
+- `wordlist_picker.py`: searchable/filterable list backed by `wordlists.py` (background indexing
+  thread), category filter, favorites pinned top; emits `wordlist_chosen`.
+- `notes_pane.py`: debounced-autosave editor for `<profile>/notes.md` (atomic write); flushes on
+  profile switch / save / close; wired as a bottom Notes dock (View menu toggle).
+- `AddCredentialDialog` (Edit menu) writes `creds.json` via `Profile.add_credential`;
+  "Browse Wordlists…" (View menu) opens the picker.
+
+### Phase 1 · chunk 5 — GUI references integration (58f08dd)
 - `reference_pane.py`: real `QWebEngineView` loading the matched HackTricks page on service
   selection (graceful fallback to a link label when QtWebEngine can't init / is disabled);
   Exploit-DB list filled from `searchsploit --json` off the UI thread, click → loads the EDB

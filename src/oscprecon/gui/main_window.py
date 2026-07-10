@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QDockWidget,
     QFileDialog,
     QFormLayout,
     QLabel,
@@ -23,10 +24,12 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import config, references, shell
+from oscprecon.gui.widgets.notes_pane import NotesPane
 from oscprecon.gui.widgets.reference_pane import ReferencePane
 from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.tool_panel import ToolPanel
-from oscprecon.models import DiscoveredService, Target
+from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
+from oscprecon.models import Credential, DiscoveredService, Target
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
 
@@ -57,6 +60,51 @@ class NewProfileDialog(QDialog):
 
     def values(self) -> tuple[str, str]:
         return self._name.text().strip(), self._ip.text().strip()
+
+
+class AddCredentialDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Add Credential")
+        self._username = QLineEdit()
+        self._secret = QLineEdit()
+        self._secret_type = QComboBox()
+        self._secret_type.addItems(["password", "hash", "key"])
+        self._domain = QLineEdit()
+        self._source = QLineEdit()
+        self._notes = QLineEdit()
+
+        form = QFormLayout()
+        form.addRow("Username:", self._username)
+        form.addRow("Secret:", self._secret)
+        form.addRow("Type:", self._secret_type)
+        form.addRow("Domain:", self._domain)
+        form.addRow("Source:", self._source)
+        form.addRow("Notes:", self._notes)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+
+    def credential(self) -> Credential | None:
+        username = self._username.text().strip()
+        secret = self._secret.text()
+        if not username or not secret:
+            return None
+        return Credential(
+            username=username,
+            secret=secret,
+            secret_type=self._secret_type.currentText(),
+            domain=self._domain.text().strip(),
+            source=self._source.text().strip() or "manual",
+            notes=self._notes.text().strip(),
+        )
 
 
 class NmapWorker(QThread):
@@ -161,6 +209,11 @@ class MainWindow(QMainWindow):
         splitter.setSizes([320, 520, 360])
         self.setCentralWidget(splitter)
 
+        self._notes_pane = NotesPane()
+        self._notes_dock = QDockWidget("Notes", self)
+        self._notes_dock.setWidget(self._notes_pane)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._notes_dock)
+
         self._build_menus()
         self._load_last_profile()
 
@@ -197,6 +250,17 @@ class MainWindow(QMainWindow):
         run_action.triggered.connect(self._on_run)
         scan_menu.addAction(run_action)
 
+        edit_menu = self.menuBar().addMenu("&Edit")
+        add_cred_action = QAction("Add Credential...", self)
+        add_cred_action.triggered.connect(self._on_add_credential)
+        edit_menu.addAction(add_cred_action)
+
+        view_menu = self.menuBar().addMenu("&View")
+        view_menu.addAction(self._notes_dock.toggleViewAction())
+        wordlists_action = QAction("Browse Wordlists...", self)
+        wordlists_action.triggered.connect(self._on_browse_wordlists)
+        view_menu.addAction(wordlists_action)
+
     def _rebuild_recent_menu(self) -> None:
         self._recent_menu.clear()
         recents = config.recent_profiles()
@@ -223,6 +287,7 @@ class MainWindow(QMainWindow):
         self._run_button.setEnabled(True)
         self._tool_panel.set_target(target.ip)
         self._service_tree.populate(profile.discovered_services)
+        self._notes_pane.set_profile(profile)
         config.add_recent(profile.directory)
         self._rebuild_recent_menu()
 
@@ -319,8 +384,31 @@ class MainWindow(QMainWindow):
 
     def _on_save(self) -> None:
         if self._profile is not None:
+            self._notes_pane.flush()
             self._profile.save()
             self._tool_panel.append_output("[saved]")
+
+    def _on_add_credential(self) -> None:
+        if self._profile is None:
+            QMessageBox.information(self, "No profile", "Open or create a profile first.")
+            return
+        dialog = AddCredentialDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        cred = dialog.credential()
+        if cred is None:
+            QMessageBox.warning(self, "Missing fields", "Username and secret are required.")
+            return
+        self._profile.add_credential(cred)
+        self._tool_panel.append_output(f"[cred] added {cred.username} (source: {cred.source})")
+
+    def _on_browse_wordlists(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Wordlists")
+        dialog.resize(640, 460)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(WordlistPicker())
+        dialog.exec()
 
     def _set_busy(self, busy: bool) -> None:
         # why: the worker thread mutates and saves the shared Profile; locking these entry points
@@ -335,6 +423,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:
         # why: destroying the window while the QThread runs aborts the process and can truncate
         # profile.json — wait for the in-flight run to finish first.
+        self._notes_pane.flush()
         if self._worker is not None and self._worker.isRunning():
             self._worker.wait()
         for edb_worker in list(self._edb_workers):
