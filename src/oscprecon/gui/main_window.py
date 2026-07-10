@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtWidgets import (
     QComboBox,
@@ -15,14 +16,17 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
-    QPlainTextEdit,
     QPushButton,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
 
-from oscprecon import config
-from oscprecon.models import Target
+from oscprecon import config, references, shell
+from oscprecon.gui.widgets.reference_pane import ReferencePane
+from oscprecon.gui.widgets.service_tree import ServiceTree
+from oscprecon.gui.widgets.tool_panel import ToolPanel
+from oscprecon.models import DiscoveredService, Target
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
 
@@ -75,31 +79,66 @@ class NmapWorker(QThread):
         self.done.emit(len(self._profile.discovered_services))
 
 
+class CommandWorker(QThread):
+    line = Signal(str)
+    done = Signal(int)
+    failed = Signal(str)
+
+    def __init__(self, shell_line: str, output_file: Path) -> None:
+        super().__init__()
+        self._shell_line = shell_line
+        self._output_file = output_file
+
+    def run(self) -> None:
+        try:
+            result = shell.run(self._shell_line, self._output_file, on_line=self.line.emit)
+        except Exception as exc:  # boundary: surface worker failures to the UI thread
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(result.exit_code)
+
+
+def _slug(command: str) -> str:
+    tokens = command.split()
+    base = tokens[0] if tokens else "command"
+    return re.sub(r"[^A-Za-z0-9._-]", "-", base) or "command"
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("oscp-recon")
-        self.resize(900, 600)
+        self.resize(1200, 720)
         self._profile: Profile | None = None
-        self._worker: NmapWorker | None = None
+        self._worker: QThread | None = None
         self._recent_menu: QMenu
         self._new_action: QAction
         self._open_action: QAction
         self._save_action: QAction
 
         self._target_label = QLabel("No profile loaded.")
-        self._run_button = QPushButton("Run nmap")
+        self._run_button = QPushButton("Run Full Recon")
         self._run_button.setEnabled(False)
         self._run_button.clicked.connect(self._on_run)
-        self._output = QPlainTextEdit()
-        self._output.setReadOnly(True)
 
-        central = QWidget()
-        layout = QVBoxLayout(central)
-        layout.addWidget(self._target_label)
-        layout.addWidget(self._run_button)
-        layout.addWidget(self._output)
-        self.setCentralWidget(central)
+        self._service_tree = ServiceTree()
+        self._service_tree.service_selected.connect(self._on_service_selected)
+        self._tool_panel = ToolPanel()
+        self._tool_panel.run_requested.connect(self._on_run_command)
+        self._reference_pane = ReferencePane()
+
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.addWidget(self._target_label)
+        left_layout.addWidget(self._run_button)
+        left_layout.addWidget(self._service_tree, stretch=1)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(left)
+        splitter.addWidget(self._tool_panel)
+        splitter.addWidget(self._reference_pane)
+        splitter.setSizes([320, 520, 360])
+        self.setCentralWidget(splitter)
 
         self._build_menus()
         self._load_last_profile()
@@ -132,6 +171,11 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
+        scan_menu = self.menuBar().addMenu("&Scan")
+        run_action = QAction("Run Full Recon", self)
+        run_action.triggered.connect(self._on_run)
+        scan_menu.addAction(run_action)
+
     def _rebuild_recent_menu(self) -> None:
         self._recent_menu.clear()
         recents = config.recent_profiles()
@@ -156,6 +200,8 @@ class MainWindow(QMainWindow):
         self._target_label.setText(label)
         self.setWindowTitle(f"oscp-recon — {profile.profile_name}")
         self._run_button.setEnabled(True)
+        self._tool_panel.set_target(target.ip)
+        self._service_tree.populate(profile.discovered_services)
         config.add_recent(profile.directory)
         self._rebuild_recent_menu()
 
@@ -173,11 +219,17 @@ class MainWindow(QMainWindow):
                 continue
             profile = self._safe_load(candidate)
             if profile is None:
-                self._output.appendPlainText(f"[skipped corrupt] {candidate}")
+                self._tool_panel.append_output(f"[skipped corrupt] {candidate}")
                 continue
             self._set_profile(profile)
-            self._output.appendPlainText(f"[restored] {candidate}")
+            self._tool_panel.append_output(f"[restored] {candidate}")
             return
+
+    def _on_service_selected(self, service: object) -> None:
+        selected = service if isinstance(service, DiscoveredService) else None
+        ref = references.match(selected) if selected is not None else None
+        self._tool_panel.show_service(selected, ref)
+        self._reference_pane.show_service(selected, ref)
 
     def _on_new(self) -> None:
         dialog = NewProfileDialog(self)
@@ -194,9 +246,9 @@ class MainWindow(QMainWindow):
         except ValueError as exc:
             QMessageBox.warning(self, "Invalid target", str(exc))
             return
-        self._output.clear()
+        self._tool_panel.clear_output()
         self._set_profile(profile)
-        self._output.appendPlainText(f"[created] {profile.directory}")
+        self._tool_panel.append_output(f"[created] {profile.directory}")
 
     def _on_open(self) -> None:
         chosen = QFileDialog.getExistingDirectory(
@@ -213,27 +265,28 @@ class MainWindow(QMainWindow):
         if profile is None:
             QMessageBox.warning(self, "Corrupt profile", f"{path}/profile.json could not be read.")
             return
-        self._output.clear()
+        self._tool_panel.clear_output()
         self._set_profile(profile)
-        self._output.appendPlainText(f"[opened] {path}")
+        self._tool_panel.append_output(f"[opened] {path}")
 
     def _on_save(self) -> None:
         if self._profile is not None:
             self._profile.save()
-            self._output.appendPlainText("[saved]")
+            self._tool_panel.append_output("[saved]")
 
     def _set_busy(self, busy: bool) -> None:
-        # why: the worker thread mutates and saves the shared Profile during a scan; locking
-        # these entry points prevents a concurrent save from racing profile.json.
+        # why: the worker thread mutates and saves the shared Profile; locking these entry points
+        # prevents a concurrent save from racing profile.json and a second overlapping run.
         self._new_action.setEnabled(not busy)
         self._open_action.setEnabled(not busy)
         self._save_action.setEnabled(not busy)
         self._recent_menu.setEnabled(not busy)
         self._run_button.setEnabled(not busy and self._profile is not None)
+        self._tool_panel.set_running(busy)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         # why: destroying the window while the QThread runs aborts the process and can truncate
-        # profile.json — wait for the in-flight scan to finish first.
+        # profile.json — wait for the in-flight run to finish first.
         if self._worker is not None and self._worker.isRunning():
             self._worker.wait()
         super().closeEvent(event)
@@ -242,20 +295,41 @@ class MainWindow(QMainWindow):
         if self._profile is None or self._worker is not None:
             return
         self._set_busy(True)
-        self._output.appendPlainText("[nmap] starting…")
+        self._tool_panel.append_output("[nmap] starting…")
         worker = NmapWorker(self._profile)
-        worker.line.connect(self._output.appendPlainText)
-        worker.done.connect(self._on_run_done)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_scan_done)
         worker.failed.connect(self._on_run_failed)
         self._worker = worker
         worker.start()
 
-    def _on_run_done(self, count: int) -> None:
-        self._output.appendPlainText(f"[nmap] done — {count} services")
+    def _on_run_command(self, command: str) -> None:
+        if self._profile is None or self._worker is not None:
+            return
+        output_file = self._profile.directory / "manual" / f"{_slug(command)}.txt"
+        with (self._profile.directory / "manual" / "commands.txt").open(
+            "a", encoding="utf-8"
+        ) as history:
+            history.write(command + "\n")
+        self._set_busy(True)
+        self._tool_panel.append_output(f"$ {command}")
+        worker = CommandWorker(command, output_file)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_command_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _on_scan_done(self, count: int) -> None:
+        self._tool_panel.append_output(f"[nmap] done — {count} services")
+        self._finish_worker()
+
+    def _on_command_done(self, exit_code: int) -> None:
+        self._tool_panel.append_output(f"[done] exit={exit_code}")
         self._finish_worker()
 
     def _on_run_failed(self, message: str) -> None:
-        self._output.appendPlainText(f"[error] {message}")
+        self._tool_panel.append_output(f"[error] {message}")
         self._finish_worker()
 
     def _finish_worker(self) -> None:

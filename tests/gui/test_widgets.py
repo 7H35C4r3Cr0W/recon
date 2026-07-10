@@ -1,0 +1,88 @@
+from pathlib import Path
+
+from pytestqt.qtbot import QtBot
+
+from oscprecon import references
+from oscprecon.gui.main_window import MainWindow, _slug
+from oscprecon.gui.widgets.reference_pane import ReferencePane
+from oscprecon.gui.widgets.service_tree import ServiceTree
+from oscprecon.gui.widgets.tool_panel import ToolPanel
+from oscprecon.models import DiscoveredService, Proto, Target
+from oscprecon.profile import Profile
+
+
+def _services() -> list[DiscoveredService]:
+    return [
+        DiscoveredService(22, Proto.TCP, "ssh", "OpenSSH", "8.4"),
+        DiscoveredService(445, Proto.TCP, "microsoft-ds", "Samba", "4.6"),
+        DiscoveredService(161, Proto.UDP, "snmp"),
+    ]
+
+
+def test_service_tree_groups_and_emits(qtbot: QtBot) -> None:
+    tree = ServiceTree()
+    qtbot.addWidget(tree)
+    tree.populate(_services())
+    assert tree.topLevelItemCount() == 2  # TCP group + UDP group
+    tcp_group = tree.topLevelItem(0)
+    assert tcp_group is not None and tcp_group.childCount() == 2
+    with qtbot.waitSignal(tree.service_selected, timeout=1000) as blocker:
+        tree.setCurrentItem(tcp_group.child(0))
+    assert isinstance(blocker.args[0], DiscoveredService)
+    assert blocker.args[0].port == 22
+
+
+def test_tool_panel_populates_hints_and_expands(qtbot: QtBot) -> None:
+    panel = ToolPanel()
+    qtbot.addWidget(panel)
+    panel.set_target("10.10.10.5")
+    svc = DiscoveredService(445, Proto.TCP, "microsoft-ds")
+    panel.show_service(svc, references.match(svc))
+    assert panel._hints.count() >= 1
+    panel._on_hint_activated(panel._hints.item(0))
+    assert "10.10.10.5" in panel._command.text()
+
+
+def test_tool_panel_emits_run_requested(qtbot: QtBot) -> None:
+    panel = ToolPanel()
+    qtbot.addWidget(panel)
+    panel._command.setText("nmap -p 80 10.10.10.5")
+    with qtbot.waitSignal(panel.run_requested, timeout=1000) as blocker:
+        panel._emit_run()
+    assert blocker.args[0] == "nmap -p 80 10.10.10.5"
+
+
+def test_tool_panel_ignores_empty_run(qtbot: QtBot) -> None:
+    panel = ToolPanel()
+    qtbot.addWidget(panel)
+    panel._command.setText("   ")
+    with qtbot.assertNotEmitted(panel.run_requested):
+        panel._emit_run()
+
+
+def test_reference_pane_shows_hacktricks(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    svc = DiscoveredService(445, Proto.TCP, "microsoft-ds")
+    pane.show_service(svc, references.match(svc))
+    assert "pentesting-smb" in pane._link.text()
+
+
+def test_main_window_selection_updates_panes(qtbot: QtBot, tmp_path: Path) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(tmp_path, "htb-test", Target(ip="10.10.10.100"))
+    prof.set_services(_services())
+    window._set_profile(prof)
+    assert window._service_tree.topLevelItemCount() == 2
+    tcp = window._service_tree.topLevelItem(0)
+    assert tcp is not None
+    window._service_tree.setCurrentItem(tcp.child(1))  # 445 (sorted 22, 445)
+    assert "445" in window._reference_pane._label.text()
+    assert window._tool_panel._hints.count() >= 1
+
+
+def test_slug() -> None:
+    assert _slug("nmap -p 80 x") == "nmap"
+    assert _slug("smbclient -L //x/") == "smbclient"
+    assert _slug("") == "command"
