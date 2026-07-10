@@ -284,14 +284,17 @@
 - { match: { service_name: "ssl/https-alt" }, label: HTTPS, module: http, hacktricks: *web }
 
 # --- Product-specific overrides ---
+# Order matters: on an equal-specificity tie the first match wins, so list SPECIFIC apps
+# (Tomcat, Jenkins, ...) before the generic servers (Apache, nginx) — e.g. "Apache Tomcat"
+# should resolve to Tomcat, not the generic Apache label.
 - { match: { product_contains: OpenSSH },  label: OpenSSH, module: ssh,  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ssh.html }
 - { match: { product_contains: vsftpd },   label: vsftpd,  module: ftp,  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ftp/index.html }
 - { match: { product_contains: ProFTPD },  label: ProFTPD, module: ftp,  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ftp/index.html }
-- { match: { product_contains: Apache },   label: Apache httpd, module: http, hacktricks: *web }
-- { match: { product_contains: nginx },    label: nginx,   module: http, hacktricks: *web }
-- { match: { product_contains: "Microsoft IIS" }, label: IIS, module: http, hacktricks: *web }
 - { match: { product_contains: Tomcat },   label: Apache Tomcat, module: http, hacktricks: *web }
 - { match: { product_contains: Jenkins },  label: Jenkins, module: http, hacktricks: *web }
 - { match: { product_contains: WordPress }, label: WordPress, module: http, hacktricks: *web }
 - { match: { product_contains: Joomla },   label: Joomla,  module: http, hacktricks: *web }
 - { match: { product_contains: Drupal },   label: Drupal,  module: http, hacktricks: *web }
+- { match: { product_contains: "Microsoft IIS" }, label: IIS, module: http, hacktricks: *web }
+- { match: { product_contains: Apache },   label: Apache httpd, module: http, hacktricks: *web }
+- { match: { product_contains: nginx },    label: nginx,   module: http, hacktricks: *web }

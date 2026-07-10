@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -76,11 +77,25 @@ class WordlistPicker(QWidget):
         self.reindex()
 
     def reindex(self) -> None:
+        if self._worker is not None and self._worker.isRunning():
+            return  # already indexing — don't orphan the running thread by overwriting the slot
         self._status.setText("indexing…")
         worker = _IndexWorker(self._paths)
         worker.ready.connect(self._on_indexed)
         self._worker = worker
         worker.start()
+
+    def shutdown(self) -> None:
+        # why: the index worker walks the whole wordlist corpus and is often still running when the
+        # dialog closes — wait for it so the QThread is never destroyed while running (SIGABRT).
+        worker = self._worker
+        if worker is not None and worker.isRunning():
+            worker.wait()
+        self._worker = None
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self.shutdown()
+        super().closeEvent(event)
 
     def selected_path(self) -> str | None:
         item = self._list.currentItem()

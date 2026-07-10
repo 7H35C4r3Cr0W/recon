@@ -117,3 +117,19 @@ def test_slug() -> None:
     assert _slug("nmap -p 80 x") == "nmap"
     assert _slug("smbclient -L //x/") == "smbclient"
     assert _slug("") == "command"
+
+
+def test_page_visit_buffered_during_scan(qtbot: QtBot, tmp_path: Path) -> None:
+    from PySide6.QtCore import QThread
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(tmp_path, "buf", Target(ip="10.0.0.1"))
+    window._set_profile(prof)
+    window._worker = QThread()  # simulate a scan in progress
+    window._on_page_visited("smb", "https://book.hacktricks.wiki/smb")
+    assert prof.references_visited == []  # buffered, not recorded yet
+    assert window._pending_visits == [("smb", "https://book.hacktricks.wiki/smb")]
+    window._finish_worker()  # joins the (unstarted) worker and drains the buffer
+    assert any(v["url"] == "https://book.hacktricks.wiki/smb" for v in prof.references_visited)
+    assert window._pending_visits == []

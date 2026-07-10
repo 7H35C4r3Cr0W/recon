@@ -23,7 +23,19 @@ Each ships: parser fixture + test, ≥3 pattern-library entries, `services.yaml`
 
 ## Log (newest first)
 
-### Phase 1 · chunk 6 — wordlist picker + notes + credentials (this commit) — Phase 1 COMPLETE
+### Phase 1 · adversarial review + hardening (this commit)
+Ran a 3-lens review of the Phase 1 additions; fixed all 15 findings (+9 regression tests → 63):
+- **§2 password-list leak (high):** `wordlists.py` now uses an AFFIRMATIVE category allowlist
+  (only web-content/dns/usernames/fuzzing/discovery surfaced) + expanded denylist — `fasttrack.txt`
+  / `wifite.txt` no longer leak from `/usr/share/wordlists` (verified live: 0 leaks).
+- **searchsploit flag injection (high):** strip leading `-` from query tokens + block
+  `-m/-x/-u` at the exec chokepoint (a hostile banner can't turn lookup into PoC copy/update).
+- **`_IndexWorker` SIGABRT (high):** `WordlistPicker.shutdown()` waits the worker before teardown.
+- creds temp file created 0600 (not umask); `Profile.load` recreates service dirs; manual output
+  files hash-suffixed; scan-time ref-visits buffered+drained; secret field masked; matcher
+  tie-break; `load_rules` degrades on bad YAML; line-count off-by-one; skip huge-file counting.
+
+### Phase 1 · chunk 6 — wordlist picker + notes + credentials (b7d97c3) — Phase 1 COMPLETE
 - `wordlist_picker.py`: searchable/filterable list backed by `wordlists.py` (background indexing
   thread), category filter, favorites pinned top; emits `wordlist_chosen`.
 - `notes_pane.py`: debounced-autosave editor for `<profile>/notes.md` (atomic write); flushes on

@@ -30,3 +30,11 @@ def test_run_refuses_forbidden_without_executing(tmp_path: Path) -> None:
     assert result.blocked is not None
     assert result.exit_code == 126
     assert "[blocked]" in out.read_text(encoding="utf-8")
+
+
+def test_blocks_searchsploit_non_display_flags() -> None:
+    assert shell.policy_violation(["searchsploit", "--json", "-m", "47080"]) is not None
+    assert shell.policy_violation(["searchsploit", "--json", "-u"]) is not None
+    assert shell.policy_violation(["searchsploit", "--json", "-x", "47080"]) is not None
+    # a plain display lookup is allowed
+    assert shell.policy_violation(["searchsploit", "--json", "nginx", "1.18"]) is None

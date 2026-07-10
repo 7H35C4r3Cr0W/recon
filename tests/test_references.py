@@ -87,3 +87,26 @@ def test_safe_query_strips_shell_hostile_chars() -> None:
         "OpenSSH 8.4p1 Debian protocol 2.0"
     )
     assert references._safe_query("", "") == ""
+
+
+def test_safe_query_strips_leading_dash_flags() -> None:
+    # a hostile nmap banner must not inject searchsploit flags via a leading dash
+    assert references._safe_query("-m", "47080") == "m 47080"
+    assert references._safe_query("Apache", "-u") == "Apache u"
+    assert not any(tok.startswith("-") for tok in references._safe_query("--json", "x").split())
+
+
+def test_match_tiebreak_prefers_specific_product() -> None:
+    svc = _svc(18080, Proto.TCP, "http", "Apache Tomcat", "9.0.30")
+    ref = references.match(svc)
+    assert ref is not None
+    assert ref.label == "Apache Tomcat"  # not the generic "Apache httpd"
+
+
+def test_load_rules_degrades_on_malformed_yaml(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("key: [unterminated\n:::\n", encoding="utf-8")
+    assert references.load_rules(bad) == []
+    nonlist = tmp_path / "nl.yaml"
+    nonlist.write_text("just a string", encoding="utf-8")
+    assert references.load_rules(nonlist) == []

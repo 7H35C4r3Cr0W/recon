@@ -63,3 +63,36 @@ def test_favorites_roundtrip() -> None:
     assert wordlists.favorites().count(target) == 1
     wordlists.remove_favorite(target)
     assert not wordlists.is_favorite(target)
+
+
+def test_uncategorized_files_are_withheld(tmp_path: Path) -> None:
+    # affirmative allowlist: recon-looking-but-uncategorized files are NOT surfaced
+    (tmp_path / "Web-Content").mkdir()
+    (tmp_path / "Web-Content" / "common.txt").write_text("a\n")
+    (tmp_path / "fasttrack.txt").write_text("Spring2017\n")  # a real Kali password list
+    (tmp_path / "random-list.txt").write_text("x\n")  # uncategorized, not denylisted
+    names = {w.name for w in wordlists.index_wordlists([tmp_path])}
+    assert "common.txt" in names
+    assert "fasttrack.txt" not in names
+    assert "random-list.txt" not in names
+
+
+def test_count_lines_without_trailing_newline(tmp_path: Path) -> None:
+    web = tmp_path / "Web-Content"
+    web.mkdir()
+    (web / "a.txt").write_text("www\nmail\nftp")  # 3 entries, no trailing newline
+    (web / "b.txt").write_text("single")  # 1 entry, no newline
+    by_name = {w.name: w for w in wordlists.index_wordlists([tmp_path])}
+    assert by_name["a.txt"].line_count == 3
+    assert by_name["b.txt"].line_count == 1
+
+
+def test_default_wordlists_have_no_password_leak() -> None:
+    # regression: the review found fasttrack.txt / wifite.txt leaking from /usr/share/wordlists
+    root = Path("/usr/share/wordlists")
+    if not root.exists():
+        return
+    for wordlist in wordlists.index_wordlists([root]):
+        resolved = str(wordlist.path.resolve()).lower()
+        for banned in ("password", "fasttrack", "wifite", "rockyou", "probable"):
+            assert banned not in resolved, f"password list leaked: {wordlist.path}"

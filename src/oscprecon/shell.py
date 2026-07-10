@@ -64,6 +64,11 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
 # here: RID cycling is recon (§11), so the check is precise, not a blanket 'brute' match.
 _FORBIDDEN_FLAGS: frozenset[str] = frozenset({"--continue-on-success", "--passwords"})
 
+# why: searchsploit is display-only (§14) — these flags copy/open/update a PoC, not display it.
+_SEARCHSPLOIT_FORBIDDEN: frozenset[str] = frozenset(
+    {"-m", "--mirror", "-x", "--examine", "-u", "--update"}
+)
+
 _INSTALL_HINTS: dict[str, str] = {
     "nmap": "apt install nmap",
     "feroxbuster": "apt install feroxbuster",
@@ -111,6 +116,10 @@ def policy_violation(argv: list[str]) -> str | None:
         for value in _script_values(argv):
             if "brute" in value.lower():
                 return f"nmap --script {value} is credential brute force (forbidden)"
+    if tool == "searchsploit":
+        for token in argv[1:]:
+            if token in _SEARCHSPLOIT_FORBIDDEN:
+                return f"searchsploit {token} is not display-only (forbidden)"
     return None
 
 

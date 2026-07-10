@@ -37,6 +37,12 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _ensure_service_dirs(directory: Path) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    for sub in SERVICE_DIRS:
+        (directory / sub).mkdir(exist_ok=True)
+
+
 def _target_to_dict(target: Target) -> dict[str, str | None]:
     return {
         "ip": target.ip,
@@ -105,9 +111,7 @@ class Profile:
     @classmethod
     def create(cls, workspace_root: Path, name: str, target: Target) -> Profile:
         directory = Path(workspace_root) / name
-        directory.mkdir(parents=True, exist_ok=True)
-        for sub in SERVICE_DIRS:
-            (directory / sub).mkdir(exist_ok=True)
+        _ensure_service_dirs(directory)
         now = _now_iso()
         profile = cls(
             directory=directory,
@@ -123,6 +127,7 @@ class Profile:
     @classmethod
     def load(cls, directory: Path) -> Profile:
         directory = Path(directory)
+        _ensure_service_dirs(directory)
         raw: dict[str, Any] = json.loads((directory / "profile.json").read_text(encoding="utf-8"))
         return cls(
             directory=directory,

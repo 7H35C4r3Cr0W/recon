@@ -61,11 +61,16 @@ def save_creds(path: Path, credentials: list[Credential]) -> None:
         "schema_version": SCHEMA_VERSION,
         "entries": [_to_dict(cred) for cred in credentials],
     }
-    # why: secrets on disk are chmod 600 and written atomically (temp + replace) so a reader
-    # never sees a half-written file and the mode is set before the file becomes visible.
+    data = json.dumps(payload, indent=2).encode("utf-8")
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.chmod(tmp, 0o600)
+    # why: the TEMP file holds the plaintext secret first — create/force it 0600 before writing
+    # (not at the process umask, which is often world/group-readable), then atomically replace.
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        os.write(fd, data)
+    finally:
+        os.close(fd)
     tmp.replace(path)
 
 

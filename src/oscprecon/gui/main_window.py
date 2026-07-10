@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -68,6 +69,7 @@ class AddCredentialDialog(QDialog):
         self.setWindowTitle("Add Credential")
         self._username = QLineEdit()
         self._secret = QLineEdit()
+        self._secret.setEchoMode(QLineEdit.EchoMode.Password)
         self._secret_type = QComboBox()
         self._secret_type.addItems(["password", "hash", "key"])
         self._domain = QLineEdit()
@@ -195,6 +197,7 @@ class MainWindow(QMainWindow):
         self._reference_pane.page_visited.connect(self._on_page_visited)
         self._edb_request_id = 0
         self._edb_workers: set[QThread] = set()
+        self._pending_visits: list[tuple[str, str]] = []
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
@@ -339,10 +342,15 @@ class MainWindow(QMainWindow):
             self._reference_pane.show_exploits(hits)
 
     def _on_page_visited(self, label: str, url: str) -> None:
-        # why: only persist when idle — a save here during a scan would race the worker's save.
-        if self._profile is not None and self._worker is None:
-            self._profile.add_reference_visited(label, url)
-            self._profile.save()
+        if self._profile is None:
+            return
+        if self._worker is not None:
+            # why: a worker is saving profile.json on its thread — buffer the visit and persist it
+            # in _finish_worker rather than dropping it or racing the save.
+            self._pending_visits.append((label, url))
+            return
+        self._profile.add_reference_visited(label, url)
+        self._profile.save()
 
     def _on_new(self) -> None:
         dialog = NewProfileDialog(self)
@@ -406,9 +414,13 @@ class MainWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Wordlists")
         dialog.resize(640, 460)
+        picker = WordlistPicker()
         layout = QVBoxLayout(dialog)
-        layout.addWidget(WordlistPicker())
-        dialog.exec()
+        layout.addWidget(picker)
+        try:
+            dialog.exec()
+        finally:
+            picker.shutdown()  # wait the index worker before the widget is destroyed
 
     def _set_busy(self, busy: bool) -> None:
         # why: the worker thread mutates and saves the shared Profile; locking these entry points
@@ -446,10 +458,11 @@ class MainWindow(QMainWindow):
     def _on_run_command(self, command: str) -> None:
         if self._profile is None or self._worker is not None:
             return
-        output_file = self._profile.directory / "manual" / f"{_slug(command)}.txt"
-        with (self._profile.directory / "manual" / "commands.txt").open(
-            "a", encoding="utf-8"
-        ) as history:
+        manual_dir = self._profile.directory / "manual"
+        manual_dir.mkdir(parents=True, exist_ok=True)
+        digest = hashlib.sha1(command.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
+        output_file = manual_dir / f"{_slug(command)}-{digest}.txt"
+        with (manual_dir / "commands.txt").open("a", encoding="utf-8") as history:
             history.write(command + "\n")
         self._set_busy(True)
         self._tool_panel.append_output(f"$ {command}")
@@ -477,5 +490,10 @@ class MainWindow(QMainWindow):
             self._worker.wait()
             self._worker = None
         if self._profile is not None:
+            if self._pending_visits:
+                for label, url in self._pending_visits:
+                    self._profile.add_reference_visited(label, url)
+                self._pending_visits.clear()
+                self._profile.save()
             self._set_profile(self._profile)
         self._set_busy(False)

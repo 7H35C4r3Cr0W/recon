@@ -93,7 +93,10 @@ def _opt_str(mapping: dict[str, Any], key: str) -> str | None:
 
 def load_rules(path: Path | None = None) -> list[MatchRule]:
     source = path if path is not None else _SERVICES_YAML
-    data = yaml.safe_load(source.read_text(encoding="utf-8"))
+    try:
+        data = yaml.safe_load(source.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return []  # a corrupt services.yaml degrades to no matches, never an exception
     rules: list[MatchRule] = []
     if not isinstance(data, list):
         return rules
@@ -103,14 +106,17 @@ def load_rules(path: Path | None = None) -> list[MatchRule]:
         match_keys = entry.get("match")
         if not isinstance(match_keys, dict):
             match_keys = {}
-        port = match_keys.get("port")
+        try:
+            port = int(match_keys["port"]) if match_keys.get("port") is not None else None
+        except (TypeError, ValueError):
+            continue  # skip a rule with a non-integer port rather than aborting the load
         rules.append(
             MatchRule(
                 label=str(entry.get("label", "")),
                 hacktricks=str(entry.get("hacktricks", HACKTRICKS_BASE)),
                 module=str(entry.get("module", "")),
                 tools=_tool_hints(entry.get("tools")),
-                port=int(port) if port is not None else None,
+                port=port,
                 proto=_opt_str(match_keys, "proto"),
                 product_contains=_opt_str(match_keys, "product_contains"),
                 service_name=_opt_str(match_keys, "service_name"),
@@ -119,13 +125,18 @@ def load_rules(path: Path | None = None) -> list[MatchRule]:
     return rules
 
 
+def _rank(rule: MatchRule) -> tuple[int, int]:
+    # tie-break equal specificity by the longer product_contains (the more specific substring)
+    return (rule.specificity, len(rule.product_contains or ""))
+
+
 def match(service: DiscoveredService, rules: list[MatchRule] | None = None) -> ServiceRef | None:
     ruleset = rules if rules is not None else load_rules()
     best: MatchRule | None = None
     for rule in ruleset:
         if not rule.matches(service):
             continue
-        if best is None or rule.specificity > best.specificity:
+        if best is None or _rank(rule) > _rank(best):
             best = rule
     if best is None:
         return None
@@ -187,7 +198,10 @@ def parse_searchsploit_json(text: str) -> list[ExploitHit]:
 
 
 def _safe_query(product: str, version: str) -> str:
-    return " ".join(_SAFE_QUERY.sub(" ", f"{product} {version}").split())
+    cleaned = _SAFE_QUERY.sub(" ", f"{product} {version}")
+    # why: a token starting with '-' becomes a searchsploit FLAG after shlex.split — a hostile
+    # banner 'product=-m 47080' would run `searchsploit -m` (copies a PoC). Strip leading dashes.
+    return " ".join(t.lstrip("-") for t in cleaned.split() if t.lstrip("-"))
 
 
 def search_exploits(product: str, version: str, output_file: Path) -> list[ExploitHit]:

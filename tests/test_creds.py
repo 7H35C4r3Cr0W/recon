@@ -60,3 +60,15 @@ def test_profile_credentials_and_references(tmp_path: Path) -> None:
     assert len(reloaded.references_visited) == 1
     assert reloaded.references_visited[0]["service"] == "smb"
     assert reloaded.references_visited[0]["url"] == url
+
+
+def test_save_forces_0600_even_with_stale_tmp(tmp_path: Path) -> None:
+    import os
+
+    path = tmp_path / "creds.json"
+    stale = tmp_path / "creds.json.tmp"
+    stale.write_text("stale", encoding="utf-8")
+    os.chmod(stale, 0o666)  # simulate a leftover world-readable temp
+    creds.save_creds(path, [Credential(username="u", secret="s")])
+    assert _mode(path) == "0o600"
+    assert not stale.exists()  # temp was atomically moved into place
