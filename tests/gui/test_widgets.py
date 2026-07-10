@@ -9,6 +9,7 @@ from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
+from oscprecon.references import ExploitHit
 
 
 def _services() -> list[DiscoveredService]:
@@ -80,6 +81,36 @@ def test_main_window_selection_updates_panes(qtbot: QtBot, tmp_path: Path) -> No
     window._service_tree.setCurrentItem(tcp.child(1))  # 445 (sorted 22, 445)
     assert "445" in window._reference_pane._label.text()
     assert window._tool_panel._hints.count() >= 1
+
+
+def test_reference_pane_emits_page_visited(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    svc = DiscoveredService(445, Proto.TCP, "microsoft-ds", "Samba", "4.6")
+    with qtbot.waitSignal(pane.page_visited, timeout=1000) as blocker:
+        pane.show_service(svc, references.match(svc))
+    assert blocker.args[1].startswith("https://book.hacktricks.wiki/")
+
+
+def test_reference_pane_show_exploits(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_exploits(
+        [ExploitHit("50973", "nginx DoS", "https://www.exploit-db.com/exploits/50973", "")]
+    )
+    assert pane._exploits.count() == 1
+    assert "50973" in pane._exploits.item(0).text()
+
+
+def test_main_window_edb_stale_result_ignored(qtbot: QtBot) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window._edb_request_id = 5
+    hit = ExploitHit("1", "title", "https://www.exploit-db.com/exploits/1", "")
+    window._on_edb_done([hit], 4)  # stale id -> ignored
+    assert window._reference_pane._exploits.count() == 0
+    window._on_edb_done([hit], 5)  # current id -> shown
+    assert window._reference_pane._exploits.count() == 1
 
 
 def test_slug() -> None:

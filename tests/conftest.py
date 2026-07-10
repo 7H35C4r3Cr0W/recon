@@ -4,6 +4,8 @@ from pathlib import Path
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# why: force the reference pane's link-label fallback so tests never spin up Chromium/QtWebEngine.
+os.environ.setdefault("OSCPRECON_DISABLE_WEBVIEW", "1")
 
 
 @pytest.fixture(autouse=True)

@@ -98,6 +98,24 @@ class CommandWorker(QThread):
         self.done.emit(result.exit_code)
 
 
+class SearchsploitWorker(QThread):
+    done = Signal(object, int)  # (list[ExploitHit], request_id)
+
+    def __init__(self, product: str, version: str, output_file: Path, request_id: int) -> None:
+        super().__init__()
+        self._product = product
+        self._version = version
+        self._output_file = output_file
+        self._request_id = request_id
+
+    def run(self) -> None:
+        try:
+            hits = references.search_exploits(self._product, self._version, self._output_file)
+        except Exception:  # boundary: never let an EDB lookup crash the worker
+            hits = []
+        self.done.emit(hits, self._request_id)
+
+
 def _slug(command: str) -> str:
     tokens = command.split()
     base = tokens[0] if tokens else "command"
@@ -126,6 +144,9 @@ class MainWindow(QMainWindow):
         self._tool_panel = ToolPanel()
         self._tool_panel.run_requested.connect(self._on_run_command)
         self._reference_pane = ReferencePane()
+        self._reference_pane.page_visited.connect(self._on_page_visited)
+        self._edb_request_id = 0
+        self._edb_workers: set[QThread] = set()
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
@@ -230,6 +251,33 @@ class MainWindow(QMainWindow):
         ref = references.match(selected) if selected is not None else None
         self._tool_panel.show_service(selected, ref)
         self._reference_pane.show_service(selected, ref)
+        self._edb_request_id += 1
+        if selected is None or not selected.product or self._profile is None:
+            return
+        output_file = (
+            self._profile.directory
+            / "references"
+            / f"edb-{selected.port}-{selected.proto.value}.json"
+        )
+        worker = SearchsploitWorker(
+            selected.product, selected.version, output_file, self._edb_request_id
+        )
+        worker.done.connect(self._on_edb_done)
+        worker.finished.connect(lambda w=worker: self._edb_workers.discard(w))
+        self._edb_workers.add(worker)
+        worker.start()
+
+    def _on_edb_done(self, hits: object, request_id: int) -> None:
+        if request_id != self._edb_request_id:
+            return  # a newer selection superseded this lookup
+        if isinstance(hits, list):
+            self._reference_pane.show_exploits(hits)
+
+    def _on_page_visited(self, label: str, url: str) -> None:
+        # why: only persist when idle — a save here during a scan would race the worker's save.
+        if self._profile is not None and self._worker is None:
+            self._profile.add_reference_visited(label, url)
+            self._profile.save()
 
     def _on_new(self) -> None:
         dialog = NewProfileDialog(self)
@@ -289,6 +337,9 @@ class MainWindow(QMainWindow):
         # profile.json — wait for the in-flight run to finish first.
         if self._worker is not None and self._worker.isRunning():
             self._worker.wait()
+        for edb_worker in list(self._edb_workers):
+            if edb_worker.isRunning():
+                edb_worker.wait()
         super().closeEvent(event)
 
     def _on_run(self) -> None:
