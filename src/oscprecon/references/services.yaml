@@ -1,0 +1,297 @@
+# Service -> HackTricks reference + per-port tool hints (CLAUDE.md §14).
+# Match keys: port, proto (tcp|udp), product_contains, service_name.
+# Most specific match wins: port+proto+product > port+proto > port > product > service_name.
+# Tool `name` templates use {target} {port} {proto} {domain} {share}; they are pre-filled into
+# the command builder, never auto-run. Every command below is on the §2 Allowed list.
+# HackTricks base: https://book.hacktricks.wiki/en/network-services-pentesting/
+
+- match: { port: 21, proto: tcp }
+  label: FTP
+  module: ftp
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ftp/index.html
+  tools:
+    - { name: "nmap --script ftp-anon -p {port} {target}", purpose: "check anonymous FTP access" }
+    - { name: "curl -s ftp://{target}/", purpose: "list root over anonymous FTP" }
+
+- match: { port: 22, proto: tcp }
+  label: SSH
+  module: ssh
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ssh.html
+  tools:
+    - { name: "nmap --script ssh2-enum-algos,ssh-hostkey -p {port} {target}", purpose: "algorithms + host keys" }
+
+- match: { port: 23, proto: tcp }
+  label: Telnet
+  module: telnet
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-telnet.html
+
+- match: { port: 25, proto: tcp }
+  label: SMTP
+  module: smtp
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smtp/index.html
+  tools:
+    - { name: "nmap --script smtp-commands,smtp-open-relay -p {port} {target}", purpose: "banner, verbs, open-relay" }
+
+- match: { port: 53, proto: tcp }
+  label: DNS
+  module: dns
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-dns.html
+  tools:
+    - { name: "dig any {domain} @{target}", purpose: "records for the domain" }
+    - { name: "dig axfr {domain} @{target}", purpose: "attempt zone transfer" }
+
+- match: { port: 69, proto: udp }
+  label: TFTP
+  module: tftp
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/tftp.html
+
+- match: { port: 79, proto: tcp }
+  label: Finger
+  module: finger
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-finger.html
+
+- match: { port: 88, proto: tcp }
+  label: Kerberos
+  module: kerberos
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-kerberos-88/index.html
+
+- match: { port: 110, proto: tcp }
+  label: POP3
+  module: pop3
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-pop.html
+
+- match: { port: 111, proto: tcp }
+  label: rpcbind
+  module: rpcbind
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-rpcbind.html
+  tools:
+    - { name: "rpcinfo {target}", purpose: "list RPC programs" }
+    - { name: "showmount -e {target}", purpose: "NFS exports (if present)" }
+
+- match: { port: 123, proto: udp }
+  label: NTP
+  module: ntp
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ntp.html
+  tools:
+    - { name: "ntpq -c readlist {target}", purpose: "server variables" }
+
+- match: { port: 135, proto: tcp }
+  label: MSRPC
+  module: msrpc
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/135-pentesting-msrpc.html
+
+- match: { port: 137, proto: udp }
+  label: NetBIOS-NS
+  module: netbios
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/137-138-139-pentesting-netbios.html
+  tools:
+    - { name: "nmblookup -A {target}", purpose: "NetBIOS name table" }
+    - { name: "nbtscan {target}", purpose: "NetBIOS scan" }
+
+- match: { port: 139, proto: tcp }
+  label: SMB (NetBIOS)
+  module: smb
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smb/index.html
+  tools:
+    - { name: "smbclient -L //{target}/ -N", purpose: "list shares via null session" }
+    - { name: "enum4linux-ng -A {target}", purpose: "broad anonymous enumeration" }
+
+- match: { port: 143, proto: tcp }
+  label: IMAP
+  module: imap
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-imap.html
+
+- match: { port: 161, proto: udp }
+  label: SNMP
+  module: snmp
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-snmp/index.html
+  tools:
+    - { name: "onesixtyone {target}", purpose: "probe common community strings" }
+    - { name: "snmpwalk -v2c -c public {target}", purpose: "walk the MIB (community 'public')" }
+
+- match: { port: 389, proto: tcp }
+  label: LDAP
+  module: ldap
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ldap.html
+  tools:
+    - { name: "ldapsearch -x -H ldap://{target} -s base", purpose: "root DSE / naming contexts" }
+
+- match: { port: 443, proto: tcp }
+  label: HTTPS
+  module: http
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-web/index.html
+  tools:
+    - { name: "whatweb https://{target}:{port}", purpose: "fingerprint stack" }
+    - { name: "curl -skI https://{target}:{port}/", purpose: "response headers" }
+
+- match: { port: 445, proto: tcp }
+  label: SMB
+  module: smb
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smb/index.html
+  tools:
+    - { name: "smbclient -L //{target}/ -N", purpose: "list shares via null session" }
+    - { name: "netexec smb {target} -u '' -p '' --shares", purpose: "shares + perms via null session" }
+    - { name: "enum4linux-ng -A {target}", purpose: "broad anonymous enumeration" }
+
+- match: { port: 464, proto: tcp }
+  label: kpasswd
+  module: kerberos
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-kerberos-88/index.html
+
+- match: { port: 500, proto: udp }
+  label: IKE/IPsec
+  module: ike
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/ipsec-ike-vpn-pentesting.html
+  tools:
+    - { name: "ike-scan {target}", purpose: "IKE handshake fingerprint" }
+
+- match: { port: 593, proto: tcp }
+  label: RPC-over-HTTP
+  module: msrpc
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/135-pentesting-msrpc.html
+
+- match: { port: 623, proto: udp }
+  label: IPMI
+  module: ipmi
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+
+- match: { port: 636, proto: tcp }
+  label: LDAPS
+  module: ldap
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ldap.html
+
+- match: { port: 873, proto: tcp }
+  label: rsync
+  module: rsync
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+  tools:
+    - { name: "rsync -av --list-only rsync://{target}/", purpose: "list rsync modules" }
+
+- match: { port: 1194, proto: udp }
+  label: OpenVPN
+  module: openvpn
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+
+- match: { port: 1433, proto: tcp }
+  label: MSSQL
+  module: mssql
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mssql-microsoft-sql-server/index.html
+  tools:
+    - { name: "nmap --script ms-sql-info,ms-sql-ntlm-info -p {port} {target}", purpose: "instance + NTLM info" }
+
+- match: { port: 1900, proto: udp }
+  label: SSDP/UPnP
+  module: upnp
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+
+- match: { port: 2049, proto: tcp }
+  label: NFS
+  module: nfs
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/nfs-service-pentesting.html
+  tools:
+    - { name: "showmount -e {target}", purpose: "list NFS exports" }
+
+- match: { port: 3268, proto: tcp }
+  label: LDAP (Global Catalog)
+  module: ldap
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ldap.html
+
+- match: { port: 3269, proto: tcp }
+  label: LDAPS (Global Catalog)
+  module: ldap
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ldap.html
+
+- match: { port: 3306, proto: tcp }
+  label: MySQL
+  module: mysql
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mysql.html
+  tools:
+    - { name: "nmap --script mysql-info -p {port} {target}", purpose: "server info" }
+
+- match: { port: 3389, proto: tcp }
+  label: RDP
+  module: rdp
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-rdp.html
+  tools:
+    - { name: "nmap --script rdp-ntlm-info -p {port} {target}", purpose: "NTLM / host info" }
+
+- match: { port: 5353, proto: udp }
+  label: mDNS
+  module: mdns
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+  tools:
+    - { name: "nmap --script dns-service-discovery -p {port} {target}", purpose: "advertised services" }
+
+- match: { port: 5432, proto: tcp }
+  label: PostgreSQL
+  module: postgresql
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-postgresql.html
+
+- match: { port: 5985, proto: tcp }
+  label: WinRM
+  module: winrm
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-winrm.html
+
+- match: { port: 5986, proto: tcp }
+  label: WinRM (HTTPS)
+  module: winrm
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-winrm.html
+
+- match: { port: 6379, proto: tcp }
+  label: Redis
+  module: redis
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-redis.html
+  tools:
+    - { name: "nmap --script redis-info -p {port} {target}", purpose: "server info (if unauth)" }
+
+- match: { port: 27017, proto: tcp }
+  label: MongoDB
+  module: mongodb
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/27017-27018-mongodb.html
+  tools:
+    - { name: "nmap --script mongodb-info -p {port} {target}", purpose: "server info (if unauth)" }
+
+# --- Alternate HTTP/HTTPS ports (per CLAUDE.md §9) -> http module ---
+- { match: { port: 80, proto: tcp },   label: HTTP,      module: http, hacktricks: &web https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-web/index.html,
+    tools: [ { name: "whatweb http://{target}:{port}", purpose: "fingerprint stack" },
+             { name: "curl -sI http://{target}:{port}/", purpose: "response headers" } ] }
+- { match: { port: 3000, proto: tcp },  label: "HTTP (3000)",  module: http, hacktricks: *web }
+- { match: { port: 4443, proto: tcp },  label: "HTTPS (4443)", module: http, hacktricks: *web }
+- { match: { port: 5000, proto: tcp },  label: "HTTP (5000)",  module: http, hacktricks: *web }
+- { match: { port: 5001, proto: tcp },  label: "HTTP (5001)",  module: http, hacktricks: *web }
+- { match: { port: 7001, proto: tcp },  label: "HTTP (7001)",  module: http, hacktricks: *web }
+- { match: { port: 7002, proto: tcp },  label: "HTTP (7002)",  module: http, hacktricks: *web }
+- { match: { port: 8000, proto: tcp },  label: "HTTP (8000)",  module: http, hacktricks: *web }
+- { match: { port: 8008, proto: tcp },  label: "HTTP (8008)",  module: http, hacktricks: *web }
+- { match: { port: 8080, proto: tcp },  label: "HTTP (8080)",  module: http, hacktricks: *web }
+- { match: { port: 8081, proto: tcp },  label: "HTTP (8081)",  module: http, hacktricks: *web }
+- { match: { port: 8088, proto: tcp },  label: "HTTP (8088)",  module: http, hacktricks: *web }
+- { match: { port: 8443, proto: tcp },  label: "HTTPS (8443)", module: http, hacktricks: *web }
+- { match: { port: 8888, proto: tcp },  label: "HTTP (8888)",  module: http, hacktricks: *web }
+- { match: { port: 9000, proto: tcp },  label: "HTTP (9000)",  module: http, hacktricks: *web }
+- { match: { port: 9001, proto: tcp },  label: "HTTP (9001)",  module: http, hacktricks: *web }
+- { match: { port: 9090, proto: tcp },  label: "HTTP (9090)",  module: http, hacktricks: *web }
+- { match: { port: 9091, proto: tcp },  label: "HTTP (9091)",  module: http, hacktricks: *web }
+- { match: { port: 10000, proto: tcp }, label: "HTTP (10000)", module: http, hacktricks: *web }
+
+# --- Generic HTTP service_name fallbacks (any port nmap flags as http-ish) ---
+- { match: { service_name: http },           label: HTTP,  module: http, hacktricks: *web }
+- { match: { service_name: https },          label: HTTPS, module: http, hacktricks: *web }
+- { match: { service_name: http-alt },       label: HTTP,  module: http, hacktricks: *web }
+- { match: { service_name: http-proxy },     label: HTTP,  module: http, hacktricks: *web }
+- { match: { service_name: "ssl/http" },     label: HTTPS, module: http, hacktricks: *web }
+- { match: { service_name: "ssl/https" },    label: HTTPS, module: http, hacktricks: *web }
+- { match: { service_name: "ssl/https-alt" }, label: HTTPS, module: http, hacktricks: *web }
+
+# --- Product-specific overrides ---
+- { match: { product_contains: OpenSSH },  label: OpenSSH, module: ssh,  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ssh.html }
+- { match: { product_contains: vsftpd },   label: vsftpd,  module: ftp,  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ftp/index.html }
+- { match: { product_contains: ProFTPD },  label: ProFTPD, module: ftp,  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ftp/index.html }
+- { match: { product_contains: Apache },   label: Apache httpd, module: http, hacktricks: *web }
+- { match: { product_contains: nginx },    label: nginx,   module: http, hacktricks: *web }
+- { match: { product_contains: "Microsoft IIS" }, label: IIS, module: http, hacktricks: *web }
+- { match: { product_contains: Tomcat },   label: Apache Tomcat, module: http, hacktricks: *web }
+- { match: { product_contains: Jenkins },  label: Jenkins, module: http, hacktricks: *web }
+- { match: { product_contains: WordPress }, label: WordPress, module: http, hacktricks: *web }
+- { match: { product_contains: Joomla },   label: Joomla,  module: http, hacktricks: *web }
+- { match: { product_contains: Drupal },   label: Drupal,  module: http, hacktricks: *web }

@@ -1,0 +1,25 @@
+{
+  "SEARCH": "nginx 1.18",
+  "DB_PATH": "/usr/share/exploitdb/",
+  "RESULTS_EXPLOIT": [
+    {
+      "Title": "nginx 1.20.0 - Denial of Service (DoS)",
+      "EDB-ID": "50973",
+      "Date_Published": "2022-05-23",
+      "Author": "Example Author",
+      "Type": "dos",
+      "Platform": "multiple",
+      "Path": "/usr/share/exploitdb/exploits/multiple/dos/50973.txt"
+    },
+    {
+      "Title": "nginx - 'DNS Resolver' Off-by-One Heap Write",
+      "EDB-ID": "40556",
+      "Date_Published": "2016-10-13",
+      "Author": "Example Author",
+      "Type": "remote",
+      "Platform": "linux",
+      "Path": "/usr/share/exploitdb/exploits/linux/remote/40556.c"
+    }
+  ],
+  "RESULTS_SHELLCODE": []
+}

@@ -32,6 +32,7 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
         "smbclient",
         "smbmap",
         "rpcclient",
+        "rpcinfo",
         "netexec",
         "crackmapexec",
         "ldapsearch",
