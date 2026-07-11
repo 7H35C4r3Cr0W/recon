@@ -5,7 +5,7 @@ from pytestqt.qtbot import QtBot
 
 from oscprecon import findings as findings_mod
 from oscprecon.gui.main_window import MainWindow
-from oscprecon.gui.widgets.graph_view import GraphBridge, GraphView
+from oscprecon.gui.widgets.graph_view import GraphBridge, GraphDetail, GraphView
 from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 
@@ -28,12 +28,14 @@ def test_bridge_get_data(qtbot: QtBot, tmp_path: Path) -> None:
     assert "target" in ids and "service-445-tcp" in ids
 
 
-def test_bridge_node_clicked_emits(qtbot: QtBot) -> None:
+def test_bridge_node_clicked_emits_id_and_data(qtbot: QtBot) -> None:
     bridge = GraphBridge()
-    got: list[str] = []
-    bridge.node_selected.connect(got.append)
-    bridge.node_clicked("service-445-tcp")
-    assert got == ["service-445-tcp"]
+    got: list[tuple[str, object]] = []
+    bridge.node_selected.connect(lambda nid, data: got.append((nid, data)))
+    bridge.node_clicked("service-445-tcp", '{"type": "service", "port": 445}')
+    assert got == [("service-445-tcp", {"type": "service", "port": 445})]
+    bridge.node_clicked("x", "not json")  # malformed -> empty dict, still emits
+    assert got[-1] == ("x", {})
 
 
 def test_bridge_persists_status_note_position(qtbot: QtBot, tmp_path: Path) -> None:
@@ -80,12 +82,46 @@ def test_main_window_graph_toggle(qtbot: QtBot) -> None:
     assert window._central_stack.currentIndex() == 0
 
 
-def test_graph_service_node_switches_back_and_selects(qtbot: QtBot, tmp_path: Path) -> None:
+def test_graph_service_open_switches_back_and_selects(qtbot: QtBot, tmp_path: Path) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
     window._set_profile(_profile(tmp_path))
     window._graph_action.setChecked(True)
-    window._on_graph_node_selected("service-445-tcp")
-    # a service node click returns to the three-pane view so its detail is visible
-    assert window._graph_action.isChecked() is False
+    window._on_graph_service_open(445, "tcp")  # the "Open service tooling" action
+    assert window._graph_action.isChecked() is False  # back to the three-pane so detail shows
     assert window._central_stack.currentIndex() == 0
+
+
+def test_graph_detail_shows_node_and_emits(qtbot: QtBot) -> None:
+    detail = GraphDetail()
+    qtbot.addWidget(detail)
+    statuses: list[tuple[str, str]] = []
+    notes: list[tuple[str, str]] = []
+    opens: list[tuple[int, str]] = []
+    detail.status_changed.connect(lambda nid, s: statuses.append((nid, s)))
+    detail.note_saved.connect(lambda nid, n: notes.append((nid, n)))
+    detail.open_service.connect(lambda p, pr: opens.append((p, pr)))
+    detail.show_node(
+        "service-445-tcp",
+        {"label": "445/tcp smb", "type": "service", "port": 445, "proto": "tcp", "note": "hi"},
+    )
+    assert detail._note.toPlainText() == "hi"
+    detail._emit_status("investigating")
+    detail._note.setPlainText("readable share")
+    detail._emit_note()
+    detail._emit_open()
+    assert statuses == [("service-445-tcp", "investigating")]
+    assert notes == [("service-445-tcp", "readable share")]
+    assert opens == [(445, "tcp")]
+
+
+def test_graph_view_persists_status_and_note_via_detail(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = _profile(tmp_path)
+    view = GraphView()
+    qtbot.addWidget(view)
+    view.set_profile(prof)
+    view._on_status_changed("service-445-tcp", "done")
+    view._on_note_saved("service-445-tcp", "note here")
+    override = prof.load_graph()["node_overrides"]["service-445-tcp"]
+    assert override["status"] == "done"
+    assert override["note"] == "note here"

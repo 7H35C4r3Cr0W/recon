@@ -820,7 +820,7 @@ class MainWindow(QMainWindow):
         splitter.setSizes([320, 520, 360])
 
         self._graph_view = GraphView()
-        self._graph_view.node_selected.connect(self._on_graph_node_selected)
+        self._graph_view.service_open_requested.connect(self._on_graph_service_open)
         self._central_stack = QStackedWidget()
         self._central_stack.addWidget(splitter)  # 0: three-pane
         self._central_stack.addWidget(self._graph_view)  # 1: graph
@@ -939,19 +939,14 @@ class MainWindow(QMainWindow):
             self._graph_view.reload()  # refresh from the latest findings/creds/graph.json
         self._central_stack.setCurrentIndex(1 if checked else 0)
 
-    def _on_graph_node_selected(self, node_id: str) -> None:
-        # a service node maps back to its tree selection so the right pane shows its detail; switch
-        # to the three-pane view so that detail is actually visible.
-        parts = node_id.split("-")
-        if len(parts) == 3 and parts[0] == "service" and parts[1].isdigit():
-            port, proto = int(parts[1]), parts[2]
-            services = self._profile.discovered_services if self._profile is not None else []
-            for svc in services:
-                if svc.port == port and svc.proto.value == proto:
-                    self._graph_action.setChecked(False)
-                    self._on_service_selected(svc)
-                    return
-        self._tool_panel.append_output(f"[graph] selected {node_id}")
+    def _on_graph_service_open(self, port: int, proto: str) -> None:
+        # the graph's "Open service tooling" button jumps to the three-pane view + selects the svc
+        services = self._profile.discovered_services if self._profile is not None else []
+        for svc in services:
+            if svc.port == port and svc.proto.value == proto:
+                self._graph_action.setChecked(False)
+                self._on_service_selected(svc)
+                return
 
     @staticmethod
     def _safe_load(path: Path) -> Profile | None:

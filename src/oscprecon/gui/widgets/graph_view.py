@@ -5,8 +5,17 @@ import os
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QObject, QUrl, Signal, Slot
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot
+from PySide6.QtWidgets import (
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSplitter,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from oscprecon.gui.graph_data import build_elements
 from oscprecon.profile import Profile
@@ -20,7 +29,8 @@ except ImportError:  # pragma: no cover - QtWebEngine ships with PySide6-Addons
     _WEBVIEW_IMPORTED = False
 
 _HTML_INDEX = Path(__file__).parent.parent / "graph_html" / "index.html"
-_VALID_STATUS = frozenset({"new", "investigating", "done", "dead-end"})
+_STATUSES = ("new", "investigating", "done", "dead-end")
+_VALID_STATUS = frozenset(_STATUSES)
 
 
 def _webview_enabled() -> bool:
@@ -30,7 +40,7 @@ def _webview_enabled() -> bool:
 class GraphBridge(QObject):
     """QWebChannel bridge: serves graph data to the JS and persists edits back to graph.json."""
 
-    node_selected = Signal(str)  # node id
+    node_selected = Signal(str, object)  # (node id, data dict)
 
     def __init__(self) -> None:
         super().__init__()
@@ -45,9 +55,13 @@ class GraphBridge(QObject):
             return json.dumps({"nodes": [], "edges": []})
         return json.dumps(build_elements(self._profile))
 
-    @Slot(str)
-    def node_clicked(self, node_id: str) -> None:
-        self.node_selected.emit(node_id)
+    @Slot(str, str)
+    def node_clicked(self, node_id: str, data_json: str) -> None:
+        try:
+            data = json.loads(data_json)
+        except json.JSONDecodeError:
+            data = {}
+        self.node_selected.emit(node_id, data if isinstance(data, dict) else {})
 
     @Slot(str, str)
     def set_status(self, node_id: str, status: str) -> None:
@@ -95,14 +109,108 @@ class GraphBridge(QObject):
             self._profile.save_graph(graph)
 
 
+class GraphDetail(QWidget):
+    """Sidebar showing the clicked node's detail + native status/note controls (§16)."""
+
+    status_changed = Signal(str, str)  # (node id, status)
+    note_saved = Signal(str, str)  # (node id, note)
+    open_service = Signal(int, str)  # (port, proto)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._node_id = ""
+        self._service: tuple[int, str] | None = None
+
+        self._title = QLabel("Click a node to see its detail.")
+        self._title.setWordWrap(True)
+        self._title.setStyleSheet("font-weight: bold;")
+        self._info = QLabel("")
+        self._info.setWordWrap(True)
+        self._info.setStyleSheet("color: gray;")
+
+        status_box = QGroupBox("Status")
+        status_row = QHBoxLayout(status_box)
+        for status in _STATUSES:
+            button = QPushButton(status)
+            button.clicked.connect(lambda _=False, s=status: self._emit_status(s))
+            status_row.addWidget(button)
+
+        self._note = QTextEdit()
+        self._note.setPlaceholderText("Add a note (saved to graph.json, shown in the report)…")
+        self._save_note = QPushButton("Save note")
+        self._save_note.clicked.connect(self._emit_note)
+        note_box = QGroupBox("Note")
+        note_layout = QVBoxLayout(note_box)
+        note_layout.addWidget(self._note)
+        note_layout.addWidget(self._save_note)
+
+        self._open = QPushButton("Open service tooling →")
+        self._open.clicked.connect(self._emit_open)
+        self._open.setVisible(False)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self._title)
+        layout.addWidget(self._info)
+        layout.addWidget(status_box)
+        layout.addWidget(note_box, stretch=1)
+        layout.addWidget(self._open)
+        self._set_controls_enabled(False)
+
+    def show_node(self, node_id: str, data: dict[str, Any]) -> None:
+        self._node_id = node_id
+        self._title.setText(str(data.get("label", node_id)))
+        self._info.setText(self._describe(data))
+        self._note.setPlainText(str(data.get("note", "")))
+        node_type = str(data.get("type", ""))
+        is_service = node_type == "service"
+        self._open.setVisible(is_service)
+        if is_service and isinstance(data.get("port"), int):
+            self._service = (int(data["port"]), str(data.get("proto", "")))
+        else:
+            self._service = None
+        self._set_controls_enabled(True)
+
+    @staticmethod
+    def _describe(data: dict[str, Any]) -> str:
+        node_type = str(data.get("type", "node"))
+        bits = [f"type: {node_type}"]
+        if node_type == "service":
+            bits.append(f"{data.get('port', '?')}/{data.get('proto', '?')}")
+        if data.get("module"):
+            bits.append(f"module: {data['module']}")
+        if data.get("source"):
+            bits.append(f"source: {data['source']}")
+        if data.get("detail"):
+            bits.append(str(data["detail"]))
+        if data.get("status"):
+            bits.append(f"status: {data['status']}")
+        return "  ·  ".join(bits)
+
+    def _set_controls_enabled(self, enabled: bool) -> None:
+        self._note.setEnabled(enabled)
+        self._save_note.setEnabled(enabled)
+
+    def _emit_status(self, status: str) -> None:
+        if self._node_id:
+            self.status_changed.emit(self._node_id, status)
+
+    def _emit_note(self) -> None:
+        if self._node_id:
+            self.note_saved.emit(self._node_id, self._note.toPlainText())
+
+    def _emit_open(self) -> None:
+        if self._service is not None:
+            self.open_service.emit(self._service[0], self._service[1])
+
+
 class GraphView(QWidget):
-    node_selected = Signal(str)  # forwarded from the bridge
+    service_open_requested = Signal(int, str)  # (port, proto) — jump to the three-pane tooling
 
     def __init__(self) -> None:
         super().__init__()
         self._profile: Profile | None = None
         self._bridge = GraphBridge()
-        self._bridge.node_selected.connect(self.node_selected)
+        self._bridge.node_selected.connect(self._on_node_selected)
         self._web: QWebEngineView | None = None
 
         if _webview_enabled():
@@ -117,15 +225,26 @@ class GraphView(QWidget):
             except Exception:  # boundary: headless/no-GPU envs can't create the web view
                 self._web = None
 
-        layout = QVBoxLayout(self)
+        self._detail = GraphDetail()
+        self._detail.status_changed.connect(self._on_status_changed)
+        self._detail.note_saved.connect(self._on_note_saved)
+        self._detail.open_service.connect(self.service_open_requested)
+
+        graph_widget: QWidget
         if self._web is not None:
-            layout.addWidget(self._web)
+            graph_widget = self._web
         else:
             fallback = QLabel(
                 "Graph view unavailable — QtWebEngine could not start in this environment."
             )
             fallback.setStyleSheet("color: gray;")
-            layout.addWidget(fallback)
+            graph_widget = fallback
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(self._detail)
+        splitter.addWidget(graph_widget)
+        splitter.setSizes([260, 780])
+        QHBoxLayout(self).addWidget(splitter)
 
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
@@ -135,3 +254,14 @@ class GraphView(QWidget):
     def reload(self) -> None:
         if self._web is not None:
             self._web.reload()  # re-runs app.js, which re-fetches via bridge.get_data()
+
+    def _on_node_selected(self, node_id: str, data: object) -> None:
+        self._detail.show_node(node_id, data if isinstance(data, dict) else {})
+
+    def _on_status_changed(self, node_id: str, status: str) -> None:
+        self._bridge.set_status(node_id, status)
+        self.reload()
+
+    def _on_note_saved(self, node_id: str, note: str) -> None:
+        self._bridge.add_note(node_id, note)
+        self.reload()

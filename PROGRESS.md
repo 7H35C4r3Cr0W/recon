@@ -59,6 +59,19 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
+### Phase 4 · graph view — chunk 3a: node-detail sidebar + native status/note UI
+- **`GraphDetail`** sidebar (left of the web view in a QSplitter): shows the tapped node's label +
+  a `type · port · module · source · detail · status` line, four **Status** buttons
+  (new/investigating/done/dead-end), a **Note** editor + Save, and (for service nodes) an
+  **"Open service tooling →"** button. app.js now sends `evt.target.data()` with the tap so the
+  sidebar has the full node; `GraphBridge.node_selected` became `(id, data)`.
+- Status/note edits go through the bridge → graph.json and reload the graph so the border/badge
+  updates live. The old "tap a service node yanks you to the three-pane" behavior became an explicit
+  button: `GraphView.service_open_requested(port, proto)` → main_window switches + selects.
+- 9 graph GUI tests (bridge id+data, detail show/emit, view persistence, service-open switch). Real
+  headless render re-verified (4 nodes, no warnings). 362 tests. **Chunk 3b:** PNG/SVG export.
+  **Chunk 3c:** drag-to-draw relates-to edges + minimap.
+
 ### Phase 4 · graph view — chunk 2: GraphView widget + Cytoscape HTML/JS + View→Graph
 - **`gui/graph_html/`**: index.html (loads Qt's `qrc:///` qwebchannel.js + the vendored
   cytoscape.min.js), app.js (Cytoscape init with the §16 node/edge colors — target ellipse / TCP blue

@@ -114,7 +114,7 @@
     else runLayout("hier");
 
     cy.on("tap", "node", function (evt) {
-      if (bridge) bridge.node_clicked(evt.target.id());
+      if (bridge) bridge.node_clicked(evt.target.id(), JSON.stringify(evt.target.data()));
     });
 
     cy.on("dragfree", "node", function () {
