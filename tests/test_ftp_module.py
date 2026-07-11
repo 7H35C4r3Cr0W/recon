@@ -57,6 +57,18 @@ def test_list_step_encodes_untrusted_path() -> None:
     assert "http://evil" not in hostile  # the ':' is encoded, so no second URL forms
 
 
+def test_list_step_output_files_are_injective() -> None:
+    module = FtpModule()
+    t = _target()
+    # '/' and '/root' both slug to "root" — the path hash keeps their snapshot files distinct
+    root = module.list_step(t, "/").command.output_file
+    root_dir = module.list_step(t, "/root").command.output_file
+    assert root != root_dir
+    assert module.list_step(t, "/a/b").command.output_file != (
+        module.list_step(t, "/a-b").command.output_file
+    )
+
+
 def test_dir_url_always_lists_never_downloads() -> None:
     # every walked URL ends in '/', so curl issues LIST, never a file download
     assert ftp_dir_url("10.10.10.5", 21, "/pub").endswith("/")

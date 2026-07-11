@@ -923,12 +923,19 @@ class MainWindow(QMainWindow):
         worker.start()
 
     def _on_smb_done(self, result: object) -> None:
-        if isinstance(result, SmbReconResult) and self._profile is not None:
-            for cred in result.creds:
-                self._profile.add_credential(cred)
-                self._tool_panel.append_output(f"[cred] {cred.username} (source: {cred.source})")
-            self._tool_panel.set_smb_summary(result.summary)
-            self._tool_panel.append_output("[smb] recon complete")
+        # why: a creds.json/summary write error must not strand self._worker — always release the
+        # slot in _finish_worker, mirroring _on_command_done's guard.
+        try:
+            if isinstance(result, SmbReconResult) and self._profile is not None:
+                for cred in result.creds:
+                    self._profile.add_credential(cred)
+                    self._tool_panel.append_output(
+                        f"[cred] {cred.username} (source: {cred.source})"
+                    )
+                self._tool_panel.set_smb_summary(result.summary)
+                self._tool_panel.append_output("[smb] recon complete")
+        except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
+            self._tool_panel.append_output(f"[error] {exc}")
         self._finish_worker()
 
     def _on_ftp_recon(self, mode: str, port: int) -> None:
@@ -944,12 +951,19 @@ class MainWindow(QMainWindow):
         worker.start()
 
     def _on_ftp_done(self, result: object) -> None:
-        if isinstance(result, FtpReconResult) and self._profile is not None:
-            for cred in result.creds:
-                self._profile.add_credential(cred)
-                self._tool_panel.append_output(f"[cred] {cred.username} (source: {cred.source})")
-            self._tool_panel.set_ftp_summary(result.summary)
-            self._tool_panel.append_output("[ftp] recon complete")
+        # why: a creds.json/summary write error must not strand self._worker — always release the
+        # slot in _finish_worker, mirroring _on_command_done's guard.
+        try:
+            if isinstance(result, FtpReconResult) and self._profile is not None:
+                for cred in result.creds:
+                    self._profile.add_credential(cred)
+                    self._tool_panel.append_output(
+                        f"[cred] {cred.username} (source: {cred.source})"
+                    )
+                self._tool_panel.set_ftp_summary(result.summary)
+                self._tool_panel.append_output("[ftp] recon complete")
+        except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
+            self._tool_panel.append_output(f"[error] {exc}")
         self._finish_worker()
 
     def _on_scan_done(self, count: int) -> None:

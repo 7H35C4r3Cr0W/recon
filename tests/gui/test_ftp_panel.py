@@ -45,6 +45,19 @@ def test_manual_followups_expand_and_stay_legal(qtbot: QtBot, tmp_path: Path) ->
         assert tool not in joined
 
 
+def test_manual_followups_honor_non_default_port(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    panel = FtpPanel()
+    qtbot.addWidget(panel)
+    panel.set_profile(prof)
+    panel.configure(DiscoveredService(2121, Proto.TCP, "ftp"))
+    commands = [panel._manual.item(i).data(_COMMAND_ROLE) for i in range(panel._manual.count())]
+    joined = " ".join(commands)
+    assert "10.10.10.5:2121" in joined  # the port reaches every follow-up
+    assert "ftp:ftp@10.10.10.5:2121" in joined
+    assert "ftp://10.10.10.5/" not in joined  # no bare :21 URL slipped through
+
+
 def test_tool_panel_switches_to_ftp_page(qtbot: QtBot, tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     panel = ToolPanel()

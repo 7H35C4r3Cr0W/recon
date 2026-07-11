@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import shlex
 from dataclasses import dataclass
@@ -112,13 +113,17 @@ class FtpModule(Module):
 
     def list_step(self, target: Target, path: str, port: int = 21) -> FtpStep:
         url = ftp_dir_url(target.ip, port, path)
+        # why: the slug is lossy (many paths collapse to one), so append a hash of the full path —
+        # otherwise two distinct dirs (e.g. '/' and '/root', '/a/b' and '/a-b') clobber each other's
+        # on-disk listing snapshot.
+        digest = hashlib.sha1(path.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
         return FtpStep(
             Command(
                 "ftp",
                 f"curl -s {shlex.quote(url)}",
                 f"Anonymous listing of {path}.",
                 "< 30s",
-                f"ftp/dirs/{_dir_slug(path)}.txt",
+                f"ftp/dirs/{_dir_slug(path)}-{digest}.txt",
             ),
             "curl-list",
         )

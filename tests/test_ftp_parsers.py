@@ -61,6 +61,28 @@ def test_parse_nmap_ftp() -> None:
     assert not any(f.value in ("/ASCII", "/ftp") for f in findings)
 
 
+def test_multi_space_filenames_preserved() -> None:
+    # a filename with 2+ consecutive spaces must survive (split()/join collapsed it before)
+    unix = "drwxr-xr-x    2 0        0            4096 Jun 20  2023 two  dirs\n"
+    names = {e.name for e in parse_ftp_listing(unix)}
+    assert "two  dirs" in names
+    assert "two dirs" not in names
+
+
+def test_nmap_writeable_marker_stripped_and_noted() -> None:
+    # nmap ftp-anon appends " [NSE: writeable]" to writable entries — it must not land in the name
+    nmap = (
+        "| ftp-anon: Anonymous FTP login allowed (FTP code 230)\n"
+        "|_drwxr-srwt   2 1170  924  2048 Jul 19 18:48 incoming [NSE: writeable]\n"
+    )
+    findings = parse_nmap_ftp(nmap)
+    dirs = {f.value for f in findings if f.kind == "dir"}
+    notes = {f.value for f in findings if f.kind == "note"}
+    assert "/incoming" in dirs
+    assert "/incoming [NSE: writeable]" not in dirs
+    assert "writable: /incoming" in notes
+
+
 def test_nmap_anon_denied() -> None:
     denied = "21/tcp open  ftp\n|_ftp-anon: Anonymous login not permitted\n"
     assert nmap_anon_ok(denied) is False

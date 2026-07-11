@@ -29,8 +29,16 @@ class FtpEntry:
     size: int = 0
 
 
-# Unix `ls -l` perms field, e.g. "drwxr-xr-x" / "-rw-r--r--" / "lrwxrwxrwx" (+ optional acl marker).
-_UNIX_PERMS = re.compile(r"^[-dlbcps][rwxsStT-]{9}[.+@]?$")
+# Unix `ls -l`: perms, links, owner, group, size, month, day, time/year, then the name. The name is
+# captured verbatim (a filename may contain 2+ consecutive spaces), so match the 8 fixed fields
+# positionally rather than split() (which would collapse runs of whitespace inside the name).
+_UNIX_LINE = re.compile(
+    r"^(?P<perms>[-dlbcps][rwxsStT-]{9}[.+@]?)\s+"
+    r"\S+\s+\S+\s+\S+\s+"  # links owner group
+    r"(?P<size>\d+)\s+"  # size
+    r"\S+\s+\S+\s+\S+\s+"  # month day time/year
+    r"(?P<name>.+)$"
+)
 # MS-DOS / IIS listing: "06-20-23  10:12AM       <DIR>          uploads".
 _DOS_LINE = re.compile(
     r"^(?P<date>\d{2}-\d{2}-\d{2,4})\s+(?P<time>\d{1,2}:\d{2}(?:AM|PM)?)\s+"
@@ -38,30 +46,27 @@ _DOS_LINE = re.compile(
 )
 
 
-def _parse_unix(tokens: list[str]) -> FtpEntry | None:
-    # standard ls -l: perms links owner group size month day time/year name...
-    if len(tokens) < 9 or not _UNIX_PERMS.match(tokens[0]):
+def _parse_unix(line: str) -> FtpEntry | None:
+    match = _UNIX_LINE.match(line)
+    if match is None:
         return None
-    is_dir = tokens[0][0] == "d"
-    try:
-        size = int(tokens[4])
-    except ValueError:
-        size = 0
-    name = " ".join(tokens[8:])
-    if tokens[0][0] == "l" and " -> " in name:  # symlink: keep the link name, drop the target
+    perms = match.group("perms")
+    is_dir = perms[0] == "d"
+    name = match.group("name")
+    if perms[0] == "l" and " -> " in name:  # symlink: keep the link name, drop the target
         name = name.split(" -> ", 1)[0]
-    return FtpEntry(name, is_dir, 0 if is_dir else size)
+    return FtpEntry(name, is_dir, 0 if is_dir else int(match.group("size")))
 
 
 def parse_ftp_listing(text: str) -> list[FtpEntry]:
     entries: list[FtpEntry] = []
     for raw in text.splitlines():
-        line = raw.strip()
-        if not line:
+        line = raw.rstrip("\r\n")  # keep internal + trailing spaces in the name; drop only the EOL
+        if not line.strip():
             continue
-        entry = _parse_unix(line.split())
+        entry = _parse_unix(line.lstrip())  # lstrip leading indent; name keeps its own spaces
         if entry is None:
-            match = _DOS_LINE.match(line)
+            match = _DOS_LINE.match(line.strip())
             if match is None:
                 continue
             is_dir = match.group("sizeordir") == "<DIR>"
@@ -106,9 +111,22 @@ def parse_nmap_ftp(text: str) -> list[FtpFinding]:
         findings.append(
             FtpFinding("note", "ftp-bounce", "FTP bounce accepted (PORT to a third party)")
         )
-    # ftp-anon prints the root listing prefixed with "| " / "|_"; strip that, then reuse the parser.
-    stripped = "\n".join(re.sub(r"^\|[_ ]?", "", line) for line in text.splitlines())
-    findings.extend(_listing_findings(stripped, "/"))
+    # ftp-anon prints the root listing prefixed with "| " / "|_" and appends " [NSE: writeable]" to
+    # any world-writable entry. Strip both — otherwise the marker is folded into the file/dir name —
+    # but keep the writable signal as a note (anonymous-writable dirs are a notable recon finding).
+    cleaned: list[str] = []
+    for raw in text.splitlines():
+        line = re.sub(r"^\|[_ ]?", "", raw)
+        if "[NSE: writeable]" in line:
+            without = re.sub(r"\s*\[NSE: writeable\]\s*$", "", line)
+            entries = parse_ftp_listing(without)
+            if entries:
+                findings.append(
+                    FtpFinding("note", f"writable: /{entries[0].name}", "anonymous write allowed")
+                )
+            line = without
+        cleaned.append(line)
+    findings.extend(_listing_findings("\n".join(cleaned), "/"))
     return findings
 
 

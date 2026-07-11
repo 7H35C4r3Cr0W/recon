@@ -89,8 +89,11 @@ class FtpPanel(QWidget):
         if self._profile is None:
             return
         target = self._profile.target
+        # the manual templates write ftp://{target}/... — fold a non-default port into the host
+        # authority so every follow-up hits the real port (curl would otherwise default to :21).
+        host = target.ip if self._port == 21 else f"{target.ip}:{self._port}"
         for entry in manual_commands.load_manual_commands(_MANUAL_YAML):
-            command = manual_commands.expand(entry.command, target=target.ip, port=self._port)
+            command = manual_commands.expand(entry.command, target=host, port=self._port)
             item = QListWidgetItem(f"{entry.description}\n    {command}")
             item.setData(_COMMAND_ROLE, command)
             self._manual.addItem(item)

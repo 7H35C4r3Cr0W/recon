@@ -6,11 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 module 4 — ftp: adversarial 3-lens review** (chunk 3). Engine + GUI done + gated (171 tests).
-Run the same OSCP-compliance / GUI-concurrency / correctness review as smb (reviewers run real
-curl/nmap to catch drift); fix HIGH/MED + cheap LOWs. Watch: the bounded-walk caps (depth 3, 25 dirs),
-LIST-only-never-download property, untrusted-path encoding in ftp_dir_url. After ftp:
-ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp.
+**Phase 2 module 5 — next service module** (§12 order): pick from **ssh/dns/ldap/smtp/nfs/snmp/tftp/
+netbios/ike/ntp**. Same engine→GUI→adversarial-review→commit pattern. **HTTP + vhost + smb + ftp all
+done, reviewed, hardened** (175 tests). Note the recurring review lessons: parsers must match REAL
+current tool output (run the tool's help/script-help), always release the worker slot in a finally/
+guard, make on-disk artifact filenames injective, thread the service port through every command.
 
 ## How to resume
 
@@ -21,7 +21,27 @@ ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp.
 
 ## Log (newest first)
 
-### Phase 2 · module 4 (ftp) — GUI (this commit)
+### Phase 2 · module 4 (ftp) hardening (this commit)
+Adversarial 3-lens review (12 agents, verified against real nmap 7.99 / curl 8.x); 5 of 9 survived, all
+fixed (4 non-issues correctly rejected):
+- **correctness (MED): parser drift — nmap `[NSE: writeable]` marker** was folded into the file/dir name
+  (`/incoming [NSE: writeable]`). Strip it and record a `note` (writable anon dir = notable recon).
+- **correctness (MED): multi-space filenames** — `split()`/`join` collapsed `two  dirs` → `two dirs`, so
+  the walk built a wrong URL and missed the subtree. Parse the 8 fixed ls -l fields positionally, take
+  the name verbatim (keep internal + trailing spaces).
+- **correctness (MED): Tier-2 manual port** — templates had no `{port}`, so every follow-up hit :21 on a
+  non-standard FTP box. Fold `:port` into the host authority when port != 21.
+- **gui-concurrency (MED): worker-slot wedge** — `_on_ftp_done` (and `_on_smb_done`) added creds before
+  `_finish_worker` with no guard; a creds.json write error stranded `self._worker` and locked the UI.
+  Guard the body so the slot is always released.
+- **gui-concurrency (LOW): snapshot filename collisions** — `_dir_slug` is lossy (`/` and `/root` both →
+  `root`), clobbering on-disk `ftp/dirs/*.txt`. Append a sha1[:8] of the full path (injective).
+- Rejected (verified non-issues): silent depth-truncation (every entry is still recorded + summarized;
+  "no silent truncation" was the reviewer's invented rule), per-LIST result not capped (a listing snapshot
+  is explicitly allowed by §12; the WALK is bounded), <9-token/device lines dropped (not in the real input
+  domain), `..`/`/` scope escape (curl removes dot-segments client-side; `--path-as-is` never passed).
+
+### Phase 2 · module 4 (ftp) — GUI (73c9f70)
 - **FtpPanel** (`gui/widgets/ftp_panel.py`): Tier-1 buttons ("Run full FTP recon (bounded walk)" → full,
   "Just list anonymous root" → anon) emitting `recon_requested(mode, port)` (FTP carries the port);
   Tier-2 manual follow-ups (target/port-expanded, FILE/SUBDIR left literal) with copy menu; findings

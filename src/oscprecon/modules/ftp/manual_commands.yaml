@@ -1,6 +1,7 @@
 # FTP manual follow-ups (Tier-2 — shown, never auto-run; §11/§12). Bulk download and single
 # default-cred checks are explicit clicks, never automatic. NEVER Tier-3 (password LISTS / spraying).
-# Placeholders {target} {port} are filled from the profile; FILE / SUBDIR are literals you edit.
+# {target} is filled from the profile (with :port folded in for non-default ports); FILE / SUBDIR
+# are literals you edit before running.
 
 - description: "Read a specific file to stdout (anonymous)"
   why: "Fetch one file's contents without saving it — targeted, not a bulk pull"
