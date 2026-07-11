@@ -23,12 +23,14 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSplitter,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from oscprecon import config, findings, references, shell
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
+from oscprecon.gui.widgets.graph_view import GraphView
 from oscprecon.gui.widgets.notes_pane import NotesPane
 from oscprecon.gui.widgets.reference_pane import ReferencePane
 from oscprecon.gui.widgets.service_tree import ServiceTree
@@ -816,7 +818,13 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._tool_panel)
         splitter.addWidget(self._reference_pane)
         splitter.setSizes([320, 520, 360])
-        self.setCentralWidget(splitter)
+
+        self._graph_view = GraphView()
+        self._graph_view.node_selected.connect(self._on_graph_node_selected)
+        self._central_stack = QStackedWidget()
+        self._central_stack.addWidget(splitter)  # 0: three-pane
+        self._central_stack.addWidget(self._graph_view)  # 1: graph
+        self.setCentralWidget(self._central_stack)
 
         self._notes_pane = NotesPane()
         self._notes_dock = QDockWidget("Notes", self)
@@ -884,6 +892,11 @@ class MainWindow(QMainWindow):
 
         view_menu = self.menuBar().addMenu("&View")
         view_menu.addAction(self._notes_dock.toggleViewAction())
+        self._graph_action = QAction("Graph", self)
+        self._graph_action.setCheckable(True)
+        self._graph_action.setShortcut("Ctrl+G")
+        self._graph_action.toggled.connect(self._on_toggle_graph)
+        view_menu.addAction(self._graph_action)
         wordlists_action = QAction("Browse Wordlists...", self)
         wordlists_action.triggered.connect(self._on_browse_wordlists)
         view_menu.addAction(wordlists_action)
@@ -915,10 +928,30 @@ class MainWindow(QMainWindow):
         self._tool_panel.set_target(target.ip)
         self._tool_panel.set_profile(profile)
         self._service_tree.populate(profile.discovered_services)
+        self._graph_view.set_profile(profile)
         self._update_status_footer()
         self._notes_pane.set_profile(profile)
         config.add_recent(profile.directory)
         self._rebuild_recent_menu()
+
+    def _on_toggle_graph(self, checked: bool) -> None:
+        if checked:
+            self._graph_view.reload()  # refresh from the latest findings/creds/graph.json
+        self._central_stack.setCurrentIndex(1 if checked else 0)
+
+    def _on_graph_node_selected(self, node_id: str) -> None:
+        # a service node maps back to its tree selection so the right pane shows its detail; switch
+        # to the three-pane view so that detail is actually visible.
+        parts = node_id.split("-")
+        if len(parts) == 3 and parts[0] == "service" and parts[1].isdigit():
+            port, proto = int(parts[1]), parts[2]
+            services = self._profile.discovered_services if self._profile is not None else []
+            for svc in services:
+                if svc.port == port and svc.proto.value == proto:
+                    self._graph_action.setChecked(False)
+                    self._on_service_selected(svc)
+                    return
+        self._tool_panel.append_output(f"[graph] selected {node_id}")
 
     @staticmethod
     def _safe_load(path: Path) -> Profile | None:

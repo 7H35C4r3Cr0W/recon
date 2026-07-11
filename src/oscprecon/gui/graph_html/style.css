@@ -1,0 +1,44 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+#toolbar {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  box-sizing: border-box;
+}
+
+#toolbar button {
+  background: #313244;
+  color: #cdd6f4;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#toolbar button:hover {
+  background: #45475a;
+}
+
+#hint {
+  color: #6c7086;
+  font-size: 12px;
+  margin-left: auto;
+}
+
+#cy {
+  width: 100%;
+  height: calc(100% - 33px);
+}

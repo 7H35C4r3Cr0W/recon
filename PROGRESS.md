@@ -59,6 +59,25 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
+### Phase 4 · graph view — chunk 2: GraphView widget + Cytoscape HTML/JS + View→Graph
+- **`gui/graph_html/`**: index.html (loads Qt's `qrc:///` qwebchannel.js + the vendored
+  cytoscape.min.js), app.js (Cytoscape init with the §16 node/edge colors — target ellipse / TCP blue
+  / UDP green / finding yellow / credential red, status borders, dashed relates-to; hierarchical +
+  force-directed layouts; tap → `bridge.node_clicked`; dragfree → `bridge.save_positions`), style.css.
+- **`gui/widgets/graph_view.py`**: `GraphBridge` (QWebChannel QObject) serves `get_data()` (the
+  build_elements JSON) and persists edits to graph.json — `set_status` (validated), `add_note`,
+  `save_positions`, `add_user_edge` — and emits `node_selected` on a tap. `GraphView` hosts the
+  QWebEngineView + channel with the same graceful QtWebEngine fallback as the reference pane.
+- **main_window**: central QStackedWidget (three-pane ↔ graph); View → Graph (Ctrl+G, checkable)
+  toggles + reloads on show; a service-node tap switches back to the three-pane and selects that
+  service so its detail shows. `set_profile` feeds the graph.
+- **Verified with a real headless QtWebEngine render**: draws all nodes (probe: cytoscape loaded, 4
+  nodes for target + 2 services + 1 finding), no console warnings after tightening the edge-label
+  selector + dropping the custom wheel-sensitivity.
+- 7 GUI tests (bridge get_data / click / persist / edge / bad-json, fallback construct, toggle,
+  service-node switch-back). 360 tests. **Next chunk 3:** native status/note UI on `node_selected`,
+  drag-to-draw relates-to edges, minimap, PNG/SVG export, node-detail sidebar.
+
 ### Phase 4 · graph view — chunk 1: data model + graph.json persistence
 - **`gui/graph_data.py`** `build_elements(profile)` — pure-Python (no Qt) Cytoscape elements builder:
   target → services (`has-service`) → findings (`exposes-finding`, linked to the owning service via the
