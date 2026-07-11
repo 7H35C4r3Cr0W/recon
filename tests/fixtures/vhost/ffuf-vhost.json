@@ -1,0 +1,7 @@
+{
+  "commandline": "ffuf -u http://10.10.10.5/ -H 'Host: FUZZ.example.com' -w subs.txt -fs 281 -o vhost/ffuf.json -of json",
+  "results": [
+    {"input": {"FUZZ": "admin"}, "position": 1, "status": 200, "length": 1234, "words": 200, "lines": 40, "url": "http://10.10.10.5/"},
+    {"input": {"FUZZ": "dev"}, "position": 2, "status": 403, "length": 281, "words": 20, "lines": 10, "url": "http://10.10.10.5/"}
+  ]
+}

@@ -1,0 +1,5 @@
+[*] Performing DNS brute force using dictionary subs.txt
+[+] A admin.example.com 10.10.10.5
+[+] CNAME www.example.com example.com
+[+] A dev.example.com 10.10.10.6
+[*] 3 Records Found

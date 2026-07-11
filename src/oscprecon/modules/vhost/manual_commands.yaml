@@ -1,0 +1,43 @@
+# Vhost / subdomain manual follow-ups (Tier-2 — shown, never auto-run). Active/target-directed
+# only (passive OSINT needs internet at runtime, forbidden by §2). Each is a SINGLE §2-allowed
+# command. Placeholders {target} {domain} {scheme} {url} filled from the profile.
+
+- description: "Wildcard baseline probe"
+  why: "Measure a nonexistent vhost's response size, then set -fs/--hh to filter wildcards"
+  command: 'curl -sk -o /dev/null -w "%{size_download}" -H "Host: zzq-nope.{domain}" {scheme}://{target}/'
+
+- description: "ffuf vhost sweep (small list)"
+  why: "Fuzz the Host header against the target IP to find name-based virtual hosts"
+  command: 'ffuf -u {scheme}://{target}/ -H "Host: FUZZ.{domain}" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt'
+
+- description: "ffuf vhost sweep (large list)"
+  why: "Deeper vhost enumeration once the small list is exhausted"
+  command: 'ffuf -u {scheme}://{target}/ -H "Host: FUZZ.{domain}" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt'
+
+- description: "gobuster vhost"
+  why: "Alternate vhost brute that appends the base domain to each word"
+  command: "gobuster vhost -u {scheme}://{domain}/ -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt --append-domain"
+
+- description: "gobuster dns (if a DNS server is reachable)"
+  why: "Resolve subdomains directly when the target runs DNS"
+  command: "gobuster dns -d {domain} -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt"
+
+- description: "dnsrecon brute force"
+  why: "Dictionary subdomain brute against the domain"
+  command: "dnsrecon -d {domain} -t brt -D /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt"
+
+- description: "wfuzz vhost sweep"
+  why: "Host-header fuzzing alternative with response-size hiding"
+  command: 'wfuzz -c -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -H "Host: FUZZ.{domain}" -u {scheme}://{target}/'
+
+- description: "Single vhost check"
+  why: "Confirm a specific guessed vhost resolves/serves content"
+  command: 'curl -sk -H "Host: dev.{domain}" {scheme}://{target}/'
+
+- description: "DNS records for the domain"
+  why: "A/NS/MX/TXT records may reveal further hosts and infrastructure"
+  command: "dig any {domain}"
+
+- description: "Zone transfer attempt"
+  why: "A misconfigured NS may hand over the full zone"
+  command: "dig axfr {domain} @{target}"
