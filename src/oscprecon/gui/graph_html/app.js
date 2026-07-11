@@ -5,6 +5,21 @@
   "use strict";
   var cy = null;
   var bridge = null;
+  var linkMode = false;
+  var linkSource = null;
+
+  var DEFAULT_HINT = "drag nodes to reposition (saved) · click a node for detail";
+
+  function setLinkMode(on) {
+    linkMode = on;
+    linkSource = null;
+    var button = document.getElementById("link-mode");
+    button.style.background = on ? "#cba6f7" : "";
+    button.style.color = on ? "#11111b" : "";
+    document.getElementById("hint").textContent = on
+      ? "LINK MODE: click a source node, then a target — creates a relates-to edge"
+      : DEFAULT_HINT;
+  }
 
   var STYLE = [
     {
@@ -139,7 +154,24 @@
     else runLayout("hier");
 
     cy.on("tap", "node", function (evt) {
-      if (bridge) bridge.node_clicked(evt.target.id(), JSON.stringify(evt.target.data()));
+      var id = evt.target.id();
+      if (linkMode) {
+        if (!linkSource) {
+          linkSource = id;
+          document.getElementById("hint").textContent = "LINK MODE: now click the target node";
+        } else {
+          if (bridge && id !== linkSource) {
+            bridge.add_user_edge(linkSource, id, "");
+            cy.add({
+              // show it immediately (already persisted to graph.json for the next load)
+              data: { id: "live-" + linkSource + "-" + id, source: linkSource, target: id, type: "relates-to" },
+            });
+          }
+          setLinkMode(false);
+        }
+        return; // link mode swallows the tap — no detail sidebar
+      }
+      if (bridge) bridge.node_clicked(id, JSON.stringify(evt.target.data()));
     });
 
     cy.on("dragfree", "node", function () {
@@ -160,6 +192,9 @@
     };
     document.getElementById("fit").onclick = function () {
       cy.fit(undefined, 40);
+    };
+    document.getElementById("link-mode").onclick = function () {
+      setLinkMode(!linkMode);
     };
     document.getElementById("export-png").onclick = function () {
       exportImage("png");

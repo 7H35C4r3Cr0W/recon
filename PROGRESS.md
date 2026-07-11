@@ -10,6 +10,12 @@ Running record of what's been built, in order, so any session can pick up mid-st
 ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp) + status footer QoL. All 14 done,
 reviewed, hardened, GUI'd (347 tests).
 
+**Phase 4 graph view is substantially complete** (chunks 1–3c: data model + persistence, rendering +
+View→Graph toggle, node-detail/status/note sidebar, PNG/SVG export, relates-to edge drawing). Only
+optional §16 polish remains: **minimap** (needs the cytoscape-navigator extension) and a **node-type
+filter sidebar**. After that (or now if you prefer), **return to Phase 3** once your Obsidian
+notes/box writeups are committed.
+
 ### ⚠️ ORDER — we are JUMPING Phase 3 → Phase 4 (user decision 2026-07-11). DO NOT SKIP PHASE 3.
 **Phase 3 (pattern library + suggestion engine) is DEFERRED, not done.** It is BLOCKED on `# source:`
 provenance (§15): no walkthroughs/box notes are committed yet. The user is loading their Obsidian
@@ -58,6 +64,17 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 4 · graph view — chunk 3c: relates-to edge drawing (link mode)
+- Toolbar **Link mode** toggle (§16 "drag edge between two nodes → relates-to user edge"): click a
+  source node, then a target → `bridge.add_user_edge(src, dst, "")` persists it to graph.json AND the
+  edge is added to the live cy immediately (dashed purple relates-to); link mode auto-exits. The tap is
+  swallowed in link mode so the detail sidebar doesn't open.
+- **Verified end-to-end in a real webengine render**: simulated the two taps → 1 relates-to edge on the
+  canvas + `graph.json.user_edges == [{"from":"target","to":"service-80-tcp","label":""}]`. The
+  `add_user_edge` persistence path is also unit-tested (chunk 2). 364 tests.
+- **Phase 4 substantially complete.** Remaining optional §16 polish: minimap (cytoscape-navigator
+  extension) + node-type filter sidebar.
 
 ### Phase 4 · graph view — chunk 3b: PNG / SVG export (§16)
 - Toolbar **Export PNG** / **Export SVG** buttons. PNG uses Cytoscape's built-in `cy.png()` (scale 2,
