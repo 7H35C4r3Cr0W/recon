@@ -35,19 +35,30 @@ class SmtpFinding:
         }
 
 
-_SMTP_VER = re.compile(r"^\d+/tcp\s+open\s+smtp[-\w]*\s+(?P<ver>\S.*)$", re.MULTILINE)
+# -sV prints the TLS-wrapped service as `ssl/smtp` (465) and 587 sometimes as `submission` — the
+# module triggers on those ports/services, so the banner regex must accept them too.
+_SMTP_VER = re.compile(
+    r"^\d+/tcp\s+open\s+(?:ssl/)?(?:smtp[-\w]*|submission)\s+(?P<ver>\S.*)$", re.MULTILINE
+)
+# smtp-commands.nse returns TWO payloads — the EHLO extensions AND the HELP response — on two lines.
+# VRFY/EXPN are base SMTP verbs that often surface ONLY on the HELP line, so read both.
+_VERB_LINE_PREFIXES = ("smtp-commands:", "this server supports the following commands:")
 
 
 def _verbs(text: str) -> list[SmtpFinding]:
     findings: list[SmtpFinding] = []
+    seen: set[str] = set()
     for raw in text.splitlines():
         line = re.sub(r"^\|[_ ]?", "", raw).strip()  # strip nmap's "| "/"|_" prefix
-        if not line.lower().startswith("smtp-commands:"):
+        low = line.lower()
+        prefix = next((p for p in _VERB_LINE_PREFIXES if low.startswith(p)), None)
+        if prefix is None:
             continue
-        payload = line.split(":", 1)[1]
+        payload = line[len(prefix) :]
         tokens = {t.upper() for t in re.split(r"[,\s]+", payload) if t}
         for verb in _NOTABLE_VERBS:
-            if verb in tokens:
+            if verb in tokens and verb not in seen:
+                seen.add(verb)
                 findings.append(SmtpFinding("verb", verb))
     return findings
 

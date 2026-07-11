@@ -22,6 +22,33 @@ def test_parse_verbs() -> None:
     assert "TURN" not in verbs  # ETRN present, TURN is not
 
 
+def test_verbs_on_help_continuation_line() -> None:
+    # smtp-commands returns EHLO extensions AND a HELP line; VRFY/EXPN often surface ONLY on HELP
+    text = (
+        "25/tcp open smtp Sendmail\n"
+        "| smtp-commands: mail.example.com Hello, SIZE 10240000, PIPELINING, 8BITMIME\n"
+        "|_ This server supports the following commands: HELO EHLO MAIL RCPT DATA VRFY EXPN HELP\n"
+    )
+    verbs = {f.value for f in parse_nmap_smtp(text) if f.kind == "verb"}
+    assert {"VRFY", "EXPN"} <= verbs
+
+
+def test_banner_on_ssl_smtp_and_submission() -> None:
+    # the module triggers on 465 (ssl/smtp) and 587 (submission) — their banners must parse too
+    ssl_banner = [
+        f.value
+        for f in parse_nmap_smtp("465/tcp open ssl/smtp Postfix smtpd\n")
+        if f.kind == "banner"
+    ]
+    sub_banner = [
+        f.value
+        for f in parse_nmap_smtp("587/tcp open submission Postfix smtpd\n")
+        if f.kind == "banner"
+    ]
+    assert ssl_banner == ["Postfix smtpd"]
+    assert sub_banner == ["Postfix smtpd"]
+
+
 def test_verb_not_matched_inside_hostname() -> None:
     text = "25/tcp open smtp\n| smtp-commands: vrfy-server.example.com Hello, SIZE 100, HELP\n"
     verbs = {f.value for f in parse_nmap_smtp(text) if f.kind == "verb"}

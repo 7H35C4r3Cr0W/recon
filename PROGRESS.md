@@ -42,6 +42,18 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
+### Phase 2 · module 8 (smtp) — hardening
+Adversarial review (verified against the real `smtp-*.nse` sources, nmap 7.99). 2 confirmed parser
+gaps; compliance/injection clean.
+- **correctness (MED): verbs on the smtp-commands HELP line were dropped.** `smtp-commands.nse` returns
+  TWO payloads — EHLO extensions AND the HELP response — on two lines (`| smtp-commands: ...` then
+  `|_ This server supports the following commands: ... VRFY EXPN`). `_verbs` read only the first, so
+  VRFY/EXPN (base SMTP verbs that often surface ONLY on HELP) were missed — the module's headline
+  user-enum capability. Now reads both lines (deduped).
+- **correctness (LOW): banner missed on ssl/smtp (465) + submission (587).** The module triggers on
+  those ports but `_SMTP_VER` required the service token to start with `smtp`; nmap prints `ssl/smtp`
+  and `submission`. Broadened the regex. Tests added for both.
+
 ### Phase 2 · module 14 (ntp) — engine — ALL 14 PHASE-2 MODULE ENGINES COMPLETE
 - **NtpModule** (`modules/ntp/`, UDP 123): triggers on 123 / ntp. Tier-1 read-only: `ntpq -c readlist`
   + `ntpq -c sysinfo` + `ntpdate -q` (always `-q` — recon never adjusts the local clock).
