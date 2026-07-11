@@ -1,0 +1,29 @@
+# TFTP manual follow-ups (Tier-2 — shown, never auto-run; §12). TFTP has NO listing protocol, so
+# recon is GETting well-known filenames (content discovery, not brute). {target} comes from the
+# profile; FILE is a literal you edit. Read-only GETs only — uploading (PUT) is never suggested; the
+# interactive tftp/atftp clients are copy-to-a-terminal (not on the exec allowlist, so an in-GUI run
+# safely blocks).
+
+- description: "Enumerate readable files (nmap tftp-enum)"
+  why: "Try nmap's well-known TFTP filename list in one pass — read-only content discovery"
+  command: "nmap -sU -sV --script tftp-enum -p 69 {target}"
+
+- description: "GET running-config (curl)"
+  why: "Router/switch running config over TFTP often holds secrets + SNMP communities. Read-only GET"
+  command: "curl -s tftp://{target}/running-config"
+
+- description: "GET startup-config (curl)"
+  why: "Saved device config — same high value as running-config. Read-only GET"
+  command: "curl -s tftp://{target}/startup-config"
+
+- description: "GET a specific file, keep its name (curl -O)"
+  why: "Fetch one named file to the cwd (edit FILE). Read-only — no PUT/upload"
+  command: "curl -s -O tftp://{target}/FILE"
+
+- description: "GET a file with the tftp client — copy to a terminal"
+  why: "Interactive tftp GET (edit FILE); run in a terminal, the GUI does not exec the tftp client"
+  command: "tftp {target} -c get FILE"
+
+- description: "GET a file with atftp — copy to a terminal"
+  why: "atftp alternative for a single-file GET (edit FILE); run in a terminal"
+  command: "atftp --get --remote-file FILE {target}"

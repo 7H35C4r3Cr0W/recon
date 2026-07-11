@@ -41,6 +41,22 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
+### Phase 2 · module 11 (tftp) — engine
+- **TftpModule** (`modules/tftp/`, UDP 69): triggers on 69 / tftp. TFTP has NO listing protocol, so
+  Tier-1 recon is `nmap -sU -sV --script tftp-enum` (enumerate readable files from nmap's well-known
+  list) + a `curl -s tftp://{target}/<file>` GET per name in a small fixed `COMMON_FILES` list
+  (network-device configs/backups). GET-only — no PUT/upload ever. curl already speaks tftp and is on
+  the allowlist, so no shell.py change.
+- **`tftp_get_url`** URL-encodes the filename (encoding `/` too) so a target-controlled tftp-enum name
+  can't smuggle a curl flag or a second URL; `get_step` hashes the full name into the on-disk snapshot
+  filename (injective, mirrors ftp). **parsers.py**: `parse_nmap_tftp` reads the filenames listed under
+  the `tftp-enum:` block (real @output format: header then `|_ bootrom.ld` lines), ends the section at
+  the next non-`|` line, dedups. `parse_tftp_tool` dispatch.
+- Tier-2 `manual_commands.yaml` (6): nmap tftp-enum, curl GETs (running/startup-config, named file),
+  and copy-to-terminal tftp/atftp GETs. Read-only only.
+- 10 tests (parsers + module incl. a hostile-filename injection test + a no-upload manual check).
+  Four gates green.
+
 ### Phase 2 · module 10 (snmp) — engine
 - **SnmpModule** (`modules/snmp/`, UDP 161): triggers on 161 / snmp. Tier-1 read-only recon:
   `discovery_steps` = `onesixtyone -c <small community list> {target}` (§2 explicitly allows
