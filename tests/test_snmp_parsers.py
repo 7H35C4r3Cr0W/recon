@@ -53,6 +53,15 @@ def test_snmpwalk_banner_processes_and_cred_hint() -> None:
     assert not any("Sup3rS3cret" in (f.value + f.detail) for f in findings)
 
 
+def test_cred_hint_no_false_positive() -> None:
+    # a value merely ending in 'pass' before '='/':' (compass=, bypass:) must NOT raise a cred note
+    benign = 'HOST-RESOURCES-MIB::hrSWRunParameters.9 = STRING: "--bypass=1 Compass: on"\n'
+    assert not any(f.kind == "note" and "credential" in f.value for f in parse_snmpwalk(benign))
+    # a real password token still raises it
+    real = 'HOST-RESOURCES-MIB::hrSWRunParameters.9 = STRING: "db_password=x"\n'
+    assert any(f.kind == "note" and "credential" in f.value for f in parse_snmpwalk(real))
+
+
 def test_snmpwalk_windows_users() -> None:
     text = (
         'iso.3.6.1.4.1.77.1.2.25.1.1.5 = STRING: "Administrator"\n'

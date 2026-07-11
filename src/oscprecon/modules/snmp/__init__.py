@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import shlex
 from dataclasses import dataclass
 
 from oscprecon.models import Command, Finding, Port, ScanResults, Target
@@ -72,13 +74,20 @@ class SnmpModule(Module):
         ]
 
     def walk_step(self, target: Target, community: str = "public") -> SnmpStep:
+        # why: community is an untrusted token reaching a command line — a discovered value
+        # (onesixtyone echoes hits verbatim, and the shipped list holds valid space-bearing entries
+        # like "all private") or a GUI/Tier-2 entry. shlex.quote keeps it a single argv token so a
+        # space can't redirect the walk to another agent or smuggle a flag; the on-disk slug is
+        # sanitized separately so a '/' can't escape the profile's snmp/ dir.
+        safe = shlex.quote(community)
+        slug = re.sub(r"[^A-Za-z0-9._-]", "_", community) or "community"
         return SnmpStep(
             Command(
                 "snmp",
-                f"snmpwalk -v2c -c {community} {target.ip}",
+                f"snmpwalk -v2c -c {safe} {target.ip}",
                 f"Full MIB walk with community '{community}' — system, users, processes, software.",
                 "1-5 min",
-                f"snmp/snmpwalk-{community}.txt",
+                f"snmp/snmpwalk-{slug}.txt",
             ),
             "snmpwalk",
         )
@@ -110,7 +119,7 @@ class SnmpModule(Module):
         if extra:
             out.append(
                 f"Non-default SNMP community '{extra[0]}' valid — "
-                f"snmpwalk -v2c -c {extra[0]} {{target}} for the full MIB (recon)."
+                f"snmpwalk -v2c -c {shlex.quote(extra[0])} {{target}} for the full MIB (recon)."
             )
         users = [f.fields.get("value", "") for f in findings if f.fields.get("kind") == "user"]
         if users:

@@ -53,6 +53,24 @@ def test_walk_uses_named_community() -> None:
     assert walk.command.output_file == "snmp/snmpwalk-secret.txt"
 
 
+def test_walk_quotes_space_bearing_community() -> None:
+    # the shipped onesixtyone list contains valid space-bearing communities (e.g. "all private");
+    # quoting keeps it one argv token so the walk still targets the real host, not a smuggled one
+    walk = SnmpModule().walk_step(_target(), community="all private")
+    argv = shlex.split(walk.command.shell_line)
+    # community survives as ONE token and the real target stays the agent (not treated as an OID)
+    assert argv == ["snmpwalk", "-v2c", "-c", "all private", "10.10.10.180"]
+    # the on-disk snapshot name must not carry the raw space or escape the snmp/ dir
+    assert walk.command.output_file == "snmp/snmpwalk-all_private.txt"
+
+
+def test_walk_community_cannot_traverse_output_path() -> None:
+    walk = SnmpModule().walk_step(_target(), community="../evil")
+    assert "/" not in walk.command.output_file.removeprefix("snmp/")
+    # and the command line can't smuggle a second argv token / target
+    assert shlex.split(walk.command.shell_line)[-1] == "10.10.10.180"
+
+
 def test_parse_and_suggest() -> None:
     module = SnmpModule()
     findings = module.parse(

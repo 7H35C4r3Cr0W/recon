@@ -6,11 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 — `nfs` engine + review + hardening done; `snmp` engine shipped (adversarial review next);
-`smtp` engine shipped (review pending); GUI panels pending for smtp/nfs/snmp.** Next: finish the
-snmp review, then `tftp/netbios/ike/ntp` engines (§12 order), then the deferred GUI panels + smtp
-review. Same engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost,
-smb, ftp, ssh, dns, ldap, nfs** (286 tests). Recurring review lessons: parsers must match REAL current tool output;
+**Phase 2 — `nfs` + `snmp` engines reviewed + hardened; `tftp` engine shipped (review next); `smtp`
+engine shipped (review pending); GUI panels pending for smtp/nfs/snmp/tftp.** Next: review tftp, then
+`netbios/ike/ntp` engines (§12 order), then the deferred GUI panels + smtp review. Same
+engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost, smb, ftp, ssh,
+dns, ldap, nfs, snmp** (299 tests). Recurring review lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -40,6 +40,21 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · module 10 (snmp) — hardening
+Adversarial 3-lens review (7 agents; verified against real onesixtyone / snmpwalk output). 4
+candidates, 4 CONFIRMED — but #1–#3 were the SAME root issue, found independently by all three lenses.
+- **injection (MED ×3): unvalidated community reaches a command line.** `walk_step` spliced
+  `{community}` unquoted into `snmpwalk -v2c -c {community} {ip}`, into `suggest()`'s hint, and into
+  the `snmp/snmpwalk-{community}.txt` path. The shipped onesixtyone list itself holds valid
+  space-bearing communities (`all private`), which onesixtyone echoes verbatim → `parse_onesixtyone`
+  keeps the space → `shlex.split` turns `-c all private 10.x` into community `all` + agent `private`,
+  redirecting the walk off-target (and `../evil` escaped the snmp/ dir). Fix: `shlex.quote` the
+  community in the command + `suggest()` (preserves a valid space-bearing community as ONE argv token,
+  unlike a reject-charset guard that would break `all private`), and a `re.sub` slug for the filename.
+- **correctness (LOW): `_CRED_HINT` false positives.** `pass(word|wd)?[=:]` (unanchored) fired on
+  `compass=` / `bypass:`. Added a `(?<![A-Za-z])` lookbehind (beats `\b`: still matches `_password=`
+  and `--password=`). Regression tests for both fixes.
 
 ### Phase 2 · module 11 (tftp) — engine
 - **TftpModule** (`modules/tftp/`, UDP 69): triggers on 69 / tftp. TFTP has NO listing protocol, so

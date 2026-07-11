@@ -28,7 +28,7 @@ _ONESIXTYONE = re.compile(
 )
 # credentials frequently sit in process command-line args exposed over SNMP — flag their presence
 # WITHOUT copying the secret into a finding (§6: reports/findings never carry plaintext secrets).
-_CRED_HINT = re.compile(r"pass(?:word|wd)?\s*[=:]", re.IGNORECASE)
+_CRED_HINT = re.compile(r"(?<![A-Za-z])pass(?:word|wd)?\s*[=:]", re.IGNORECASE)
 
 
 def _dedup(findings: list[SnmpFinding]) -> list[SnmpFinding]:
