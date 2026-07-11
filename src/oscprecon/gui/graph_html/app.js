@@ -1,25 +1,17 @@
 // Renders the profile graph with Cytoscape.js and talks to the Qt GraphBridge over QWebChannel.
-// Node/edge colors follow CLAUDE.md §16. No network — cytoscape.min.js is vendored, qwebchannel.js
-// is served by Qt from qrc://.
+// Node/edge colors follow CLAUDE.md §16. No network — cytoscape.min.js / cytoscape-svg.js are vendored,
+// qwebchannel.js is served by Qt from qrc://. The minimap is a second locked Cytoscape overview (no
+// jQuery-dependent navigator extension).
 (function () {
   "use strict";
   var cy = null;
+  var mini = null;
   var bridge = null;
   var linkMode = false;
   var linkSource = null;
+  var svgReady = false;
 
   var DEFAULT_HINT = "drag nodes to reposition (saved) · click a node for detail";
-
-  function setLinkMode(on) {
-    linkMode = on;
-    linkSource = null;
-    var button = document.getElementById("link-mode");
-    button.style.background = on ? "#cba6f7" : "";
-    button.style.color = on ? "#11111b" : "";
-    document.getElementById("hint").textContent = on
-      ? "LINK MODE: click a source node, then a target — creates a relates-to edge"
-      : DEFAULT_HINT;
-  }
 
   var STYLE = [
     {
@@ -52,14 +44,12 @@
       style: { "background-color": "#f38ba8", color: "#e0e7ff" },
     },
     { selector: 'node[type="note"]', style: { "background-color": "#9399b2" } },
-    {
-      selector: "node[status]",
-      style: { "border-width": 3, "border-color": "#f9e2af" },
-    },
+    { selector: "node[status]", style: { "border-width": 3, "border-color": "#f9e2af" } },
     { selector: 'node[status="done"]', style: { "border-color": "#a6e3a1" } },
     { selector: 'node[status="dead-end"]', style: { opacity: 0.45 } },
     { selector: "node[note]", style: { "border-style": "dashed", "border-color": "#cba6f7" } },
     { selector: "node:selected", style: { "border-width": 4, "border-color": "#cba6f7" } },
+    { selector: ".hidden", style: { display: "none" } },
     {
       selector: "edge",
       style: {
@@ -71,7 +61,6 @@
       },
     },
     {
-      // only edges that actually carry a label get one (avoids Cytoscape's "no mapping" warning)
       selector: "edge[label]",
       style: {
         label: "data(label)",
@@ -98,23 +87,6 @@
     },
   ];
 
-  function runLayout(name) {
-    if (!cy) return;
-    var opts =
-      name === "force"
-        ? { name: "cose", animate: false, padding: 30 }
-        : {
-            name: "breadthfirst",
-            directed: true,
-            padding: 30,
-            spacingFactor: 1.3,
-            roots: "#target",
-          };
-    cy.layout(opts).run();
-    cy.fit(undefined, 40);
-  }
-
-  var svgReady = false;
   function registerExtensions() {
     if (!svgReady && window.cytoscapeSvg) {
       try {
@@ -124,6 +96,27 @@
         svgReady = false;
       }
     }
+  }
+
+  function runLayout(name) {
+    if (!cy) return;
+    var opts =
+      name === "force"
+        ? { name: "cose", animate: false, padding: 30 }
+        : { name: "breadthfirst", directed: true, padding: 30, spacingFactor: 1.3, roots: "#target" };
+    cy.layout(opts).run();
+    cy.fit(undefined, 40);
+  }
+
+  function setLinkMode(on) {
+    linkMode = on;
+    linkSource = null;
+    var button = document.getElementById("link-mode");
+    button.style.background = on ? "#cba6f7" : "";
+    button.style.color = on ? "#11111b" : "";
+    document.getElementById("hint").textContent = on
+      ? "LINK MODE: click a source node, then a target — creates a relates-to edge"
+      : DEFAULT_HINT;
   }
 
   function exportImage(format) {
@@ -136,6 +129,80 @@
       data = cy.png({ output: "base64uri", full: true, scale: 2, bg: "#1e1e2e" });
     }
     bridge.export_image(format, data);
+  }
+
+  // Hide/show a node type across the main graph + the minimap; an edge is hidden when either end is.
+  function applyFilter() {
+    var hidden = {};
+    var boxes = document.querySelectorAll("input.filter");
+    for (var i = 0; i < boxes.length; i++) {
+      if (!boxes[i].checked) hidden[boxes[i].getAttribute("data-type")] = true;
+    }
+    [cy, mini].forEach(function (graph) {
+      if (!graph) return;
+      graph.nodes().forEach(function (n) {
+        n.toggleClass("hidden", !!hidden[n.data("type")]);
+      });
+      graph.edges().forEach(function (e) {
+        e.toggleClass("hidden", e.source().hasClass("hidden") || e.target().hasClass("hidden"));
+      });
+    });
+  }
+
+  function updateViewportRect() {
+    var rect = document.getElementById("minimap-viewport");
+    if (!mini || !rect) return;
+    var z = cy.zoom();
+    var pan = cy.pan();
+    var w = cy.width();
+    var h = cy.height();
+    // model-space rectangle currently visible in the main view
+    var mx1 = -pan.x / z;
+    var my1 = -pan.y / z;
+    var mx2 = (w - pan.x) / z;
+    var my2 = (h - pan.y) / z;
+    var mz = mini.zoom();
+    var mp = mini.pan();
+    var rx1 = mx1 * mz + mp.x;
+    var ry1 = my1 * mz + mp.y;
+    var rx2 = mx2 * mz + mp.x;
+    var ry2 = my2 * mz + mp.y;
+    rect.style.left = Math.min(rx1, rx2) + "px";
+    rect.style.top = Math.min(ry1, ry2) + "px";
+    rect.style.width = Math.abs(rx2 - rx1) + "px";
+    rect.style.height = Math.abs(ry2 - ry1) + "px";
+  }
+
+  function buildMinimap(elements) {
+    var container = document.getElementById("minimap");
+    if (!container) return;
+    if (mini) {
+      mini.destroy();
+      mini = null;
+    }
+    mini = cytoscape({
+      container: container,
+      elements: JSON.parse(JSON.stringify(elements)), // clone so the two instances never share state
+      style: STYLE,
+      userZoomingEnabled: false,
+      userPanningEnabled: false,
+      boxSelectionEnabled: false,
+      autoungrabify: true,
+      autounselectify: true,
+    });
+    window.mini = mini; // exposed for the web inspector / render checks
+    cy.nodes().forEach(function (n) {
+      var m = mini.getElementById(n.id());
+      if (m.length) m.position(n.position());
+    });
+    mini.fit(undefined, 6);
+    // click the minimap to pan the main view there
+    mini.on("tap", function (evt) {
+      if (!evt.position) return;
+      var z = cy.zoom();
+      cy.pan({ x: cy.width() / 2 - evt.position.x * z, y: cy.height() / 2 - evt.position.y * z });
+    });
+    updateViewportRect();
   }
 
   function render(elements) {
@@ -163,7 +230,6 @@
           if (bridge && id !== linkSource) {
             bridge.add_user_edge(linkSource, id, "");
             cy.add({
-              // show it immediately (already persisted to graph.json for the next load)
               data: { id: "live-" + linkSource + "-" + id, source: linkSource, target: id, type: "relates-to" },
             });
           }
@@ -184,6 +250,8 @@
       bridge.save_positions(JSON.stringify(positions));
     });
 
+    cy.on("pan zoom resize", updateViewportRect);
+
     document.getElementById("layout-hier").onclick = function () {
       runLayout("hier");
     };
@@ -202,6 +270,10 @@
     document.getElementById("export-svg").onclick = function () {
       exportImage("svg");
     };
+    var boxes = document.querySelectorAll("input.filter");
+    for (var i = 0; i < boxes.length; i++) boxes[i].onchange = applyFilter;
+
+    buildMinimap(elements);
   }
 
   function boot() {

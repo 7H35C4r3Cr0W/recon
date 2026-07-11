@@ -10,11 +10,10 @@ Running record of what's been built, in order, so any session can pick up mid-st
 ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp) + status footer QoL. All 14 done,
 reviewed, hardened, GUI'd (347 tests).
 
-**Phase 4 graph view is substantially complete** (chunks 1–3c: data model + persistence, rendering +
-View→Graph toggle, node-detail/status/note sidebar, PNG/SVG export, relates-to edge drawing). Only
-optional §16 polish remains: **minimap** (needs the cytoscape-navigator extension) and a **node-type
-filter sidebar**. After that (or now if you prefer), **return to Phase 3** once your Obsidian
-notes/box writeups are committed.
+**Phase 4 graph view is COMPLETE** (chunks 1–3d: data model + persistence, rendering + View→Graph
+toggle, node-detail/status/note sidebar, PNG/SVG export, relates-to edge drawing, minimap +
+node-type filter). All §16 graph items done. **NEXT: Phase 3** — now unblocked by the mounted Obsidian
+notes (see below / memory `obsidian-notes-location`).
 
 ### ⚠️ ORDER — we JUMPED Phase 3 → Phase 4 (user decision 2026-07-11). DO NOT SKIP PHASE 3.
 **Phase 3 (pattern library + suggestion engine) is DEFERRED, not done — now UNBLOCKED.** The user's
@@ -65,6 +64,17 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 4 · graph view — chunk 3d: minimap + node-type filter (Phase 4 COMPLETE)
+- **Minimap**: a bottom-right overview built as a SECOND locked Cytoscape instance (positions mirrored
+  from the main graph, non-interactive) + a live `#minimap-viewport` rectangle that tracks the main
+  view's pan/zoom, and click-the-minimap-to-pan. Deliberately NOT the cytoscape-navigator extension —
+  it hard-requires jQuery (verified 3 `jQuery(` calls), too heavy for optional polish; the custom
+  overview reuses the already-vendored Cytoscape with no new deps.
+- **Filter**: toolbar checkboxes (services / findings / creds) toggle a `.hidden` class
+  (`display: none`) across BOTH the graph and the minimap; an edge is hidden when either endpoint is.
+- **Verified in a real webengine render**: minimap has all 5 nodes, viewport rect is sized, and
+  unchecking creds gives `display=none visible=false` (reverses on re-check). JS-only chunk. 364 tests.
 
 ### Phase 4 · graph view — chunk 3c: relates-to edge drawing (link mode)
 - Toolbar **Link mode** toggle (§16 "drag edge between two nodes → relates-to user edge"): click a

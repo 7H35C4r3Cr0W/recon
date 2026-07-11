@@ -32,6 +32,17 @@ body {
   background: #45475a;
 }
 
+#filters {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-label {
+  color: #bac2de;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 #hint {
   color: #6c7086;
   font-size: 12px;
@@ -41,4 +52,26 @@ body {
 #cy {
   width: 100%;
   height: calc(100% - 33px);
+  position: relative;
+}
+
+#minimap {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  width: 200px;
+  height: 150px;
+  background: rgba(24, 24, 37, 0.9);
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  overflow: hidden;
+  z-index: 50;
+}
+
+#minimap-viewport {
+  position: absolute;
+  border: 1.5px solid #cba6f7;
+  background: rgba(203, 166, 247, 0.12);
+  pointer-events: none;
+  z-index: 51;
 }
