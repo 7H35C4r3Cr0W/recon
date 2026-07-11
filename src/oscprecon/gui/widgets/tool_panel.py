@@ -17,10 +17,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.widgets.dns_panel import DnsPanel
 from oscprecon.gui.widgets.ftp_panel import FtpPanel
 from oscprecon.gui.widgets.http_panel import HttpPanel
 from oscprecon.gui.widgets.ldap_panel import LdapPanel
+from oscprecon.gui.widgets.simple_recon_panel import SimpleReconPanel
 from oscprecon.gui.widgets.smb_panel import SmbPanel
 from oscprecon.gui.widgets.ssh_panel import SshPanel
 from oscprecon.gui.widgets.vhost_panel import VhostPanel
@@ -46,6 +48,7 @@ class ToolPanel(QWidget):
     ssh_recon_requested = Signal(int)  # port
     dns_recon_requested = Signal(str, int)  # (domain, port)
     ldap_recon_requested = Signal(str, int)  # (basedn, port)
+    simple_recon_requested = Signal(str)  # module name (nfs/snmp/tftp/netbios/ike/ntp/smtp)
 
     def __init__(self) -> None:
         super().__init__()
@@ -118,6 +121,14 @@ class ToolPanel(QWidget):
         self._ldap.manual_requested.connect(self.run_requested)
         self._ldap.validation_failed.connect(self.vhost_validation_failed)
 
+        # simple read-only modules share one panel type — one instance per module, keyed by name
+        self._simple: dict[str, SimpleReconPanel] = {}
+        for spec in SIMPLE_SPECS.values():
+            panel = SimpleReconPanel(spec)
+            panel.recon_requested.connect(self.simple_recon_requested)
+            panel.manual_requested.connect(self.run_requested)
+            self._simple[spec.module] = panel
+
         self._stack = QStackedWidget()
         self._stack.addWidget(generic)  # 0: generic hints
         self._stack.addWidget(self._web_tabs)  # 1: http/vhost builders
@@ -126,6 +137,8 @@ class ToolPanel(QWidget):
         self._stack.addWidget(self._ssh)  # 4: ssh
         self._stack.addWidget(self._dns)  # 5: dns
         self._stack.addWidget(self._ldap)  # 6: ldap
+        for panel in self._simple.values():  # 7+: nfs/snmp/tftp/netbios/ike/ntp/smtp
+            self._stack.addWidget(panel)
 
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
@@ -146,6 +159,8 @@ class ToolPanel(QWidget):
         self._ssh.set_profile(profile)
         self._dns.set_profile(profile)
         self._ldap.set_profile(profile)
+        for panel in self._simple.values():
+            panel.set_profile(profile)
 
     def show_service(self, service: DiscoveredService | None, ref: ServiceRef | None) -> None:
         self._hints.clear()
@@ -180,6 +195,11 @@ class ToolPanel(QWidget):
             self._ldap.configure(service)
             self._stack.setCurrentWidget(self._ldap)
             return
+        if ref is not None and ref.module in self._simple:
+            panel = self._simple[ref.module]
+            panel.configure(service)
+            self._stack.setCurrentWidget(panel)
+            return
         self._stack.setCurrentIndex(0)
         if ref is None:
             return
@@ -202,6 +222,8 @@ class ToolPanel(QWidget):
         self._ssh.set_running(running)
         self._dns.set_running(running)
         self._ldap.set_running(running)
+        for panel in self._simple.values():
+            panel.set_running(running)
 
     def set_smb_summary(self, lines: list[str]) -> None:
         self._smb.set_summary(lines)
@@ -217,6 +239,11 @@ class ToolPanel(QWidget):
 
     def set_ldap_summary(self, lines: list[str]) -> None:
         self._ldap.set_summary(lines)
+
+    def set_simple_summary(self, module: str, lines: list[str]) -> None:
+        panel = self._simple.get(module)
+        if panel is not None:
+            panel.set_summary(lines)
 
     def add_vhosts(self, vhosts: list[str]) -> None:
         self._vhost.add_vhosts(vhosts)

@@ -27,12 +27,14 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import config, findings, references, shell
+from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.widgets.notes_pane import NotesPane
 from oscprecon.gui.widgets.reference_pane import ReferencePane
 from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
-from oscprecon.models import Credential, DiscoveredService, Target
+from oscprecon.models import Credential, DiscoveredService, Finding, Target
+from oscprecon.modules.base import Module
 from oscprecon.modules.dns import DnsFinding, DnsModule, parse_dns_tool
 from oscprecon.modules.ftp import (
     FtpFinding,
@@ -654,6 +656,82 @@ class LdapReconWorker(QThread):
         return summary
 
 
+@dataclass
+class SimpleReconResult:
+    module: str
+    summary: list[str]
+
+
+class SimpleReconWorker(QThread):
+    line = Signal(str)
+    done = Signal(object)  # SimpleReconResult
+    failed = Signal(str)
+
+    def __init__(self, profile: Profile, module_name: str) -> None:
+        super().__init__()
+        self._profile = profile
+        self._spec = SIMPLE_SPECS[module_name]
+
+    def run(self) -> None:
+        try:
+            result = self._drive()
+        except Exception as exc:  # boundary: surface worker failures to the UI thread
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(result)
+
+    def _run_step(self, shell_line: str, output_rel: str) -> str:
+        base = self._profile.directory
+        out = base / output_rel
+        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        try:
+            return out.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+
+    def _drive(self) -> SimpleReconResult:
+        target = self._profile.target
+        raw: dict[str, str] = {}
+        for command, tool in self._spec.steps_fn(target):
+            text = self._run_step(command.shell_line, command.output_file)
+            if tool:  # unparsed steps (e.g. tftp GETs) still run, but carry no parser key
+                raw[tool] = text
+        module = self._spec.factory()
+        found = module.parse(raw)
+        self._write_findings(found)
+        return SimpleReconResult(self._spec.module, self._summarize(module, found))
+
+    def _write_findings(self, found: list[Finding]) -> None:
+        if not found:
+            return
+        now = datetime.now(UTC).isoformat()
+        findings.add_findings(
+            self._profile.directory,
+            [
+                {
+                    "module": f.service,
+                    "kind": f.fields.get("kind", ""),
+                    "value": f.fields.get("value", ""),
+                    "detail": f.detail,
+                    "discovered_at": now,
+                }
+                for f in found
+            ],
+        )
+
+    def _summarize(self, module: Module, found: list[Finding]) -> list[str]:
+        summary: list[str] = []
+        by_kind: dict[str, list[str]] = {}
+        for f in found:
+            by_kind.setdefault(f.fields.get("kind", "?"), []).append(f.fields.get("value", ""))
+        for kind, values in by_kind.items():
+            shown = ", ".join(v for v in values[:4] if v)
+            more = " …" if len(values) > 4 else ""
+            summary.append(f"{kind} ({len(values)}): {shown}{more}")
+        summary.extend(f"→ {tip}" for tip in module.suggest(found))
+        return summary or [f"No {self._spec.module.upper()} findings."]
+
+
 def _slug(command: str) -> str:
     tokens = command.split()
     base = tokens[0] if tokens else "command"
@@ -705,6 +783,7 @@ class MainWindow(QMainWindow):
         self._tool_panel.ssh_recon_requested.connect(self._on_ssh_recon)
         self._tool_panel.dns_recon_requested.connect(self._on_dns_recon)
         self._tool_panel.ldap_recon_requested.connect(self._on_ldap_recon)
+        self._tool_panel.simple_recon_requested.connect(self._on_simple_recon)
         self._tool_panel.vhost_validation_failed.connect(
             lambda msg: self._tool_panel.append_output(f"[blocked] {msg}")
         )
@@ -1226,6 +1305,29 @@ class MainWindow(QMainWindow):
             if isinstance(result, SshReconResult):
                 self._tool_panel.set_ssh_summary(result.summary)
                 self._tool_panel.append_output("[ssh] recon complete")
+        except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
+            self._tool_panel.append_output(f"[error] {exc}")
+        self._finish_worker()
+
+    def _on_simple_recon(self, module_name: str) -> None:
+        if self._profile is None or self._worker is not None or module_name not in SIMPLE_SPECS:
+            return
+        self._set_busy(True)
+        self._tool_panel.append_output(f"[{module_name}] recon starting…")
+        worker = SimpleReconWorker(self._profile, module_name)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_simple_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _on_simple_done(self, result: object) -> None:
+        # why: a summary write error must not strand self._worker — always release the slot in
+        # _finish_worker, mirroring _on_ssh_done's guard.
+        try:
+            if isinstance(result, SimpleReconResult):
+                self._tool_panel.set_simple_summary(result.module, result.summary)
+                self._tool_panel.append_output(f"[{result.module}] recon complete")
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
         self._finish_worker()

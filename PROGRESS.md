@@ -6,11 +6,13 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 ENGINES COMPLETE + ALL 14 ADVERSARIALLY REVIEWED & HARDENED** (http, vhost, smb, ftp, ssh,
-dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp). Next: **GUI panels** for the engine-only modules
-(smtp/nfs/snmp/tftp/netbios/ike/ntp — the tool_panel stack pages + workers, mirroring the ftp/smb
-panels), then **Phase 3** (pattern library + suggestion engine). **All 14 modules done, reviewed,
-hardened** (334 tests). Recurring review lessons: parsers must match REAL current tool output;
+**Phase 2 COMPLETE — all 14 modules have engine + adversarial review + GUI panel** (http, vhost, smb,
+ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp). The 7 engine-only modules
+(smtp/nfs/snmp/tftp/netbios/ike/ntp) now share one generic SimpleReconPanel + SimpleReconWorker.
+**Next: Phase 3** (pattern library + suggestion engine — `patterns/<svc>.yaml` with `# source:`
+provenance gate, `patterns/engine.py`, "Recon next steps" in the tool panel), then the queued QoL
+items (status footer §19, project file ops §19, audit log §6a). **All 14 modules done, reviewed,
+hardened, GUI'd** (346 tests). Recurring review lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -40,6 +42,24 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · GUI — generic simple-recon panel for the 7 engine-only modules
+- **SimpleReconPanel** (`gui/widgets/simple_recon_panel.py`) + **SimpleReconWorker** (`main_window.py`)
+  + **registry** (`gui/simple_recon.py`): ONE panel type for the read-only single-shape modules
+  (smtp/nfs/snmp/tftp/netbios/ike/ntp) instead of 7 bespoke widgets. Each `SimpleReconSpec` supplies the
+  Tier-1 button label, intro, `manual_commands.yaml`, a module factory (for the uniform
+  `Module.parse`/`suggest`), and a typed step-provider (snmp adds the public MIB walk; tftp fans out the
+  COMMON_FILES GETs) — so the base Module never needs the concrete step methods.
+- The worker runs the Tier-1 steps through the policy-enforced `shell.run`, builds `raw_outputs` keyed
+  by tool, calls `module.parse()` → base Findings → `findings.json`, and produces a per-kind summary +
+  `suggest()` next-steps. Empty parse writes nothing (mirrors the ssh worker).
+- `tool_panel` adds one SimpleReconPanel per module to the stack, dispatches by `ref.module`, forwards
+  `simple_recon_requested(name)` + Tier-2 manual follow-ups (validated at the shell chokepoint), and
+  disables them during a scan. `main_window` wires the worker with the standard worker-slot /
+  `_finish_worker` guard.
+- 12 GUI tests (ntp + netbios worker parse→findings, empty case, panel dispatch + signal forwarding,
+  manual-legality across all 7 specs). Updated the one widget test that assumed smtp used the generic
+  hints page (smtp now has a panel; mysql covers the generic page). 346 tests, four gates green.
 
 ### Phase 2 · modules 13–14 (ike, ntp) — hardening
 Adversarial reviews (verified against real ike-scan / ntpq / ntpdate output). Both modules were clean
