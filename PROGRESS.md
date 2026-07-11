@@ -41,6 +41,19 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
+### Phase 2 · module 11 (tftp) — hardening
+Adversarial 3-lens review (verified against the real `tftp-enum.nse` source). 4 candidates, 2 CONFIRMED
+(one issue found by two lenses); 2 refuted.
+- **parser-correctness (MED): `_SKIP_PREFIXES` dropped real files.** The guard skipped in-section lines
+  starting with started/date/error/info — but tftp-enum's output is ONLY found filenames (those strings
+  appear only in the script's `debug1()` calls, never in output), so the filter protected against
+  nothing while silently deleting legitimate readable files named `info.txt` / `error.log` / `date`.
+  Removed the guard (every in-section `|` line is a filename); added a regression test.
+- Refuted (verified non-issues): adjacent-NSE-block leak (`fingerprint-strings` from `-sV` sorts before
+  `tftp-enum`, so no `|` block ever follows it — the non-`|` trailing lines already end the section);
+  0-byte-miss vs 0-byte-hit ambiguity (speculation about a not-yet-built worker; `ShellResult` already
+  exposes `exit_code`).
+
 ### Phase 2 · module 12 (netbios) — engine
 - **NetbiosModule** (`modules/netbios/`, UDP 137): triggers on 137 / netbios-ns. Tier-1 read-only:
   `nmblookup -A {target}` + `nbtscan {target}` (NetBIOS name table — host, domain/workgroup, service

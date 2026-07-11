@@ -23,8 +23,9 @@ class TftpFinding:
 
 
 # nmap tftp-enum lists each readable file on its own `|`/`|_` line under the `tftp-enum:` header;
-# the header carries no filename (@output shows `| tftp-enum:` then a `|_ bootrom.ld` line).
-_SKIP_PREFIXES = ("started", "date", "error", "info")
+# the header carries no filename (@output shows `| tftp-enum:` then a `|_ bootrom.ld` line). Every
+# in-section `|` line IS a reported filename — the script emits no status/sentinel lines to skip, so
+# there is no prefix filter (one would only drop real files named info.txt / error.log / date).
 
 
 def parse_nmap_tftp(text: str) -> list[TftpFinding]:
@@ -34,8 +35,7 @@ def parse_nmap_tftp(text: str) -> list[TftpFinding]:
     for raw in text.splitlines():
         is_script_line = raw.lstrip().startswith("|")
         cleaned = re.sub(r"^\s*\|[_ ]?", "", raw).strip()
-        low = cleaned.lower()
-        if low.startswith("tftp-enum:"):
+        if cleaned.lower().startswith("tftp-enum:"):
             in_section = True
             inline = cleaned.split(":", 1)[1].strip()
             if inline:
@@ -44,7 +44,7 @@ def parse_nmap_tftp(text: str) -> list[TftpFinding]:
         if not is_script_line:
             in_section = False
             continue
-        if in_section and cleaned and not low.startswith(_SKIP_PREFIXES):
+        if in_section and cleaned:
             _add_file(findings, seen, cleaned)
     return findings
 

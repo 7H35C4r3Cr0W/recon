@@ -26,6 +26,14 @@ def test_inline_filename_on_header() -> None:
     assert files == {"nvram.bin"}
 
 
+def test_status_prefixed_filenames_are_kept() -> None:
+    # every in-section line is a reported filename — a name starting with info/error/date/started
+    # (realistic via a custom tftp-enum.filelist or a device) must NOT be dropped
+    text = "| tftp-enum:\n|   info.txt\n|   error.log\n|   date\n|_  startup-config\n"
+    files = {f.value for f in parse_nmap_tftp(text) if f.kind == "file"}
+    assert files == {"info.txt", "error.log", "date", "startup-config"}
+
+
 def test_dispatch_and_garbage() -> None:
     assert parse_tftp_tool("unknown", "x") == []
     assert parse_tftp_tool("nmap-tftp", _read("nmap-tftp.txt"))
