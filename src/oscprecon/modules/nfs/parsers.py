@@ -120,7 +120,14 @@ def parse_nmap_nfs(text: str) -> list[NfsFinding]:
         if section == "showmount" and stripped.startswith("/"):
             findings.extend(_export_findings(stripped))
         elif section == "ls":
-            if low.startswith("access:"):
+            vol_match = re.match(r"Volume\s+(?P<vol>/\S+)", stripped)
+            if vol_match is not None:
+                # nmap prints each nfs-ls export as its own `Volume /path` line (the 2nd+ export,
+                # and the 1st too in real output). Re-anchor here so files/access after it attribute
+                # to the right export instead of the header's volume — else a writable share and any
+                # sensitive file land under the wrong export in the report/graph.
+                volume = vol_match.group("vol")
+            elif low.startswith("access:"):
                 caps = stripped.split(":", 1)[1].strip()
                 # tokens are "Read"/"NoModify"/"Modify"/... — a standalone "Modify" means writable;
                 # "NoModify" is one word so \bModify\b does not match inside it.

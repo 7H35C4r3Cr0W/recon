@@ -41,16 +41,44 @@ def test_nmap_nfs_exports_and_world_readable() -> None:
 
 
 def test_nmap_nfs_lists_files_and_skips_dot_entries() -> None:
-    files = {f.value for f in parse_nmap_nfs(_read("nmap-nfs.txt")) if f.kind == "file"}
-    assert files == {"id_rsa", "notes.txt"}  # '.' and '..' excluded
-    id_rsa = next(f for f in parse_nmap_nfs(_read("nmap-nfs.txt")) if f.value == "id_rsa")
-    assert "/opt/backups" in id_rsa.detail and id_rsa.detail.startswith("rw-------")
+    findings = parse_nmap_nfs(_read("nmap-nfs.txt"))
+    files = {f.value for f in findings if f.kind == "file"}
+    assert files == {"motd", "id_rsa", "notes.txt"}  # '.' and '..' excluded
+    id_rsa = next(f for f in findings if f.value == "id_rsa")
+    # per-volume attribution: id_rsa lives in /opt/backups, not the header volume /var/nfs/general
+    assert "/opt/backups" in id_rsa.detail
+    # real nmap emits a 10-char perm with a leading type char — it must survive intact
+    assert id_rsa.detail.startswith("-rw-------")
+    motd = next(f for f in findings if f.value == "motd")
+    assert "/var/nfs/general" in motd.detail
 
 
 def test_nmap_nfs_access_detects_writable() -> None:
-    access = [f for f in parse_nmap_nfs(_read("nmap-nfs.txt")) if f.kind == "access"]
-    assert access and access[0].value == "/opt/backups"
-    assert "writable" in access[0].detail  # 'Modify' present, not 'NoModify'
+    access = {
+        f.value: f.detail for f in parse_nmap_nfs(_read("nmap-nfs.txt")) if f.kind == "access"
+    }
+    # each export's access line is attributed to its own volume, not the first one
+    assert "writable" in access["/opt/backups"]  # 'Modify' present
+    assert "read-only" in access["/var/nfs/general"]  # 'NoModify'
+
+
+def test_nmap_nfs_multi_volume_attribution() -> None:
+    # regression: a standalone `Volume /X` line (the 2nd+ export) must re-anchor attribution, else
+    # every file/access after the first volume is credited to the wrong export.
+    text = (
+        "| nfs-ls: Volume /exportA\n"
+        "|   access: Read Lookup NoModify NoExtend NoDelete NoExecute\n"
+        "|   -rw-r--r--  0 0 10 2026-01-10T22:13:37 fileA\n"
+        "|   Volume /exportB\n"
+        "|   access: Read Lookup Modify Extend Delete NoExecute\n"
+        "|_  -rw-------  0 0 20 2026-01-10T22:13:37 secret.key\n"
+    )
+    findings = parse_nmap_nfs(text)
+    secret = next(f for f in findings if f.value == "secret.key")
+    assert "/exportB" in secret.detail  # not mis-attributed to /exportA
+    access = {f.value: f.detail for f in findings if f.kind == "access"}
+    assert "writable" in access["/exportB"]
+    assert "read-only" in access["/exportA"]
 
 
 def test_access_read_only_not_misread_as_writable() -> None:

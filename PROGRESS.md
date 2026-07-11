@@ -6,11 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 modules 8–9 — `smtp` + `nfs` engines shipped (engine-only; GUI panel + per-module
-adversarial review still pending for both).** Next: `snmp/tftp/netbios/ike/ntp` engines (§12 order),
-then the deferred smtp+nfs GUI panels + reviews. Same engine→GUI→adversarial-review→commit pattern.
-**Done, reviewed, hardened: http, vhost, smb, ftp, ssh, dns, ldap** (272 tests). Recurring review
-lessons: parsers must match REAL current tool output;
+**Phase 2 — `nfs` engine done + adversarially reviewed + hardened; `smtp` engine shipped (review
++ GUI still pending); GUI panels pending for both smtp & nfs.** Next: `snmp/tftp/netbios/ike/ntp`
+engines (§12 order), then the deferred smtp+nfs GUI panels + smtp review. Same
+engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost, smb, ftp,
+ssh, dns, ldap, nfs** (273 tests). Recurring review lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -40,6 +40,23 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · module 9 (nfs) — hardening
+Adversarial 3-lens review (7 agents: 3 review lenses → per-finding adversarial verify, checked against
+the real `nfs-ls.nse` / `nselib/ls.lua` source). 1 of 4 candidates survived verification; 3 correctly
+refuted.
+- **correctness (HIGH): multi-export nfs-ls mis-attribution.** `parse_nmap_nfs` captured the volume
+  only from the inline `nfs-ls:` header, but real nmap prints each export as its own `Volume /path`
+  line — so on a multi-share box every file/access after the first was credited to the wrong (or
+  empty) export, aiming the writable-share + sensitive-file findings at the wrong share in the
+  report/graph. Fix: match a standalone `^Volume\s+(/\S+)` line inside the ls section and re-anchor
+  `volume`. Rewrote the fixture to real nmap output (standalone 2nd `Volume` + 10-char type-char
+  perms) and added a multi-volume attribution regression test.
+- Refuted (verified non-issues): fixture's type-char-less perms "drop findings" (the `[dlbcps-]?`
+  regex already handles the real 10-char form; only a speculative future regex-tightening breaks it);
+  `is_secret_name` misses/over-fires (non-executing hint tuning; `.htpasswd`/`.git-credentials`
+  already match via the `passwd`/`credential` substrings); mixed-ACL test gap (`_world_readable`
+  already flags `10.0.0.0/24,*` as world-readable — hypothetical regression, not a live defect).
 
 ### Phase 2 · module 9 (nfs) — engine
 - **NfsModule** (`modules/nfs/`): triggers on 2049 / nfs service names. Tier-1 read-only recon
