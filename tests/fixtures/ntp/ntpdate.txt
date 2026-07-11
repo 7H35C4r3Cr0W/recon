@@ -1,0 +1,2 @@
+server 10.10.10.180, stratum 3, offset +0.001234, delay 0.02585
+11 Jul 12:00:00 ntpdate[1234]: adjust time server 10.10.10.180 offset +0.001234 sec

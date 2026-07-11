@@ -6,11 +6,12 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 — `nfs` + `snmp` + `tftp` + `netbios` engines reviewed + hardened; `smtp` engine shipped
-(review pending); GUI panels pending for smtp/nfs/snmp/tftp/netbios.** Next: `ike/ntp` engines (§12
-order — the last two Phase-2 modules), then the deferred GUI panels + smtp review. Same
-engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost, smb, ftp, ssh,
-dns, ldap, nfs, snmp, tftp, netbios** (311 tests). Recurring review lessons: parsers must match REAL current tool output;
+**Phase 2 module engines COMPLETE — all 14 built (http, vhost, smb, ftp, ssh, dns, ldap, smtp, nfs,
+snmp, tftp, netbios, ike, ntp).** Reviewed + hardened: 11. **Review still pending: `smtp`, `ike`,
+`ntp`.** GUI panels pending for the engine-only modules (smtp/nfs/snmp/tftp/netbios/ike/ntp). Next:
+adversarial reviews for smtp/ike/ntp → their GUI panels → then Phase 3 (pattern library + suggestion
+engine). **Done, reviewed, hardened: http, vhost, smb, ftp, ssh, dns, ldap, nfs, snmp, tftp, netbios**
+(328 tests). Recurring review lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -40,6 +41,18 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · module 14 (ntp) — engine — ALL 14 PHASE-2 MODULE ENGINES COMPLETE
+- **NtpModule** (`modules/ntp/`, UDP 123): triggers on 123 / ntp. Tier-1 read-only: `ntpq -c readlist`
+  + `ntpq -c sysinfo` + `ntpdate -q` (always `-q` — recon never adjusts the local clock).
+- **parsers.py**: `parse_ntpq` pulls `version`/`system`/`processor` (host fingerprint) from the
+  `key="value"` readlist form and stratum from either `stratum=3` (readlist) or `stratum:  3`
+  (sysinfo); `parse_ntpdate` extracts stratum + server from the `server IP, stratum N` line. Dispatch:
+  ntpq-readlist/ntpq-sysinfo → parse_ntpq, ntpdate → parse_ntpdate.
+- `suggest()` uses the disclosed version/OS to fingerprint and points at ntp-monlist (Tier-2 nmap).
+  Tier-2 `manual_commands.yaml` (5): readlist/sysinfo/peers, `ntpdate -q`, nmap ntp-info/ntp-monlist —
+  ntpdate is only ever used with `-q` (enforced by both the module and a manual-legality test).
+- shell.py: install hints for ntpq (ntpsec) + ntpdate (ntpsec-ntpdate). 9 tests.
 
 ### Phase 2 · module 13 (ike) — engine
 - **IkeModule** (`modules/ike/`, UDP 500): triggers on 500 / isakmp. Tier-1 read-only: `ike-scan -M`

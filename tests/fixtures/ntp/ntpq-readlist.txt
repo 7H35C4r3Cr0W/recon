@@ -1,0 +1,5 @@
+associd=0 status=0615 leap_none, sync_ntp, 5 events, clock_sync,
+version="ntpd 4.2.8p15@1.3728-o Fri Jun 19 12:00:00 UTC 2020 (1)",
+processor="x86_64", system="Linux/5.4.0-91-generic", leap=00, stratum=3,
+precision=-23, rootdelay=10.512, rootdisp=25.300, refid=192.168.1.1,
+reftime=0xe4f1a2b3.00000000, clock=0xe4f1a2c0.00000000, peer=54321, tc=10,

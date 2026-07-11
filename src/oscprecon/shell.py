@@ -127,6 +127,8 @@ _INSTALL_HINTS: dict[str, str] = {
     "searchsploit": "apt install exploitdb",
     "showmount": "apt install nfs-common",
     "rpcinfo": "apt install rpcbind",
+    "ntpq": "apt install ntpsec",
+    "ntpdate": "apt install ntpsec-ntpdate",
 }
 
 

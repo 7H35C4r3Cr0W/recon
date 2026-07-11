@@ -1,0 +1,22 @@
+# NTP manual follow-ups (Tier-2 — shown, never auto-run; §12). Read-only time/variable queries only —
+# ntpdate always uses -q so the local clock is never adjusted. {target} comes from the profile.
+
+- description: "Read NTP system variables (ntpq -c readlist)"
+  why: "Leaks ntpd version, OS, processor, stratum, refid — host fingerprinting. Recon"
+  command: "ntpq -c readlist {target}"
+
+- description: "NTP system info (ntpq -c sysinfo)"
+  why: "System peer, stratum and sync state — recon"
+  command: "ntpq -c sysinfo {target}"
+
+- description: "Query time without setting it (ntpdate -q)"
+  why: "One-shot time query (stratum, offset); -q never adjusts the local clock. Recon"
+  command: "ntpdate -q {target}"
+
+- description: "List peers (ntpq -c peers)"
+  why: "Upstream/peer servers this host syncs with — maps the time hierarchy. Recon"
+  command: "ntpq -c peers {target}"
+
+- description: "NTP info / monlist via nmap"
+  why: "ntp-monlist lists recent clients (also the classic amplification check) — recon"
+  command: "nmap -sU -sV --script ntp-info,ntp-monlist -p 123 {target}"
