@@ -6,6 +6,8 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
+from oscprecon import findings as findings_mod
+from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -41,6 +43,12 @@ class Reporter:
         notes = ""
         if profile.notes_path.exists():
             notes = profile.notes_path.read_text(encoding="utf-8").strip()
+        suggestions = suggest_for(
+            findings_mod.load_findings(profile.directory),
+            target=profile.target.ip,
+            domain=profile.target.hostname or "",
+            has_credential=bool(profile.credentials()),
+        )
         return {
             "profile_name": profile.profile_name,
             "target": {
@@ -54,6 +62,15 @@ class Reporter:
             "command_history": profile.command_history,
             "tags": profile.tags,
             "notes": notes,
+            "suggestions": [
+                {
+                    "text": s.text,
+                    "command": s.command_template,
+                    "source_pattern": s.source_pattern,
+                    "source_box": s.source_box,
+                }
+                for s in suggestions
+            ],
         }
 
     def render(self) -> str:

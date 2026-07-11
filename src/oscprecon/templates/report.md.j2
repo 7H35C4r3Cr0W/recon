@@ -42,8 +42,15 @@ _Run nmap to populate this section._
 {% endfor %}
 
 ## Suggested next steps
+{% for s in suggestions %}
 
-_Pattern-library suggestions arrive in Phase 3._
+- {{ s.text }}
+{% if s.command %}  - `{{ s.command }}`
+{% endif %}  - _source: {{ s.source_box or s.source_pattern }}_
+{% else %}
+
+_No pattern suggestions yet — sourced `patterns/*.yaml` entries populate this from findings._
+{% endfor %}
 
 ## User notes
 

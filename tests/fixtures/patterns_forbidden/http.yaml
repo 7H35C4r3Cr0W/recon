@@ -1,0 +1,6 @@
+# this suggestion names a CVE — the forbidden-content gate must flag it (§15)
+- match:
+    service: http
+  suggest:
+    - "Try CVE-2021-41773 path traversal"
+# source: tests/fixture.md

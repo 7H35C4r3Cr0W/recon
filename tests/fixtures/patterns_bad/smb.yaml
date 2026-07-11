@@ -1,0 +1,6 @@
+# this entry deliberately has NO `# source:` — the provenance gate must flag it
+- match:
+    service: smb
+    detail_contains: "guest"
+  suggest:
+    - "unsourced suggestion"

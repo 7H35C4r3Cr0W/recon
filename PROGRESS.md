@@ -65,6 +65,25 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
+### Phase 3 · step 1a: pattern engine + provenance/forbidden gates + report wiring
+- **`patterns/engine.py`**: `load_patterns()` parses each `patterns/<svc>.yaml` (list of `{match,
+  suggest}` entries) and — since yaml.safe_load drops comments — re-splits the raw text per top-level
+  entry to recover each entry's `# source:` provenance. `suggest_for(findings, target, domain,
+  has_credential)` matches findings (keys: service/port/proto/detail_contains/field+value-regex/
+  has_credential), interpolates `{target}/{domain}/{value}/{kind}` plus a `{<kind>}` alias (a `share`
+  finding exposes `{share}`), dedups, and emits `Suggestion(text, command_template, source_pattern,
+  source_box)`. A suggest item is a plain string (advisory) or `{text, command}` (pre-fillable).
+- **Gates**: `check_provenance()` flags any entry missing `# source:` (the §15 build gate);
+  `check_forbidden()` flags exploit/cracking content (cve-/metasploit/msfvenom/meterpreter/hydra/
+  medusa/sqlmap/rockyou/--passwords) — content-discovery wordlists stay allowed. A test runs BOTH over
+  the real (currently empty) `patterns/` dir so they stay green as entries land.
+- **Report**: `reporter.py` feeds findings through `suggest_for`; the "Suggested next steps" section
+  now renders each suggestion + its command + `source:` citation.
+- 6 engine tests (load+source, provenance-fail, forbidden-fail, match+interpolate, dedup, shipped-gates)
+  over `tests/fixtures/patterns{,_bad,_forbidden}/`. 370 tests. **Step 1b next:** GUI "Recon next
+  steps" panel (pre-fill, no auto-run). **Step 2:** author real `patterns/*.yaml` from the mounted
+  Obsidian cheatsheets with `# source:` provenance (memory `obsidian-notes-location`, §21 rules).
+
 ### Phase 4 · graph view — chunk 3d: minimap + node-type filter (Phase 4 COMPLETE)
 - **Minimap**: a bottom-right overview built as a SECOND locked Cytoscape instance (positions mirrored
   from the main graph, non-interactive) + a live `#minimap-viewport` rectangle that tracks the main

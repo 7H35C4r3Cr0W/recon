@@ -1,0 +1,17 @@
+# smb patterns (test fixture — not shipped)
+- match:
+    service: smb
+    detail_contains: "signing: disabled"
+  suggest:
+    - "SMB signing disabled — relay candidate. Confirm scope before attempting."
+    - text: "Enumerate shares to confirm null access"
+      command: "netexec smb {target} -u '' -p '' --shares"
+# source: tests/fixture-smb.md
+
+- match:
+    service: smb
+    field: kind
+    value: "share"
+  suggest:
+    - "Readable share {value} on {target} — inspect it for creds/config."
+# source: tests/fixture-smb.md
