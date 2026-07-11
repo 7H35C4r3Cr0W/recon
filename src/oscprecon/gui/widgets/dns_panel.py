@@ -108,7 +108,10 @@ class DnsPanel(QWidget):
         if self._profile is None:
             return
         target = self._profile.target
-        domain = self._domain.text().strip()
+        # why: the manual path interpolates {domain} into a runnable dig/dnsrecon command, so an
+        # unvalidated field could smuggle argv tokens (e.g. a subdomain-brute flag). Normalize it
+        # through the same validate_host gate the recon button uses; blank it if it doesn't pass.
+        domain = dns_mod.normalize_domain(self._domain.text()) or ""
         for entry in manual_commands.load_manual_commands(_MANUAL_YAML):
             command = manual_commands.expand(
                 entry.command, target=target.ip, port=self._port, domain=domain

@@ -41,6 +41,19 @@
     - { name: "dig any {domain} @{target}", purpose: "records for the domain" }
     - { name: "dig axfr {domain} @{target}", purpose: "attempt zone transfer" }
 
+- match: { port: 53, proto: udp }
+  label: DNS
+  module: dns
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-dns.html
+  tools:
+    - { name: "dig any {domain} @{target}", purpose: "records for the domain" }
+    - { name: "dig axfr {domain} @{target}", purpose: "attempt zone transfer" }
+
+- match: { service_name: domain }
+  label: DNS
+  module: dns
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-dns.html
+
 - match: { port: 69, proto: udp }
   label: TFTP
   module: tftp

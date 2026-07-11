@@ -54,6 +54,19 @@ def test_product_override_matches() -> None:
     assert ref.module == "ssh"
 
 
+def test_dns_udp_maps_to_dns_module() -> None:
+    # DNS's primary transport is UDP — 53/udp must reach the dns module/panel, not fall through
+    ref = references.match(_svc(53, Proto.UDP, "domain"))
+    assert ref is not None
+    assert ref.module == "dns"
+
+
+def test_dns_service_name_fallback_on_odd_port() -> None:
+    ref = references.match(_svc(5300, Proto.TCP, "domain"))
+    assert ref is not None
+    assert ref.module == "dns"
+
+
 def test_no_match_returns_none() -> None:
     assert references.match(_svc(1, Proto.TCP, "tcpwrapped")) is None
 

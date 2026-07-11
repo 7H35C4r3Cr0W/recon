@@ -74,6 +74,18 @@ def test_nmap_dns_recursion_disabled() -> None:
     assert any(f.kind == "recursion" and f.value == "disabled" for f in findings)
 
 
+def test_dig_version_skips_shell_sentinels_and_errors() -> None:
+    # shell.run writes these into the output file when a tool is missing / blocked; a dig resolver
+    # error looks similar — none of them is a version, so parse_dig_version must reject all of them.
+    for junk in (
+        "[missing] dig — install with: apt install dnsutils\n",
+        "[blocked] dig is not on the OSCP-allowed tool list: dig version.bind\n",
+        "dig: couldn't get address for 'ns': not known\n",
+        ";; connection timed out; no servers could be reached\n",
+    ):
+        assert parse_dig_version(junk) == []
+
+
 def test_dispatch_and_garbage() -> None:
     assert parse_dns_tool("unknown", "x") == []
     assert parse_dns_tool("dig-axfr", _read("dig-axfr.txt"))

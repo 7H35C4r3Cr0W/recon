@@ -73,6 +73,19 @@ def test_manual_followups_expand_and_stay_legal(qtbot: QtBot, tmp_path: Path) ->
         assert tool not in joined  # subdomain brute stays in the vhost module
 
 
+def test_manual_followups_reject_hostile_domain(qtbot: QtBot, tmp_path: Path) -> None:
+    # a domain that tries to smuggle a subdomain-brute flag must be dropped before it reaches a
+    # runnable command (the manual path validates like the recon button does)
+    panel = DnsPanel()
+    qtbot.addWidget(panel)
+    panel.set_profile(_profile(tmp_path))
+    panel._domain.setText("example.htb -t brt")
+    commands = [panel._manual.item(i).data(_COMMAND_ROLE) for i in range(panel._manual.count())]
+    joined = " ".join(commands)
+    assert "-t brt" not in joined  # the hostile token never reaches a command line
+    assert "example.htb -t brt" not in joined
+
+
 def test_tool_panel_switches_to_dns_page(qtbot: QtBot, tmp_path: Path) -> None:
     panel = ToolPanel()
     qtbot.addWidget(panel)

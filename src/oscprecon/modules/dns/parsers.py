@@ -29,10 +29,14 @@ class DnsFinding:
 
 def parse_dig_version(text: str) -> list[DnsFinding]:
     for raw in text.splitlines():
-        line = raw.strip().strip('"')
-        if not line or line.startswith(";"):
+        line = raw.strip()
+        # skip dig comments (;), shell.run's [missing]/[blocked] sentinels, and dig resolver errors
+        # — otherwise the first such line is misrecorded as the server version.
+        if not line or line.startswith((";", "[")) or line.startswith("dig:"):
             continue
-        return [DnsFinding("version", line, "version.bind")]
+        if "couldn't get address" in line or "connection timed out" in line:
+            continue
+        return [DnsFinding("version", line.strip('"'), "version.bind")]
     return []
 
 
