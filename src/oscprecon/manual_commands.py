@@ -47,6 +47,7 @@ def expand(
     domain: str = "",
     user: str = "",
     password: str = "",
+    basedn: str = "",
 ) -> str:
     return (
         template.replace("{target}", target)
@@ -55,4 +56,5 @@ def expand(
         .replace("{domain}", domain)
         .replace("{user}", user)
         .replace("{password}", password)
+        .replace("{basedn}", basedn)
     )

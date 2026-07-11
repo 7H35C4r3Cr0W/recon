@@ -6,11 +6,13 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 module 5 — next service module** (§12 order): pick from **ssh/dns/ldap/smtp/nfs/snmp/tftp/
-netbios/ike/ntp**. Same engine→GUI→adversarial-review→commit pattern. **HTTP + vhost + smb + ftp all
-done, reviewed, hardened** (175 tests). Note the recurring review lessons: parsers must match REAL
-current tool output (run the tool's help/script-help), always release the worker slot in a finally/
-guard, make on-disk artifact filenames injective, thread the service port through every command.
+**Phase 2 module 8 — `smtp`** (§12 order), then nfs/snmp/tftp/netbios/ike/ntp. Same
+engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost, smb, ftp,
+ssh, dns, ldap** (234 tests). Recurring review lessons: parsers must match REAL current tool output;
+always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
+the service port through every command; **validate every user/server-supplied token that reaches a
+command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
+the manual-follow-up path must validate too, not just the recon button.**
 
 ## Queued additions (recorded 2026-07-11 — do NOT build early; pick up at the noted phase)
 
@@ -36,6 +38,24 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · modules 5–7 (ssh, dns, ldap) — feature + hardening
+- **ssh** (§ next after ftp): `SshModule` Tier-1 = one nmap NSE scan (ssh2-enum-algos,ssh-auth-methods,
+  ssh-hostkey); parser extracts banner, host keys, weak algos, offered auth methods. `ssh` added to
+  shell ALLOWED_TOOLS. Hardening: interactive ssh password logins could hang the sole worker slot —
+  fixed at the chokepoint (Popen now `stdin=DEVNULL` + `start_new_session=True`, so no wrapped tool
+  can block on stdin//dev/tty), + ConnectTimeout on ssh entries + honest "copy to a terminal" wording.
+- **dns** (protocol-only; subdomain brute stays in vhost): version.bind + nmap dns-nsid/dns-recursion,
+  and zone transfer + `dnsrecon -t std` only when a validated domain is present. Hardening: the manual
+  path interpolated the UNVALIDATED domain (could smuggle `-t brt`) → now normalize_domain-gated;
+  parse_dig_version skips `[missing]`/`[blocked]`/`dig:` sentinels; added 53/udp + `service_name:
+  domain` reference rules.
+- **ldap**: two-phase worker — anonymous root DSE (ldapsearch + nmap ldap-rootdse) → discover naming
+  context → bounded (`-z 200`) anonymous user search. `sanitize_basedn` guards the `-b "..."` surface
+  against BOTH a user-typed and a hostile server-returned base DN; LDIF parser unfolds continuation
+  lines and skips base64 values; anonymous bind auto-writes an `ldap-anon-enum` cred. LDAPS-aware URI
+  (636/3269 → ldaps://). manual_commands.expand gained `{basedn}`.
+- Each shipped with fixtures + parser/module/GUI tests; four gates green at every commit.
 
 ### Phase 2 · module 4 (ftp) hardening (this commit)
 Adversarial 3-lens review (12 agents, verified against real nmap 7.99 / curl 8.x); 5 of 9 survived, all

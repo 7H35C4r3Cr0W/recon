@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from oscprecon.gui.widgets.dns_panel import DnsPanel
 from oscprecon.gui.widgets.ftp_panel import FtpPanel
 from oscprecon.gui.widgets.http_panel import HttpPanel
+from oscprecon.gui.widgets.ldap_panel import LdapPanel
 from oscprecon.gui.widgets.smb_panel import SmbPanel
 from oscprecon.gui.widgets.ssh_panel import SshPanel
 from oscprecon.gui.widgets.vhost_panel import VhostPanel
@@ -44,6 +45,7 @@ class ToolPanel(QWidget):
     ftp_recon_requested = Signal(str, int)  # (mode: full | anon, port)
     ssh_recon_requested = Signal(int)  # port
     dns_recon_requested = Signal(str, int)  # (domain, port)
+    ldap_recon_requested = Signal(str, int)  # (basedn, port)
 
     def __init__(self) -> None:
         super().__init__()
@@ -110,6 +112,12 @@ class ToolPanel(QWidget):
         self._dns.manual_requested.connect(self.run_requested)
         self._dns.validation_failed.connect(self.vhost_validation_failed)
 
+        # ldap page: Tier-1 anonymous recon (+ base-DN field) + Tier-2 manual follow-ups + findings
+        self._ldap = LdapPanel()
+        self._ldap.recon_requested.connect(self.ldap_recon_requested)
+        self._ldap.manual_requested.connect(self.run_requested)
+        self._ldap.validation_failed.connect(self.vhost_validation_failed)
+
         self._stack = QStackedWidget()
         self._stack.addWidget(generic)  # 0: generic hints
         self._stack.addWidget(self._web_tabs)  # 1: http/vhost builders
@@ -117,6 +125,7 @@ class ToolPanel(QWidget):
         self._stack.addWidget(self._ftp)  # 3: ftp
         self._stack.addWidget(self._ssh)  # 4: ssh
         self._stack.addWidget(self._dns)  # 5: dns
+        self._stack.addWidget(self._ldap)  # 6: ldap
 
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
@@ -136,6 +145,7 @@ class ToolPanel(QWidget):
         self._ftp.set_profile(profile)
         self._ssh.set_profile(profile)
         self._dns.set_profile(profile)
+        self._ldap.set_profile(profile)
 
     def show_service(self, service: DiscoveredService | None, ref: ServiceRef | None) -> None:
         self._hints.clear()
@@ -166,6 +176,10 @@ class ToolPanel(QWidget):
             self._dns.configure(service)
             self._stack.setCurrentWidget(self._dns)
             return
+        if ref is not None and ref.module == "ldap":
+            self._ldap.configure(service)
+            self._stack.setCurrentWidget(self._ldap)
+            return
         self._stack.setCurrentIndex(0)
         if ref is None:
             return
@@ -187,6 +201,7 @@ class ToolPanel(QWidget):
         self._ftp.set_running(running)
         self._ssh.set_running(running)
         self._dns.set_running(running)
+        self._ldap.set_running(running)
 
     def set_smb_summary(self, lines: list[str]) -> None:
         self._smb.set_summary(lines)
@@ -199,6 +214,9 @@ class ToolPanel(QWidget):
 
     def set_dns_summary(self, lines: list[str]) -> None:
         self._dns.set_summary(lines)
+
+    def set_ldap_summary(self, lines: list[str]) -> None:
+        self._ldap.set_summary(lines)
 
     def add_vhosts(self, vhosts: list[str]) -> None:
         self._vhost.add_vhosts(vhosts)

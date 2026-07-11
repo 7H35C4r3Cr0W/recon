@@ -1,0 +1,33 @@
+# LDAP manual follow-ups (Tier-2 — shown, never auto-run; §11/§12). Anonymous (-x) enumeration is
+# recon; authenticated queries reuse a credential the tool already collected (never a brute/list).
+# {target}/{port} come from the profile; {basedn} is the discovered/entered base DN (validated
+# before it reaches a command); {user}/{domain}/{password} come from creds.json when present.
+
+- description: "Dump everything under the base DN (anonymous)"
+  why: "Full anonymous directory read — the broadest single recon query"
+  command: 'ldapsearch -x -H ldap://{target}:{port} -b "{basedn}" "(objectClass=*)"'
+
+- description: "List users (anonymous)"
+  why: "Enumerate account names to feed SMB / Kerberos enumeration"
+  command: 'ldapsearch -x -H ldap://{target}:{port} -b "{basedn}" "(objectClass=user)" sAMAccountName'
+
+- description: "List groups and members (anonymous)"
+  why: "Map group membership — high-value AD recon"
+  command: 'ldapsearch -x -H ldap://{target}:{port} -b "{basedn}" "(objectClass=group)" cn member'
+
+- description: "List computers / OS (anonymous)"
+  why: "Enumerate domain-joined hosts and their OS for the target picture"
+  command: 'ldapsearch -x -H ldap://{target}:{port} -b "{basedn}" "(objectClass=computer)" dNSHostName operatingSystem'
+
+- description: "Hunt for secrets in user description fields (anonymous)"
+  why: "description/info attributes sometimes hold plaintext passwords — read-only recon"
+  command: 'ldapsearch -x -H ldap://{target}:{port} -b "{basedn}" "(objectClass=user)" sAMAccountName description info'
+
+- description: "Query over LDAPS (self-signed labs need LDAPTLS_REQCERT=never)"
+  why: "Some DCs only answer on 636/TLS — set the env var in your terminal if the cert is self-signed"
+  command: 'ldapsearch -x -H ldaps://{target}:636 -b "{basedn}" "(objectClass=*)"'
+
+- description: "Authenticated bind with a collected credential (edit USER/DOMAIN/PASSWORD)"
+  why: "Re-query as a known user (creds already gathered) — a single bind, not a brute force"
+  command: 'ldapsearch -x -H ldap://{target}:{port} -D "USER@DOMAIN" -w PASSWORD -b "{basedn}" "(objectClass=user)" sAMAccountName'
+  requires: ["creds"]

@@ -1,0 +1,33 @@
+# extended LDIF
+#
+# LDAPv3
+# base <> with scope baseObject
+# filter: (objectClass=*)
+# requesting: +
+#
+
+#
+dn:
+domainFunctionality: 7
+forestFunctionality: 7
+domainControllerFunctionality: 7
+rootDomainNamingContext: DC=example,DC=htb
+ldapServiceName: example.htb:dc01$@EXAMPLE.HTB
+isGlobalCatalogReady: TRUE
+supportedSASLMechanisms: GSSAPI
+supportedLDAPVersion: 3
+namingContexts: DC=example,DC=htb
+namingContexts: CN=Configuration,DC=example,DC=htb
+namingContexts: CN=Schema,CN=Configuration,DC=example,DC=htb
+namingContexts: DC=DomainDnsZones,DC=example,DC=htb
+namingContexts: DC=ForestDnsZones,DC=example,DC=htb
+defaultNamingContext: DC=example,DC=htb
+dnsHostName: dc01.example.htb
+serverName: CN=DC01,CN=Servers,CN=Default-First-Site-Name,CN=Sites,CN=Configuration,DC=example,DC=htb
+
+# search result
+search: 2
+result: 0 Success
+
+# numResponses: 2
+# numEntries: 1

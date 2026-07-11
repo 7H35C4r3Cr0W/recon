@@ -45,6 +45,15 @@ from oscprecon.modules.ftp import (
     anon_credential as ftp_anon_credential,
 )
 from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
+from oscprecon.modules.ldap import (
+    LdapFinding,
+    LdapModule,
+    parse_ldap_tool,
+    sanitize_basedn,
+)
+from oscprecon.modules.ldap import (
+    anon_credential as ldap_anon_credential,
+)
 from oscprecon.modules.smb import (
     SmbFinding,
     SmbModule,
@@ -555,6 +564,96 @@ class DnsReconWorker(QThread):
         return summary or ["No DNS findings."]
 
 
+@dataclass
+class LdapReconResult:
+    summary: list[str]
+    creds: list[Credential]
+
+
+class LdapReconWorker(QThread):
+    line = Signal(str)
+    done = Signal(object)  # LdapReconResult
+    failed = Signal(str)
+
+    def __init__(self, profile: Profile, basedn: str, port: int) -> None:
+        super().__init__()
+        self._profile = profile
+        self._basedn = basedn
+        self._port = port
+        self._module = LdapModule()
+
+    def run(self) -> None:
+        try:
+            result = self._drive()
+        except Exception as exc:  # boundary: surface worker failures to the UI thread
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(result)
+
+    def _run_step(self, shell_line: str, output_rel: str) -> str:
+        base = self._profile.directory
+        out = base / output_rel
+        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        try:
+            return out.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+
+    def _drive(self) -> LdapReconResult:
+        target = self._profile.target
+        module = self._module
+        collected: list[LdapFinding] = []
+
+        for step in module.rootdse_steps(target, self._port):
+            text = self._run_step(step.command.shell_line, step.command.output_file)
+            if step.tool:
+                collected += parse_ldap_tool(step.tool, text)
+
+        # base DN for the user search: prefer a discovered naming context, else the entered value.
+        # sanitize_basedn drops anything not DN-syntax (a hostile server-returned context too).
+        discovered = [f.value for f in collected if f.kind == "naming-context"]
+        basedn: str | None = None
+        for candidate in [*discovered, self._basedn]:
+            basedn = sanitize_basedn(candidate)
+            if basedn is not None:
+                break
+
+        if basedn is not None:
+            user_step = module.user_search_step(target, basedn, self._port)
+            if user_step is not None:
+                text = self._run_step(user_step.command.shell_line, user_step.command.output_file)
+                collected += parse_ldap_tool(user_step.tool, text)
+
+        anon = any(f.kind == "bind" for f in collected)
+        creds = [ldap_anon_credential(target)] if anon else []
+        self._write_findings(collected)
+        return LdapReconResult(self._summarize(collected, basedn, anon), creds)
+
+    def _write_findings(self, collected: list[LdapFinding]) -> None:
+        if not collected:
+            return
+        now = datetime.now(UTC).isoformat()
+        findings.add_findings(self._profile.directory, [f.to_dict(now) for f in collected])
+
+    def _summarize(self, collected: list[LdapFinding], basedn: str | None, anon: bool) -> list[str]:
+        summary: list[str] = []
+        contexts = sorted({f.value for f in collected if f.kind == "naming-context"})
+        if contexts:
+            summary.append(f"Naming contexts ({len(contexts)}):")
+            summary.extend(f"  {c}" for c in contexts)
+        for info in (f for f in collected if f.kind == "info"):
+            summary.append(f"Info: {info.value}")
+        users = sorted({f.value for f in collected if f.kind == "user"})
+        if users:
+            shown = ", ".join(users[:15])
+            more = "…" if len(users) > 15 else ""
+            summary.append(f"Users ({len(users)}): {shown}{more}")
+        if basedn is not None:
+            summary.append(f"Base DN used: {basedn}")
+        summary.append("Anonymous bind: allowed" if anon else "Anonymous bind: denied")
+        return summary
+
+
 def _slug(command: str) -> str:
     tokens = command.split()
     base = tokens[0] if tokens else "command"
@@ -605,6 +704,7 @@ class MainWindow(QMainWindow):
         self._tool_panel.ftp_recon_requested.connect(self._on_ftp_recon)
         self._tool_panel.ssh_recon_requested.connect(self._on_ssh_recon)
         self._tool_panel.dns_recon_requested.connect(self._on_dns_recon)
+        self._tool_panel.ldap_recon_requested.connect(self._on_ldap_recon)
         self._tool_panel.vhost_validation_failed.connect(
             lambda msg: self._tool_panel.append_output(f"[blocked] {msg}")
         )
@@ -1150,6 +1250,35 @@ class MainWindow(QMainWindow):
             if isinstance(result, DnsReconResult):
                 self._tool_panel.set_dns_summary(result.summary)
                 self._tool_panel.append_output("[dns] recon complete")
+        except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
+            self._tool_panel.append_output(f"[error] {exc}")
+        self._finish_worker()
+
+    def _on_ldap_recon(self, basedn: str, port: int) -> None:
+        if self._profile is None or self._worker is not None:
+            return
+        self._set_busy(True)
+        scope = f"base {basedn}" if basedn else "auto-discover base DN"
+        self._tool_panel.append_output(f"[ldap] recon on port {port} — {scope} starting…")
+        worker = LdapReconWorker(self._profile, basedn, port)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_ldap_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _on_ldap_done(self, result: object) -> None:
+        # why: a creds/summary write error must not strand self._worker — always release the slot in
+        # _finish_worker, mirroring _on_smb_done / _on_ftp_done.
+        try:
+            if isinstance(result, LdapReconResult) and self._profile is not None:
+                for cred in result.creds:
+                    self._profile.add_credential(cred)
+                    self._tool_panel.append_output(
+                        f"[cred] {cred.username} (source: {cred.source})"
+                    )
+                self._tool_panel.set_ldap_summary(result.summary)
+                self._tool_panel.append_output("[ldap] recon complete")
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
         self._finish_worker()

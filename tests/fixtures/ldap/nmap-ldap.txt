@@ -1,0 +1,21 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-11 12:00 UTC
+Nmap scan report for 10.10.10.5
+Host is up (0.020s latency).
+
+PORT    STATE SERVICE VERSION
+389/tcp open  ldap    Microsoft Windows Active Directory LDAP (Domain: example.htb, Site: Default-First-Site-Name)
+| ldap-rootdse:
+| LDAP Results
+|   <ROOT>
+|       domainFunctionality: 7
+|       forestFunctionality: 7
+|       domainControllerFunctionality: 7
+|       namingContexts: DC=example,DC=htb
+|       namingContexts: CN=Configuration,DC=example,DC=htb
+|       namingContexts: CN=Schema,CN=Configuration,DC=example,DC=htb
+|       dnsHostName: dc01.example.htb
+|_      serverName: CN=DC01,CN=Servers,CN=Default-First-Site-Name,CN=Sites,CN=Configuration,DC=example,DC=htb
+Service Info: Host: DC01; OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host) scanned in 12.44 seconds

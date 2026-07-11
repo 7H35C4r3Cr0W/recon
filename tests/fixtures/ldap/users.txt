@@ -1,0 +1,34 @@
+# extended LDIF
+#
+# LDAPv3
+# base <DC=example,DC=htb> with scope subtree
+# filter: (objectClass=person)
+# requesting: sAMAccountName cn
+#
+
+# Administrator, Users, example.htb
+dn: CN=Administrator,CN=Users,DC=example,DC=htb
+sAMAccountName: Administrator
+cn: Administrator
+
+# Guest, Users, example.htb
+dn: CN=Guest,CN=Users,DC=example,DC=htb
+sAMAccountName: Guest
+cn: Guest
+
+# John Smith, Users, example.htb
+dn: CN=John Smith,CN=Users,DC=example,DC=htb
+sAMAccountName: jsmith
+cn: John Smith
+
+# svc_backup, Users, example.htb
+dn: CN=svc_backup,CN=Users,DC=example,DC=htb
+sAMAccountName: svc_backup
+cn:: c3ZjX2JhY2t1cA==
+
+# search result
+search: 2
+result: 0 Success
+
+# numResponses: 5
+# numEntries: 4
