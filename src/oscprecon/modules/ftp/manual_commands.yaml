@@ -1,0 +1,31 @@
+# FTP manual follow-ups (Tier-2 — shown, never auto-run; §11/§12). Bulk download and single
+# default-cred checks are explicit clicks, never automatic. NEVER Tier-3 (password LISTS / spraying).
+# Placeholders {target} {port} are filled from the profile; FILE / SUBDIR are literals you edit.
+
+- description: "Read a specific file to stdout (anonymous)"
+  why: "Fetch one file's contents without saving it — targeted, not a bulk pull"
+  command: "curl -s ftp://{target}/FILE"
+
+- description: "Download a specific file (anonymous)"
+  why: "Explicit single-file download (§12: download is a click, never auto)"
+  command: "curl -s -O ftp://{target}/FILE"
+
+- description: "List a subdirectory the auto-walk bounded out (anonymous)"
+  why: "Reach a directory deeper than the bounded snapshot"
+  command: "curl -s ftp://{target}/SUBDIR/"
+
+- description: "Passive-mode root listing"
+  why: "Some servers need PASV when the data channel is firewalled — retry the listing passively"
+  command: "curl -s --ftp-pasv ftp://{target}/"
+
+- description: "Mirror the whole anonymous tree (explicit bulk download)"
+  why: "Recursive download is Tier-2 — heavy and never automatic (§12)"
+  command: "wget -m --no-remove-listing ftp://{target}/"
+
+- description: "Try ftp:ftp default credentials (single attempt)"
+  why: "One default-cred check against a common account — not a brute force"
+  command: "curl -s ftp://ftp:ftp@{target}/"
+
+- description: "Try admin:admin default credentials (single attempt)"
+  why: "One default-cred check — common misconfiguration"
+  command: "curl -s ftp://admin:admin@{target}/"

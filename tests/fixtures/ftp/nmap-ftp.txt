@@ -1,0 +1,20 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-10 12:00 UTC
+Nmap scan report for 10.10.10.5
+Host is up (0.021s latency).
+
+PORT   STATE SERVICE VERSION
+21/tcp open  ftp     vsftpd 3.0.3
+| ftp-anon: Anonymous FTP login allowed (FTP code 230)
+| -rw-r--r--    1 0        0             107 Jun 20  2023 note.txt
+| drwxr-xr-x    2 0        0            4096 Jun 20  2023 pub
+|_drwxr-xr-x    2 0        0            4096 Jun 20  2023 uploads
+| ftp-syst:
+|   STAT:
+|   FTP server status:
+|      Connected to ::ffff:10.10.14.2
+|      Logged in as ftp
+|      TYPE: ASCII
+|_     vsFTPd 3.0.3 - secure, fast, stable
+Service Info: OS: Unix; CPE: cpe:/o:unix:unix
+
+Nmap done: 1 IP address (1 host up) scanned in 3.21 seconds

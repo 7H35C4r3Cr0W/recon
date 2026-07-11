@@ -1,0 +1,5 @@
+drwxr-xr-x    2 1000     1000         4096 Jun 20  2023 backups
+-rw-r--r--    1 1000     1000          452 Jun 20  2023 readme.txt
+-rw-r--r--    1 1000     1000        10240 Jun 20  2023 archive.zip
+lrwxrwxrwx    1 0        0               7 Jun 20  2023 www -> /var/www
+drwxr-xr-x    2 1000     1000         4096 Jun 20  2023 New Folder

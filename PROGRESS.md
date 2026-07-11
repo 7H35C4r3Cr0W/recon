@@ -6,10 +6,12 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 module 4 — next service module** (§12 order): pick from **ftp/ssh/dns/ldap/smtp/nfs/snmp/
-tftp/netbios/ike/ntp**. Same engine→GUI→adversarial-review→commit pattern. **HTTP + vhost + smb all
-done, reviewed, and hardened** (149 tests). Reuse the affirmative-allowlist + shell-chokepoint
-sanitization pattern; keep any tool with nargs='+' cred flags in mind (see the netexec guard).
+**Phase 2 module 4 — ftp: GUI + review** (chunks 2–3). Engine is done + gated (165 tests). Build an
+FtpPanel (Tier-1 buttons: full walk / anon-check-only; Tier-2 manual list with FILE/SUBDIR edits;
+findings summary) + FtpReconWorker that drives the bounded anonymous auto-walk (curl root → recurse
+into subdirs, depth/count-bounded, LIST-only never download), writes findings.json + anon cred
+(ftp-anon-enum). Wire into tool_panel as a new stack page shown for module==ftp. Then the 3-lens
+adversarial review (reviewers run real curl/nmap). After ftp: ssh/dns/ldap/smtp/nfs/snmp/tftp/etc.
 
 ## How to resume
 
@@ -20,7 +22,21 @@ sanitization pattern; keep any tool with nargs='+' cred flags in mind (see the n
 
 ## Log (newest first)
 
-### Phase 2 · module 3 (smb) hardening (this commit)
+### Phase 2 · module 4 (ftp) — engine (this commit)
+- **FtpModule** (`modules/ftp/`): triggers on 21 / ftp service names. Step-builders return `FtpStep`s
+  (parser key per step): `banner_steps` (`nmap -sV --script ftp-anon,ftp-syst,ftp-bounce`), `anon_steps`
+  (`curl -s ftp://host/` root LIST), `list_step(path)` for the bounded walk. `ftp_dir_url` URL-encodes
+  the target-controlled path (keeping '/') and always ends in '/' so curl LISTs (never downloads a file)
+  and a hostile dir name (`-x`, spaces, `:`) can't inject a flag/second URL. anon_credential
+  (source `ftp-anon-enum`).
+- **parsers.py**: `parse_ftp_listing` handles both Unix `ls -l` (incl. multi-word names, symlinks) and
+  MS-DOS/IIS listings → `FtpEntry`; `parse_nmap_ftp` (anon-allowed, -sV banner, ftp-bounce note, ftp-anon
+  root snapshot, ignores the ftp-syst STAT block); `subdirs` drives the walk. `parse_ftp_tool` dispatch.
+- Tier-2 `manual_commands.yaml` (7): targeted read/download (FILE), subdir listing (SUBDIR), passive
+  listing, explicit mirror, single default-cred checks (ftp:ftp, admin:admin) — never lists/spray.
+- 16 tests (parsers + module incl. untrusted-path injection); services.yaml already had the ftp entry.
+
+### Phase 2 · module 3 (smb) hardening (4f662f2)
 Adversarial 3-lens review (12 agents, each finding verified against the REAL installed netexec 1.4.0);
 6 of 9 candidates survived verification, all fixed (3 non-issues correctly rejected):
 - **§2/§11 (HIGH ×2): netexec spray-guard bypasses.** The old guard only checked the single token after
