@@ -23,8 +23,8 @@ the manual-follow-up path must validate too, not just the recon button.**
 Five features queued into `CLAUDE.md` + `ROADMAP.md` for a fresh session to build at the right time.
 Specs are authoritative in CLAUDE.md; this is the pointer list.
 
-1. **Status footer** (CLAUDE.md §19) — always-visible bottom strip: app+version (from pyproject),
-   active profile, workspace root, "recon-only — OSCP exam legal". → Phase 2 QoL or Phase 5.
+1. ~~**Status footer** (CLAUDE.md §19)~~ — **DONE** (Phase 2 QoL): QStatusBar strip with app+version,
+   active profile, workspace root, and the muted "recon-only — OSCP exam legal" reminder.
 2. **Project file operations** (CLAUDE.md §19) — File → Open by IP / Import Project / Export Project
    (.tar.gz; warns `creds.json` included). Each `~/oscprecon/<name>/` is a project file. → Phase 5.
 3. **Full GUI audit log** (CLAUDE.md §6a) — append-only `<profile>/audit.jsonl` of every user action;
@@ -42,6 +42,12 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · QoL — status footer (§19)
+- Always-visible `QStatusBar` strip: `oscp-recon v<version>` (importlib.metadata, falls back to
+  0.0.1), the active profile (`profile: <name>` / `no profile loaded`), the workspace root, and a
+  muted permanent `recon-only — OSCP exam legal per CLAUDE.md §2` reminder. `_update_status_footer`
+  refreshes it on every profile load. Closes queued item #1. 347 tests, four gates green.
 
 ### Phase 2 · GUI — generic simple-recon panel for the 7 engine-only modules
 - **SimpleReconPanel** (`gui/widgets/simple_recon_panel.py`) + **SimpleReconWorker** (`main_window.py`)

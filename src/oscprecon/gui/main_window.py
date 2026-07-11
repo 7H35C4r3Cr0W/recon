@@ -4,6 +4,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from importlib import metadata
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
@@ -732,6 +733,13 @@ class SimpleReconWorker(QThread):
         return summary or [f"No {self._spec.module.upper()} findings."]
 
 
+def _app_version() -> str:
+    try:
+        return metadata.version("oscp-recon")
+    except metadata.PackageNotFoundError:
+        return "0.0.1"
+
+
 def _slug(command: str) -> str:
     tokens = command.split()
     base = tokens[0] if tokens else "command"
@@ -815,8 +823,26 @@ class MainWindow(QMainWindow):
         self._notes_dock.setWidget(self._notes_pane)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._notes_dock)
 
+        # status footer (§19): app+version · active profile · workspace · exam-legal reminder
+        self._status_profile = QLabel()
+        self._status_workspace = QLabel()
+        legal = QLabel("recon-only — OSCP exam legal per CLAUDE.md §2")
+        legal.setStyleSheet("color: gray;")
+        status = self.statusBar()
+        assert status is not None
+        status.addWidget(QLabel(f"oscp-recon v{_app_version()}"))
+        status.addWidget(self._status_profile)
+        status.addWidget(self._status_workspace)
+        status.addPermanentWidget(legal)
+        self._update_status_footer()
+
         self._build_menus()
         self._load_last_profile()
+
+    def _update_status_footer(self) -> None:
+        name = self._profile.profile_name if self._profile is not None else "no profile loaded"
+        self._status_profile.setText(f"profile: {name}")
+        self._status_workspace.setText(f"workspace: {config.workspace_root()}")
 
     def _build_menus(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
@@ -889,6 +915,7 @@ class MainWindow(QMainWindow):
         self._tool_panel.set_target(target.ip)
         self._tool_panel.set_profile(profile)
         self._service_tree.populate(profile.discovered_services)
+        self._update_status_footer()
         self._notes_pane.set_profile(profile)
         config.add_recent(profile.directory)
         self._rebuild_recent_menu()
