@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 oscprecon-cli = "oscprecon.cli:app"
 oscprecon = "oscprecon.gui.app:main"
+oscp-recon = "oscprecon.__main__:main"
 
 [dependency-groups]
 dev = [
