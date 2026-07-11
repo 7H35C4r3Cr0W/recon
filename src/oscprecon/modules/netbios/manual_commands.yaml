@@ -1,0 +1,22 @@
+# NetBIOS manual follow-ups (Tier-2 — shown, never auto-run; §12). All read-only NetBIOS name
+# queries. {target} comes from the profile. NetBIOS-NS (137/udp) recon feeds the SMB module on 139/445.
+
+- description: "NetBIOS name table (nmblookup -A)"
+  why: "Hostname, domain/workgroup, service roles (<20> server, <1c> DC) and MAC — recon"
+  command: "nmblookup -A {target}"
+
+- description: "NetBIOS scan (nbtscan)"
+  why: "One-line name + server flag + MAC; quick confirmation of NetBIOS presence — recon"
+  command: "nbtscan {target}"
+
+- description: "Verbose nbtscan (full name table)"
+  why: "Per-name suffix breakdown like nmblookup, in nbtscan's format — recon"
+  command: "nbtscan -v {target}"
+
+- description: "Resolve a NetBIOS name to an IP (nmblookup)"
+  why: "Look up a discovered NetBIOS name (edit NAME) — maps names to hosts. Recon"
+  command: "nmblookup -A {target} NAME"
+
+- description: "nmap NetBIOS / NBNS scripts"
+  why: "nbstat pulls the name table + MAC via nmap; cross-checks nmblookup — recon"
+  command: "nmap -sU -sV --script nbstat -p 137 {target}"

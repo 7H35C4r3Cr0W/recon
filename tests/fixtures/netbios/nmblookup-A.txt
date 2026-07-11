@@ -1,0 +1,10 @@
+Looking up status of 10.10.10.180
+	SRV01           <00> -         M <ACTIVE>
+	SRV01           <20> -         M <ACTIVE>
+	MYDOMAIN        <00> - <GROUP> M <ACTIVE>
+	MYDOMAIN        <1c> - <GROUP> M <ACTIVE>
+	MYDOMAIN        <1b> -         M <ACTIVE>
+	__MSBROWSE__    <01> - <GROUP> M <ACTIVE>
+	ADMINPC         <03> -         M <ACTIVE>
+
+	MAC Address = 00-50-56-AA-BB-CC

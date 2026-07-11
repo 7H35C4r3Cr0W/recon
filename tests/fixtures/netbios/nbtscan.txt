@@ -1,0 +1,5 @@
+Doing NBT name scan for addresses from 10.10.10.180
+
+IP address       NetBIOS Name     Server    User             MAC address
+------------------------------------------------------------------------------
+10.10.10.180     SRV01            <server>  SRV01            00:50:56:aa:bb:cc

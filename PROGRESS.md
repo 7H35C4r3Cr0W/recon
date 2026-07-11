@@ -6,11 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 — `nfs` + `snmp` engines reviewed + hardened; `tftp` engine shipped (review next); `smtp`
-engine shipped (review pending); GUI panels pending for smtp/nfs/snmp/tftp.** Next: review tftp, then
-`netbios/ike/ntp` engines (§12 order), then the deferred GUI panels + smtp review. Same
-engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost, smb, ftp, ssh,
-dns, ldap, nfs, snmp** (299 tests). Recurring review lessons: parsers must match REAL current tool output;
+**Phase 2 — `nfs` + `snmp` engines reviewed + hardened; `tftp` + `netbios` engines shipped (reviews
+in flight); `smtp` engine shipped (review pending); GUI panels pending for smtp/nfs/snmp/tftp/netbios.**
+Next: finish tftp + netbios reviews, then `ike/ntp` engines (§12 order), then the deferred GUI panels
++ smtp review. Same engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http,
+vhost, smb, ftp, ssh, dns, ldap, nfs, snmp** (309 tests). Recurring review lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -40,6 +40,19 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · module 12 (netbios) — engine
+- **NetbiosModule** (`modules/netbios/`, UDP 137): triggers on 137 / netbios-ns. Tier-1 read-only:
+  `nmblookup -A {target}` + `nbtscan {target}` (NetBIOS name table — host, domain/workgroup, service
+  roles, MAC). Both already on the allowlist; services.yaml already had the 137 entry.
+- **parsers.py**: `parse_nmblookup` reads each `NAME <XX> - [<GROUP>] <node> <ACTIVE>` row and maps the
+  suffix code to meaning — `<00>` unique→hostname / group→domain, `<20>`→file-server(SMB),
+  `<1c>`/`<1b>`→domain-controller (also emits the AD domain), `<03>`→logged-in user (skipped when it
+  equals the host's own name), plus MAC; `__MSBROWSE__` is dropped. `parse_nbtscan` reads the one-line
+  table (name + `<server>` flag + MAC). `parse_netbios_tool` dispatch.
+- `suggest()` pivots: a DC/PDC → LDAP/kerberos/SMB AD flows; `<20>` → SMB module; `<03>` → user enum.
+- Tier-2 `manual_commands.yaml` (5): nmblookup -A, nbtscan (+ -v), name resolve, nmap nbstat. Recon-only.
+- 10 tests (parsers + module incl. the <03>==hostname suppression and header-not-a-finding checks).
 
 ### Phase 2 · module 10 (snmp) — hardening
 Adversarial 3-lens review (7 agents; verified against real onesixtyone / snmpwalk output). 4
