@@ -125,6 +125,8 @@ _INSTALL_HINTS: dict[str, str] = {
     "snmpwalk": "apt install snmp",
     "onesixtyone": "apt install onesixtyone",
     "searchsploit": "apt install exploitdb",
+    "showmount": "apt install nfs-common",
+    "rpcinfo": "apt install rpcbind",
 }
 
 

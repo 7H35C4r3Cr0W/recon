@@ -6,9 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 module 8 — `smtp`** (§12 order), then nfs/snmp/tftp/netbios/ike/ntp. Same
-engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost, smb, ftp,
-ssh, dns, ldap** (234 tests). Recurring review lessons: parsers must match REAL current tool output;
+**Phase 2 modules 8–9 — `smtp` + `nfs` engines shipped (engine-only; GUI panel + per-module
+adversarial review still pending for both).** Next: `snmp/tftp/netbios/ike/ntp` engines (§12 order),
+then the deferred smtp+nfs GUI panels + reviews. Same engine→GUI→adversarial-review→commit pattern.
+**Done, reviewed, hardened: http, vhost, smb, ftp, ssh, dns, ldap** (272 tests). Recurring review
+lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -38,6 +40,25 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · module 9 (nfs) — engine
+- **NfsModule** (`modules/nfs/`): triggers on 2049 / nfs service names. Tier-1 read-only recon
+  (`recon_steps`): `showmount -e {target}` (exports + client ACL) + `nmap -sV --script
+  nfs-showmount,nfs-ls,nfs-statfs -p 2049 {target}` (exports, a BOUNDED directory listing over the
+  NFS protocol with NO local mount, fs stats). Mounting stays Tier-2 (§12 "mount only on confirm").
+  `anon_credential` (source `nfs-anon-enum`) for a world-readable export.
+- **parsers.py**: `parse_showmount` (export path + client ACL; world-readable = a client token of
+  `*`/`(everyone)`/`0.0.0.0/0`, exact-token not substring so `*.corp` and `/24` stay restricted;
+  leading-`/` filter skips the header, RPC errors, and `[missing]`/`[blocked]` sentinels) and
+  `parse_nmap_nfs` (banner, nfs-showmount exports, nfs-ls files [skips `.`/`..`, filename kept
+  verbatim], access-line writable detection via `\bModify\b` so "NoModify" is not misread as
+  writable). `is_secret_name` flags id_rsa/.ssh/shadow/etc. `parse_nfs_tool` dispatch.
+- Tier-2 `manual_commands.yaml` (8): rpcinfo, showmount -e/-d/-a, nmap nfs-ls (no mount), and a
+  read-only mount → ls -laR → umount workflow (copy-to-a-terminal; sudo/ls/mount aren't on the exec
+  allowlist, so a stray in-GUI run of them safely `[blocked]`s). No creds, no lists.
+- shell.py: correct install hints for showmount (nfs-common) + rpcinfo (rpcbind).
+- 16 tests (parsers + module incl. world-readable ACL cases, writable-vs-NoModify, and a mount
+  read-only invariant); `services.yaml` already had the 2049 entry. Four gates green.
 
 ### Phase 2 · modules 5–7 (ssh, dns, ldap) — feature + hardening
 - **ssh** (§ next after ftp): `SshModule` Tier-1 = one nmap NSE scan (ssh2-enum-algos,ssh-auth-methods,

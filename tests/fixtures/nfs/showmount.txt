@@ -1,0 +1,5 @@
+Export list for 10.10.10.180:
+/var/nfs/general   *
+/home              10.11.1.0/24
+/opt/backups       (everyone)
+/srv/restricted    192.168.56.0/24,10.0.0.0/8

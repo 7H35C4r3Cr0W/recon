@@ -1,0 +1,23 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-11 12:00 UTC
+Nmap scan report for 10.10.10.180
+Host is up (0.021s latency).
+
+PORT     STATE SERVICE VERSION
+2049/tcp open  nfs_acl 2-3 (RPC #100227)
+| nfs-showmount:
+|   /var/nfs/general 10.11.1.0/24
+|_  /opt/backups *
+| nfs-ls: Volume /opt/backups
+|   access: Read Lookup Modify Extend Delete NoExecute
+|   PERMISSION  UID    GID    SIZE  TIME                 FILENAME
+|   rwxrwxrwx   65534  65534  4096  2026-01-15T10:00:00  .
+|   rwxr-xr-x   0      0      4096  2025-12-01T09:00:00  ..
+|   rw-------   1000   1000   1675  2026-01-10T22:13:37  id_rsa
+|_  rw-r--r--   1000   1000   118   2026-01-10T22:13:37  notes.txt
+| nfs-statfs:
+|   Filesystem   1K-blocks  Used     Available  Use%  Maxfilesize  Maxlink
+|_  /opt/backups 8256952    1531340  6285852    20%   16.0T        32000
+Service Info: OS: Unix
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host) scanned in 6.02 seconds

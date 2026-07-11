@@ -1,0 +1,37 @@
+# NFS manual follow-ups (Tier-2 — shown, never auto-run; §12 "mount only on confirm"). Mounting an
+# export needs root and touches the local filesystem, so those are copy-to-a-terminal commands, not
+# in-GUI runs. {target} comes from the profile; EXPORT / the mountpoint are literals you edit before
+# running. Everything here is read-only recon: enumerate, mount with -o ro, list, unmount — never
+# modify a mounted export during recon.
+
+- description: "Portmapper / RPC program dump (rpcinfo)"
+  why: "Lists mountd/nfs/nlockmgr and their ports — confirms NFS is reachable via portmapper. Recon"
+  command: "rpcinfo -p {target}"
+
+- description: "Re-list NFS exports (showmount -e)"
+  why: "Exports and the client ACL for each — read-only RPC query"
+  command: "showmount -e {target}"
+
+- description: "List directories currently mounted by clients (showmount -d)"
+  why: "Shows which exports are actively in use — recon"
+  command: "showmount -d {target}"
+
+- description: "List active client mounts (showmount -a)"
+  why: "host:/export pairs for current mounts — recon"
+  command: "showmount -a {target}"
+
+- description: "List files over NFS without mounting (nmap nfs-ls)"
+  why: "Reads an export's contents via the NFS protocol, bounded by maxfiles — no local mount. Recon"
+  command: "nmap --script nfs-ls -p 2049 {target}"
+
+- description: "Mount an export read-only — copy to a terminal"
+  why: "Mounting needs root + a local mountpoint; -o ro,nolock keeps it read-only. Confirm scope first"
+  command: "sudo mkdir -p /mnt/nfs && sudo mount -t nfs -o ro,nolock,vers=3 {target}:/EXPORT /mnt/nfs"
+
+- description: "Bounded recursive listing of a mounted export — copy to a terminal"
+  why: "Snapshot the tree read-only after mounting; inspect files in place, never modify"
+  command: "ls -laR /mnt/nfs"
+
+- description: "Unmount when done — copy to a terminal"
+  why: "Release the read-only mount cleanly"
+  command: "sudo umount /mnt/nfs"
