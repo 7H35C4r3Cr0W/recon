@@ -74,12 +74,42 @@ _SEARCHSPLOIT_FORBIDDEN: frozenset[str] = frozenset(
 # brute. --passwords is also in _FORBIDDEN_FLAGS; the short -P alias must be blocked too.
 _WPSCAN_FORBIDDEN: frozenset[str] = frozenset({"-P", "--passwords", "-U", "--usernames"})
 
-# why: netexec is enum/single-cred only (§11 Tier-1/2). It treats a -u/-p value that IS a file as a
-# LIST (Tier-3 spray) — so a file argument to these flags is forbidden; single literals are allowed.
+# why: netexec is enum/single-cred only (§11 Tier-1/2). Its -u/-p are argparse nargs='+' and
+# "user x password" spraying is the DEFAULT, so Tier-3 hides three ways a naive single-token check
+# misses: >1 inline value, a value in 2nd+ position, and '='/concatenated syntax. _netexec_violation
+# handles all three; a single inline literal (`-p ''`, `-p sa`) stays allowed (the Tier-1/2 check).
 _NETEXEC_TOOLS: frozenset[str] = frozenset({"netexec", "nxc", "crackmapexec"})
-_NETEXEC_AUTH_FLAGS: frozenset[str] = frozenset(
-    {"-u", "--user", "--username", "-p", "--pass", "--password"}
-)
+_NETEXEC_AUTH_FLAGS: frozenset[str] = frozenset({"-u", "--username", "-p", "--password"})
+
+
+def _netexec_violation(argv: list[str]) -> str | None:
+    i = 1
+    while i < len(argv):
+        token = argv[i]
+        flag, sep, inline = token.partition("=")
+        if sep:  # `-p=X` / `--password=X`
+            values = [inline]
+            i += 1
+        elif not token.startswith("--") and len(token) > 2 and token[:2] in _NETEXEC_AUTH_FLAGS:
+            flag, values = token[:2], [token[2:]]  # concatenated short form: `-pX`
+            i += 1
+        elif flag in _NETEXEC_AUTH_FLAGS:  # `-p X [Y ...]` — consume the whole nargs='+' run
+            i += 1
+            values = []
+            while i < len(argv) and not argv[i].startswith("-"):
+                values.append(argv[i])
+                i += 1
+        else:
+            i += 1
+            continue
+        literals = [v for v in values if v]
+        if len(literals) > 1:
+            return f"netexec {flag} has {len(literals)} inline credentials — spray (forbidden)"
+        for value in values:
+            if value and Path(value).is_file():
+                return f"netexec {flag} {value} is a list file — credential brute (forbidden)"
+    return None
+
 
 _INSTALL_HINTS: dict[str, str] = {
     "nmap": "apt install nmap",
@@ -137,11 +167,9 @@ def policy_violation(argv: list[str]) -> str | None:
             if token in _WPSCAN_FORBIDDEN:
                 return f"wpscan {token} is credential brute (forbidden — enumerate only)"
     if tool in _NETEXEC_TOOLS:
-        for index, token in enumerate(argv):
-            if token in _NETEXEC_AUTH_FLAGS and index + 1 < len(argv):
-                value = argv[index + 1]
-                if value and Path(value).is_file():
-                    return f"netexec {token} {value} is a list file — credential brute (forbidden)"
+        netexec_violation = _netexec_violation(argv)
+        if netexec_violation is not None:
+            return netexec_violation
     return None
 
 

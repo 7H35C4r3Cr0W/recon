@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from dataclasses import dataclass
 
 from oscprecon.models import Command, Credential, Finding, Port, ScanResults, Target
@@ -226,11 +227,13 @@ class SmbModule(Module):
         host = target.ip
         auth = "-U 'guest%'" if method == "guest" else "-N"
         safe = share.replace("$", "").replace("/", "-") or "share"
+        # quote the UNC so a legal multi-word share name ("Team Share") stays one argv token
+        unc = shlex.quote(f"//{host}/{share}")
         return [
             SmbStep(
                 Command(
                     "smb",
-                    f"smbclient //{host}/{share} {auth} -c 'ls'",
+                    f"smbclient {unc} {auth} -c 'ls'",
                     f"Root listing of share {share}.",
                     "< 30s",
                     f"smb/shares/{safe}-ls.txt",

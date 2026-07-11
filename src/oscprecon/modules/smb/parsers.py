@@ -63,12 +63,14 @@ def parse_netexec_shares(text: str) -> list[SmbFinding]:
             if rest.startswith("["):
                 in_table = False
                 continue
-            tokens = rest.split()
-            if not tokens:
+            # netexec pads columns, so split on 2+ spaces: a multi-word share name (single spaces)
+            # stays intact, and the perms column arrives as one token ("READ,WRITE") to comma-split.
+            cols = re.split(r"\s{2,}", rest.strip())
+            if not cols or not cols[0]:
                 in_table = False
                 continue
-            perms = [t for t in tokens[1:] if t in ("READ", "WRITE")]
-            findings.append(SmbFinding("share", tokens[0], ",".join(perms)))
+            perms = [p for col in cols[1:] for p in col.split(",") if p in ("READ", "WRITE")]
+            findings.append(SmbFinding("share", cols[0], ",".join(perms)))
     return findings
 
 
@@ -76,14 +78,22 @@ _DOMAIN_USER = re.compile(r"^[^\\\s]+\\(?P<user>\S+)")
 
 
 def parse_netexec_users(text: str) -> list[SmbFinding]:
+    # netexec 1.4.0 prints --users as a fixed-width table with NO domain prefix and a
+    # "-Username- -Last PW Set- -BadPW- -Description-" header; the username is the first column.
+    # Older CME-style "DOMAIN\\user" lines are still handled via the backslash fallback.
     findings: list[SmbFinding] = []
     for line in text.splitlines():
         rest = _nxc_rest(line)
-        if rest is None or rest.startswith("["):
+        if rest is None:
+            continue
+        rest = rest.strip()
+        if not rest or rest.startswith("[") or rest.startswith("-Username-"):
             continue
         match = _DOMAIN_USER.match(rest)
         if match is not None:
             findings.append(SmbFinding("user", match.group("user")))
+            continue
+        findings.append(SmbFinding("user", rest.split()[0]))
     return findings
 
 
@@ -134,9 +144,9 @@ def parse_smbclient_shares(text: str) -> list[SmbFinding]:
             if not stripped or stripped.startswith("SMB1") or stripped.startswith("Server"):
                 in_table = False
                 continue
-            tokens = stripped.split()
-            if tokens:
-                findings.append(SmbFinding("share", tokens[0]))
+            cols = re.split(r"\s{2,}", stripped)  # 2+ spaces: keep multi-word share names intact
+            if cols and cols[0]:
+                findings.append(SmbFinding("share", cols[0]))
     return findings
 
 

@@ -1,5 +1,7 @@
-SMB         10.10.10.5      445    DC01             [+] active.htb\:
-SMB         10.10.10.5      445    DC01             [*] Enumerated domain user(s)
-SMB         10.10.10.5      445    DC01             active.htb\Administrator                  badpwdcount: 0 desc: Built-in account
-SMB         10.10.10.5      445    DC01             active.htb\Guest                          badpwdcount: 0
-SMB         10.10.10.5      445    DC01             active.htb\svc_tgs                         badpwdcount: 0
+SMB         10.10.10.5      445    DC01             [*] Enumerating domain users
+SMB         10.10.10.5      445    DC01             [+] active.htb\Guest:
+SMB         10.10.10.5      445    DC01             -Username-                     -Last PW Set-       -BadPW- -Description-
+SMB         10.10.10.5      445    DC01             Administrator                  2023-07-01 12:00:00 0       Built-in account for administering the computer/domain
+SMB         10.10.10.5      445    DC01             Guest                          <never>             0       Built-in account for guest access to the computer/domain
+SMB         10.10.10.5      445    DC01             svc_tgs                        2023-05-05 08:00:00 0
+SMB         10.10.10.5      445    DC01             [*] Enumerated 3 domain users: ACTIVE

@@ -253,7 +253,9 @@ class SmbReconWorker(QThread):
             if self._mode in ("full", "null", "guest"):
                 followup, _ = self._run_phase(module.followup_steps(target, method))
                 collected += followup
-            for share in readable_shares(collected):
+            # dedup: full/shares modes enumerate shares via both null and guest, so the same
+            # readable share can appear twice — list each once (dict.fromkeys preserves order).
+            for share in dict.fromkeys(readable_shares(collected)):
                 self._run_phase(module.share_steps(target, share, method))
 
         self._write_findings(collected)

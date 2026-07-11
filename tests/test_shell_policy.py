@@ -70,3 +70,27 @@ def test_blocks_netexec_list_auth(tmp_path: object) -> None:
         )
         is None
     )
+
+
+def test_blocks_netexec_spray_bypasses(tmp_path: object) -> None:
+    from pathlib import Path
+
+    wl = Path(str(tmp_path)) / "rockyou.txt"
+    wl.write_text("Summer2024\nWinter2024\n", encoding="utf-8")
+
+    def blocked(argv: list[str]) -> bool:
+        return shell.policy_violation(argv) is not None
+
+    # nargs='+' spray: >1 inline password / >1 inline username (no file needed)
+    assert blocked(["netexec", "smb", "10.0.0.1", "-u", "admin", "-p", "a", "b", "c"])
+    assert blocked(["netexec", "smb", "10.0.0.1", "-u", "alice", "bob", "-p", "Password1"])
+    # a wordlist file smuggled in 2nd position, or via '='/short '=' or concatenated syntax
+    assert blocked(["netexec", "smb", "10.0.0.1", "-u", "admin", "-p", "decoy", str(wl)])
+    assert blocked(["netexec", "smb", "10.0.0.1", f"--password={wl}"])
+    assert blocked(["netexec", "smb", "10.0.0.1", f"-p={wl}"])
+    assert blocked(["netexec", "smb", "10.0.0.1", f"-p{wl}"])
+    assert blocked(["nxc", "smb", "10.0.0.1", "-u", "admin", "-p", "a", "b"])
+    # single inline literals (Tier-1/2) still pass, including via '=' and empty secret
+    assert not blocked(["netexec", "smb", "10.0.0.1", "-u", "administrator", "-p", ""])
+    assert not blocked(["netexec", "smb", "10.0.0.1", "-u=guest", "-p=guest"])
+    assert not blocked(["netexec", "smb", "10.0.0.1", "-u", "", "-p", "", "--shares"])

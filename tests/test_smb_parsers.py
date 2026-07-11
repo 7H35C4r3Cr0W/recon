@@ -40,9 +40,30 @@ def test_netexec_auth_failure() -> None:
     )
 
 
+def test_netexec_share_read_write_and_multiword() -> None:
+    # netexec 1.4.0 emits perms as one comma-joined token; share names may contain spaces.
+    text = (
+        "SMB  10.0.0.1  445  DC  Share           Permissions     Remark\n"
+        "SMB  10.0.0.1  445  DC  -----           -----------     ------\n"
+        "SMB  10.0.0.1  445  DC  Data            READ,WRITE      user data\n"
+        "SMB  10.0.0.1  445  DC  Team Share      READ            dept files\n"
+    )
+    shares = {f.value: f.detail for f in parse_netexec_shares(text) if f.kind == "share"}
+    assert shares["Data"] == "READ,WRITE"  # both perms survive (was parsed as no-access)
+    assert shares["Team Share"] == "READ"  # multi-word name intact (was truncated to "Team")
+    assert set(readable_shares(parse_netexec_shares(text))) == {"Data", "Team Share"}
+
+
 def test_netexec_users() -> None:
+    # netexec 1.4.0 columnar --users output (no domain prefix)
     users = {f.value for f in parse_netexec_users(_read("netexec-users.txt"))}
     assert users == {"Administrator", "Guest", "svc_tgs"}
+
+
+def test_netexec_users_legacy_domain_prefix() -> None:
+    # older CME-style "DOMAIN\\user" output still parses via the backslash fallback
+    text = "SMB  10.0.0.1  445  DC  active.htb\\svc_old   badpwdcount: 0\n"
+    assert {f.value for f in parse_netexec_users(text)} == {"svc_old"}
 
 
 def test_netexec_ridbrute_only_users() -> None:

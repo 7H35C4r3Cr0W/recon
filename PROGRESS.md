@@ -6,11 +6,10 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 module 3 — smb: adversarial 3-lens review** (chunk 3). Engine + GUI are done and gated
-(146 tests). Run the same OSCP-compliance / GUI-concurrency / correctness review as http & vhost
-(reviewers run the real netexec/smbclient/rpcclient to catch version drift), fix HIGH/MED + cheap
-LOWs, then move on. After that: **ftp/ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp**.
-**HTTP + vhost + smb(engine+GUI) done.**
+**Phase 2 module 4 — next service module** (§12 order): pick from **ftp/ssh/dns/ldap/smtp/nfs/snmp/
+tftp/netbios/ike/ntp**. Same engine→GUI→adversarial-review→commit pattern. **HTTP + vhost + smb all
+done, reviewed, and hardened** (149 tests). Reuse the affirmative-allowlist + shell-chokepoint
+sanitization pattern; keep any tool with nargs='+' cred flags in mind (see the netexec guard).
 
 ## How to resume
 
@@ -21,7 +20,31 @@ LOWs, then move on. After that: **ftp/ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ik
 
 ## Log (newest first)
 
-### Phase 2 · module 3 (smb) — GUI (this commit)
+### Phase 2 · module 3 (smb) hardening (this commit)
+Adversarial 3-lens review (12 agents, each finding verified against the REAL installed netexec 1.4.0);
+6 of 9 candidates survived verification, all fixed (3 non-issues correctly rejected):
+- **§2/§11 (HIGH ×2): netexec spray-guard bypasses.** The old guard only checked the single token after
+  -u/-p and only for is_file(). But netexec -u/-p are argparse `nargs='+'` and user×password spray is the
+  DEFAULT, so three Tier-3 vectors slipped through: `-p a b c` (inline spray), `-p decoy rockyou.txt`
+  (file in 2nd position), and `-p=rockyou.txt` / `-prockyou.txt` (= / concatenated syntax). Rewrote as
+  `_netexec_violation`: normalizes =/concatenated forms, consumes the whole nargs run, blocks >1 literal
+  OR any file value; single literals (`-p ''`, `-p sa`) still pass. Verified all 29 real module/manual
+  commands pass and all bypass vectors are blocked.
+- **correctness (HIGH): parse_netexec_users matched nothing on netexec 1.4.0.** 1.4.0 prints --users as a
+  fixed-width table with NO `domain\user` prefix (header `-Username- -Last PW Set- -BadPW- -Description-`);
+  the old regex required a backslash → zero users on a successful enum. Now takes the first column, with a
+  backslash fallback for older CME output; regenerated the fixture to the real 1.4.0 format.
+- **correctness (MED): READ,WRITE shares read as no-access.** netexec joins perms into one `READ,WRITE`
+  token; the membership test never matched → a writable share looked inaccessible. Now comma-split.
+- **correctness (LOW ×2): multi-word share names truncated** (split on 2+ spaces so `Team Share` survives;
+  quote the UNC in the follow-up smbclient command); **duplicate readable shares** listed twice in
+  full/shares mode (dict.fromkeys before the per-share loop).
+- Rejected (verified non-issues): _on_smb_done cred-add wedge (findings.json write front-runs it on the
+  same path, so failures surface via the guarded worker try/except), timeout=None hang (tools self-bound:
+  netexec --smb-timeout 2s, enum4linux-ng 10s), Add-Credential-during-run (modal dialog; writes only
+  creds.json on the UI thread, no profile.json race).
+
+### Phase 2 · module 3 (smb) — GUI (660a9cd)
 - **SmbPanel** (`gui/widgets/smb_panel.py`): Tier-1 recon buttons (full / null-only / guest-only /
   shares-only → `recon_requested`), Tier-2 manual follow-ups list loaded from `manual_commands.yaml`
   and target-expanded (double-click runs via the ad-hoc path; right-click → copy as `//`, `\\`, or
