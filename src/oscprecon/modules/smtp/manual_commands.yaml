@@ -1,0 +1,28 @@
+# SMTP manual follow-ups (Tier-2 — shown, never auto-run; §11). Username enumeration via VRFY/EXPN/
+# RCPT is information disclosure (does this account exist?), NOT credential brute — but nc/telnet/swaks
+# are not on the exec allowlist, so the interactive ones are copy-to-a-terminal commands. {target}/
+# {port} come from the profile; USER / DOMAIN are literals you edit before running.
+
+- description: "Re-list supported ESMTP verbs (nmap)"
+  why: "Confirm VRFY/EXPN/AUTH/STARTTLS support before enumerating users — recon"
+  command: "nmap --script smtp-commands -p {port} {target}"
+
+- description: "Open-relay re-test (nmap)"
+  why: "Second open-relay confirmation — read-only test, no mail actually sent onward"
+  command: "nmap --script smtp-open-relay -p {port} {target}"
+
+- description: "NTLM domain / hostname leak (nmap)"
+  why: "Pulls AD domain + computer name from an NTLM challenge without authenticating — recon"
+  command: "nmap --script smtp-ntlm-info -p {port} {target}"
+
+- description: "VRFY a single user — copy to a terminal"
+  why: "Ask whether one account exists (VRFY). Copy to a terminal; nc is not run in-GUI"
+  command: "printf 'VRFY USER\\r\\nQUIT\\r\\n' | nc -nv {target} {port}"
+
+- description: "EXPN a mailing list — copy to a terminal"
+  why: "Expand a list/alias to its members (EXPN) — user enumeration, run in a terminal"
+  command: "printf 'EXPN USER\\r\\nQUIT\\r\\n' | nc -nv {target} {port}"
+
+- description: "RCPT-based user check — copy to a terminal"
+  why: "When VRFY is disabled, MAIL FROM + RCPT TO reveals valid recipients — run in a terminal"
+  command: "swaks --to USER@DOMAIN --server {target}:{port} --quit-after RCPT"
