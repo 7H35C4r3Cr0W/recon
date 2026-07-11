@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -33,6 +34,15 @@ from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import Credential, DiscoveredService, Target
 from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
+from oscprecon.modules.smb import (
+    SmbFinding,
+    SmbModule,
+    SmbStep,
+    anon_credential,
+    netexec_auth_ok,
+    parse_smb_tool,
+    readable_shares,
+)
 from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
@@ -172,6 +182,114 @@ class SearchsploitWorker(QThread):
         self.done.emit(hits, self._request_id)
 
 
+@dataclass
+class SmbReconResult:
+    summary: list[str]
+    creds: list[Credential]
+
+
+class SmbReconWorker(QThread):
+    line = Signal(str)
+    done = Signal(object)  # SmbReconResult
+    failed = Signal(str)
+
+    def __init__(self, profile: Profile, mode: str) -> None:
+        super().__init__()
+        self._profile = profile
+        self._mode = mode
+        self._module = SmbModule()
+
+    def run(self) -> None:
+        try:
+            result = self._drive()
+        except Exception as exc:  # boundary: surface worker failures to the UI thread
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(result)
+
+    def _run_phase(self, steps: list[SmbStep]) -> tuple[list[SmbFinding], bool]:
+        # why: SMB Tier-1 is a conditional sequence, so auth must be detected between phases on
+        # this thread — a single CommandWorker can't branch on a share listing's result.
+        base = self._profile.directory
+        found: list[SmbFinding] = []
+        auth_ok = False
+        for step in steps:
+            out = base / step.command.output_file
+            shell.run(step.command.shell_line, out, cwd=base, on_line=self.line.emit)
+            if not step.tool:
+                continue
+            try:
+                text = out.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            found.extend(parse_smb_tool(step.tool, text))
+            if step.tool == "netexec-shares" and netexec_auth_ok(text):
+                auth_ok = True
+        return found, auth_ok
+
+    def _drive(self) -> SmbReconResult:
+        target = self._profile.target
+        module = self._module
+        collected: list[SmbFinding] = []
+
+        banner, _ = self._run_phase(module.banner_steps(target))
+        collected += banner
+
+        method: str | None = None
+        if self._mode in ("full", "null", "shares"):
+            null_found, null_ok = self._run_phase(module.null_session_steps(target))
+            collected += null_found
+            if null_ok:
+                method = "null"
+        if self._mode in ("full", "guest", "shares"):
+            guest_found, guest_ok = self._run_phase(module.guest_steps(target))
+            collected += guest_found
+            if guest_ok and method is None:
+                method = "guest"
+
+        creds: list[Credential] = []
+        if method is not None:
+            creds.append(anon_credential(target, method))
+            if self._mode in ("full", "null", "guest"):
+                followup, _ = self._run_phase(module.followup_steps(target, method))
+                collected += followup
+            for share in readable_shares(collected):
+                self._run_phase(module.share_steps(target, share, method))
+
+        self._write_findings(collected)
+        return SmbReconResult(self._summarize(collected, method), creds)
+
+    def _write_findings(self, collected: list[SmbFinding]) -> None:
+        if not collected:
+            return
+        now = datetime.now(UTC).isoformat()
+        findings.add_findings(self._profile.directory, [f.to_dict(now) for f in collected])
+
+    def _summarize(self, collected: list[SmbFinding], method: str | None) -> list[str]:
+        summary: list[str] = []
+        signing = [f.value for f in collected if f.kind == "signing"]
+        if signing:
+            summary.append(f"SMB signing: {signing[-1]}")
+        share_findings = [f for f in collected if f.kind == "share"]
+        if share_findings:
+            names = sorted({f.value for f in share_findings})
+            readable = set(readable_shares(collected))
+            summary.append(f"Shares ({len(names)}):")
+            summary.extend(f"  {n}{' [READ]' if n in readable else ''}" for n in names)
+        users = sorted({f.value for f in collected if f.kind == "user"})
+        if users:
+            shown = ", ".join(users[:10])
+            more = "…" if len(users) > 10 else ""
+            summary.append(f"Users ({len(users)}): {shown}{more}")
+        for policy in (f for f in collected if f.kind == "policy"):
+            summary.append(f"Policy — {policy.value}: {policy.detail}")
+        if method is not None:
+            summary.append(f"Anonymous access: {method} session OK")
+        else:
+            summary.append("Anonymous access: none (null/guest denied)")
+        return summary or ["No SMB findings."]
+
+
 def _slug(command: str) -> str:
     tokens = command.split()
     base = tokens[0] if tokens else "command"
@@ -218,6 +336,7 @@ class MainWindow(QMainWindow):
         self._tool_panel.vhost_dry_run_requested.connect(self._on_http_dry_run)
         self._tool_panel.wildcard_detect_requested.connect(self._on_wildcard_detect)
         self._tool_panel.enumerate_as_http_requested.connect(self._on_enumerate_as_http)
+        self._tool_panel.smb_recon_requested.connect(self._on_smb_recon)
         self._tool_panel.vhost_validation_failed.connect(
             lambda msg: self._tool_panel.append_output(f"[blocked] {msg}")
         )
@@ -662,6 +781,27 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(f"[http] port {service.port} now treated as HTTP")
         else:
             self._tool_panel.append_output("[probe] no HTTP response")
+        self._finish_worker()
+
+    def _on_smb_recon(self, mode: str) -> None:
+        if self._profile is None or self._worker is not None:
+            return
+        self._set_busy(True)
+        self._tool_panel.append_output(f"[smb] {mode} recon starting…")
+        worker = SmbReconWorker(self._profile, mode)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_smb_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _on_smb_done(self, result: object) -> None:
+        if isinstance(result, SmbReconResult) and self._profile is not None:
+            for cred in result.creds:
+                self._profile.add_credential(cred)
+                self._tool_panel.append_output(f"[cred] {cred.username} (source: {cred.source})")
+            self._tool_panel.set_smb_summary(result.summary)
+            self._tool_panel.append_output("[smb] recon complete")
         self._finish_worker()
 
     def _on_scan_done(self, count: int) -> None:

@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon.gui.widgets.http_panel import HttpPanel
+from oscprecon.gui.widgets.smb_panel import SmbPanel
 from oscprecon.gui.widgets.vhost_panel import VhostPanel
 from oscprecon.models import DiscoveredService
 from oscprecon.profile import Profile
@@ -36,6 +37,7 @@ class ToolPanel(QWidget):
     wildcard_detect_requested = Signal(str, str)
     enumerate_as_http_requested = Signal(str)
     vhost_validation_failed = Signal(str)
+    smb_recon_requested = Signal(str)  # mode: full | null | guest | shares
 
     def __init__(self) -> None:
         super().__init__()
@@ -80,9 +82,16 @@ class ToolPanel(QWidget):
         self._web_tabs.addTab(self._http, "Content discovery")
         self._web_tabs.addTab(self._vhost, "Vhosts")
 
+        # smb page: Tier-1 recon buttons + Tier-2 manual follow-ups + findings
+        self._smb = SmbPanel()
+        self._smb.recon_requested.connect(self.smb_recon_requested)
+        # Tier-2 follow-ups reuse the ad-hoc command path (validated at the shell chokepoint).
+        self._smb.manual_requested.connect(self.run_requested)
+
         self._stack = QStackedWidget()
-        self._stack.addWidget(generic)
-        self._stack.addWidget(self._web_tabs)
+        self._stack.addWidget(generic)  # 0: generic hints
+        self._stack.addWidget(self._web_tabs)  # 1: http/vhost builders
+        self._stack.addWidget(self._smb)  # 2: smb
 
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
@@ -98,6 +107,7 @@ class ToolPanel(QWidget):
     def set_profile(self, profile: Profile) -> None:
         self._http.set_profile(profile)
         self._vhost.set_profile(profile)
+        self._smb.set_profile(profile)
 
     def show_service(self, service: DiscoveredService | None, ref: ServiceRef | None) -> None:
         self._hints.clear()
@@ -111,6 +121,10 @@ class ToolPanel(QWidget):
             self._http.configure(service, ref)
             self._vhost.configure(service)
             self._stack.setCurrentWidget(self._web_tabs)
+            return
+        if ref is not None and ref.module == "smb":
+            self._smb.configure(service)
+            self._stack.setCurrentWidget(self._smb)
             return
         self._stack.setCurrentIndex(0)
         if ref is None:
@@ -129,6 +143,10 @@ class ToolPanel(QWidget):
         self._run_button.setEnabled(not running)
         self._http.setEnabled(not running)
         self._vhost.setEnabled(not running)
+        self._smb.set_running(running)
+
+    def set_smb_summary(self, lines: list[str]) -> None:
+        self._smb.set_summary(lines)
 
     def add_vhosts(self, vhosts: list[str]) -> None:
         self._vhost.add_vhosts(vhosts)

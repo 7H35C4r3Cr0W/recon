@@ -37,7 +37,8 @@ def test_tool_panel_populates_hints_and_expands(qtbot: QtBot) -> None:
     panel = ToolPanel()
     qtbot.addWidget(panel)
     panel.set_target("10.10.10.5")
-    svc = DiscoveredService(445, Proto.TCP, "microsoft-ds")
+    # ssh uses the generic hints page (http/smb have dedicated builder panels)
+    svc = DiscoveredService(22, Proto.TCP, "ssh")
     panel.show_service(svc, references.match(svc))
     assert panel._hints.count() >= 1
     panel._on_hint_activated(panel._hints.item(0))
@@ -80,7 +81,8 @@ def test_main_window_selection_updates_panes(qtbot: QtBot, tmp_path: Path) -> No
     assert tcp is not None
     window._service_tree.setCurrentItem(tcp.child(1))  # 445 (sorted 22, 445)
     assert "445" in window._reference_pane._label.text()
-    assert window._tool_panel._hints.count() >= 1
+    # 445 is SMB → the tool panel switches to the dedicated SMB page
+    assert window._tool_panel._stack.currentWidget() is window._tool_panel._smb
 
 
 def test_reference_pane_emits_page_visited(qtbot: QtBot) -> None:

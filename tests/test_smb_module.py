@@ -5,6 +5,8 @@ from oscprecon.modules.smb import (
     backslash_unc,
     escaped_unc,
     forward_unc,
+    to_backslash_command,
+    to_escaped_command,
 )
 
 
@@ -63,6 +65,16 @@ def test_unc_helpers() -> None:
     assert forward_unc("10.10.10.5", "IT") == "//10.10.10.5/IT"
     assert backslash_unc("10.10.10.5", "IT") == r"\\10.10.10.5\IT"
     assert escaped_unc("10.10.10.5", "IT") == r"\\\\10.10.10.5\\IT"
+
+
+def test_unc_command_transforms() -> None:
+    cmd = "smbclient //10.10.10.5/Replication -N -c 'ls'"
+    assert to_backslash_command(cmd) == r"smbclient \\10.10.10.5\Replication -N -c 'ls'"
+    assert to_escaped_command(cmd) == r"smbclient \\\\10.10.10.5\\Replication -N -c 'ls'"
+    # a command without a UNC path is left untouched
+    assert to_backslash_command("netexec smb 10.10.10.5 --shares") == (
+        "netexec smb 10.10.10.5 --shares"
+    )
 
 
 def test_anon_credential() -> None:

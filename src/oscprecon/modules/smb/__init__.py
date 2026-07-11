@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from oscprecon.models import Command, Credential, Finding, Port, ScanResults, Target
@@ -23,6 +24,8 @@ __all__ = [
     "netexec_auth_ok",
     "parse_smb_tool",
     "readable_shares",
+    "to_backslash_command",
+    "to_escaped_command",
 ]
 
 SMB_SERVICE_NAMES = frozenset({"microsoft-ds", "netbios-ssn", "smb", "microsoft-ds?"})
@@ -45,6 +48,21 @@ def backslash_unc(target: str, share: str = "") -> str:
 
 def escaped_unc(target: str, share: str = "") -> str:
     return f"\\\\\\\\{target}\\\\{share}"
+
+
+_UNC_IN_COMMAND = re.compile(r"//(?P<host>[^/\s]+)/(?P<share>\S*)")
+
+
+def to_backslash_command(command: str) -> str:
+    # //target/share -> \\target\share (Windows cmd form)
+    return _UNC_IN_COMMAND.sub(lambda m: f"\\\\{m.group('host')}\\{m.group('share')}", command)
+
+
+def to_escaped_command(command: str) -> str:
+    # //target/share -> \\\\target\\share (bash-escaped form)
+    return _UNC_IN_COMMAND.sub(
+        lambda m: f"\\\\\\\\{m.group('host')}\\\\{m.group('share')}", command
+    )
 
 
 def anon_credential(target: Target, method: str) -> Credential:

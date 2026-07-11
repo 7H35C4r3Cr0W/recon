@@ -6,11 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 module 3 — smb** (tiered auto-recon, §11): Tier-1 auto null-session/guest checks
-(smbclient -L -N, netexec --shares, enum4linux-ng -A, rpcclient null, RID cycling, per-share
-listing), Tier-2 shown-only single default-cred checks (administrator:'', admin:'', sa:sa),
-NEVER Tier-3 list-driven brute. Auto-write null/guest success to creds.json (source smb-anon-enum).
-Then ftp/ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp. **HTTP + vhost done + hardened.**
+**Phase 2 module 3 — smb: adversarial 3-lens review** (chunk 3). Engine + GUI are done and gated
+(146 tests). Run the same OSCP-compliance / GUI-concurrency / correctness review as http & vhost
+(reviewers run the real netexec/smbclient/rpcclient to catch version drift), fix HIGH/MED + cheap
+LOWs, then move on. After that: **ftp/ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp**.
+**HTTP + vhost + smb(engine+GUI) done.**
 
 ## How to resume
 
@@ -21,7 +21,36 @@ Then ftp/ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp. **HTTP + vhost done + 
 
 ## Log (newest first)
 
-### Phase 2 · module 2 (vhost) hardening (this commit)
+### Phase 2 · module 3 (smb) — GUI (this commit)
+- **SmbPanel** (`gui/widgets/smb_panel.py`): Tier-1 recon buttons (full / null-only / guest-only /
+  shares-only → `recon_requested`), Tier-2 manual follow-ups list loaded from `manual_commands.yaml`
+  and target-expanded (double-click runs via the ad-hoc path; right-click → copy as `//`, `\\`, or
+  bash-escaped UNC), and a live "Findings so far" summary. Tier-3 is never shown.
+- **tool_panel**: SmbPanel is stack page 2, shown when `ref.module == "smb"`; `smb_recon_requested`
+  forwarded; manual follow-ups reuse `run_requested` (validated at the shell chokepoint); disabled
+  during a scan.
+- **SmbReconWorker** (`main_window.py`): QThread that drives the conditional Tier-1 *sequence* on its
+  own thread — banner → null/guest phases → detect auth (`netexec_auth_ok`) → if authed, followups
+  (users/pass-pol/rid-brute/rpcclient) + per-readable-share `ls`. Writes findings.json; returns
+  anon creds (source `smb-anon-enum`) for the UI thread to add. Modes: full/null/guest/shares
+  (shares skips followups).
+- UNC command transforms `to_backslash_command`/`to_escaped_command` added to the smb module.
+- Tests: `tests/gui/test_smb_panel.py` (buttons, manual legality, worker full-drive + shares-mode via
+  a monkeypatched shell.run) + UNC-transform unit tests; updated two widget tests that assumed 445
+  used the generic hints page (it now opens the SMB panel). 146 pass; all four gates green.
+
+### Phase 2 · module 3 (smb) — engine (b177316)
+- **SmbModule** (`modules/smb/`): triggers on 139/445; step-builders (`banner/null_session/guest/
+  followup/share_steps`) returning `SmbStep`s (each carrying a parser key) since Tier-1 is a
+  conditional sequence, not one command. Tier-2 `manual_commands.yaml` = single default-cred attempts
+  (administrator:'', admin:'', sa:sa, guest) + RID cycling + rpcclient/smbmap enum (no secretsdump,
+  no lists). anon_credential(source smb-anon-enum).
+- **parsers.py**: netexec shares/users/rid-brute/pass-pol, smbclient -L, rpcclient enumdomusers →
+  `SmbFinding`; modelled on real tool output. `readable_shares`, `netexec_auth_ok`.
+- **§11 spray guard** (shell.py): a `-u`/`-p` value that is a *file* (netexec's own list semantics) is
+  blocked as Tier-3 brute; single literals pass. `nxc` added to the allowlist.
+
+### Phase 2 · module 2 (vhost) hardening (4c04471)
 Adversarial 3-lens review; fixed all 9 findings (the correctness lens ran the real installed tools):
 - **§2 (high):** validate the vhost domain/dns_server like Target.ip (reject whitespace/leading-'-'/
   quotes) — blocks flag injection (a crafted domain adding ffuf `-x proxy` → off-target traffic).
