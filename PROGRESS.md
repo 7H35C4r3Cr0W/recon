@@ -16,14 +16,15 @@ optional §16 polish remains: **minimap** (needs the cytoscape-navigator extensi
 filter sidebar**. After that (or now if you prefer), **return to Phase 3** once your Obsidian
 notes/box writeups are committed.
 
-### ⚠️ ORDER — we are JUMPING Phase 3 → Phase 4 (user decision 2026-07-11). DO NOT SKIP PHASE 3.
-**Phase 3 (pattern library + suggestion engine) is DEFERRED, not done.** It is BLOCKED on `# source:`
-provenance (§15): no walkthroughs/box notes are committed yet. The user is loading their Obsidian
-notes / box writeups onto Kali **separately** to unblock it. **Do NOT build pattern entries or mark
-Phase 3 complete until real `walkthroughs/*.md` or `boxes/*.md` sources are committed.** After Phase 4,
-**return to Phase 3.** (Phase 3 deliverables still owed: `patterns/engine.py`, per-service
-`patterns/<svc>.yaml` with the provenance build-gate, "Recon next steps" tool-panel section with
-pre-fill-no-autorun, report "Suggested next steps" with citations.)
+### ⚠️ ORDER — we JUMPED Phase 3 → Phase 4 (user decision 2026-07-11). DO NOT SKIP PHASE 3.
+**Phase 3 (pattern library + suggestion engine) is DEFERRED, not done — now UNBLOCKED.** The user's
+Obsidian vault is mounted at **`/media/sf_notes-vault2`** (see memory `obsidian-notes-location`);
+`0.01 Cheatsheets/All_In_One` is the flagged goldmine of raw port/service syntax, `Boxes/` has per-box
+writeups. These are the `# source:` provenance for §15. **Plan: finish the Phase 4 minimap+filter
+polish, THEN do Phase 3** using those notes. **§21 rule when building Phase 3: extract recon INSIGHTS
+only — cite `# source:`, NEVER commit the raw notes / prose / creds / wordlists.** Phase 3 deliverables
+owed: `patterns/engine.py`, per-service `patterns/<svc>.yaml` (provenance build-gate), "Recon next
+steps" tool-panel section (pre-fill, no autorun), report "Suggested next steps" with citations.
 
 **NOW: Phase 4 — Bloodhound-style graph view (§16, §23).** Deliverables: `gui/widgets/graph_view.py`
 (QWebEngineView + vendored offline Cytoscape.js, NO runtime CDN), `QWebChannel` GraphBridge
