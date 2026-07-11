@@ -28,6 +28,7 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
         "curl",
         "wget",
         "wpscan",
+        "ssh",
         "enum4linux-ng",
         "smbclient",
         "smbmap",
@@ -222,15 +223,21 @@ def run(
         )
 
     logger.info("run: %s", shell_line)
+    # why: stdin=DEVNULL + start_new_session detach the child from the launching terminal, so a
+    # wrapped tool can never block on stdin or /dev/tty for interactive input (e.g. an ssh password
+    # prompt). Without this a single interactive command hangs the streaming read loop forever and
+    # wedges the GUI's sole worker slot; here it fails fast ("no tty present") instead.
     proc = subprocess.Popen(
         argv,
         cwd=str(cwd) if cwd is not None else None,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         encoding="utf-8",
         errors="replace",
         bufsize=1,
+        start_new_session=True,
     )
 
     timed_out = False

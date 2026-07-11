@@ -37,8 +37,8 @@ def test_tool_panel_populates_hints_and_expands(qtbot: QtBot) -> None:
     panel = ToolPanel()
     qtbot.addWidget(panel)
     panel.set_target("10.10.10.5")
-    # ssh uses the generic hints page (http/smb have dedicated builder panels)
-    svc = DiscoveredService(22, Proto.TCP, "ssh")
+    # smtp uses the generic hints page (http/smb/ftp/ssh have dedicated builder panels)
+    svc = DiscoveredService(25, Proto.TCP, "smtp")
     panel.show_service(svc, references.match(svc))
     assert panel._hints.count() >= 1
     panel._on_hint_activated(panel._hints.item(0))

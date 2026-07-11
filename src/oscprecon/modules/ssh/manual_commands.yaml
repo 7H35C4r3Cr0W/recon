@@ -1,0 +1,32 @@
+# SSH manual follow-ups (Tier-2 — shown, never auto-run; §2/§11). Single-attempt logins against a
+# well-known account are recon-adjacent; iterating a LIST is brute force and NEVER wrapped here
+# (no hydra/medusa/ncrack/sshpass, no password lists). {target} is the host and {port} the SSH
+# port, both filled from the profile; USER / KEYFILE are literals you edit before running.
+#
+# The password/interactive logins below prompt for a password on a terminal, which the GUI can't
+# supply — copy them and run in a real terminal. (In-GUI, ssh has no tty and fails fast rather
+# than hanging.) ConnectTimeout bounds a filtered host so nothing blocks the worker slot.
+
+- description: "Enumerate offered auth methods for a specific user (nmap)"
+  why: "Confirms whether password auth is exposed for that account — recon, no login attempted"
+  command: "nmap --script ssh-auth-methods --script-args ssh.user=root -p {port} {target}"
+
+- description: "Deeper algorithm / host-key / SSHv1 audit (nmap)"
+  why: "Fuller NSE sweep including a legacy SSHv1 check — read-only fingerprinting"
+  command: "nmap -sV --script ssh2-enum-algos,ssh-hostkey,sshv1 -p {port} {target}"
+
+- description: "Log in with a private key you already found (key-based, single)"
+  why: "Uses a key recovered elsewhere — access with a found credential, not a brute force"
+  command: "ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=6 -p {port} -i KEYFILE USER@{target} id"
+
+- description: "Try root with a default password — copy to a terminal (single attempt)"
+  why: "One default-cred check (§2 Tier-2). The GUI can't take a password — copy this to a terminal; a single manual attempt, never a list/brute"
+  command: "ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o ConnectTimeout=6 -p {port} root@{target}"
+
+- description: "Try admin with a default password — copy to a terminal (single attempt)"
+  why: "One default-cred check — copy to a terminal to enter the password; single attempt only"
+  command: "ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o ConnectTimeout=6 -p {port} admin@{target}"
+
+- description: "Interactive single login as a chosen user — copy to a terminal"
+  why: "Generic single manual login — copy to a terminal; you supply the account and password, one attempt"
+  command: "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=6 -p {port} USER@{target}"

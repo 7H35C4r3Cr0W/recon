@@ -1,0 +1,45 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-11 12:00 UTC
+Nmap scan report for 10.10.10.5
+Host is up (0.021s latency).
+
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+| ssh2-enum-algos:
+|   kex_algorithms: (7)
+|       curve25519-sha256
+|       curve25519-sha256@libssh.org
+|       ecdh-sha2-nistp256
+|       diffie-hellman-group-exchange-sha256
+|       diffie-hellman-group14-sha1
+|       diffie-hellman-group1-sha1
+|   server_host_key_algorithms: (4)
+|       ssh-rsa
+|       rsa-sha2-512
+|       ecdsa-sha2-nistp256
+|       ssh-ed25519
+|   encryption_algorithms: (6)
+|       chacha20-poly1305@openssh.com
+|       aes128-ctr
+|       aes256-ctr
+|       aes256-cbc
+|       3des-cbc
+|   mac_algorithms: (5)
+|       umac-64-etm@openssh.com
+|       hmac-sha2-256
+|       hmac-sha1
+|       hmac-md5
+|   compression_algorithms: (2)
+|       none
+|_      zlib@openssh.com
+| ssh-hostkey:
+|   2048 aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99 (RSA)
+|   256 12:34:56:78:9a:bc:de:f0:12:34:56:78:9a:bc:de:f0 (ECDSA)
+|_  256 fe:dc:ba:98:76:54:32:10:fe:dc:ba:98:76:54:32:10 (ED25519)
+| ssh-auth-methods:
+|   Supported authentication methods:
+|     publickey
+|_    password
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host) scanned in 3.42 seconds

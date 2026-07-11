@@ -17,9 +17,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from oscprecon.gui.widgets.dns_panel import DnsPanel
 from oscprecon.gui.widgets.ftp_panel import FtpPanel
 from oscprecon.gui.widgets.http_panel import HttpPanel
 from oscprecon.gui.widgets.smb_panel import SmbPanel
+from oscprecon.gui.widgets.ssh_panel import SshPanel
 from oscprecon.gui.widgets.vhost_panel import VhostPanel
 from oscprecon.models import DiscoveredService
 from oscprecon.profile import Profile
@@ -40,6 +42,8 @@ class ToolPanel(QWidget):
     vhost_validation_failed = Signal(str)
     smb_recon_requested = Signal(str)  # mode: full | null | guest | shares
     ftp_recon_requested = Signal(str, int)  # (mode: full | anon, port)
+    ssh_recon_requested = Signal(int)  # port
+    dns_recon_requested = Signal(str, int)  # (domain, port)
 
     def __init__(self) -> None:
         super().__init__()
@@ -95,11 +99,24 @@ class ToolPanel(QWidget):
         self._ftp.recon_requested.connect(self.ftp_recon_requested)
         self._ftp.manual_requested.connect(self.run_requested)
 
+        # ssh page: Tier-1 fingerprint button + Tier-2 manual follow-ups + findings
+        self._ssh = SshPanel()
+        self._ssh.recon_requested.connect(self.ssh_recon_requested)
+        self._ssh.manual_requested.connect(self.run_requested)
+
+        # dns page: Tier-1 protocol recon (+ domain field) + Tier-2 manual follow-ups + findings
+        self._dns = DnsPanel()
+        self._dns.recon_requested.connect(self.dns_recon_requested)
+        self._dns.manual_requested.connect(self.run_requested)
+        self._dns.validation_failed.connect(self.vhost_validation_failed)
+
         self._stack = QStackedWidget()
         self._stack.addWidget(generic)  # 0: generic hints
         self._stack.addWidget(self._web_tabs)  # 1: http/vhost builders
         self._stack.addWidget(self._smb)  # 2: smb
         self._stack.addWidget(self._ftp)  # 3: ftp
+        self._stack.addWidget(self._ssh)  # 4: ssh
+        self._stack.addWidget(self._dns)  # 5: dns
 
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
@@ -117,6 +134,8 @@ class ToolPanel(QWidget):
         self._vhost.set_profile(profile)
         self._smb.set_profile(profile)
         self._ftp.set_profile(profile)
+        self._ssh.set_profile(profile)
+        self._dns.set_profile(profile)
 
     def show_service(self, service: DiscoveredService | None, ref: ServiceRef | None) -> None:
         self._hints.clear()
@@ -139,6 +158,14 @@ class ToolPanel(QWidget):
             self._ftp.configure(service)
             self._stack.setCurrentWidget(self._ftp)
             return
+        if ref is not None and ref.module == "ssh":
+            self._ssh.configure(service)
+            self._stack.setCurrentWidget(self._ssh)
+            return
+        if ref is not None and ref.module == "dns":
+            self._dns.configure(service)
+            self._stack.setCurrentWidget(self._dns)
+            return
         self._stack.setCurrentIndex(0)
         if ref is None:
             return
@@ -158,12 +185,20 @@ class ToolPanel(QWidget):
         self._vhost.setEnabled(not running)
         self._smb.set_running(running)
         self._ftp.set_running(running)
+        self._ssh.set_running(running)
+        self._dns.set_running(running)
 
     def set_smb_summary(self, lines: list[str]) -> None:
         self._smb.set_summary(lines)
 
     def set_ftp_summary(self, lines: list[str]) -> None:
         self._ftp.set_summary(lines)
+
+    def set_ssh_summary(self, lines: list[str]) -> None:
+        self._ssh.set_summary(lines)
+
+    def set_dns_summary(self, lines: list[str]) -> None:
+        self._dns.set_summary(lines)
 
     def add_vhosts(self, vhosts: list[str]) -> None:
         self._vhost.add_vhosts(vhosts)

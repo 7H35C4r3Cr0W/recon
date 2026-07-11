@@ -19,6 +19,7 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ssh.html
   tools:
     - { name: "nmap --script ssh2-enum-algos,ssh-hostkey -p {port} {target}", purpose: "algorithms + host keys" }
+    - { name: "nmap --script ssh-auth-methods --script-args ssh.user=root -p {port} {target}", purpose: "offered auth methods for a user" }
 
 - match: { port: 23, proto: tcp }
   label: Telnet

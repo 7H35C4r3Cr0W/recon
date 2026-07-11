@@ -1,0 +1,12 @@
+[*] std: Performing General Enumeration against: example.htb...
+[-] DNSSEC is not configured for example.htb
+[*]      SOA ns1.example.htb 10.10.10.5
+[*]      NS ns1.example.htb 10.10.10.5
+[*]      MX mail.example.htb 10.10.10.6
+[*]      A example.htb 10.10.10.5
+[*]      A admin.example.htb 10.10.10.10
+[+] Zone Transfer was successful!!
+[*]      NS ns1.example.htb 10.10.10.5
+[*]      A internal.example.htb 10.10.10.20
+[*] Enumerating SRV Records
+[+] 0 Records Found

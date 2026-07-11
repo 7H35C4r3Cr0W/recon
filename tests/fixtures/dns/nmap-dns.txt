@@ -1,0 +1,13 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-11 12:00 UTC
+Nmap scan report for 10.10.10.5
+Host is up (0.020s latency).
+
+PORT   STATE SERVICE VERSION
+53/tcp open  domain  ISC BIND 9.11.3-1ubuntu1.13 (Ubuntu Linux)
+| dns-nsid:
+|_  bind.version: 9.11.3-1ubuntu1.13-Ubuntu
+|_dns-recursion: Recursion appears to be enabled
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host) scanned in 8.11 seconds

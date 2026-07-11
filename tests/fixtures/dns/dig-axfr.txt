@@ -1,0 +1,16 @@
+; <<>> DiG 9.18.24-1 <<>> @10.10.10.5 example.htb AXFR
+; (1 server found)
+;; global options: +cmd
+example.htb.            604800  IN      SOA     ns1.example.htb. root.example.htb. 2 604800 86400 2419200 604800
+example.htb.            604800  IN      NS      ns1.example.htb.
+example.htb.            604800  IN      MX      10 mail.example.htb.
+example.htb.            604800  IN      A       10.10.10.5
+admin.example.htb.      604800  IN      A       10.10.10.10
+internal.example.htb.   604800  IN      A       10.10.10.20
+mail.example.htb.       604800  IN      A       10.10.10.6
+ns1.example.htb.        604800  IN      A       10.10.10.5
+example.htb.            604800  IN      SOA     ns1.example.htb. root.example.htb. 2 604800 86400 2419200 604800
+;; Query time: 5 msec
+;; SERVER: 10.10.10.5#53(10.10.10.5) (TCP)
+;; WHEN: Sat Jul 11 12:00:00 UTC 2026
+;; XFR size: 9 records (messages 1, bytes 268)

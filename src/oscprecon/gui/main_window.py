@@ -33,6 +33,7 @@ from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import Credential, DiscoveredService, Target
+from oscprecon.modules.dns import DnsFinding, DnsModule, parse_dns_tool
 from oscprecon.modules.ftp import (
     FtpFinding,
     FtpModule,
@@ -53,6 +54,7 @@ from oscprecon.modules.smb import (
     parse_smb_tool,
     readable_shares,
 )
+from oscprecon.modules.ssh import SshFinding, SshModule, parse_ssh_tool
 from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
@@ -416,6 +418,143 @@ class FtpReconWorker(QThread):
         return summary
 
 
+@dataclass
+class SshReconResult:
+    summary: list[str]
+
+
+class SshReconWorker(QThread):
+    line = Signal(str)
+    done = Signal(object)  # SshReconResult
+    failed = Signal(str)
+
+    def __init__(self, profile: Profile, port: int) -> None:
+        super().__init__()
+        self._profile = profile
+        self._port = port
+        self._module = SshModule()
+
+    def run(self) -> None:
+        try:
+            result = self._drive()
+        except Exception as exc:  # boundary: surface worker failures to the UI thread
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(result)
+
+    def _run_step(self, shell_line: str, output_rel: str) -> str:
+        base = self._profile.directory
+        out = base / output_rel
+        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        try:
+            return out.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+
+    def _drive(self) -> SshReconResult:
+        target = self._profile.target
+        collected: list[SshFinding] = []
+        for step in self._module.recon_steps(target, self._port):
+            text = self._run_step(step.command.shell_line, step.command.output_file)
+            if step.tool:
+                collected += parse_ssh_tool(step.tool, text)
+        self._write_findings(collected)
+        return SshReconResult(self._summarize(collected))
+
+    def _write_findings(self, collected: list[SshFinding]) -> None:
+        if not collected:
+            return
+        now = datetime.now(UTC).isoformat()
+        findings.add_findings(self._profile.directory, [f.to_dict(now) for f in collected])
+
+    def _summarize(self, collected: list[SshFinding]) -> list[str]:
+        summary: list[str] = []
+        banners = [f.value for f in collected if f.kind == "banner"]
+        if banners:
+            summary.append(f"Banner: {banners[0]}")
+        hostkeys = [f.value for f in collected if f.kind == "hostkey"]
+        if hostkeys:
+            summary.append(f"Host keys ({len(hostkeys)}): {', '.join(hostkeys)}")
+        weak = sorted({f.value for f in collected if f.kind == "algo-weak"})
+        if weak:
+            summary.append(f"Weak algorithms ({len(weak)}): {', '.join(weak)}")
+        methods = [f.value for f in collected if f.kind == "auth"]
+        if methods:
+            summary.append(f"Auth methods: {', '.join(methods)}")
+            if "password" in methods:
+                summary.append("Password auth enabled — single default-cred checks are Tier-2")
+        return summary or ["No SSH findings."]
+
+
+@dataclass
+class DnsReconResult:
+    summary: list[str]
+
+
+class DnsReconWorker(QThread):
+    line = Signal(str)
+    done = Signal(object)  # DnsReconResult
+    failed = Signal(str)
+
+    def __init__(self, profile: Profile, domain: str, port: int) -> None:
+        super().__init__()
+        self._profile = profile
+        self._domain = domain
+        self._port = port
+        self._module = DnsModule()
+
+    def run(self) -> None:
+        try:
+            result = self._drive()
+        except Exception as exc:  # boundary: surface worker failures to the UI thread
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(result)
+
+    def _run_step(self, shell_line: str, output_rel: str) -> str:
+        base = self._profile.directory
+        out = base / output_rel
+        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        try:
+            return out.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+
+    def _drive(self) -> DnsReconResult:
+        target = self._profile.target
+        collected: list[DnsFinding] = []
+        for step in self._module.recon_steps(target, self._domain or None, self._port):
+            text = self._run_step(step.command.shell_line, step.command.output_file)
+            if step.tool:
+                collected += parse_dns_tool(step.tool, text)
+        self._write_findings(collected)
+        return DnsReconResult(self._summarize(collected))
+
+    def _write_findings(self, collected: list[DnsFinding]) -> None:
+        if not collected:
+            return
+        now = datetime.now(UTC).isoformat()
+        findings.add_findings(self._profile.directory, [f.to_dict(now) for f in collected])
+
+    def _summarize(self, collected: list[DnsFinding]) -> list[str]:
+        summary: list[str] = []
+        versions = [f.value for f in collected if f.kind == "version"]
+        if versions:
+            summary.append(f"Version: {versions[0]}")
+        transfer = [f for f in collected if f.kind == "zone-transfer"]
+        if transfer:
+            latest = transfer[-1]
+            summary.append(f"Zone transfer: {latest.value} ({latest.detail})")
+        recursion = [f.value for f in collected if f.kind == "recursion"]
+        if recursion:
+            summary.append(f"Recursion: {recursion[-1]}")
+        records = sorted({f.value for f in collected if f.kind == "record"})
+        if records:
+            summary.append(f"Records ({len(records)}):")
+            summary.extend(f"  {r}" for r in records)
+        return summary or ["No DNS findings."]
+
+
 def _slug(command: str) -> str:
     tokens = command.split()
     base = tokens[0] if tokens else "command"
@@ -464,6 +603,8 @@ class MainWindow(QMainWindow):
         self._tool_panel.enumerate_as_http_requested.connect(self._on_enumerate_as_http)
         self._tool_panel.smb_recon_requested.connect(self._on_smb_recon)
         self._tool_panel.ftp_recon_requested.connect(self._on_ftp_recon)
+        self._tool_panel.ssh_recon_requested.connect(self._on_ssh_recon)
+        self._tool_panel.dns_recon_requested.connect(self._on_dns_recon)
         self._tool_panel.vhost_validation_failed.connect(
             lambda msg: self._tool_panel.append_output(f"[blocked] {msg}")
         )
@@ -962,6 +1103,53 @@ class MainWindow(QMainWindow):
                     )
                 self._tool_panel.set_ftp_summary(result.summary)
                 self._tool_panel.append_output("[ftp] recon complete")
+        except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
+            self._tool_panel.append_output(f"[error] {exc}")
+        self._finish_worker()
+
+    def _on_ssh_recon(self, port: int) -> None:
+        if self._profile is None or self._worker is not None:
+            return
+        self._set_busy(True)
+        self._tool_panel.append_output(f"[ssh] recon on port {port} starting…")
+        worker = SshReconWorker(self._profile, port)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_ssh_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _on_ssh_done(self, result: object) -> None:
+        # why: a summary write error must not strand self._worker — always release the slot in
+        # _finish_worker, mirroring _on_ftp_done's guard.
+        try:
+            if isinstance(result, SshReconResult):
+                self._tool_panel.set_ssh_summary(result.summary)
+                self._tool_panel.append_output("[ssh] recon complete")
+        except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
+            self._tool_panel.append_output(f"[error] {exc}")
+        self._finish_worker()
+
+    def _on_dns_recon(self, domain: str, port: int) -> None:
+        if self._profile is None or self._worker is not None:
+            return
+        self._set_busy(True)
+        scope = f"zone {domain}" if domain else "no zone (version + recursion only)"
+        self._tool_panel.append_output(f"[dns] recon on port {port} — {scope} starting…")
+        worker = DnsReconWorker(self._profile, domain, port)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_dns_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _on_dns_done(self, result: object) -> None:
+        # why: a summary write error must not strand self._worker — always release the slot in
+        # _finish_worker, mirroring _on_ssh_done's guard.
+        try:
+            if isinstance(result, DnsReconResult):
+                self._tool_panel.set_dns_summary(result.summary)
+                self._tool_panel.append_output("[dns] recon complete")
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
         self._finish_worker()

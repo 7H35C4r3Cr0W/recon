@@ -1,0 +1,28 @@
+# DNS manual follow-ups (Tier-2 — shown, never auto-run; §5/§11). DNS-PROTOCOL queries only:
+# subdomain brute-forcing (dnsenum/dns-brute/dnsrecon -t brt) belongs to the vhost module, not here.
+# {target} is the DNS server, {domain} the zone, {port} the port — all filled from the profile.
+# TARGET_IP is a literal you edit before running the reverse lookup.
+
+- description: "ANY records for the zone"
+  why: "One query that returns every record type the server will disclose — recon"
+  command: "dig @{target} {domain} ANY"
+
+- description: "Explicit zone transfer (AXFR)"
+  why: "Re-attempt the full zone dump — the single biggest DNS recon win when misconfigured"
+  command: "dig @{target} {domain} AXFR"
+
+- description: "dnsrecon zone-transfer attempt"
+  why: "Second AXFR path — dnsrecon iterates every NS it finds for the zone"
+  command: "dnsrecon -n {target} -d {domain} -t axfr"
+
+- description: "Nameserver + mail records"
+  why: "NS/MX reveal other DNS and mail hosts to enumerate — recon"
+  command: "dig @{target} {domain} NS +short"
+
+- description: "TXT records (SPF / verification strings)"
+  why: "TXT records often leak infrastructure and third-party services — recon"
+  command: "dig @{target} {domain} TXT +short"
+
+- description: "Reverse PTR lookup for a discovered IP"
+  why: "Map an IP back to a hostname to expand the target picture — recon"
+  command: "dig @{target} -x TARGET_IP"
