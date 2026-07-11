@@ -59,6 +59,16 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
+### Phase 4 · graph view — chunk 3b: PNG / SVG export (§16)
+- Toolbar **Export PNG** / **Export SVG** buttons. PNG uses Cytoscape's built-in `cy.png()` (scale 2,
+  full graph); SVG uses the vendored **cytoscape-svg 0.4.0** extension (`cy.svg()`), registered via
+  `cytoscape.use(window.cytoscapeSvg)`. app.js sends the image to `bridge.export_image(format, data)`.
+- `GraphBridge.export_image` → `export_requested(format, data)` → `GraphView._on_export` opens a
+  QFileDialog and writes via the testable `_write_image` (PNG: strip the `base64,` data-uri prefix +
+  b64decode → bytes; SVG: write the string verbatim).
+- Verified in a real webengine render that both `cy.png` and `cy.svg` are registered functions
+  (`true|true`). 11 graph tests (added export-emit + write-image png/svg). 364 tests, gates green.
+
 ### Phase 4 · graph view — chunk 3a: node-detail sidebar + native status/note UI
 - **`GraphDetail`** sidebar (left of the web view in a QSplitter): shows the tapped node's label +
   a `type · port · module · source · detail · status` line, four **Status** buttons

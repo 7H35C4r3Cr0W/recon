@@ -1,3 +1,4 @@
+import base64
 import json
 from pathlib import Path
 
@@ -113,6 +114,26 @@ def test_graph_detail_shows_node_and_emits(qtbot: QtBot) -> None:
     assert statuses == [("service-445-tcp", "investigating")]
     assert notes == [("service-445-tcp", "readable share")]
     assert opens == [(445, "tcp")]
+
+
+def test_bridge_export_image_emits(qtbot: QtBot) -> None:
+    bridge = GraphBridge()
+    got: list[tuple[str, str]] = []
+    bridge.export_requested.connect(lambda fmt, data: got.append((fmt, data)))
+    bridge.export_image("png", "data:image/png;base64,AAA")
+    assert got == [("png", "data:image/png;base64,AAA")]
+
+
+def test_write_image_png_decodes_and_svg_is_text(tmp_path: Path) -> None:
+    png = tmp_path / "g.png"
+    payload = b"\x89PNG-not-really"
+    GraphView._write_image(
+        "png", "data:image/png;base64," + base64.b64encode(payload).decode(), png
+    )
+    assert png.read_bytes() == payload  # base64 data-uri is stripped + decoded to bytes
+    svg = tmp_path / "g.svg"
+    GraphView._write_image("svg", "<svg><rect/></svg>", svg)
+    assert svg.read_text(encoding="utf-8") == "<svg><rect/></svg>"  # svg written verbatim
 
 
 def test_graph_view_persists_status_and_note_via_detail(qtbot: QtBot, tmp_path: Path) -> None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -7,6 +9,7 @@ from typing import Any
 
 from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot
 from PySide6.QtWidgets import (
+    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -41,6 +44,7 @@ class GraphBridge(QObject):
     """QWebChannel bridge: serves graph data to the JS and persists edits back to graph.json."""
 
     node_selected = Signal(str, object)  # (node id, data dict)
+    export_requested = Signal(str, str)  # (format, data — png base64-uri or raw svg)
 
     def __init__(self) -> None:
         super().__init__()
@@ -90,6 +94,10 @@ class GraphBridge(QObject):
                 if isinstance(slot, dict):
                     slot["position"] = [position[0], position[1]]
         self._profile.save_graph(graph)
+
+    @Slot(str, str)
+    def export_image(self, image_format: str, data: str) -> None:
+        self.export_requested.emit(image_format, data)
 
     @Slot(str, str, str)
     def add_user_edge(self, source: str, target: str, label: str) -> None:
@@ -225,6 +233,7 @@ class GraphView(QWidget):
             except Exception:  # boundary: headless/no-GPU envs can't create the web view
                 self._web = None
 
+        self._bridge.export_requested.connect(self._on_export)
         self._detail = GraphDetail()
         self._detail.status_changed.connect(self._on_status_changed)
         self._detail.note_saved.connect(self._on_note_saved)
@@ -265,3 +274,23 @@ class GraphView(QWidget):
     def _on_note_saved(self, node_id: str, note: str) -> None:
         self._bridge.add_note(node_id, note)
         self.reload()
+
+    def _on_export(self, image_format: str, data: str) -> None:
+        is_svg = image_format == "svg"
+        ext = "svg" if is_svg else "png"
+        caption = f"Export graph as {ext.upper()}"
+        chosen, _ = QFileDialog.getSaveFileName(self, caption, f"graph.{ext}", f"*.{ext}")
+        if not chosen:
+            return
+        with contextlib.suppress(OSError, ValueError):
+            self._write_image(image_format, data, Path(chosen))
+
+    @staticmethod
+    def _write_image(image_format: str, data: str, path: Path) -> None:
+        if image_format == "svg":
+            path.write_text(data, encoding="utf-8")
+            return
+        marker = "base64,"
+        index = data.find(marker)
+        payload = data[index + len(marker) :] if index != -1 else data
+        path.write_bytes(base64.b64decode(payload))

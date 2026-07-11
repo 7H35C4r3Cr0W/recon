@@ -99,7 +99,32 @@
     cy.fit(undefined, 40);
   }
 
+  var svgReady = false;
+  function registerExtensions() {
+    if (!svgReady && window.cytoscapeSvg) {
+      try {
+        cytoscape.use(window.cytoscapeSvg);
+        svgReady = true;
+      } catch (e) {
+        svgReady = false;
+      }
+    }
+  }
+
+  function exportImage(format) {
+    if (!cy || !bridge) return;
+    var data;
+    if (format === "svg") {
+      if (typeof cy.svg !== "function") return;
+      data = cy.svg({ full: true, bg: "#1e1e2e" });
+    } else {
+      data = cy.png({ output: "base64uri", full: true, scale: 2, bg: "#1e1e2e" });
+    }
+    bridge.export_image(format, data);
+  }
+
   function render(elements) {
+    registerExtensions();
     cy = cytoscape({
       container: document.getElementById("cy"),
       elements: elements,
@@ -135,6 +160,12 @@
     };
     document.getElementById("fit").onclick = function () {
       cy.fit(undefined, 40);
+    };
+    document.getElementById("export-png").onclick = function () {
+      exportImage("png");
+    };
+    document.getElementById("export-svg").onclick = function () {
+      exportImage("svg");
     };
   }
 
