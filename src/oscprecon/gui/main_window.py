@@ -33,6 +33,16 @@ from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import Credential, DiscoveredService, Target
+from oscprecon.modules.ftp import (
+    FtpFinding,
+    FtpModule,
+    nmap_anon_ok,
+    parse_ftp_listing,
+    parse_ftp_tool,
+)
+from oscprecon.modules.ftp import (
+    anon_credential as ftp_anon_credential,
+)
 from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
 from oscprecon.modules.smb import (
     SmbFinding,
@@ -292,6 +302,120 @@ class SmbReconWorker(QThread):
         return summary or ["No SMB findings."]
 
 
+_FTP_MAX_DIRS = 25
+_FTP_MAX_DEPTH = 3
+
+
+@dataclass
+class FtpReconResult:
+    summary: list[str]
+    creds: list[Credential]
+
+
+class FtpReconWorker(QThread):
+    line = Signal(str)
+    done = Signal(object)  # FtpReconResult
+    failed = Signal(str)
+
+    def __init__(self, profile: Profile, mode: str, port: int) -> None:
+        super().__init__()
+        self._profile = profile
+        self._mode = mode
+        self._port = port
+        self._module = FtpModule()
+
+    def run(self) -> None:
+        try:
+            result = self._drive()
+        except Exception as exc:  # boundary: surface worker failures to the UI thread
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(result)
+
+    def _run_step(self, shell_line: str, output_rel: str) -> str:
+        base = self._profile.directory
+        out = base / output_rel
+        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        try:
+            return out.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+
+    def _drive(self) -> FtpReconResult:
+        target = self._profile.target
+        module = self._module
+        collected: list[FtpFinding] = []
+
+        nmap_text = ""
+        for step in module.banner_steps(target, self._port):
+            nmap_text = self._run_step(step.command.shell_line, step.command.output_file)
+            if step.tool:
+                collected += parse_ftp_tool(step.tool, nmap_text)
+        anon = nmap_anon_ok(nmap_text)
+
+        walk = self._walk(target, recurse=self._mode == "full")
+        collected += walk
+        if any(f.kind in ("file", "dir") for f in walk):
+            anon = True  # a non-empty anonymous listing confirms anon even if nmap was inconclusive
+
+        creds = [ftp_anon_credential(target)] if anon else []
+        self._write_findings(collected)
+        return FtpReconResult(self._summarize(collected, anon), creds)
+
+    def _walk(self, target: Target, recurse: bool) -> list[FtpFinding]:
+        # bounded BFS: curl LISTs each directory (never downloads); depth + total-dir capped so the
+        # snapshot is finite (§12). `seen` prevents symlink/loop re-listing.
+        module = self._module
+        findings: list[FtpFinding] = []
+        seen: set[str] = set()
+        queue: list[tuple[str, int]] = [("/", 0)]
+        listed = 0
+        while queue and listed < _FTP_MAX_DIRS:
+            path, depth = queue.pop(0)
+            if path in seen:
+                continue
+            seen.add(path)
+            step = module.list_step(target, path, self._port)
+            text = self._run_step(step.command.shell_line, step.command.output_file)
+            listed += 1
+            for entry in parse_ftp_listing(text):
+                child = path.rstrip("/") + "/" + entry.name
+                kind = "dir" if entry.is_dir else "file"
+                detail = "" if entry.is_dir else f"{entry.size} bytes"
+                findings.append(FtpFinding(kind, child, detail))
+                if recurse and entry.is_dir and depth + 1 < _FTP_MAX_DEPTH:
+                    queue.append((child + "/", depth + 1))
+        if queue:  # exited on the dir cap — say so, don't pretend the walk was exhaustive
+            self.line.emit(
+                f"[ftp] walk bounded at {_FTP_MAX_DIRS} dirs — list deeper paths via Tier-2"
+            )
+        return findings
+
+    def _write_findings(self, collected: list[FtpFinding]) -> None:
+        if not collected:
+            return
+        now = datetime.now(UTC).isoformat()
+        findings.add_findings(self._profile.directory, [f.to_dict(now) for f in collected])
+
+    def _summarize(self, collected: list[FtpFinding], anon: bool) -> list[str]:
+        summary: list[str] = []
+        banners = [f.value for f in collected if f.kind == "banner"]
+        if banners:
+            summary.append(f"Banner: {banners[0]}")
+        dirs = sorted({f.value for f in collected if f.kind == "dir"})
+        files = sorted({f.value for f in collected if f.kind == "file"})
+        if dirs:
+            summary.append(f"Directories ({len(dirs)}):")
+            summary.extend(f"  {d}/" for d in dirs)
+        if files:
+            summary.append(f"Files ({len(files)}):")
+            summary.extend(f"  {f}" for f in files)
+        if any(f.kind == "note" and "bounce" in f.value for f in collected):
+            summary.append("Note: FTP bounce accepted (recon)")
+        summary.append("Anonymous access: allowed" if anon else "Anonymous access: denied")
+        return summary
+
+
 def _slug(command: str) -> str:
     tokens = command.split()
     base = tokens[0] if tokens else "command"
@@ -339,6 +463,7 @@ class MainWindow(QMainWindow):
         self._tool_panel.wildcard_detect_requested.connect(self._on_wildcard_detect)
         self._tool_panel.enumerate_as_http_requested.connect(self._on_enumerate_as_http)
         self._tool_panel.smb_recon_requested.connect(self._on_smb_recon)
+        self._tool_panel.ftp_recon_requested.connect(self._on_ftp_recon)
         self._tool_panel.vhost_validation_failed.connect(
             lambda msg: self._tool_panel.append_output(f"[blocked] {msg}")
         )
@@ -804,6 +929,27 @@ class MainWindow(QMainWindow):
                 self._tool_panel.append_output(f"[cred] {cred.username} (source: {cred.source})")
             self._tool_panel.set_smb_summary(result.summary)
             self._tool_panel.append_output("[smb] recon complete")
+        self._finish_worker()
+
+    def _on_ftp_recon(self, mode: str, port: int) -> None:
+        if self._profile is None or self._worker is not None:
+            return
+        self._set_busy(True)
+        self._tool_panel.append_output(f"[ftp] {mode} recon on port {port} starting…")
+        worker = FtpReconWorker(self._profile, mode, port)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_ftp_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _on_ftp_done(self, result: object) -> None:
+        if isinstance(result, FtpReconResult) and self._profile is not None:
+            for cred in result.creds:
+                self._profile.add_credential(cred)
+                self._tool_panel.append_output(f"[cred] {cred.username} (source: {cred.source})")
+            self._tool_panel.set_ftp_summary(result.summary)
+            self._tool_panel.append_output("[ftp] recon complete")
         self._finish_worker()
 
     def _on_scan_done(self, count: int) -> None:

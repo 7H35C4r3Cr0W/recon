@@ -6,12 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 module 4 — ftp: GUI + review** (chunks 2–3). Engine is done + gated (165 tests). Build an
-FtpPanel (Tier-1 buttons: full walk / anon-check-only; Tier-2 manual list with FILE/SUBDIR edits;
-findings summary) + FtpReconWorker that drives the bounded anonymous auto-walk (curl root → recurse
-into subdirs, depth/count-bounded, LIST-only never download), writes findings.json + anon cred
-(ftp-anon-enum). Wire into tool_panel as a new stack page shown for module==ftp. Then the 3-lens
-adversarial review (reviewers run real curl/nmap). After ftp: ssh/dns/ldap/smtp/nfs/snmp/tftp/etc.
+**Phase 2 module 4 — ftp: adversarial 3-lens review** (chunk 3). Engine + GUI done + gated (171 tests).
+Run the same OSCP-compliance / GUI-concurrency / correctness review as smb (reviewers run real
+curl/nmap to catch drift); fix HIGH/MED + cheap LOWs. Watch: the bounded-walk caps (depth 3, 25 dirs),
+LIST-only-never-download property, untrusted-path encoding in ftp_dir_url. After ftp:
+ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp.
 
 ## How to resume
 
@@ -22,7 +21,19 @@ adversarial review (reviewers run real curl/nmap). After ftp: ssh/dns/ldap/smtp/
 
 ## Log (newest first)
 
-### Phase 2 · module 4 (ftp) — engine (this commit)
+### Phase 2 · module 4 (ftp) — GUI (this commit)
+- **FtpPanel** (`gui/widgets/ftp_panel.py`): Tier-1 buttons ("Run full FTP recon (bounded walk)" → full,
+  "Just list anonymous root" → anon) emitting `recon_requested(mode, port)` (FTP carries the port);
+  Tier-2 manual follow-ups (target/port-expanded, FILE/SUBDIR left literal) with copy menu; findings
+  summary. Shown as tool_panel stack page 3 when `ref.module == "ftp"`; disabled during a scan.
+- **FtpReconWorker** (`main_window.py`): drives the bounded anonymous auto-walk on its thread — nmap
+  banner/anon → curl root LIST → BFS recurse into subdirs, **capped at depth 3 / 25 dirs** (emits a
+  "bounded" line when it truncates, never silently), LIST-only (never downloads). `seen` set stops
+  symlink loops. Confirms anon from nmap OR a non-empty listing; writes findings.json + anon cred
+  (`ftp-anon-enum`). Modes: full (recurse) / anon (root only).
+- 6 GUI tests (buttons+port, manual legality, page switch, worker full-walk recursion + anon-no-recurse).
+
+### Phase 2 · module 4 (ftp) — engine (24a3837)
 - **FtpModule** (`modules/ftp/`): triggers on 21 / ftp service names. Step-builders return `FtpStep`s
   (parser key per step): `banner_steps` (`nmap -sV --script ftp-anon,ftp-syst,ftp-bounce`), `anon_steps`
   (`curl -s ftp://host/` root LIST), `list_step(path)` for the bounded walk. `ftp_dir_url` URL-encodes

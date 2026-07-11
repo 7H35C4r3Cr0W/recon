@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from oscprecon.gui.widgets.ftp_panel import FtpPanel
 from oscprecon.gui.widgets.http_panel import HttpPanel
 from oscprecon.gui.widgets.smb_panel import SmbPanel
 from oscprecon.gui.widgets.vhost_panel import VhostPanel
@@ -38,6 +39,7 @@ class ToolPanel(QWidget):
     enumerate_as_http_requested = Signal(str)
     vhost_validation_failed = Signal(str)
     smb_recon_requested = Signal(str)  # mode: full | null | guest | shares
+    ftp_recon_requested = Signal(str, int)  # (mode: full | anon, port)
 
     def __init__(self) -> None:
         super().__init__()
@@ -88,10 +90,16 @@ class ToolPanel(QWidget):
         # Tier-2 follow-ups reuse the ad-hoc command path (validated at the shell chokepoint).
         self._smb.manual_requested.connect(self.run_requested)
 
+        # ftp page: anonymous bounded-walk buttons + Tier-2 manual follow-ups + findings
+        self._ftp = FtpPanel()
+        self._ftp.recon_requested.connect(self.ftp_recon_requested)
+        self._ftp.manual_requested.connect(self.run_requested)
+
         self._stack = QStackedWidget()
         self._stack.addWidget(generic)  # 0: generic hints
         self._stack.addWidget(self._web_tabs)  # 1: http/vhost builders
         self._stack.addWidget(self._smb)  # 2: smb
+        self._stack.addWidget(self._ftp)  # 3: ftp
 
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
@@ -108,6 +116,7 @@ class ToolPanel(QWidget):
         self._http.set_profile(profile)
         self._vhost.set_profile(profile)
         self._smb.set_profile(profile)
+        self._ftp.set_profile(profile)
 
     def show_service(self, service: DiscoveredService | None, ref: ServiceRef | None) -> None:
         self._hints.clear()
@@ -125,6 +134,10 @@ class ToolPanel(QWidget):
         if ref is not None and ref.module == "smb":
             self._smb.configure(service)
             self._stack.setCurrentWidget(self._smb)
+            return
+        if ref is not None and ref.module == "ftp":
+            self._ftp.configure(service)
+            self._stack.setCurrentWidget(self._ftp)
             return
         self._stack.setCurrentIndex(0)
         if ref is None:
@@ -144,9 +157,13 @@ class ToolPanel(QWidget):
         self._http.setEnabled(not running)
         self._vhost.setEnabled(not running)
         self._smb.set_running(running)
+        self._ftp.set_running(running)
 
     def set_smb_summary(self, lines: list[str]) -> None:
         self._smb.set_summary(lines)
+
+    def set_ftp_summary(self, lines: list[str]) -> None:
+        self._ftp.set_summary(lines)
 
     def add_vhosts(self, vhosts: list[str]) -> None:
         self._vhost.add_vhosts(vhosts)
