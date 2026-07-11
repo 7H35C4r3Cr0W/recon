@@ -33,6 +33,7 @@ from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import Credential, DiscoveredService, Target
 from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
+from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
 
@@ -213,12 +214,18 @@ class MainWindow(QMainWindow):
         self._tool_panel.http_run_requested.connect(self._on_http_run)
         self._tool_panel.http_dry_run_requested.connect(self._on_http_dry_run)
         self._tool_panel.http_add_report_requested.connect(self._on_http_add_report)
+        self._tool_panel.vhost_run_requested.connect(self._on_vhost_run)
+        self._tool_panel.vhost_dry_run_requested.connect(self._on_http_dry_run)
+        self._tool_panel.wildcard_detect_requested.connect(self._on_wildcard_detect)
+        self._tool_panel.enumerate_as_http_requested.connect(self._on_enumerate_as_http)
         self._reference_pane = ReferencePane()
         self._reference_pane.page_visited.connect(self._on_page_visited)
         self._edb_request_id = 0
         self._edb_workers: set[QThread] = set()
         self._pending_visits: list[tuple[str, str]] = []
         self._http_parse: tuple[Path, str, int] | None = None
+        self._vhost_parse: tuple[Path, str, str] | None = None
+        self._wildcard_out: Path | None = None
         self._treat_http_ctx: DiscoveredService | None = None
 
         left = QWidget()
@@ -549,6 +556,75 @@ class MainWindow(QMainWindow):
                 "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url <target>"
             )
 
+    def _on_vhost_run(self, command: str, output_rel: str, tool: str, domain: str) -> None:
+        if self._profile is None or self._worker is not None or not output_rel:
+            return
+        struct_path = _contained_path(self._profile.directory, output_rel)
+        if struct_path is None:
+            self._tool_panel.append_output(
+                f"[blocked] output path must stay inside the profile: {output_rel}"
+            )
+            return
+        struct_path.parent.mkdir(parents=True, exist_ok=True)
+        self._vhost_parse = (struct_path, tool, domain)
+        self._set_busy(True)
+        self._tool_panel.append_output(f"$ {command}")
+        worker = CommandWorker(
+            command, struct_path.with_suffix(".log"), cwd=self._profile.directory
+        )
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_command_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _parse_vhost_output(self, struct_path: Path, tool: str, domain: str) -> None:
+        if self._profile is None:
+            return
+        # ffuf/gobuster write -o (struct_path); dnsrecon/wfuzz write stdout (captured to the .log)
+        path = struct_path if struct_path.exists() else struct_path.with_suffix(".log")
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return
+        hits = parse_vhost_tool(tool, text, domain)
+        if hits:
+            now = datetime.now(UTC).isoformat()
+            findings.add_findings(self._profile.directory, [h.to_dict(now) for h in hits])
+            self._tool_panel.add_vhosts([h.vhost for h in hits])
+            self._tool_panel.append_output(f"[vhosts] +{len(hits)} -> findings.json")
+
+    def _on_wildcard_detect(self, command: str, output_rel: str) -> None:
+        if self._profile is None or self._worker is not None:
+            return
+        out = _contained_path(self._profile.directory, output_rel)
+        if out is None:
+            return
+        out.parent.mkdir(parents=True, exist_ok=True)
+        self._wildcard_out = out
+        self._set_busy(True)
+        self._tool_panel.append_output(f"$ {command}")
+        worker = CommandWorker(command, out, cwd=self._profile.directory)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_command_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _apply_wildcard_size(self, out: Path) -> None:
+        try:
+            text = out.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return
+        digits = "".join(c for c in text if c.isdigit())
+        if digits:
+            self._tool_panel.set_vhost_filter_size(int(digits))
+            self._tool_panel.append_output(f"[wildcard] baseline size {digits} -> -fs set")
+
+    def _on_enumerate_as_http(self, vhost: str) -> None:
+        self._tool_panel.enumerate_http(vhost)
+        self._tool_panel.append_output(f"[http] enumerate vhost as http://{vhost}/")
+
     def _on_treat_as_http(self, service: object) -> None:
         if (
             not isinstance(service, DiscoveredService)
@@ -588,18 +664,28 @@ class MainWindow(QMainWindow):
 
     def _on_command_done(self, exit_code: int) -> None:
         self._tool_panel.append_output(f"[done] exit={exit_code}")
-        if self._http_parse is not None:
-            struct_path, tool, port = self._http_parse
-            self._http_parse = None
-            try:
+        try:
+            if self._http_parse is not None:
+                struct_path, tool, port = self._http_parse
+                self._http_parse = None
                 self._parse_http_output(struct_path, tool, port)
-            except OSError as exc:  # boundary: a findings-write failure must not wedge the worker
-                self._tool_panel.append_output(f"[findings] write failed: {exc}")
+            elif self._vhost_parse is not None:
+                vstruct, vtool, domain = self._vhost_parse
+                self._vhost_parse = None
+                self._parse_vhost_output(vstruct, vtool, domain)
+            elif self._wildcard_out is not None:
+                out = self._wildcard_out
+                self._wildcard_out = None
+                self._apply_wildcard_size(out)
+        except OSError as exc:  # boundary: a parse/findings-write error must not wedge the worker
+            self._tool_panel.append_output(f"[parse] failed: {exc}")
         self._finish_worker()
 
     def _on_run_failed(self, message: str) -> None:
         self._tool_panel.append_output(f"[error] {message}")
         self._http_parse = None
+        self._vhost_parse = None
+        self._wildcard_out = None
         self._treat_http_ctx = None
         self._finish_worker()
 

@@ -122,7 +122,8 @@ def test_tool_panel_switches_to_http_builder(qtbot: QtBot, tmp_path: Path) -> No
     qtbot.addWidget(tp)
     tp.set_profile(prof)
     tp.show_service(DiscoveredService(80, Proto.TCP, "http"), _ref(module="http"))
-    assert tp._stack.currentWidget() is tp._http
+    assert tp._stack.currentWidget() is tp._web_tabs  # http builder now lives in the tab widget
+    assert tp._web_tabs.currentWidget() is tp._http
     tp.show_service(DiscoveredService(22, Proto.TCP, "ssh"), _ref(module="ssh", label="SSH"))
     assert tp._stack.currentIndex() == 0
 

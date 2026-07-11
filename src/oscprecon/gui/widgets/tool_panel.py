@@ -12,11 +12,13 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QStackedWidget,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from oscprecon.gui.widgets.http_panel import HttpPanel
+from oscprecon.gui.widgets.vhost_panel import VhostPanel
 from oscprecon.models import DiscoveredService
 from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef, expand_hint
@@ -29,6 +31,10 @@ class ToolPanel(QWidget):
     http_run_requested = Signal(str, str, str, int)
     http_dry_run_requested = Signal(str)
     http_add_report_requested = Signal(str)
+    vhost_run_requested = Signal(str, str, str, str)
+    vhost_dry_run_requested = Signal(str)
+    wildcard_detect_requested = Signal(str, str)
+    enumerate_as_http_requested = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -58,15 +64,23 @@ class ToolPanel(QWidget):
         generic_layout.addWidget(hints_box, stretch=1)
         generic_layout.addLayout(command_row)
 
-        # http page: the command builder
+        # web page: HTTP content-discovery builder + vhost builder in tabs
         self._http = HttpPanel()
         self._http.run_requested.connect(self.http_run_requested)
         self._http.dry_run_requested.connect(self.http_dry_run_requested)
         self._http.add_report_requested.connect(self.http_add_report_requested)
+        self._vhost = VhostPanel()
+        self._vhost.run_requested.connect(self.vhost_run_requested)
+        self._vhost.dry_run_requested.connect(self.vhost_dry_run_requested)
+        self._vhost.wildcard_detect_requested.connect(self.wildcard_detect_requested)
+        self._vhost.enumerate_as_http_requested.connect(self.enumerate_as_http_requested)
+        self._web_tabs = QTabWidget()
+        self._web_tabs.addTab(self._http, "Content discovery")
+        self._web_tabs.addTab(self._vhost, "Vhosts")
 
         self._stack = QStackedWidget()
         self._stack.addWidget(generic)
-        self._stack.addWidget(self._http)
+        self._stack.addWidget(self._web_tabs)
 
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
@@ -81,6 +95,7 @@ class ToolPanel(QWidget):
 
     def set_profile(self, profile: Profile) -> None:
         self._http.set_profile(profile)
+        self._vhost.set_profile(profile)
 
     def show_service(self, service: DiscoveredService | None, ref: ServiceRef | None) -> None:
         self._hints.clear()
@@ -92,7 +107,8 @@ class ToolPanel(QWidget):
         self._header.setText(f"{service.port}/{service.proto.value} — {label}")
         if ref is not None and ref.module == "http":
             self._http.configure(service, ref)
-            self._stack.setCurrentWidget(self._http)
+            self._vhost.configure(service)
+            self._stack.setCurrentWidget(self._web_tabs)
             return
         self._stack.setCurrentIndex(0)
         if ref is None:
@@ -106,10 +122,22 @@ class ToolPanel(QWidget):
             self._hints.addItem(item)
 
     def set_running(self, running: bool) -> None:
-        # why: the http builder persists into the shared Profile on every control change; disable it
-        # during a scan so a UI edit can't race the worker thread's profile.save().
+        # why: the http/vhost builders persist into the shared Profile on every control change;
+        # disable them during a scan so a UI edit can't race the worker thread's profile.save().
         self._run_button.setEnabled(not running)
         self._http.setEnabled(not running)
+        self._vhost.setEnabled(not running)
+
+    def add_vhosts(self, vhosts: list[str]) -> None:
+        self._vhost.add_vhosts(vhosts)
+
+    def set_vhost_filter_size(self, size: int) -> None:
+        self._vhost.set_filter_size(size)
+
+    def enumerate_http(self, vhost: str) -> None:
+        self._http.set_url(f"http://{vhost}/")
+        self._web_tabs.setCurrentWidget(self._http)
+        self._stack.setCurrentWidget(self._web_tabs)
 
     def append_output(self, text: str) -> None:
         self._output.appendPlainText(text)

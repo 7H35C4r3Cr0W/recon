@@ -205,6 +205,11 @@ class HttpPanel(QWidget):
         self._output_is_custom = False  # a new port re-derives the default output path
         self._refresh()
 
+    def set_url(self, url: str) -> None:
+        self._url.setText(url)
+        self._output_is_custom = False
+        self._refresh()
+
     def _on_rate_toggled(self, enabled: bool) -> None:
         self._rate.setEnabled(enabled)
         self._refresh()
