@@ -1,0 +1,7 @@
+SNMPv2-MIB::sysDescr.0 = STRING: Linux nix01 5.4.0-91-generic #102-Ubuntu SMP x86_64
+SNMPv2-MIB::sysName.0 = STRING: nix01
+SNMPv2-MIB::sysContact.0 = STRING: admin@example.htb
+HOST-RESOURCES-MIB::hrSWRunName.1 = STRING: "systemd"
+HOST-RESOURCES-MIB::hrSWRunName.882 = STRING: "sshd"
+HOST-RESOURCES-MIB::hrSWRunName.1337 = STRING: "backup.sh"
+HOST-RESOURCES-MIB::hrSWRunParameters.1337 = STRING: "-u backupsvc --password=Sup3rS3cret!"

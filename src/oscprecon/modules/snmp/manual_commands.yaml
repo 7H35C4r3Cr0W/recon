@@ -1,0 +1,36 @@
+# SNMP manual follow-ups (Tier-2 — shown, never auto-run; §12). Community enumeration and MIB walks
+# are read-only recon. {target} comes from the profile; COMMUNITY is a literal you edit (default the
+# discovered community, else 'public'). No brute: onesixtyone uses the small default community list
+# only; there is no username/password iteration anywhere here.
+
+- description: "Full MIB walk (v2c, default community)"
+  why: "Dump the whole MIB with the public community — system, users, processes, software. Recon"
+  command: "snmpwalk -v2c -c public {target}"
+
+- description: "Full MIB walk with a discovered community"
+  why: "Re-walk using a community onesixtyone found (edit COMMUNITY) — read-only"
+  command: "snmpwalk -v2c -c COMMUNITY {target}"
+
+- description: "SNMPv1 walk (older devices)"
+  why: "Some devices only answer SNMPv1 — try -v1 if v2c returns nothing. Recon"
+  command: "snmpwalk -v1 -c public {target}"
+
+- description: "Windows user accounts OID"
+  why: "The LanMgr user table hands over account names without auth — recon for user lists"
+  command: "snmpwalk -v2c -c public {target} 1.3.6.1.4.1.77.1.2.25"
+
+- description: "Running processes (hrSWRunName)"
+  why: "Process names/args over SNMP sometimes leak service accounts or passwords in cmdlines. Recon"
+  command: "snmpwalk -v2c -c public {target} 1.3.6.1.2.1.25.4.2.1.2"
+
+- description: "Installed software (hrSWInstalledName)"
+  why: "Installed-package inventory — maps the attack surface / versions. Recon"
+  command: "snmpwalk -v2c -c public {target} 1.3.6.1.2.1.25.6.3.1.2"
+
+- description: "Listening TCP ports (tcpConnLocalPort)"
+  why: "Local listening ports the external scan may have missed (bound to localhost). Recon"
+  command: "snmpwalk -v2c -c public {target} 1.3.6.1.2.1.6.13.1.3"
+
+- description: "SNMP recon via nmap NSE"
+  why: "sysDescr, engine info, interfaces, processes, netstat in one pass — no brute script. Recon"
+  command: "nmap -sU -sV --script snmp-info,snmp-sysdescr,snmp-interfaces,snmp-processes -p 161 {target}"

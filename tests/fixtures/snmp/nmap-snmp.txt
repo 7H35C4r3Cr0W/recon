@@ -1,0 +1,30 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-11 12:00 UTC
+Nmap scan report for 10.10.10.180
+Host is up (0.021s latency).
+
+PORT    STATE SERVICE VERSION
+161/udp open  snmp    SNMPv1 server; net-snmp SNMPv3 server
+| snmp-sysdescr: Linux nix01 5.4.0-91-generic #102-Ubuntu SMP x86_64
+|_  System uptime: 1h32m10s (552000 timeticks)
+| snmp-info:
+|   enterprise: net-snmp
+|   engineIDFormat: unknown
+|   snmpEngineBoots: 12
+|_  snmpEngineTime: 1h32m10s
+| snmp-processes:
+|   1:
+|     Name: systemd
+|   882:
+|     Name: sshd
+|     Path: /usr/sbin/
+|_    Params: -D
+| snmp-interfaces:
+|   lo
+|     IP address: 127.0.0.1  Netmask: 255.0.0.0
+|   eth0
+|     IP address: 10.10.10.180  Netmask: 255.255.255.0
+|_    MAC address: 00:50:56:AA:BB:CC (VMware)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host) scanned in 12.34 seconds

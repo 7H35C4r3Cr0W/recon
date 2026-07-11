@@ -1,0 +1,3 @@
+Scanning 1 hosts, 51 communities
+10.10.10.180 [public] Hardware: Intel64 Family 6 Model 158 - Software: Windows Version 6.1 (Build 7601 Multiprocessor Free)
+10.10.10.180 [private] Hardware: Intel64 Family 6 Model 158 - Software: Windows Version 6.1 (Build 7601 Multiprocessor Free)

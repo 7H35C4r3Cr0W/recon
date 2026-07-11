@@ -6,11 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 — `nfs` engine done + adversarially reviewed + hardened; `smtp` engine shipped (review
-+ GUI still pending); GUI panels pending for both smtp & nfs.** Next: `snmp/tftp/netbios/ike/ntp`
-engines (§12 order), then the deferred smtp+nfs GUI panels + smtp review. Same
-engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost, smb, ftp,
-ssh, dns, ldap, nfs** (273 tests). Recurring review lessons: parsers must match REAL current tool output;
+**Phase 2 — `nfs` engine + review + hardening done; `snmp` engine shipped (adversarial review next);
+`smtp` engine shipped (review pending); GUI panels pending for smtp/nfs/snmp.** Next: finish the
+snmp review, then `tftp/netbios/ike/ntp` engines (§12 order), then the deferred GUI panels + smtp
+review. Same engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost,
+smb, ftp, ssh, dns, ldap, nfs** (286 tests). Recurring review lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -40,6 +40,25 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · module 10 (snmp) — engine
+- **SnmpModule** (`modules/snmp/`, UDP 161): triggers on 161 / snmp. Tier-1 read-only recon:
+  `discovery_steps` = `onesixtyone -c <small community list> {target}` (§2 explicitly allows
+  onesixtyone with a small list — used the 822-byte onesixtyone-formatted seclists file, NOT the
+  22 KB one) + `nmap -sU -sV --script snmp-info,snmp-sysdescr,snmp-interfaces,snmp-processes,
+  snmp-netstat` (no snmp-brute). `walk_step(community="public")` = `snmpwalk -v2c -c <community>`;
+  `commands()` = discovery + a default public walk.
+- **parsers.py**: `parse_onesixtyone` (`IP [community] sysDescr` → community + banner, deduped),
+  `parse_nmap_snmp` (version-line + snmp-sysdescr banners, snmp-processes `Name:`, interface IP
+  isolated from the trailing `Netmask:`, enterprise note), `parse_snmpwalk` (sysDescr banner, Windows
+  LanMgr users + hrSWRunName processes matched via prefix-independent numeric OID tails so the `iso.`
+  and `.1.` render forms both hit; a `pass(word)?[=:]` value raises a credential NOTE without copying
+  the secret — §6). `parse_snmp_tool` dispatch.
+- Tier-2 `manual_commands.yaml` (8): v2c/v1 walks, discovered-community re-walk, targeted OID pulls
+  (users / processes / installed software / listening ports), nmap NSE. No brute — onesixtyone stays
+  on the small default list; no user/password iteration anywhere.
+- 13 tests (parsers + module incl. secret-not-leaked assertions + a manual recon-only check);
+  onesixtyone + snmpwalk already on the exec allowlist. Four gates green.
 
 ### Phase 2 · module 9 (nfs) — hardening
 Adversarial 3-lens review (7 agents: 3 review lenses → per-finding adversarial verify, checked against
