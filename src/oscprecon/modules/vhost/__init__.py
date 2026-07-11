@@ -76,14 +76,18 @@ def _build_ffuf(s: VhostScanSettings) -> str:
 
 
 def _build_gobuster_vhost(s: VhostScanSettings) -> str:
+    # why: connect to the target IP and set the vhost via --domain + --append-domain, so it works
+    # without the domain resolving (gobuster's own advice: use the IP as the URL).
     parts = [
         "gobuster",
         "vhost",
         "-u",
-        f"{s.scheme}://{s.domain}/",
+        f"{s.scheme}://{s.target}/",
         "-w",
         s.wordlist,
         "--append-domain",
+        "--domain",
+        s.domain,
         "-t",
         str(s.threads),
     ]
@@ -93,9 +97,10 @@ def _build_gobuster_vhost(s: VhostScanSettings) -> str:
 
 
 def _build_gobuster_dns(s: VhostScanSettings) -> str:
-    parts = ["gobuster", "dns", "-d", s.domain, "-w", s.wordlist, "-t", str(s.threads)]
+    # why: gobuster >=3.7 uses --domain (not -d, which is --delay) and --resolver (no -r alias).
+    parts = ["gobuster", "dns", "--domain", s.domain, "-w", s.wordlist, "-t", str(s.threads)]
     if s.dns_server:
-        parts += ["-r", s.dns_server]
+        parts += ["--resolver", s.dns_server]
     if s.output_file:
         parts += ["-o", s.output_file]
     return " ".join(parts)

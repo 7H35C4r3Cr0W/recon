@@ -35,6 +35,7 @@ class ToolPanel(QWidget):
     vhost_dry_run_requested = Signal(str)
     wildcard_detect_requested = Signal(str, str)
     enumerate_as_http_requested = Signal(str)
+    vhost_validation_failed = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -74,6 +75,7 @@ class ToolPanel(QWidget):
         self._vhost.dry_run_requested.connect(self.vhost_dry_run_requested)
         self._vhost.wildcard_detect_requested.connect(self.wildcard_detect_requested)
         self._vhost.enumerate_as_http_requested.connect(self.enumerate_as_http_requested)
+        self._vhost.validation_failed.connect(self.vhost_validation_failed)
         self._web_tabs = QTabWidget()
         self._web_tabs.addTab(self._http, "Content discovery")
         self._web_tabs.addTab(self._vhost, "Vhosts")

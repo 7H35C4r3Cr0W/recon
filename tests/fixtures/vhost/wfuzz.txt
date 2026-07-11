@@ -1,0 +1,13 @@
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://10.10.10.5/
+Total requests: 5000
+
+ID           Response   Lines    Word       Chars       Payload
+
+000000001:   200        7 L      11 W       162 Ch      "admin"
+000000002:   403        9 L      20 W       281 Ch      "dev"
+
+Total time: 12.3

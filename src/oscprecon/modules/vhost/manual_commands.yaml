@@ -15,12 +15,12 @@
   command: 'ffuf -u {scheme}://{target}/ -H "Host: FUZZ.{domain}" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt'
 
 - description: "gobuster vhost"
-  why: "Alternate vhost brute that appends the base domain to each word"
-  command: "gobuster vhost -u {scheme}://{domain}/ -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt --append-domain"
+  why: "Alternate vhost brute against the target IP, appending the base domain to each word"
+  command: "gobuster vhost -u {scheme}://{target}/ -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt --append-domain --domain {domain}"
 
-- description: "gobuster dns (if a DNS server is reachable)"
-  why: "Resolve subdomains directly when the target runs DNS"
-  command: "gobuster dns -d {domain} -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt"
+- description: "gobuster dns (needs a resolvable domain / --resolver)"
+  why: "Resolve subdomains directly when the target or a reachable resolver serves DNS"
+  command: "gobuster dns --domain {domain} -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt"
 
 - description: "dnsrecon brute force"
   why: "Dictionary subdomain brute against the domain"

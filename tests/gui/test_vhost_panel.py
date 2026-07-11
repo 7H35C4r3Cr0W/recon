@@ -74,6 +74,18 @@ def test_add_vhosts_dedup_and_enumerate(qtbot: QtBot, tmp_path: Path) -> None:
     assert blocker.args[0] == "admin.example.com"
 
 
+def test_vhost_rejects_injection_domain(qtbot: QtBot, tmp_path: Path) -> None:
+    panel = VhostPanel()
+    qtbot.addWidget(panel)
+    panel.set_profile(_profile(tmp_path))
+    panel._domain.setText('example.com" -x http://evil')  # flag-injection attempt
+    with (
+        qtbot.assertNotEmitted(panel.run_requested),  # must NOT run
+        qtbot.waitSignal(panel.validation_failed, timeout=1000),
+    ):
+        panel._on_run()
+
+
 def test_tool_panel_shows_vhost_tab_and_enumerate(qtbot: QtBot, tmp_path: Path) -> None:
     tp = ToolPanel()
     qtbot.addWidget(tp)

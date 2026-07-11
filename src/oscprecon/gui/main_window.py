@@ -218,6 +218,9 @@ class MainWindow(QMainWindow):
         self._tool_panel.vhost_dry_run_requested.connect(self._on_http_dry_run)
         self._tool_panel.wildcard_detect_requested.connect(self._on_wildcard_detect)
         self._tool_panel.enumerate_as_http_requested.connect(self._on_enumerate_as_http)
+        self._tool_panel.vhost_validation_failed.connect(
+            lambda msg: self._tool_panel.append_output(f"[blocked] {msg}")
+        )
         self._reference_pane = ReferencePane()
         self._reference_pane.page_visited.connect(self._on_page_visited)
         self._edb_request_id = 0
@@ -566,6 +569,9 @@ class MainWindow(QMainWindow):
             )
             return
         struct_path.parent.mkdir(parents=True, exist_ok=True)
+        # why: clear a stale -o from a prior run so a failed/blocked re-run can't resurrect it
+        # (the parser would otherwise read the old file and report old vhosts as new).
+        struct_path.unlink(missing_ok=True)
         self._vhost_parse = (struct_path, tool, domain)
         self._set_busy(True)
         self._tool_panel.append_output(f"$ {command}")
@@ -677,7 +683,7 @@ class MainWindow(QMainWindow):
                 out = self._wildcard_out
                 self._wildcard_out = None
                 self._apply_wildcard_size(out)
-        except OSError as exc:  # boundary: a parse/findings-write error must not wedge the worker
+        except Exception as exc:  # boundary: any parse/write error must not wedge the worker slot
             self._tool_panel.append_output(f"[parse] failed: {exc}")
         self._finish_worker()
 

@@ -1,5 +1,5 @@
-[*] Performing DNS brute force using dictionary subs.txt
-[+] A admin.example.com 10.10.10.5
-[+] CNAME www.example.com example.com
-[+] A dev.example.com 10.10.10.6
-[*] 3 Records Found
+2026-07-10T21:02:31 INFO     Performing DNS brute force using dictionary subs.txt
+2026-07-10T21:02:31 INFO     A admin.example.com 10.10.10.5
+2026-07-10T21:02:31 INFO     CNAME www.example.com example.com
+2026-07-10T21:02:32 INFO     A dev.example.com 10.10.10.6
+2026-07-10T21:02:32 INFO     3 Records Found

@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
-from oscprecon.models import DiscoveredService
+from oscprecon.models import DiscoveredService, validate_host
 from oscprecon.modules.http import is_tls
 from oscprecon.modules.vhost import (
     DEFAULT_VHOST_WORDLIST,
@@ -38,6 +38,7 @@ class VhostPanel(QWidget):
     dry_run_requested = Signal(str)
     wildcard_detect_requested = Signal(str, str)  # probe command, output_rel
     enumerate_as_http_requested = Signal(str)  # vhost
+    validation_failed = Signal(str)
 
     def __init__(self) -> None:
         super().__init__()
@@ -133,7 +134,9 @@ class VhostPanel(QWidget):
         self._profile = profile
         self._target = profile.target.ip
         self._loading = True
-        if profile.target.hostname:
+        # why: only seed the domain when empty — a worker's scan-end refresh calls set_profile
+        # again and must not clobber a domain the user typed.
+        if profile.target.hostname and not self._domain.text().strip():
             self._domain.setText(profile.target.hostname)
         self._loading = False
         self._apply_settings(profile.module_settings.get("vhost", {}))
@@ -231,9 +234,28 @@ class VhostPanel(QWidget):
         self._loading = False
         self._refresh()
 
+    def _validate(self) -> str | None:
+        # why: domain/dns_server are interpolated into commands — validate like Target.ip does so a
+        # value with whitespace/leading-'-'/quotes can't smuggle flags (e.g. ffuf -x proxy) (§2).
+        try:
+            validate_host(self._domain.text().strip())
+        except ValueError:
+            return f"invalid domain: {self._domain.text().strip()!r}"
+        dns = self._dns.text().strip()
+        if dns:
+            try:
+                validate_host(dns)
+            except ValueError:
+                return f"invalid DNS server: {dns!r}"
+        return None
+
     def _on_run(self) -> None:
         settings = self._current_settings()
         if not settings.domain or not settings.wordlist:
+            return
+        error = self._validate()
+        if error is not None:
+            self.validation_failed.emit(error)
             return
         self.run_requested.emit(
             build_command(settings), settings.output_file, settings.tool, settings.domain
@@ -245,6 +267,10 @@ class VhostPanel(QWidget):
     def _on_detect_wildcard(self) -> None:
         domain = self._domain.text().strip()
         if not domain or not self._target:
+            return
+        error = self._validate()
+        if error is not None:
+            self.validation_failed.emit(error)
             return
         probe = wildcard_probe_command(self._scheme.currentText(), self._target, domain)
         self.wildcard_detect_requested.emit(probe, "vhost/wildcard-probe.txt")

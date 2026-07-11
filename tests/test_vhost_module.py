@@ -20,9 +20,16 @@ def test_ffuf_vhost_command() -> None:
 def test_tool_translations() -> None:
     base = {"target": "10.10.10.5", "domain": "example.com", "wordlist": "/w.txt"}
     gv = build_command(VhostScanSettings(tool="gobuster-vhost", **base))
-    assert gv.startswith("gobuster vhost -u http://example.com/ -w /w.txt --append-domain")
+    # hits the target IP directly (not the domain URL) so it works without /etc/hosts
+    assert gv.startswith(
+        "gobuster vhost -u http://10.10.10.5/ -w /w.txt --append-domain --domain example.com"
+    )
     gd = build_command(VhostScanSettings(tool="gobuster-dns", **base))
-    assert gd.startswith("gobuster dns -d example.com -w /w.txt")
+    assert gd.startswith("gobuster dns --domain example.com -w /w.txt")  # --domain, not -d
+    gd_resolver = build_command(
+        VhostScanSettings(tool="gobuster-dns", dns_server="1.1.1.1", **base)
+    )
+    assert "--resolver 1.1.1.1" in gd_resolver  # --resolver, not -r
     dr = build_command(VhostScanSettings(tool="dnsrecon", **base))
     assert dr == "dnsrecon -d example.com -t brt -D /w.txt"
     wf = build_command(VhostScanSettings(tool="wfuzz", **base))

@@ -6,11 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 module 2 — vhost** (subdomain / virtual-host enumeration; §10): ffuf `-H "Host: FUZZ.{domain}"`,
-gobuster vhost/dns, dnsrecon -t brt, wfuzz; wildcard detection; discovered vhost -> "enumerate as
-new HTTP target". Then `smb` (tiered, §11), then ftp/ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp.
-Each module ships: parser fixture + test, ≥3 pattern entries (Phase 3), services.yaml tools,
-manual_commands.yaml, auto-walk where §12 permits. **HTTP (Phase 2 module 1) is done + hardened.**
+**Phase 2 module 3 — smb** (tiered auto-recon, §11): Tier-1 auto null-session/guest checks
+(smbclient -L -N, netexec --shares, enum4linux-ng -A, rpcclient null, RID cycling, per-share
+listing), Tier-2 shown-only single default-cred checks (administrator:'', admin:'', sa:sa),
+NEVER Tier-3 list-driven brute. Auto-write null/guest success to creds.json (source smb-anon-enum).
+Then ftp/ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp. **HTTP + vhost done + hardened.**
 
 ## How to resume
 
@@ -21,7 +21,26 @@ manual_commands.yaml, auto-walk where §12 permits. **HTTP (Phase 2 module 1) is
 
 ## Log (newest first)
 
-### Phase 2 · module 1 (http) hardening (this commit)
+### Phase 2 · module 2 (vhost) hardening (this commit)
+Adversarial 3-lens review; fixed all 9 findings (the correctness lens ran the real installed tools):
+- **§2 (high):** validate the vhost domain/dns_server like Target.ip (reject whitespace/leading-'-'/
+  quotes) — blocks flag injection (a crafted domain adding ffuf `-x proxy` → off-target traffic).
+- **tool-version bugs (high):** gobuster 3.8.2 uses `--domain`/`--resolver` (not `-d`/`-r`); gobuster
+  vhost now hits the target IP (not the domain URL, so no /etc/hosts needed); dnsrecon 1.6.0 output is
+  "INFO A host ip" (no `[+]`); added a dedicated gobuster-dns parser and a wfuzz parser (both had
+  silently dropped every hit).
+- **robustness:** broadened the parse guard (a ValueError could wedge the worker); defensive int
+  coercion; clear a stale `-o` before a re-run; set_profile no longer clobbers a user-typed domain.
+
+### Phase 2 · module 2 (vhost) — engine + GUI (6cb6899, 062cc18)
+- engine: VhostModule (active/target-directed only; passive OSINT excluded per §2), build_command
+  (ffuf Host-FUZZ, gobuster vhost/dns, dnsrecon, wfuzz), wildcard probe, 5 parsers -> findings.json
+  (dedup key gained 'vhost'), 10 manual commands.
+- GUI: vhost builder in a second web tab (domain/tool/scheme/wordlist/-fs + Detect-wildcard/threads/
+  DNS server), discovered-vhosts list + "enumerate as new HTTP target"; run -> findings; wildcard
+  probe auto-fills -fs.
+
+### Phase 2 · module 1 (http) hardening (04313f5)
 Adversarial 3-lens review of the HTTP module; fixed all 8 findings (+ regression tests):
 - **§2:** shell.run now blocks wpscan `-P`/`-U` (short aliases of --passwords/--usernames), not just --passwords.
 - **HIGH concurrency:** disable the service tree + HTTP builder during a scan so a UI edit can't race
