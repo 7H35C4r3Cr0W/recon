@@ -1,0 +1,8 @@
+{
+  "commandline": "ffuf -u http://10.129.95.192/FUZZ -w big.txt -mc 200,301 -o ffuf.json -of json",
+  "config": {"url": "http://10.129.95.192/FUZZ"},
+  "results": [
+    {"input": {"FUZZ": "admin"}, "position": 1, "status": 301, "length": 154, "words": 22, "lines": 8, "url": "http://10.129.95.192/admin", "redirectlocation": "http://10.129.95.192/admin/"},
+    {"input": {"FUZZ": "login"}, "position": 2, "status": 200, "length": 842, "words": 120, "lines": 30, "url": "http://10.129.95.192/login", "redirectlocation": ""}
+  ]
+}

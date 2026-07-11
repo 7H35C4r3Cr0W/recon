@@ -1,0 +1,10 @@
+- Nikto v2.5.0
+---------------------------------------------------------------------------
++ Target IP:          10.129.95.192
++ Target Port:        80
++ Server: Apache/2.4.41 (Ubuntu)
++ /: The anti-clickjacking X-Frame-Options header is not present.
++ /admin/: Admin login page/section found.
++ OSVDB-3268: /backup/: Directory indexing found.
++ /wp-login.php: WordPress login found.
++ 8074 requests: 0 error(s) and 4 item(s) reported

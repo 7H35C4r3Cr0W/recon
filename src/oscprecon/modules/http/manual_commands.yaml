@@ -1,0 +1,83 @@
+# HTTP manual follow-ups (Tier-2 — shown, never auto-run). Each is a SINGLE §2-allowed recon
+# command (curl / wpscan --enumerate) so it runs unchanged through shell.run (no shell chaining).
+# Placeholders {url} {target} {port} {domain} are filled from the active profile.
+
+- description: "API version endpoint"
+  why: "Version leaks are common on unauthenticated API roots"
+  command: "curl -sk {url}api/version"
+
+- description: "API v1 root"
+  why: "An open API base often lists routes or returns a version banner"
+  command: "curl -sk {url}api/v1/"
+
+- description: "Health / status endpoint"
+  why: "Unauthenticated health checks can leak build and dependency info"
+  command: "curl -sk {url}health"
+
+- description: "well-known security.txt"
+  why: "/.well-known/ exposes security.txt, openid config, change-password"
+  command: "curl -sk {url}.well-known/security.txt"
+
+- description: "Exposed .git/HEAD"
+  why: "A committed .git dir can leak full source"
+  command: "curl -sk {url}.git/HEAD"
+
+- description: "Exposed .svn/entries"
+  why: "Legacy Subversion metadata can leak paths and source"
+  command: "curl -sk {url}.svn/entries"
+
+- description: "Framework .env file"
+  why: ".env commonly leaks DB creds and API keys"
+  command: "curl -sk {url}.env"
+
+- description: "macOS .DS_Store"
+  why: ".DS_Store enumerates directory contents"
+  command: "curl -sk {url}.DS_Store"
+
+- description: "Apache .htaccess / .htpasswd"
+  why: "Misserved auth files leak rewrite rules and password hashes"
+  command: "curl -sk {url}.htaccess"
+
+- description: "WebDAV PROPFIND"
+  why: "PROPFIND confirms WebDAV and lists resources when enabled"
+  command: "curl -sk -X PROPFIND {url} -H 'Depth: 1'"
+
+- description: "Backup directory"
+  why: "Deployed backups frequently expose source or credentials"
+  command: "curl -skI {url}backup/"
+
+- description: "Allowed HTTP methods (OPTIONS)"
+  why: "Reveals PUT/DELETE/PROPFIND and other enabled verbs"
+  command: "curl -sk -X OPTIONS {url} -i"
+
+- description: "TRACE method check"
+  why: "TRACE echoes the request — useful for XST and proxy checks"
+  command: "curl -sk -X TRACE {url} -i"
+
+- description: "Response headers"
+  why: "Server/framework banners, security headers, cookies"
+  command: "curl -sIk {url}"
+
+- description: "Verbose HEAD (TLS + redirects)"
+  why: "Shows the handshake, redirect chain and full header set"
+  command: "curl -svk -I {url}"
+
+- description: "robots.txt"
+  why: "Disallowed paths reveal hidden endpoints"
+  command: "curl -sk {url}robots.txt"
+
+- description: "WordPress enumeration (if WordPress detected)"
+  why: "Enumerate plugins/themes/users — enumeration only, never --passwords"
+  command: "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url {url}"
+
+- description: "Common admin panel"
+  why: "Locate the authentication surface for later manual review"
+  command: "curl -skI {url}admin/"
+
+- description: "WordPress login panel"
+  why: "Confirms a WordPress install and its login endpoint"
+  command: "curl -skI {url}wp-login.php"
+
+- description: "Virtual-host hint (see the vhost module next)"
+  why: "If a domain is known, the IP may serve additional vhosts"
+  command: "curl -sk {url} -H 'Host: {domain}'"

@@ -1,0 +1,92 @@
+from pathlib import Path
+
+from oscprecon.modules.http.parsers import (
+    detect_wordpress,
+    parse_dirsearch,
+    parse_feroxbuster,
+    parse_ffuf,
+    parse_gobuster,
+    parse_nikto,
+    parse_tool,
+    parse_whatweb,
+    parse_wpscan,
+)
+
+FIX = Path(__file__).parent / "fixtures" / "http"
+
+
+def _read(name: str) -> str:
+    return (FIX / name).read_text(encoding="utf-8")
+
+
+def test_feroxbuster() -> None:
+    findings = parse_feroxbuster(_read("feroxbuster.json"), 80)
+    by_path = {f.path: f for f in findings}
+    assert len(findings) == 3  # statistics line skipped
+    assert by_path["/admin"].status == 301
+    assert by_path["/admin"].size == 154
+    assert by_path["/admin"].redirect_to == "/admin/"
+    assert by_path["/index.html"].size == 10918
+    assert all(f.port == 80 for f in findings)
+
+
+def test_gobuster() -> None:
+    findings = parse_gobuster(_read("gobuster.txt"), 80)
+    by_path = {f.path: f for f in findings}
+    assert len(findings) == 4
+    assert by_path["/admin"].status == 301
+    assert "admin/" in by_path["/admin"].redirect_to
+    assert by_path["/index.html"].size == 10918
+    assert by_path["/server-status"].status == 403
+
+
+def test_ffuf() -> None:
+    findings = parse_ffuf(_read("ffuf.json"), 8080)
+    by_path = {f.path: f for f in findings}
+    assert by_path["/admin"].status == 301
+    assert by_path["/admin"].size == 154
+    assert by_path["/admin"].redirect_to.endswith("/admin/")
+    assert by_path["/login"].status == 200
+    assert all(f.port == 8080 for f in findings)
+
+
+def test_dirsearch() -> None:
+    findings = parse_dirsearch(_read("dirsearch.txt"), 80)
+    by_path = {f.path: f for f in findings}
+    assert by_path["/admin"].status == 301
+    assert by_path["/admin"].size == 154
+    assert by_path["/index.html"].size == 10240  # 10KB
+    assert by_path["/server-status"].status == 403
+
+
+def test_nikto_and_wordpress_detection() -> None:
+    findings = parse_nikto(_read("nikto.txt"), 80)
+    paths = " ".join(f.path for f in findings)
+    assert "/admin" in paths
+    assert "/wp-login.php" in paths
+    assert detect_wordpress(_read("nikto.txt")) is True
+
+
+def test_whatweb() -> None:
+    findings = parse_whatweb(_read("whatweb.json"), 443)
+    assert len(findings) == 1
+    assert findings[0].status == 200
+    assert findings[0].path == "/"
+    assert "WordPress" in findings[0].note
+    assert detect_wordpress(_read("whatweb.json")) is True
+
+
+def test_wpscan() -> None:
+    findings = parse_wpscan(_read("wpscan.json"), 80)
+    notes = " ".join(f.note for f in findings)
+    assert "WordPress 5.8" in notes
+    assert "akismet" in notes
+    assert "admin" in notes
+
+
+def test_parse_tool_dispatch_and_garbage() -> None:
+    assert parse_tool("unknown-tool", "x", 80) == []
+    assert parse_ffuf("not json", 80) == []
+    assert parse_whatweb("not json", 80) == []
+    assert parse_wpscan("[]", 80) == []
+    assert detect_wordpress("nginx 1.18") is False

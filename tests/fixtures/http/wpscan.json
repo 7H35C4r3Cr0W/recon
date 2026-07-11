@@ -1,0 +1,15 @@
+{
+  "target_url": "http://10.129.95.192/",
+  "version": {"number": "5.8", "status": "insecure", "confidence": 100},
+  "plugins": {
+    "akismet": {"slug": "akismet", "version": {"number": "4.0"}},
+    "contact-form-7": {"slug": "contact-form-7", "version": {"number": "5.4"}}
+  },
+  "themes": {
+    "twentytwentyone": {"slug": "twentytwentyone", "version": {"number": "1.3"}}
+  },
+  "users": {
+    "admin": {"id": 1, "found_by": "Author Id Brute Forcing - Author Pattern"},
+    "editor": {"id": 2, "found_by": "Rss Generator"}
+  }
+}

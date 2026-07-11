@@ -1,0 +1,4 @@
+{"type":"response","url":"http://10.129.95.192/admin","status":301,"content_length":154,"line_count":8,"word_count":22,"method":"GET","headers":{"location":"/admin/","content-type":"text/html"}}
+{"type":"response","url":"http://10.129.95.192/index.html","status":200,"content_length":10918,"line_count":220,"word_count":900,"method":"GET","headers":{"content-type":"text/html"}}
+{"type":"response","url":"http://10.129.95.192/robots.txt","status":200,"content_length":45,"line_count":3,"word_count":6,"method":"GET","headers":{"content-type":"text/plain"}}
+{"type":"statistics","timeouts":0,"requests":30000,"expected_per_scan":30000,"total_expected":30000}
