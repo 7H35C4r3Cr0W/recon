@@ -1,0 +1,4 @@
+Starting ike-scan 1.9.5 with 1 hosts (http://www.nta-monitor.com/tools/ike-scan/)
+10.10.10.180	Main Mode Handshake returned HDR=(CKY-R=a1b2c3d4e5f6) SA=(Enc=3DES Hash=SHA1 Group=2:modp1024 Auth=PSK LifeType=Seconds LifeDuration=28800)
+
+Ending ike-scan 1.9.5: 1 hosts scanned in 0.512 seconds (1.95 hosts/sec).  1 returned handshake; 0 returned notify

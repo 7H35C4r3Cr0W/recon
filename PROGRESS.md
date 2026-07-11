@@ -41,6 +41,19 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
+### Phase 2 · module 13 (ike) — engine
+- **IkeModule** (`modules/ike/`, UDP 500): triggers on 500 / isakmp. Tier-1 read-only: `ike-scan -M`
+  (detect the IKE/ISAKMP VPN responder + its main-mode transform) + `ike-scan -M -A` (aggressive-mode
+  check). No `-P` / PSK-hash capture — offline PSK cracking is out of scope for this recon tool.
+- **parsers.py**: `parse_ike_scan` flags main-mode (`service`) and aggressive-mode (`aggressive`
+  enabled — PSK-material disclosure) handshakes and extracts the SA transform (Enc/Hash/Group/Auth) for
+  either; dispatch keys `ike-scan` + `ike-scan-aggressive` both map to it (distinct keys avoid the
+  raw_outputs collision).
+- `suggest()` notes aggressive mode (recon only — explicitly states offline PSK cracking is out of
+  scope) or a bare VPN presence. Tier-2 `manual_commands.yaml` (5): detection, aggressive check,
+  transform enumeration, named-group aggressive, nmap ike-version. No PSK capture/cracking anywhere.
+- 8 tests (parsers + module incl. a "no -P" assertion + a manual no-PSK-crack check).
+
 ### Phase 2 · module 12 (netbios) — hardening
 Adversarial 3-lens review (verified against real nmblookup/nbtscan output). 4 candidates, 1 CONFIRMED;
 3 refuted.

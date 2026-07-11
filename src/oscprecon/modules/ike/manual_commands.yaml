@@ -1,0 +1,23 @@
+# IKE / ISAKMP manual follow-ups (Tier-2 — shown, never auto-run; §12). Read-only VPN recon only.
+# {target} comes from the profile; GROUP is a literal you edit. Detection + transform / aggressive-mode
+# enumeration only — no PSK-hash capture for offline cracking (that is out of scope for this tool).
+
+- description: "Detect IKE responder + transform (ike-scan -M)"
+  why: "Main-mode handshake reveals the VPN and its enc/hash/DH/auth transform — recon"
+  command: "ike-scan -M {target}"
+
+- description: "Aggressive-mode check (ike-scan -M -A)"
+  why: "Does the responder answer aggressive mode? Aggressive mode weakens PSK protection — recon"
+  command: "ike-scan -M -A {target}"
+
+- description: "Enumerate accepted transforms (ike-scan --trans)"
+  why: "Discover which enc/hash/group/auth combinations the responder accepts — fingerprint, not auth"
+  command: "ike-scan -M --trans {target}"
+
+- description: "Aggressive mode with a named VPN group/ID (ike-scan --id)"
+  why: "Some responders only answer aggressive mode for a named group/ID (edit GROUP) — recon"
+  command: "ike-scan -M -A --id=GROUP {target}"
+
+- description: "IKE version / vendor via nmap"
+  why: "nmap ike-version cross-checks the responder and vendor-fingerprints it — recon"
+  command: "nmap -sU -sV --script ike-version -p 500 {target}"
