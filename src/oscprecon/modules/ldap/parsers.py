@@ -108,6 +108,14 @@ def parse_nmap_ldap(text: str) -> list[LdapFinding]:
     host = _NMAP_HOST.search(text)
     if host is not None:
         findings.append(LdapFinding("info", f"dnsHostName: {host.group('host').strip()}"))
+    if seen:
+        # why: nmap's ldap-rootdse does its own certless TLS, so on LDAPS (636/3269) it recovers the
+        # root DSE where anonymous `ldapsearch` aborts on the lab's self-signed cert. Emit the same
+        # bind finding here so the summary/credential don't say "denied" on a wide-open DC when only
+        # nmap got through (dedups with the ldapsearch bind finding — findings _key ignores detail).
+        findings.append(
+            LdapFinding("bind", "anonymous", "anonymous root DSE via nmap ldap-rootdse")
+        )
     return findings
 
 

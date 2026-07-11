@@ -53,6 +53,14 @@ def test_parse_nmap_ldap() -> None:
     assert "DC=example,DC=htb" in contexts
     assert contexts.count("DC=example,DC=htb") == 1  # deduped within the nmap block
     assert any(f.value == "dnsHostName: dc01.example.htb" for f in findings)
+    # nmap recovering the root DSE (e.g. over LDAPS where anonymous ldapsearch aborts on the
+    # self-signed cert) is itself proof of anonymous access -> it must emit the bind finding
+    assert any(f.kind == "bind" and f.value == "anonymous" for f in findings)
+
+
+def test_nmap_ldap_no_bind_without_contexts() -> None:
+    # no naming contexts came back -> no bind finding (don't claim anonymous access on nothing)
+    assert parse_nmap_ldap("389/tcp open ldap\nfiltered\n") == []
 
 
 def test_ldif_line_folding() -> None:
