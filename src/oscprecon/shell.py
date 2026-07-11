@@ -34,6 +34,7 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
         "rpcclient",
         "rpcinfo",
         "netexec",
+        "nxc",
         "crackmapexec",
         "ldapsearch",
         "snmpwalk",
@@ -72,6 +73,13 @@ _SEARCHSPLOIT_FORBIDDEN: frozenset[str] = frozenset(
 # why: wpscan is enumeration-only (§9) — -P/--passwords + -U/--usernames drive a credential
 # brute. --passwords is also in _FORBIDDEN_FLAGS; the short -P alias must be blocked too.
 _WPSCAN_FORBIDDEN: frozenset[str] = frozenset({"-P", "--passwords", "-U", "--usernames"})
+
+# why: netexec is enum/single-cred only (§11 Tier-1/2). It treats a -u/-p value that IS a file as a
+# LIST (Tier-3 spray) — so a file argument to these flags is forbidden; single literals are allowed.
+_NETEXEC_TOOLS: frozenset[str] = frozenset({"netexec", "nxc", "crackmapexec"})
+_NETEXEC_AUTH_FLAGS: frozenset[str] = frozenset(
+    {"-u", "--user", "--username", "-p", "--pass", "--password"}
+)
 
 _INSTALL_HINTS: dict[str, str] = {
     "nmap": "apt install nmap",
@@ -128,6 +136,12 @@ def policy_violation(argv: list[str]) -> str | None:
         for token in argv[1:]:
             if token in _WPSCAN_FORBIDDEN:
                 return f"wpscan {token} is credential brute (forbidden — enumerate only)"
+    if tool in _NETEXEC_TOOLS:
+        for index, token in enumerate(argv):
+            if token in _NETEXEC_AUTH_FLAGS and index + 1 < len(argv):
+                value = argv[index + 1]
+                if value and Path(value).is_file():
+                    return f"netexec {token} {value} is a list file — credential brute (forbidden)"
     return None
 
 

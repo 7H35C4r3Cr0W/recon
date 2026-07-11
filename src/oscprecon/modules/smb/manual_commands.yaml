@@ -1,0 +1,51 @@
+# SMB manual follow-ups (Tier-2 — shown, never auto-run; §11). Single-attempt default creds against
+# well-known accounts, plus RPC/smbmap enumeration. NEVER Tier-3 (username/password LISTS, spraying).
+# All commands are §2-allowed recon; placeholders {target} {share} {domain} filled from the profile.
+
+- description: "Try administrator with empty password"
+  why: "Single attempt against a well-known account — not a brute force"
+  command: "netexec smb {target} -u 'administrator' -p '' --shares"
+
+- description: "Try admin with empty password"
+  why: "Single attempt — common misconfiguration check"
+  command: "netexec smb {target} -u 'admin' -p '' --shares"
+
+- description: "Default-cred sanity check (sa:sa)"
+  why: "Single attempt against a well-known default"
+  command: "netexec smb {target} -u 'sa' -p 'sa' --shares"
+
+- description: "Try guest:guest"
+  why: "Single attempt against the guest account with a default password"
+  command: "netexec smb {target} -u 'guest' -p 'guest' --shares"
+
+- description: "RID cycling via null session"
+  why: "RID enumeration sometimes returns users SAMR/LDAP enum misses (recon, not brute)"
+  command: "netexec smb {target} -u '' -p '' --rid-brute 10000"
+
+- description: "RPC null session — domain groups"
+  why: "enumdomgroups lists groups reachable over a null session"
+  command: "rpcclient -U '' -N {target} -c 'enumdomgroups'"
+
+- description: "RPC null session — user display info"
+  why: "querydispinfo returns user details (full name, description)"
+  command: "rpcclient -U '' -N {target} -c 'querydispinfo'"
+
+- description: "RPC null session — server info"
+  why: "srvinfo returns OS version and server type"
+  command: "rpcclient -U '' -N {target} -c 'srvinfo'"
+
+- description: "smbmap null session"
+  why: "Alternate share + permission view over a null session"
+  command: "smbmap -H {target}"
+
+- description: "smbmap as guest"
+  why: "Share + permission view as the guest account"
+  command: "smbmap -H {target} -u guest -p ''"
+
+- description: "Recursive listing of a readable share (fill in SHARE)"
+  why: "Walk a readable share; bounded — deeper needs a second run"
+  command: "smbclient //{target}/SHARE -N -c 'recurse ON; ls'"
+
+- description: "SMB vuln NSE scripts"
+  why: "Flag known SMB vulns (MS17-010, etc.) — enumeration/detection only"
+  command: "nmap --script smb-vuln-* -p 445 {target}"

@@ -1,0 +1,5 @@
+SMB         10.10.10.5      445    DC01             [+] active.htb\:
+SMB         10.10.10.5      445    DC01             [*] Enumerated domain user(s)
+SMB         10.10.10.5      445    DC01             active.htb\Administrator                  badpwdcount: 0 desc: Built-in account
+SMB         10.10.10.5      445    DC01             active.htb\Guest                          badpwdcount: 0
+SMB         10.10.10.5      445    DC01             active.htb\svc_tgs                         badpwdcount: 0

@@ -1,0 +1,4 @@
+SMB         10.10.10.5      445    DC01             [+] Dumping password info for domain: ACTIVE
+SMB         10.10.10.5      445    DC01             Minimum password length: 7
+SMB         10.10.10.5      445    DC01             Password history length: 24
+SMB         10.10.10.5      445    DC01             Account Lockout Threshold: None

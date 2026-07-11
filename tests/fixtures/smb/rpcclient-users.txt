@@ -1,0 +1,3 @@
+user:[Administrator] rid:[0x1f4]
+user:[Guest] rid:[0x1f5]
+user:[svc_account] rid:[0x455]

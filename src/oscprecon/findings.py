@@ -30,6 +30,8 @@ def _key(finding: dict[str, Any]) -> tuple[Any, ...]:
         finding.get("port"),
         finding.get("path"),
         finding.get("vhost"),
+        finding.get("kind"),
+        finding.get("value"),
         finding.get("status"),
         finding.get("size"),
         finding.get("redirect_to"),

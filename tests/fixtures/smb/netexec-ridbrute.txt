@@ -1,0 +1,4 @@
+SMB         10.10.10.5      445    DC01             498: active.htb\Enterprise Read-only Domain Controllers (SidTypeGroup)
+SMB         10.10.10.5      445    DC01             500: active.htb\Administrator (SidTypeUser)
+SMB         10.10.10.5      445    DC01             501: active.htb\Guest (SidTypeUser)
+SMB         10.10.10.5      445    DC01             1103: active.htb\svc_account (SidTypeUser)
