@@ -182,6 +182,27 @@ class Profile:
     def add_credential(self, cred: Credential) -> None:
         creds.add_credential(self.creds_path, cred)
 
+    @property
+    def graph_path(self) -> Path:
+        return self.directory / "graph.json"
+
+    def load_graph(self) -> dict[str, Any]:
+        try:
+            data = json.loads(self.graph_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = None
+        if not isinstance(data, dict):
+            data = {}
+        data.setdefault("user_edges", [])
+        data.setdefault("node_overrides", {})
+        return data
+
+    def save_graph(self, data: dict[str, Any]) -> None:
+        # why: mirror profile.json's atomic write — a crash mid-write must not corrupt graph.json.
+        tmp = self.directory / "graph.json.tmp"
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        tmp.replace(self.graph_path)
+
     def add_reference_visited(self, service: str, url: str) -> None:
         if any(entry.get("url") == url for entry in self.references_visited):
             return

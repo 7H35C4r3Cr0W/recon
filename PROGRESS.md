@@ -7,12 +7,28 @@ Running record of what's been built, in order, so any session can pick up mid-st
 ## Next up
 
 **Phase 2 COMPLETE — all 14 modules have engine + adversarial review + GUI panel** (http, vhost, smb,
-ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp). The 7 engine-only modules
-(smtp/nfs/snmp/tftp/netbios/ike/ntp) now share one generic SimpleReconPanel + SimpleReconWorker.
-**Next: Phase 3** (pattern library + suggestion engine — `patterns/<svc>.yaml` with `# source:`
-provenance gate, `patterns/engine.py`, "Recon next steps" in the tool panel), then the queued QoL
-items (status footer §19, project file ops §19, audit log §6a). **All 14 modules done, reviewed,
-hardened, GUI'd** (346 tests). Recurring review lessons: parsers must match REAL current tool output;
+ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp) + status footer QoL. All 14 done,
+reviewed, hardened, GUI'd (347 tests).
+
+### ⚠️ ORDER — we are JUMPING Phase 3 → Phase 4 (user decision 2026-07-11). DO NOT SKIP PHASE 3.
+**Phase 3 (pattern library + suggestion engine) is DEFERRED, not done.** It is BLOCKED on `# source:`
+provenance (§15): no walkthroughs/box notes are committed yet. The user is loading their Obsidian
+notes / box writeups onto Kali **separately** to unblock it. **Do NOT build pattern entries or mark
+Phase 3 complete until real `walkthroughs/*.md` or `boxes/*.md` sources are committed.** After Phase 4,
+**return to Phase 3.** (Phase 3 deliverables still owed: `patterns/engine.py`, per-service
+`patterns/<svc>.yaml` with the provenance build-gate, "Recon next steps" tool-panel section with
+pre-fill-no-autorun, report "Suggested next steps" with citations.)
+
+**NOW: Phase 4 — Bloodhound-style graph view (§16, §23).** Deliverables: `gui/widgets/graph_view.py`
+(QWebEngineView + vendored offline Cytoscape.js, NO runtime CDN), `QWebChannel` GraphBridge
+(get_data / node_clicked / status_changed / add_user_edge / save_layout), `gui/graph_html/`
+(index.html + app.js + cytoscape.min.js + style.css), node/edge types + colors per §16, `graph.json`
+persistence (user edges, node positions, per-node status/notes), `View → Graph` (Ctrl+G) toggle, and
+the §16 QUEUED reinforcements (drag-drop persistence, right-click Add Note→graph.json+tooltip+report,
+minimap + edge labels, PNG/SVG export). Also queued/owed after Phase 4: project file ops (§19), audit
+log (§6a), concurrent-copy lock (§6b), the rest of Phase 5 QoL, Phase 6 doctor/exam-preset.
+
+Recurring review lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -42,6 +58,22 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 4 · graph view — chunk 1: data model + graph.json persistence
+- **`gui/graph_data.py`** `build_elements(profile)` — pure-Python (no Qt) Cytoscape elements builder:
+  target → services (`has-service`) → findings (`exposes-finding`, linked to the owning service via the
+  references module→port map, else the target) → credentials (`references-credential`, secret REDACTED
+  via `creds.redact` — never reaches the graph). Overlays `graph.json`: per-node status
+  (new/investigating/done/dead-end, validated), note, saved position, and user-drawn `relates-to` edges
+  (a dangling edge whose endpoint no longer exists is dropped so Cytoscape never errors).
+- **`Profile.graph_path` / `load_graph` / `save_graph`** — atomic write mirroring profile.json; load
+  returns the `{user_edges, node_overrides}` default when the file is absent or corrupt.
+- Cytoscape.js 3.30.2 vendored offline to `gui/graph_html/cytoscape.min.js` (committed with chunk 2).
+- 6 unit tests (structure, module→service finding links, redaction, overrides + user-edge filtering,
+  invalid-status rejection, persistence round-trip). 353 tests. **Next chunk 2:** GraphView widget
+  (QWebEngineView + QWebChannel bridge) + `graph_html/` (index.html/app.js/style.css) + View→Graph
+  (Ctrl+G). **Chunk 3:** interactions (click→detail, right-click Add Note/status, drag-edge relates-to,
+  drag-position persistence), minimap, PNG/SVG export.
 
 ### Phase 2 · QoL — status footer (§19)
 - Always-visible `QStatusBar` strip: `oscp-recon v<version>` (importlib.metadata, falls back to
