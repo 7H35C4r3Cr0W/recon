@@ -6,12 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 module engines COMPLETE — all 14 built (http, vhost, smb, ftp, ssh, dns, ldap, smtp, nfs,
-snmp, tftp, netbios, ike, ntp).** Reviewed + hardened: 11. **Review still pending: `smtp`, `ike`,
-`ntp`.** GUI panels pending for the engine-only modules (smtp/nfs/snmp/tftp/netbios/ike/ntp). Next:
-adversarial reviews for smtp/ike/ntp → their GUI panels → then Phase 3 (pattern library + suggestion
-engine). **Done, reviewed, hardened: http, vhost, smb, ftp, ssh, dns, ldap, nfs, snmp, tftp, netbios**
-(328 tests). Recurring review lessons: parsers must match REAL current tool output;
+**Phase 2 ENGINES COMPLETE + ALL 14 ADVERSARIALLY REVIEWED & HARDENED** (http, vhost, smb, ftp, ssh,
+dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp). Next: **GUI panels** for the engine-only modules
+(smtp/nfs/snmp/tftp/netbios/ike/ntp — the tool_panel stack pages + workers, mirroring the ftp/smb
+panels), then **Phase 3** (pattern library + suggestion engine). **All 14 modules done, reviewed,
+hardened** (334 tests). Recurring review lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -41,6 +40,24 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · modules 13–14 (ike, ntp) — hardening
+Adversarial reviews (verified against real ike-scan / ntpq / ntpdate output). Both modules were clean
+on their OWN commands; the confirmed defects were parser gaps + a shared exec-chokepoint backstop gap
+(the recurring "the sole §2 chokepoint must enforce the invariant, not just the module" theme).
+- **ike correctness (LOW–MED): SA transform truncated on a nested-paren lifetime.** Real ike-scan
+  encodes the lifetime as `LifeDuration(4)=0x00007080` — a nested paren — so `SA=\([^)]*\)` cut the
+  transform off there. Allow one level of nesting (still stops before the aggressive-mode trailing
+  payloads KeyExchange(..)/Nonce(..)/ID(..)/Hash(..)).
+- **ike §12 (MED): exec chokepoint didn't block ike-scan PSK capture.** shell.py enforces every other
+  §2 rule but let `ike-scan --pskcrack` / `-Pfile` through — the module never emits it, but the §19
+  custom-command surface could. Added an ike-scan guard (prefix-matches the concatenated `-Pfile`).
+- **ntp §2 (MED): exec chokepoint didn't enforce the `ntpdate -q` invariant.** Bare `ntpdate <target>`
+  SETS the local clock; the module always uses -q but the chokepoint didn't back-stop it. Now blocks
+  ntpdate without -q.
+- **ntp correctness (LOW): `parse_ntpdate` dropped an IPv6 server.** The regex hard-coded a dotted
+  quad; Target accepts IPv6. Broadened to a non-greedy server capture. Regression tests for all four
+  (incl. shell-policy tests for both backstops).
 
 ### Phase 2 · module 8 (smtp) — hardening
 Adversarial review (verified against the real `smtp-*.nse` sources, nmap 7.99). 2 confirmed parser

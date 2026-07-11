@@ -25,6 +25,15 @@ def test_parse_aggressive_mode() -> None:
     assert any(f.kind == "transform" and "Group=2:modp1024" in f.value for f in findings)
 
 
+def test_transform_keeps_nested_paren_lifetime() -> None:
+    # real ike-scan encodes the lifetime as a nested paren (LifeDuration(4)=0x...) — keep it all
+    text = (
+        "1.2.3.4\tMain Mode Handshake returned SA=(Enc=3DES Auth=PSK LifeDuration(4)=0x00007080)\n"
+    )
+    tf = next(f for f in parse_ike_scan(text) if f.kind == "transform")
+    assert tf.value == "Enc=3DES Auth=PSK LifeDuration(4)=0x00007080"
+
+
 def test_no_handshake_no_findings() -> None:
     text = (
         "Starting ike-scan 1.9.5 with 1 hosts\n"

@@ -22,7 +22,11 @@ class IkeFinding:
         }
 
 
-_SA = re.compile(r"SA=\((?P<sa>[^)]*)\)")
+# why: real ike-scan encodes a variable-length lifetime as a NESTED paren inside the SA payload
+# (e.g. `LifeDuration(4)=0x00007080`), so a simple `[^)]*` truncates the transform there. Allow one
+# level of nesting — this still stops before the aggressive-mode trailing payloads (KeyExchange(..),
+# Nonce(..), ID(..), Hash(..)) that follow `SA=(...)`.
+_SA = re.compile(r"SA=\((?P<sa>(?:[^()]|\([^()]*\))*)\)")
 
 
 def parse_ike_scan(text: str) -> list[IkeFinding]:

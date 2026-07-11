@@ -31,6 +31,14 @@ def test_ntpdate_stratum_and_server() -> None:
     assert "10.10.10.180" in stratum.detail
 
 
+def test_ntpdate_ipv6_server() -> None:
+    # Target accepts IPv6, so ntpdate can print an IPv6 server — its stratum must still parse
+    findings = parse_ntpdate("server 2001:db8::1, stratum 2, offset +0.001, delay 0.02\n")
+    stratum = next(f for f in findings if f.kind == "stratum")
+    assert stratum.value == "2"
+    assert "2001:db8::1" in stratum.detail
+
+
 def test_dispatch_and_garbage() -> None:
     assert parse_ntp_tool("unknown", "x") == []
     assert parse_ntp_tool("ntpq-readlist", _read("ntpq-readlist.txt"))

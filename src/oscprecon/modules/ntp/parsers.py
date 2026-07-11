@@ -26,10 +26,9 @@ class NtpFinding:
 _INFO_KEYS = (("version", "ntpd version"), ("system", "OS"), ("processor", "processor"))
 # stratum appears as `stratum=3` (readlist) or `stratum:   3` (sysinfo).
 _STRATUM = re.compile(r"stratum[=:\s]+(?P<s>\d+)", re.IGNORECASE)
-# ntpdate -q line: `server 10.0.0.1, stratum 3, offset ...`
-_NTPDATE = re.compile(
-    r"server\s+(?P<ip>\d{1,3}(?:\.\d{1,3}){3}),\s*stratum\s+(?P<s>\d+)", re.IGNORECASE
-)
+# ntpdate -q line: `server 10.0.0.1, stratum 3, offset ...`. The server may be IPv4, IPv6, or a
+# hostname (Target accepts IPv6), so capture non-greedily up to `, stratum`, not a dotted quad.
+_NTPDATE = re.compile(r"server\s+(?P<ip>\S+?),\s*stratum\s+(?P<s>\d+)", re.IGNORECASE)
 
 
 def parse_ntpq(text: str) -> list[NtpFinding]:

@@ -48,6 +48,24 @@ def test_blocks_wpscan_credential_brute() -> None:
     assert shell.policy_violation(["wpscan", "--url", "http://x/", "--enumerate", "u"]) is None
 
 
+def test_blocks_ike_scan_pskcrack() -> None:
+    # -P/--pskcrack writes the aggressive-mode PSK hash to disk for offline cracking (§12) — blocked
+    assert shell.policy_violation(["ike-scan", "-A", "--pskcrack", "10.0.0.1"]) is not None
+    assert shell.policy_violation(["ike-scan", "-A", "--pskcrack=out.txt", "10.0.0.1"]) is not None
+    assert shell.policy_violation(["ike-scan", "-Pout.txt", "10.0.0.1"]) is not None  # -Pfile form
+    # plain detection / aggressive-mode check are allowed
+    assert shell.policy_violation(["ike-scan", "-M", "10.0.0.1"]) is None
+    assert shell.policy_violation(["ike-scan", "-M", "-A", "10.0.0.1"]) is None
+
+
+def test_blocks_ntpdate_without_q() -> None:
+    # ntpdate WITHOUT -q sets the local clock (modifies state) -> blocked; -q query mode is allowed
+    assert shell.policy_violation(["ntpdate", "10.0.0.1"]) is not None
+    assert shell.policy_violation(["ntpdate", "-b", "-u", "10.0.0.1"]) is not None
+    assert shell.policy_violation(["ntpdate", "-q", "10.0.0.1"]) is None
+    assert shell.policy_violation(["ntpdate", "-q", "-u", "10.0.0.1"]) is None
+
+
 def test_blocks_netexec_list_auth(tmp_path: object) -> None:
     from pathlib import Path
 

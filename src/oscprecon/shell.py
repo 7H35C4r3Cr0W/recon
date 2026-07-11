@@ -75,6 +75,17 @@ _SEARCHSPLOIT_FORBIDDEN: frozenset[str] = frozenset(
 # brute. --passwords is also in _FORBIDDEN_FLAGS; the short -P alias must be blocked too.
 _WPSCAN_FORBIDDEN: frozenset[str] = frozenset({"-P", "--passwords", "-U", "--usernames"})
 
+
+# why: ike-scan is IKE/ISAKMP detection only (§12). -P/--pskcrack writes the aggressive-mode PSK
+# hash to a file for offline cracking — banned. -P takes its file concatenated (`-Pfile`, no space),
+# so the short form must be matched by prefix, not equality.
+def _ike_scan_violation(argv: list[str]) -> str | None:
+    for token in argv[1:]:
+        if token.startswith("-P") or token == "--pskcrack" or token.startswith("--pskcrack="):
+            return "ike-scan -P/--pskcrack captures the PSK hash for offline cracking (forbidden)"
+    return None
+
+
 # why: netexec is enum/single-cred only (§11 Tier-1/2). Its -u/-p are argparse nargs='+' and
 # "user x password" spraying is the DEFAULT, so Tier-3 hides three ways a naive single-token check
 # misses: >1 inline value, a value in 2nd+ position, and '='/concatenated syntax. _netexec_violation
@@ -175,6 +186,14 @@ def policy_violation(argv: list[str]) -> str | None:
         netexec_violation = _netexec_violation(argv)
         if netexec_violation is not None:
             return netexec_violation
+    if tool == "ike-scan":
+        ike_violation = _ike_scan_violation(argv)
+        if ike_violation is not None:
+            return ike_violation
+    if tool == "ntpdate" and "-q" not in argv[1:]:
+        # why: ntpdate WITHOUT -q SETS the local clock (modifies local state, needs root). Recon is
+        # query-only — the module always passes -q; back-stop it here for the custom-command path.
+        return "ntpdate without -q sets the local clock (forbidden — recon-only)"
     return None
 
 
