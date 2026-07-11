@@ -39,7 +39,6 @@ _ROLE_SUFFIXES = {
 
 def parse_nmblookup(text: str) -> list[NetbiosFinding]:
     findings: list[NetbiosFinding] = []
-    hostnames: set[str] = set()
     seen: set[tuple[str, str]] = set()
 
     def _add(kind: str, value: str, detail: str = "") -> None:
@@ -48,20 +47,29 @@ def parse_nmblookup(text: str) -> list[NetbiosFinding]:
             seen.add(key)
             findings.append(NetbiosFinding(kind, value, detail))
 
+    # Two passes: collect every <00>-unique host name FIRST, then classify. The target chooses the
+    # node-status row order (RFC 1002), so a host whose <03> messenger row precedes its own <00> row
+    # must still be recognised as the computer name, not misreported as a logged-in user.
+    rows: list[tuple[str, str, bool]] = []
+    hostnames: set[str] = set()
     for raw in text.splitlines():
         row = _NBT_ROW.match(raw)
         if row is None:
             continue
         name = row.group("name").strip()
-        suffix = row.group("suffix").lower()
-        is_group = row.group("group") is not None
         if name == "__MSBROWSE__":
             continue
+        suffix = row.group("suffix").lower()
+        is_group = row.group("group") is not None
+        if suffix == "00" and not is_group:
+            hostnames.add(name)
+        rows.append((name, suffix, is_group))
+
+    for name, suffix, is_group in rows:
         if suffix == "00":
             if is_group:
                 _add("domain", name, "workgroup / domain")
             else:
-                hostnames.add(name)
                 _add("hostname", name)
         elif suffix in _ROLE_SUFFIXES:
             _add("role", _ROLE_SUFFIXES[suffix], name)
@@ -69,6 +77,7 @@ def parse_nmblookup(text: str) -> list[NetbiosFinding]:
                 _add("domain", name, "AD domain (from DC suffix)")
         elif suffix == "03" and name not in hostnames:
             _add("user", name, "NetBIOS messenger name — possible logged-in user")
+
     mac = _MAC.search(text)
     if mac is not None:
         _add("mac", mac.group("mac"))

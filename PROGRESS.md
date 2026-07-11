@@ -6,11 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 — `nfs` + `snmp` engines reviewed + hardened; `tftp` + `netbios` engines shipped (reviews
-in flight); `smtp` engine shipped (review pending); GUI panels pending for smtp/nfs/snmp/tftp/netbios.**
-Next: finish tftp + netbios reviews, then `ike/ntp` engines (§12 order), then the deferred GUI panels
-+ smtp review. Same engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http,
-vhost, smb, ftp, ssh, dns, ldap, nfs, snmp** (309 tests). Recurring review lessons: parsers must match REAL current tool output;
+**Phase 2 — `nfs` + `snmp` + `tftp` + `netbios` engines reviewed + hardened; `smtp` engine shipped
+(review pending); GUI panels pending for smtp/nfs/snmp/tftp/netbios.** Next: `ike/ntp` engines (§12
+order — the last two Phase-2 modules), then the deferred GUI panels + smtp review. Same
+engine→GUI→adversarial-review→commit pattern. **Done, reviewed, hardened: http, vhost, smb, ftp, ssh,
+dns, ldap, nfs, snmp, tftp, netbios** (311 tests). Recurring review lessons: parsers must match REAL current tool output;
 always release the worker slot in a finally/guard; make on-disk artifact filenames injective; thread
 the service port through every command; **validate every user/server-supplied token that reaches a
 command line (host via validate_host, domain via normalize_domain, base DN via sanitize_basedn) —
@@ -40,6 +40,19 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 2 · module 12 (netbios) — hardening
+Adversarial 3-lens review (verified against real nmblookup/nbtscan output). 4 candidates, 1 CONFIRMED;
+3 refuted.
+- **parser-correctness (MED): order-dependent `<03>` classification.** The `<03>`-messenger-vs-hostname
+  suppression was single-pass, so if the target returned a host's `<03>` row before its own `<00>` row
+  (RFC 1002 node-status ordering is target-controlled), the box's OWN computer name was misreported as
+  a logged-in user and `suggest()` advised user-enum against it. Made `parse_nmblookup` two-pass:
+  collect all `<00>` host names first, then classify — order-independent. Regression test added.
+- Refuted (verified non-issues): no cross-tool dedup between nmblookup+nbtscan (deliberate per-tool
+  house convention, matches smtp/nfs; each finding is individually correct); MAC in two formats (each
+  parser faithfully echoes its tool — cosmetic); the `__MSBROWSE__` guard is dead code (the `<01>`
+  suffix path already excludes it) but emits nothing wrong; plus a pure test-coverage nit.
 
 ### Phase 2 · module 11 (tftp) — hardening
 Adversarial 3-lens review (verified against the real `tftp-enum.nse` source). 4 candidates, 2 CONFIRMED

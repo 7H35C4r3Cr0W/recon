@@ -42,6 +42,17 @@ def test_nmblookup_03_matching_hostname_is_not_a_user() -> None:
     assert not any(f.kind == "user" for f in parse_nmblookup(text))
 
 
+def test_nmblookup_03_before_00_still_suppressed() -> None:
+    # RFC 1002 node-status ordering is target-controlled; a <03> row that precedes its own <00> host
+    # row must still be read as the computer name, not a logged-in user (order-independent two-pass)
+    text = (
+        "\tWKSTN           <03> -         B <ACTIVE>\n\tWKSTN           <00> -         B <ACTIVE>\n"
+    )
+    findings = parse_nmblookup(text)
+    assert not any(f.kind == "user" for f in findings)
+    assert any(f.kind == "hostname" and f.value == "WKSTN" for f in findings)
+
+
 def test_nbtscan_name_server_mac() -> None:
     findings = parse_nbtscan(_read("nbtscan.txt"))
     assert any(f.kind == "hostname" and f.value == "SRV01" for f in findings)
