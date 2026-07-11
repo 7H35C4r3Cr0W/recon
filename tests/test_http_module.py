@@ -112,6 +112,13 @@ def test_default_url_output_and_tls() -> None:
     )
 
 
+def test_default_url_brackets_ipv6() -> None:
+    assert default_url("dead:beef::1", 8080, False) == "http://[dead:beef::1]:8080/"
+    assert default_url("::1", 80, False) == "http://[::1]/"
+    assert default_url("10.10.10.5", 8080, False) == "http://10.10.10.5:8080/"
+    assert default_url("target.htb", 80, False) == "http://target.htb/"
+
+
 def test_triggers_and_http_ports() -> None:
     scan = ScanResults(
         target=Target(ip="10.10.10.5"),

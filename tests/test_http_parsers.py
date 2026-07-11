@@ -72,9 +72,11 @@ def test_dirsearch() -> None:
 
 def test_nikto_and_wordpress_detection() -> None:
     findings = parse_nikto(_read("nikto.txt"), 80)
-    paths = " ".join(f.path for f in findings)
-    assert "/admin" in paths
-    assert "/wp-login.php" in paths
+    path_list = [f.path for f in findings]
+    assert "/admin/" in path_list
+    assert "/wp-login.php" in path_list
+    assert "/backup/" in path_list  # from the OSVDB-####: /backup/ line
+    assert "/2.4.41" not in path_list  # the 'Server: Apache/2.4.41' banner is a note, not a path
     assert detect_wordpress(_read("nikto.txt")) is True
 
 

@@ -125,3 +125,22 @@ def test_tool_panel_switches_to_http_builder(qtbot: QtBot, tmp_path: Path) -> No
     assert tp._stack.currentWidget() is tp._http
     tp.show_service(DiscoveredService(22, Proto.TCP, "ssh"), _ref(module="ssh", label="SSH"))
     assert tp._stack.currentIndex() == 0
+
+
+def test_custom_output_sticks_within_session(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.5"))
+    panel = HttpPanel()
+    qtbot.addWidget(panel)
+    panel.set_profile(prof)
+    panel.configure(DiscoveredService(80, Proto.TCP, "http"), _ref())
+    panel._output.setText("http/80/custom.txt")
+    panel._threads.setValue(55)  # a non-output change must NOT clobber the custom output
+    assert panel._output.text() == "http/80/custom.txt"
+
+
+def test_contained_path_rejects_escapes(tmp_path: Path) -> None:
+    from oscprecon.gui.main_window import _contained_path
+
+    assert _contained_path(tmp_path, "http/80/x.txt") is not None
+    assert _contained_path(tmp_path, "/etc/passwd") is None
+    assert _contained_path(tmp_path, "../../etc/passwd") is None

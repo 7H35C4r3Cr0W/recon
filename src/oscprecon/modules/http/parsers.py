@@ -171,7 +171,7 @@ def parse_dirsearch(text: str, port: int) -> list[HttpFinding]:
     return findings
 
 
-_NIKTO_PATH = re.compile(r"(/\S+)")
+_NIKTO_OSVDB = re.compile(r"^OSVDB-\d+:\s*(.*)$")
 
 
 def parse_nikto(text: str, port: int) -> list[HttpFinding]:
@@ -181,8 +181,13 @@ def parse_nikto(text: str, port: int) -> list[HttpFinding]:
         if not stripped.startswith("+ "):
             continue
         message = stripped[2:].strip()
-        match = _NIKTO_PATH.search(message)
-        path = match.group(1).rstrip(":") if match else "/"
+        # a real path finding starts with '/...' (optionally after an 'OSVDB-####:' prefix);
+        # banner/version lines like 'Server: Apache/2.4.41' are notes, not a '/2.4.41' path.
+        candidate = message
+        osvdb = _NIKTO_OSVDB.match(candidate)
+        if osvdb is not None:
+            candidate = osvdb.group(1).strip()
+        path = candidate.split()[0].rstrip(":") if candidate.startswith("/") else "/"
         findings.append(HttpFinding(port=port, path=path, status=0, note=message))
     return findings
 

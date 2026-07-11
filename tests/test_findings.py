@@ -19,6 +19,18 @@ def test_distinct_status_is_a_new_finding(tmp_path: Path) -> None:
     assert len(findings.load_findings(tmp_path)) == 2
 
 
+def test_distinct_note_same_path_status_both_kept(tmp_path: Path) -> None:
+    # wpscan version vs users findings are both ('http',80,'/',0) — must not collapse
+    findings.add_findings(
+        tmp_path,
+        [{"module": "http", "port": 80, "path": "/", "status": 0, "note": "WordPress 5.8"}],
+    )
+    findings.add_findings(
+        tmp_path, [{"module": "http", "port": 80, "path": "/", "status": 0, "note": "users: admin"}]
+    )
+    assert len(findings.load_findings(tmp_path)) == 2
+
+
 def test_load_missing_or_garbage(tmp_path: Path) -> None:
     assert findings.load_findings(tmp_path) == []
     (tmp_path / "findings.json").write_text("not json", encoding="utf-8")

@@ -22,8 +22,18 @@ def load_findings(profile_dir: Path) -> list[dict[str, Any]]:
     return [item for item in data if isinstance(item, dict)]
 
 
-def _key(finding: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
-    return (finding.get("module"), finding.get("port"), finding.get("path"), finding.get("status"))
+def _key(finding: dict[str, Any]) -> tuple[Any, ...]:
+    # why: two findings that share path+status but differ in size/redirect/note are distinct
+    # (e.g. wpscan's version vs users entries are both ('http',80,'/',0)) — don't collapse them.
+    return (
+        finding.get("module"),
+        finding.get("port"),
+        finding.get("path"),
+        finding.get("status"),
+        finding.get("size"),
+        finding.get("redirect_to"),
+        finding.get("note"),
+    )
 
 
 def add_findings(profile_dir: Path, new: list[dict[str, Any]]) -> list[dict[str, Any]]:

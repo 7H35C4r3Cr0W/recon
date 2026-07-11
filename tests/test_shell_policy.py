@@ -38,3 +38,11 @@ def test_blocks_searchsploit_non_display_flags() -> None:
     assert shell.policy_violation(["searchsploit", "--json", "-x", "47080"]) is not None
     # a plain display lookup is allowed
     assert shell.policy_violation(["searchsploit", "--json", "nginx", "1.18"]) is None
+
+
+def test_blocks_wpscan_credential_brute() -> None:
+    assert shell.policy_violation(["wpscan", "--url", "http://x/", "-P", "rockyou.txt"]) is not None
+    assert shell.policy_violation(["wpscan", "--url", "http://x/", "--passwords", "l"]) is not None
+    assert shell.policy_violation(["wpscan", "--url", "http://x/", "-U", "admin"]) is not None
+    # enumeration is allowed
+    assert shell.policy_violation(["wpscan", "--url", "http://x/", "--enumerate", "u"]) is None

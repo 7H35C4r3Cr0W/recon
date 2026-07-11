@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -93,9 +94,19 @@ def is_tls(service_name: str, port: int) -> bool:
     return service_name.lower() in _TLS_SERVICES or port in _TLS_PORTS
 
 
+def _bracket_host(host: str) -> str:
+    try:
+        if ipaddress.ip_address(host).version == 6:
+            return f"[{host}]"  # RFC 3986 requires brackets around an IPv6 literal in a URL
+    except ValueError:
+        pass
+    return host
+
+
 def default_url(host: str, port: int, tls: bool) -> str:
     scheme = "https" if tls else "http"
     default_port = 443 if tls else 80
+    host = _bracket_host(host)
     if port == default_port:
         return f"{scheme}://{host}/"
     return f"{scheme}://{host}:{port}/"

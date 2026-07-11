@@ -57,7 +57,7 @@ class HttpPanel(QWidget):
         self._profile: Profile | None = None
         self._port = 80
         self._wordlist = _DEFAULT_WORDLIST
-        self._auto_output = ""
+        self._output_is_custom = False
         self._loading = False
 
         self._tool = QComboBox()
@@ -186,7 +186,7 @@ class HttpPanel(QWidget):
         self._skip_tls.toggled.connect(self._refresh)
         self._status_csv.textChanged.connect(self._refresh)
         self._status_preset.currentTextChanged.connect(self._on_status_preset)
-        self._output.textChanged.connect(self._save_only)
+        self._output.textChanged.connect(self._on_output_changed)
         self._wide_net.toggled.connect(self._refresh)
         for box in self._group_boxes.values():
             box.toggled.connect(self._refresh)
@@ -202,7 +202,7 @@ class HttpPanel(QWidget):
         if self._profile is not None and self._profile.target.hostname:
             host = self._profile.target.hostname
         self._url.setText(default_url(host, service.port, tls))
-        self._auto_output = ""  # force output refresh for the new port
+        self._output_is_custom = False  # a new port re-derives the default output path
         self._refresh()
 
     def _on_rate_toggled(self, enabled: bool) -> None:
@@ -277,12 +277,10 @@ class HttpPanel(QWidget):
         if self._loading:
             return
         tool = _TOOL_LABELS[self._tool.currentText()]
-        new_output = default_output(self._port, tool, self._wordlist)
-        if self._output.text() in ("", self._auto_output):
+        if not self._output_is_custom:
             self._loading = True
-            self._output.setText(new_output)
+            self._output.setText(default_output(self._port, tool, self._wordlist))
             self._loading = False
-        self._auto_output = new_output
 
         self._threads_label.setText(
             f"{self._threads.value()}" + ("  ⚠ noisy" if self._threads.value() > 100 else "")
@@ -309,8 +307,14 @@ class HttpPanel(QWidget):
             "custom_exts": self._custom_exts.text(),
             "wide_net": self._wide_net.isChecked(),
             "groups": [g for g, b in self._group_boxes.items() if b.isChecked()],
-            "output": self._output.text(),
         }
+        # note: 'output' is intentionally not persisted — it is always re-derived per port/tool/
+        # wordlist; a user edit sticks within the session via self._output_is_custom.
+
+    def _on_output_changed(self) -> None:
+        if not self._loading:
+            self._output_is_custom = True  # a user edit sticks; the default no longer overwrites it
+        self._save_only()
 
     def _apply_settings(self, data: dict[str, Any]) -> None:
         if not data:

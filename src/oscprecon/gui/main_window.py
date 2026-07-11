@@ -32,7 +32,7 @@ from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import Credential, DiscoveredService, Target
-from oscprecon.modules.http import detect_wordpress, parse_tool
+from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
 
@@ -175,6 +175,17 @@ def _slug(command: str) -> str:
     tokens = command.split()
     base = tokens[0] if tokens else "command"
     return re.sub(r"[^A-Za-z0-9._-]", "-", base) or "command"
+
+
+def _contained_path(base: Path, rel: str) -> Path | None:
+    # why: the http Output field is user-editable — an absolute or ../ value would let a tool write
+    # outside the profile. Refuse anything that does not resolve inside the profile directory.
+    if Path(rel).is_absolute():
+        return None
+    candidate = (base / rel).resolve()
+    if not candidate.is_relative_to(base.resolve()):
+        return None
+    return candidate
 
 
 class MainWindow(QMainWindow):
@@ -441,6 +452,7 @@ class MainWindow(QMainWindow):
         self._open_action.setEnabled(not busy)
         self._save_action.setEnabled(not busy)
         self._recent_menu.setEnabled(not busy)
+        self._service_tree.setEnabled(not busy)
         self._run_button.setEnabled(not busy and self._profile is not None)
         self._tool_panel.set_running(busy)
 
@@ -488,7 +500,12 @@ class MainWindow(QMainWindow):
     def _on_http_run(self, command: str, output_rel: str, tool: str, port: int) -> None:
         if self._profile is None or self._worker is not None or not output_rel:
             return
-        struct_path = self._profile.directory / output_rel
+        struct_path = _contained_path(self._profile.directory, output_rel)
+        if struct_path is None:
+            self._tool_panel.append_output(
+                f"[blocked] output path must stay inside the profile: {output_rel}"
+            )
+            return
         struct_path.parent.mkdir(parents=True, exist_ok=True)
         self._http_parse = (struct_path, tool, port)
         self._set_busy(True)
@@ -539,7 +556,7 @@ class MainWindow(QMainWindow):
             or self._worker is not None
         ):
             return
-        url = f"http://{self._profile.target.ip}:{service.port}/"
+        url = default_url(self._profile.target.ip, service.port, False)
         probe_out = self._profile.directory / "http" / str(service.port) / "probe.txt"
         probe_out.parent.mkdir(parents=True, exist_ok=True)
         self._treat_http_ctx = service
@@ -574,7 +591,10 @@ class MainWindow(QMainWindow):
         if self._http_parse is not None:
             struct_path, tool, port = self._http_parse
             self._http_parse = None
-            self._parse_http_output(struct_path, tool, port)
+            try:
+                self._parse_http_output(struct_path, tool, port)
+            except OSError as exc:  # boundary: a findings-write failure must not wedge the worker
+                self._tool_panel.append_output(f"[findings] write failed: {exc}")
         self._finish_worker()
 
     def _on_run_failed(self, message: str) -> None:

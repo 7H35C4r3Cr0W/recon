@@ -69,6 +69,10 @@ _SEARCHSPLOIT_FORBIDDEN: frozenset[str] = frozenset(
     {"-m", "--mirror", "-x", "--examine", "-u", "--update"}
 )
 
+# why: wpscan is enumeration-only (§9) — -P/--passwords + -U/--usernames drive a credential
+# brute. --passwords is also in _FORBIDDEN_FLAGS; the short -P alias must be blocked too.
+_WPSCAN_FORBIDDEN: frozenset[str] = frozenset({"-P", "--passwords", "-U", "--usernames"})
+
 _INSTALL_HINTS: dict[str, str] = {
     "nmap": "apt install nmap",
     "feroxbuster": "apt install feroxbuster",
@@ -120,6 +124,10 @@ def policy_violation(argv: list[str]) -> str | None:
         for token in argv[1:]:
             if token in _SEARCHSPLOIT_FORBIDDEN:
                 return f"searchsploit {token} is not display-only (forbidden)"
+    if tool == "wpscan":
+        for token in argv[1:]:
+            if token in _WPSCAN_FORBIDDEN:
+                return f"wpscan {token} is credential brute (forbidden — enumerate only)"
     return None
 
 

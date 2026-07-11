@@ -6,13 +6,11 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 — core service modules.** Phase 1 is feature-complete (all 6 chunks committed;
-exit path verified live). Phase 2 builds one service module per chunk in this order:
-`http` (granular controls + non-standard ports) → `vhost` → `smb` (tiered, §11) → `ftp` →
-`ssh` → `dns` → `ldap` → `smtp` → `nfs` → `snmp` → `tftp` → `netbios` → `ike` → `ntp`.
-Each ships: parser fixture + test, ≥3 pattern-library entries, `services.yaml` tools, a
-`manual_commands.yaml` (≥5 Tier-2 entries), and auto-walk where §12 permits. **Start with the
-`http` module** — show its wrapped commands before writing (all must be on the §2 allowlist).
+**Phase 2 module 2 — vhost** (subdomain / virtual-host enumeration; §10): ffuf `-H "Host: FUZZ.{domain}"`,
+gobuster vhost/dns, dnsrecon -t brt, wfuzz; wildcard detection; discovered vhost -> "enumerate as
+new HTTP target". Then `smb` (tiered, §11), then ftp/ssh/dns/ldap/smtp/nfs/snmp/tftp/netbios/ike/ntp.
+Each module ships: parser fixture + test, ≥3 pattern entries (Phase 3), services.yaml tools,
+manual_commands.yaml, auto-walk where §12 permits. **HTTP (Phase 2 module 1) is done + hardened.**
 
 ## How to resume
 
@@ -23,7 +21,25 @@ Each ships: parser fixture + test, ≥3 pattern-library entries, `services.yaml`
 
 ## Log (newest first)
 
-### Phase 1 · adversarial review + hardening (this commit)
+### Phase 2 · module 1 (http) hardening (this commit)
+Adversarial 3-lens review of the HTTP module; fixed all 8 findings (+ regression tests):
+- **§2:** shell.run now blocks wpscan `-P`/`-U` (short aliases of --passwords/--usernames), not just --passwords.
+- **HIGH concurrency:** disable the service tree + HTTP builder during a scan so a UI edit can't race
+  the worker's `profile.save()` (module_settings mutation → "dict changed size during iteration").
+- **path containment:** reject an absolute/`..` Output value (was writable outside the profile dir).
+- **worker-slot wedge:** parse-on-done wrapped so a findings-write error can't strand `self._worker`.
+- parse_nikto no longer fabricates `/paths` from banner lines; findings dedup keys on size/redirect/note
+  too (was dropping distinct wpscan users/version); default_url brackets IPv6; custom output no longer
+  clobbered mid-session.
+
+### Phase 2 · module 1 (http) — engine + GUI + QoL (7715f98, f64983b, 7547d29)
+- engine: HttpModule, build_command (feroxbuster §9 line reproduced via controls), 11 extension presets
+  + Wide net, status presets, 7 parsers -> findings.json, manual_commands.yaml (20), findings store.
+- GUI: HTTP command-builder panel (all §9 controls + live preview + Run/Dry-run/Add-to-report +
+  persistence), tool_panel QStackedWidget, http run -> findings parse, treat-as-HTTP right-click probe.
+- qol: `oscp-recon` console script (`uv pip install -e .`), Kali `.desktop`, README.
+
+### Phase 1 · adversarial review + hardening (1898c94)
 Ran a 3-lens review of the Phase 1 additions; fixed all 15 findings (+9 regression tests → 63):
 - **§2 password-list leak (high):** `wordlists.py` now uses an AFFIRMATIVE category allowlist
   (only web-content/dns/usernames/fuzzing/discovery surfaced) + expanded denylist — `fasttrack.txt`

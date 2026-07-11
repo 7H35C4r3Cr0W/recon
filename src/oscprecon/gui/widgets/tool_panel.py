@@ -106,7 +106,10 @@ class ToolPanel(QWidget):
             self._hints.addItem(item)
 
     def set_running(self, running: bool) -> None:
+        # why: the http builder persists into the shared Profile on every control change; disable it
+        # during a scan so a UI edit can't race the worker thread's profile.save().
         self._run_button.setEnabled(not running)
+        self._http.setEnabled(not running)
 
     def append_output(self, text: str) -> None:
         self._output.appendPlainText(text)
