@@ -26,7 +26,7 @@ from oscprecon.gui.widgets.simple_recon_panel import SimpleReconPanel
 from oscprecon.gui.widgets.smb_panel import SmbPanel
 from oscprecon.gui.widgets.ssh_panel import SshPanel
 from oscprecon.gui.widgets.vhost_panel import VhostPanel
-from oscprecon.models import DiscoveredService
+from oscprecon.models import DiscoveredService, Suggestion
 from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef, expand_hint
 
@@ -140,12 +140,23 @@ class ToolPanel(QWidget):
         for panel in self._simple.values():  # 7+: nfs/snmp/tftp/netbios/ike/ntp/smtp
             self._stack.addWidget(panel)
 
+        # "Recon next steps" — pattern-library suggestions from findings (§15). Pre-fill only.
+        self._next_steps = QListWidget()
+        self._next_steps.setMaximumHeight(130)
+        self._next_steps.itemActivated.connect(self._on_next_step_activated)
+        next_box = QGroupBox(
+            "Recon next steps (patterns — double-click to pre-fill; never auto-run)"
+        )
+        QVBoxLayout(next_box).addWidget(self._next_steps)
+        self.set_suggestions([])
+
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self._header)
         layout.addWidget(self._stack, stretch=2)
+        layout.addWidget(next_box)
         layout.addWidget(self._output, stretch=1)
 
     def set_target(self, target: str) -> None:
@@ -244,6 +255,32 @@ class ToolPanel(QWidget):
         panel = self._simple.get(module)
         if panel is not None:
             panel.set_summary(lines)
+
+    def set_suggestions(self, suggestions: list[Suggestion]) -> None:
+        self._next_steps.clear()
+        if not suggestions:
+            placeholder = QListWidgetItem("No pattern suggestions yet.")
+            placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
+            self._next_steps.addItem(placeholder)
+            return
+        for suggestion in suggestions:
+            label = suggestion.text
+            source = suggestion.source_box or suggestion.source_pattern
+            if source:
+                label += f"\n    ↳ source: {source}"
+            if suggestion.command_template:
+                label += f"\n    $ {suggestion.command_template}  (double-click to pre-fill)"
+            item = QListWidgetItem(label)
+            if suggestion.command_template:
+                item.setData(_COMMAND_ROLE, suggestion.command_template)
+            self._next_steps.addItem(item)
+
+    def _on_next_step_activated(self, item: QListWidgetItem) -> None:
+        command = item.data(_COMMAND_ROLE)
+        if isinstance(command, str) and command:
+            # pre-fill the command builder (never auto-run) and surface it
+            self._command.setText(command)
+            self._stack.setCurrentIndex(0)
 
     def add_vhosts(self, vhosts: list[str]) -> None:
         self._vhost.add_vhosts(vhosts)

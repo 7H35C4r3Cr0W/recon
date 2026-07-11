@@ -65,6 +65,18 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
+### Phase 3 · step 1b: GUI "Recon next steps" panel (pre-fill, no auto-run)
+- **tool_panel**: a "Recon next steps" QGroupBox (below the module stack) lists the pattern-library
+  suggestions — each row shows the text, its `↳ source:` citation, and (if the entry has a command)
+  the `$ command`. Double-clicking a command row **pre-fills** the command builder and switches to the
+  generic page so the user reviews it and clicks Run — never auto-executed. Advisory-only rows (no
+  command) do nothing on activation. Empty → a non-selectable "No pattern suggestions yet." placeholder.
+- **main_window**: `_refresh_suggestions()` recomputes via `suggest_for(findings, target, domain,
+  has_credential)` on profile open AND after every recon run (through `_finish_worker` → `_set_profile`).
+- 3 GUI tests (set+prefill+advisory-noop, empty placeholder, main-window refresh via monkeypatched
+  engine). 373 tests. **Phase 3 step 1 COMPLETE (engine + gates + report + GUI).** Step 2 next: author
+  real `patterns/*.yaml` from the mounted Obsidian cheatsheets, `# source:`-cited, proposed in batches.
+
 ### Phase 3 · step 1a: pattern engine + provenance/forbidden gates + report wiring
 - **`patterns/engine.py`**: `load_patterns()` parses each `patterns/<svc>.yaml` (list of `{match,
   suggest}` entries) and — since yaml.safe_load drops comments — re-splits the raw text per top-level

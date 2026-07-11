@@ -71,6 +71,7 @@ from oscprecon.modules.smb import (
 from oscprecon.modules.ssh import SshFinding, SshModule, parse_ssh_tool
 from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.orchestrator import Orchestrator
+from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
 
 
@@ -930,9 +931,25 @@ class MainWindow(QMainWindow):
         self._service_tree.populate(profile.discovered_services)
         self._graph_view.set_profile(profile)
         self._update_status_footer()
+        self._refresh_suggestions()
         self._notes_pane.set_profile(profile)
         config.add_recent(profile.directory)
         self._rebuild_recent_menu()
+
+    def _refresh_suggestions(self) -> None:
+        # pattern-library "Recon next steps" — recomputed on profile open + after every recon run
+        # (via _finish_worker -> _set_profile). Never auto-runs anything.
+        if self._profile is None:
+            self._tool_panel.set_suggestions([])
+            return
+        self._tool_panel.set_suggestions(
+            suggest_for(
+                findings.load_findings(self._profile.directory),
+                target=self._profile.target.ip,
+                domain=self._profile.target.hostname or "",
+                has_credential=bool(self._profile.credentials()),
+            )
+        )
 
     def _on_toggle_graph(self, checked: bool) -> None:
         if checked:
