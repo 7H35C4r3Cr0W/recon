@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
@@ -24,13 +25,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import config, references, shell
+from oscprecon import config, findings, references, shell
 from oscprecon.gui.widgets.notes_pane import NotesPane
 from oscprecon.gui.widgets.reference_pane import ReferencePane
 from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import Credential, DiscoveredService, Target
+from oscprecon.modules.http import detect_wordpress, parse_tool
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
 
@@ -134,14 +136,17 @@ class CommandWorker(QThread):
     done = Signal(int)
     failed = Signal(str)
 
-    def __init__(self, shell_line: str, output_file: Path) -> None:
+    def __init__(self, shell_line: str, output_file: Path, cwd: Path | None = None) -> None:
         super().__init__()
         self._shell_line = shell_line
         self._output_file = output_file
+        self._cwd = cwd
 
     def run(self) -> None:
         try:
-            result = shell.run(self._shell_line, self._output_file, on_line=self.line.emit)
+            result = shell.run(
+                self._shell_line, self._output_file, cwd=self._cwd, on_line=self.line.emit
+            )
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
             return
@@ -191,13 +196,19 @@ class MainWindow(QMainWindow):
 
         self._service_tree = ServiceTree()
         self._service_tree.service_selected.connect(self._on_service_selected)
+        self._service_tree.treat_as_http.connect(self._on_treat_as_http)
         self._tool_panel = ToolPanel()
         self._tool_panel.run_requested.connect(self._on_run_command)
+        self._tool_panel.http_run_requested.connect(self._on_http_run)
+        self._tool_panel.http_dry_run_requested.connect(self._on_http_dry_run)
+        self._tool_panel.http_add_report_requested.connect(self._on_http_add_report)
         self._reference_pane = ReferencePane()
         self._reference_pane.page_visited.connect(self._on_page_visited)
         self._edb_request_id = 0
         self._edb_workers: set[QThread] = set()
         self._pending_visits: list[tuple[str, str]] = []
+        self._http_parse: tuple[Path, str, int] | None = None
+        self._treat_http_ctx: DiscoveredService | None = None
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
@@ -289,6 +300,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"oscp-recon — {profile.profile_name}")
         self._run_button.setEnabled(True)
         self._tool_panel.set_target(target.ip)
+        self._tool_panel.set_profile(profile)
         self._service_tree.populate(profile.discovered_services)
         self._notes_pane.set_profile(profile)
         config.add_recent(profile.directory)
@@ -466,12 +478,92 @@ class MainWindow(QMainWindow):
             history.write(command + "\n")
         self._set_busy(True)
         self._tool_panel.append_output(f"$ {command}")
-        worker = CommandWorker(command, output_file)
+        worker = CommandWorker(command, output_file, cwd=self._profile.directory)
         worker.line.connect(self._tool_panel.append_output)
         worker.done.connect(self._on_command_done)
         worker.failed.connect(self._on_run_failed)
         self._worker = worker
         worker.start()
+
+    def _on_http_run(self, command: str, output_rel: str, tool: str, port: int) -> None:
+        if self._profile is None or self._worker is not None or not output_rel:
+            return
+        struct_path = self._profile.directory / output_rel
+        struct_path.parent.mkdir(parents=True, exist_ok=True)
+        self._http_parse = (struct_path, tool, port)
+        self._set_busy(True)
+        self._tool_panel.append_output(f"$ {command}")
+        worker = CommandWorker(
+            command, struct_path.with_suffix(".log"), cwd=self._profile.directory
+        )
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_command_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _on_http_dry_run(self, command: str) -> None:
+        self._tool_panel.append_output(f"[dry-run] {command}")
+
+    def _on_http_add_report(self, command: str) -> None:
+        if self._profile is None:
+            return
+        manual_dir = self._profile.directory / "manual"
+        manual_dir.mkdir(parents=True, exist_ok=True)
+        with (manual_dir / "commands.txt").open("a", encoding="utf-8") as history:
+            history.write(command + "\n")
+        self._tool_panel.append_output(f"[report] queued: {command}")
+
+    def _parse_http_output(self, struct_path: Path, tool: str, port: int) -> None:
+        if self._profile is None:
+            return
+        try:
+            text = struct_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return
+        hits = parse_tool(tool, text, port)
+        if hits:
+            now = datetime.now(UTC).isoformat()
+            findings.add_findings(self._profile.directory, [h.to_dict(now) for h in hits])
+            self._tool_panel.append_output(f"[findings] +{len(hits)} from {tool} -> findings.json")
+        if detect_wordpress(text):
+            self._tool_panel.append_output(
+                "[wordpress] detected — follow-up: "
+                "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url <target>"
+            )
+
+    def _on_treat_as_http(self, service: object) -> None:
+        if (
+            not isinstance(service, DiscoveredService)
+            or self._profile is None
+            or self._worker is not None
+        ):
+            return
+        url = f"http://{self._profile.target.ip}:{service.port}/"
+        probe_out = self._profile.directory / "http" / str(service.port) / "probe.txt"
+        probe_out.parent.mkdir(parents=True, exist_ok=True)
+        self._treat_http_ctx = service
+        self._set_busy(True)
+        self._tool_panel.append_output(f"[probe] curl -sIk {url}")
+        worker = CommandWorker(f"curl -sIk {url}", probe_out, cwd=self._profile.directory)
+        worker.line.connect(self._tool_panel.append_output)
+        worker.done.connect(self._on_probe_done)
+        worker.failed.connect(self._on_run_failed)
+        self._worker = worker
+        worker.start()
+
+    def _on_probe_done(self, exit_code: int) -> None:
+        service = self._treat_http_ctx
+        self._treat_http_ctx = None
+        if exit_code == 0 and service is not None and self._profile is not None:
+            for discovered in self._profile.discovered_services:
+                if discovered.port == service.port and discovered.proto == service.proto:
+                    discovered.service = "http"
+            self._profile.save()
+            self._tool_panel.append_output(f"[http] port {service.port} now treated as HTTP")
+        else:
+            self._tool_panel.append_output("[probe] no HTTP response")
+        self._finish_worker()
 
     def _on_scan_done(self, count: int) -> None:
         self._tool_panel.append_output(f"[nmap] done — {count} services")
@@ -479,10 +571,16 @@ class MainWindow(QMainWindow):
 
     def _on_command_done(self, exit_code: int) -> None:
         self._tool_panel.append_output(f"[done] exit={exit_code}")
+        if self._http_parse is not None:
+            struct_path, tool, port = self._http_parse
+            self._http_parse = None
+            self._parse_http_output(struct_path, tool, port)
         self._finish_worker()
 
     def _on_run_failed(self, message: str) -> None:
         self._tool_panel.append_output(f"[error] {message}")
+        self._http_parse = None
+        self._treat_http_ctx = None
         self._finish_worker()
 
     def _finish_worker(self) -> None:

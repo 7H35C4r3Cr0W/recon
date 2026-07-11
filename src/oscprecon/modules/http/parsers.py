@@ -51,29 +51,49 @@ def _parse_size(token: str) -> int:
         return 0
 
 
+# feroxbuster plain -o line: "301  GET  8l  22w  154c  http://x/admin => /admin/"
+_FEROX_PLAIN = re.compile(
+    r"^(?P<status>\d{3})\s+\w+\s+\d+l\s+\d+w\s+(?P<size>\d+)c\s+(?P<url>\S+)"
+    r"(?:\s+=>\s+(?P<redir>\S+))?"
+)
+
+
 def parse_feroxbuster(text: str, port: int) -> list[HttpFinding]:
     findings: list[HttpFinding] = []
-    for line in text.splitlines():
-        line = line.strip()
+    for raw in text.splitlines():
+        line = raw.strip()
         if not line:
             continue
-        try:
-            obj = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(obj, dict) or obj.get("type") != "response":
-            continue
-        headers = obj.get("headers", {})
-        redirect = str(headers.get("location", "")) if isinstance(headers, dict) else ""
-        findings.append(
-            HttpFinding(
-                port=port,
-                path=_path_of(str(obj.get("url", ""))),
-                status=int(obj.get("status", 0) or 0),
-                size=int(obj.get("content_length", 0) or 0),
-                redirect_to=redirect,
+        if line.startswith("{"):  # --json ndjson line
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict) or obj.get("type") != "response":
+                continue
+            headers = obj.get("headers", {})
+            redirect = str(headers.get("location", "")) if isinstance(headers, dict) else ""
+            findings.append(
+                HttpFinding(
+                    port=port,
+                    path=_path_of(str(obj.get("url", ""))),
+                    status=int(obj.get("status", 0) or 0),
+                    size=int(obj.get("content_length", 0) or 0),
+                    redirect_to=redirect,
+                )
             )
-        )
+            continue
+        match = _FEROX_PLAIN.match(line)  # default plain -o output (the §9 reference form)
+        if match is not None:
+            findings.append(
+                HttpFinding(
+                    port=port,
+                    path=_path_of(match.group("url")),
+                    status=int(match.group("status")),
+                    size=int(match.group("size")),
+                    redirect_to=(match.group("redir") or ""),
+                )
+            )
     return findings
 
 

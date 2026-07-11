@@ -30,6 +30,17 @@ def test_feroxbuster() -> None:
     assert all(f.port == 80 for f in findings)
 
 
+def test_feroxbuster_plain_output() -> None:
+    # the §9 reference uses plain -o (no --json) — the columnar format must parse too
+    findings = parse_feroxbuster(_read("feroxbuster-plain.txt"), 80)
+    by_path = {f.path: f for f in findings}
+    assert len(findings) == 3
+    assert by_path["/admin"].status == 301
+    assert by_path["/admin"].size == 154
+    assert by_path["/admin"].redirect_to == "/admin/"
+    assert by_path["/index.html"].size == 10918
+
+
 def test_gobuster() -> None:
     findings = parse_gobuster(_read("gobuster.txt"), 80)
     by_path = {f.path: f for f in findings}

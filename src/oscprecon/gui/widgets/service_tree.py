@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtWidgets import QMenu, QTreeWidget, QTreeWidgetItem
 
 from oscprecon.models import DiscoveredService, Proto
 
@@ -10,6 +10,7 @@ _SERVICE_ROLE = Qt.ItemDataRole.UserRole
 
 class ServiceTree(QTreeWidget):
     service_selected = Signal(object)
+    treat_as_http = Signal(object)
 
     def __init__(self) -> None:
         super().__init__()
@@ -17,6 +18,18 @@ class ServiceTree(QTreeWidget):
         self.setColumnWidth(0, 90)
         self.setColumnWidth(1, 120)
         self.currentItemChanged.connect(self._on_current_changed)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._on_context_menu)
+
+    def _on_context_menu(self, pos: QPoint) -> None:
+        item = self.itemAt(pos)
+        service = item.data(0, _SERVICE_ROLE) if item is not None else None
+        if not isinstance(service, DiscoveredService):
+            return
+        menu = QMenu(self)
+        action = menu.addAction("Treat as HTTP")
+        if menu.exec(self.viewport().mapToGlobal(pos)) is action:
+            self.treat_as_http.emit(service)
 
     def populate(self, services: list[DiscoveredService]) -> None:
         self.clear()
