@@ -213,6 +213,9 @@ Default workspace: `~/oscprecon/`. Each profile is a folder:
 ├── notes.md                  ← long-form user notes (editable in-GUI)
 ├── report.md                 ← auto-generated Obsidian-compatible master report
 ├── report-archive/           ← timestamped snapshots of prior report.md
+├── audit.jsonl               ← append-only GUI action audit log — QUEUED (§ 6a, Phase 5)
+├── audit-archive/            ← rotated audit logs, per-day after N MB — QUEUED (§ 6a, Phase 5)
+├── .lock                     ← present while opened for edit; concurrent-copy guard — QUEUED (§ 6b, Phase 5)
 ├── nmap/
 │   ├── tcp-top1000.txt
 │   ├── tcp-full.txt
@@ -315,6 +318,45 @@ Default workspace: `~/oscprecon/`. Each profile is a folder:
   }
 }
 ```
+
+### 6a. Audit log — `<profile>/audit.jsonl` — QUEUED (Phase 5)
+
+**Not built yet — recorded here so it lands in Phase 5.** An append-only, one-JSON-object-per-line
+record of every GUI action, for a complete exam audit trail. Writes are **best-effort — never block
+the UI**. Rotated into `audit-archive/` per day once the live file passes N MB.
+
+Entry shape:
+
+```json
+{ "ts": "2026-05-19T22:55:00Z", "actor": "user", "action": "run-command",
+  "profile": "htb-active", "details": { "shell_line": "nmap ...", "module": "nmap" } }
+```
+
+- `actor`: `"user"` | `"system"`. `action`: kebab-case slug. `details`: action-specific object.
+- Events to capture:
+  - **Profile lifecycle** — created / opened / closed / saved / exported / imported
+  - **Work triggers** — Run / Dry-run / Stop / Add-to-report button clicks
+  - **Command runs** — finer-grained superset of `profile.json.command_history`
+  - **Setting changes** — wordlist picked, extensions changed, threads/depth/timeout adjusted, tool switched, status codes changed
+  - **Reference clicks** — HackTricks page visited, EDB-ID clicked
+  - **Notes edits** — one debounced entry per save with a byte-diff summary (never per keystroke)
+  - **Credentials added/edited** — **redact the secret value**; log field names + source only
+  - **Graph interactions** (Phase 4) — node status change, edge added, layout saved
+  - **Menu selections** — New / Open / Save / Preferences opened
+- The report generator (§18) gains an **"Audit trail"** appendix that reads from this log.
+- **Wiring guidance:** add the emit points as each earlier phase's UI lands (cheap backfill), but
+  the audit-log subsystem itself is a Phase 5 deliverable.
+
+### 6b. Concurrent copies & profile lock — `<profile>/.lock` — QUEUED (Phase 5)
+
+**Not built yet.** The exam workflow may run several GUI instances at once (a second window on a
+different profile, or the same profile open read-only for reference).
+
+- Opening a profile **for edit** writes `<profile>/.lock` (flock/fcntl, records the owning PID).
+- A second instance opening the same profile prompts: *"This profile is open in another window —
+  open read-only?"* Read-only mode disables Run buttons and dims edits.
+- The lock is released on graceful close, and reclaimed on startup via **stale-lock detection**
+  (recorded PID no longer alive).
 
 ---
 
@@ -767,6 +809,18 @@ Alternate visual interface to the tree view. Toggle: `View → Graph` (Ctrl+G).
 
 `<profile>/graph.json` — user-drawn edges, node positions, per-node status/notes.
 
+### Presentation & export — QUEUED reinforcements (Phase 4)
+
+The Phase 4 graph must be presentation-quality, not merely functional. Explicit expectations to
+build into the Phase 4 deliverable:
+
+- **Full drag-and-drop** node repositioning; positions persist in `graph.json` **across sessions**.
+- **Right-click any node → Add Note** — persists to `graph.json`, shows as a hover tooltip, and
+  appears in `report.md`.
+- **Consistent visual language** — fixed colors per node type (table above), edge labels, a minimap,
+  smooth zoom/pan.
+- **Export graph as PNG / SVG** — for reports and walkthroughs.
+
 BloodHound reference (for design comparison only, not a dependency): https://github.com/BloodHoundAD/BloodHound
 
 ---
@@ -858,6 +912,18 @@ Rewritten every scan event. Prior version archived to `<profile>/report-archive/
  ?: help  q: quit  /: filter  enter: run  Ctrl+G: toggle graph  m: notes
 ```
 
+### Status footer — QUEUED (Phase 2 or Phase 5 QoL, wherever cleanest)
+
+**Not built yet.** A small always-visible strip along the bottom of the main window:
+
+- App name + version (read from `pyproject.toml`)
+- Active profile name (or `no profile loaded`)
+- Workspace root path
+- Muted text: `recon-only — OSCP exam legal per CLAUDE.md § 2`
+
+Cleanest to add alongside the first module UI work (Phase 2) or with the Phase 5 QoL pass —
+implementer's call.
+
 ### File menu
 
 | Item | Shortcut | Action |
@@ -870,8 +936,22 @@ Rewritten every scan event. Prior version archived to `<profile>/report-archive/
 | Close Profile | Ctrl+W | |
 | Export Report... | — | Renders `report.md` to HTML |
 | Export to Obsidian Vault... | — | See § 17 |
+| Open by IP... | — | **QUEUED (Phase 5).** Search all `~/oscprecon/` profiles for one whose `profile.json.target.ip` matches; open it. Fast recovery when the name is forgotten |
+| Import Project... | — | **QUEUED (Phase 5).** Extract a `<name>.tar.gz` (or folder) exported elsewhere into `~/oscprecon/<name>/` and open it |
+| Export Project... | — | **QUEUED (Phase 5).** Pack the active profile folder into `<name>.tar.gz` for backup/transfer; **warn that `creds.json` is included** |
 | Preferences... | — | Workspace root, wordlist paths, theme |
 | Exit | Ctrl+Q | |
+
+### Project file operations — QUEUED (Phase 5)
+
+Each `~/oscprecon/<name>/` folder is a self-contained **project file**: opening it restores
+everything — discovered services, notes, audit log (§ 6a), command history, references visited,
+credentials, findings, and graph layout. The three File-menu actions above formalize that model:
+
+- **Open by IP...** — fast recovery when the profile name is forgotten; matches `profile.json.target.ip`.
+- **Import Project...** — accept a `<name>.tar.gz` (or folder) exported from another machine.
+- **Export Project...** — pack the folder for backup/transfer. Redacts nothing (it is the user's own
+  working copy) but **warns that `creds.json` is included**.
 
 ### Other menus
 

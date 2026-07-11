@@ -68,6 +68,9 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 
 - `graph_view.py` — `QWebEngineView` + vendored Cytoscape.js; `QWebChannel` bridge.
 - Node/edge types, layouts, interactions per §16; `graph.json` persistence; `View → Graph` (Ctrl+G).
+- **Presentation reinforcements (queued 2026-07-11, CLAUDE.md §16):** full drag-and-drop repositioning
+  (positions persist across sessions), right-click → Add Note (→ `graph.json` + hover tooltip + report),
+  consistent per-type colors + edge labels + minimap + zoom/pan, and **Export graph as PNG/SVG**.
 
 **Exit:** graph shows the discovery story end-to-end; can mark/annotate nodes in place.
 
@@ -79,6 +82,11 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 - **Bounded parallel execution + status bar with cancel buttons** (real interrupt/cancel for in-flight scans — see Deferred below).
 - Reference search box; report viewer tab; single-file Obsidian frontmatter mode (default) + `File → Export to Obsidian Vault...`.
 - Profile actions (right-click Recent): Open Folder / Mark Done / Duplicate / Delete; TRACKER.md sync on root; dark/light theme.
+- **Queued additions (2026-07-11):**
+  - **Status footer** (CLAUDE.md §19) — app name+version, active profile, workspace root, "recon-only — OSCP exam legal". May land earlier alongside module UI.
+  - **Project file operations** (CLAUDE.md §19) — File → Open by IP / Import Project (.tar.gz) / Export Project (.tar.gz, warns `creds.json` included); each `~/oscprecon/<name>/` is a project file.
+  - **Full GUI audit log** (CLAUDE.md §6a) — append-only `<profile>/audit.jsonl` of every user action; report "Audit trail" appendix; wire emit points as earlier phases' UI lands (backfill is cheap).
+  - **Concurrent-copy lock** (CLAUDE.md §6b) — `<profile>/.lock` (flock) + "open read-only?" prompt + stale-lock (dead-PID) reclaim.
 
 **Exit:** pleasant to use under exam pressure; reports drop into Obsidian cleanly.
 

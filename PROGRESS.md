@@ -12,6 +12,22 @@ done, reviewed, hardened** (175 tests). Note the recurring review lessons: parse
 current tool output (run the tool's help/script-help), always release the worker slot in a finally/
 guard, make on-disk artifact filenames injective, thread the service port through every command.
 
+## Queued additions (recorded 2026-07-11 — do NOT build early; pick up at the noted phase)
+
+Five features queued into `CLAUDE.md` + `ROADMAP.md` for a fresh session to build at the right time.
+Specs are authoritative in CLAUDE.md; this is the pointer list.
+
+1. **Status footer** (CLAUDE.md §19) — always-visible bottom strip: app+version (from pyproject),
+   active profile, workspace root, "recon-only — OSCP exam legal". → Phase 2 QoL or Phase 5.
+2. **Project file operations** (CLAUDE.md §19) — File → Open by IP / Import Project / Export Project
+   (.tar.gz; warns `creds.json` included). Each `~/oscprecon/<name>/` is a project file. → Phase 5.
+3. **Full GUI audit log** (CLAUDE.md §6a) — append-only `<profile>/audit.jsonl` of every user action;
+   report "Audit trail" appendix. Wire emit points as earlier UI lands (cheap backfill). → Phase 5.
+4. **Concurrent-copy lock** (CLAUDE.md §6b) — `<profile>/.lock` (flock) + "open read-only?" prompt +
+   stale-PID reclaim. → Phase 5.
+5. **Graph presentation polish** (CLAUDE.md §16) — drag-drop repositioning, right-click Add Note,
+   persistent layout, minimap + edge labels, PNG/SVG export. → Phase 4 (amends existing deliverable).
+
 ## How to resume
 
 1. `cd ~/oscp-recon` (repo is local-only, no git remote yet). `uv` lives at `~/.local/bin/uv`; run `uv sync` if deps are missing.
