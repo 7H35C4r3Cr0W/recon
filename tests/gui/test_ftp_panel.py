@@ -96,6 +96,7 @@ def _fake_run_factory() -> object:
         *,
         cwd: Path | None = None,
         timeout: float | None = None,
+        cancel: object | None = None,
         on_line: object | None = None,
     ) -> object:
         if shell_line.startswith("nmap"):

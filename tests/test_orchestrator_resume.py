@@ -1,3 +1,4 @@
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -20,6 +21,7 @@ def _counting_run(calls: list[str]) -> Callable[..., object]:
         *,
         cwd: Path | None = None,
         timeout: object | None = None,
+        cancel: object | None = None,
         on_line: object | None = None,
     ) -> object:
         calls.append(shell_line)
@@ -80,6 +82,18 @@ def test_reusable_ignores_nonzero_exit(tmp_path: Path) -> None:
     cmd = Command("nmap", "nmap --top-ports 1000 x", "why", "< 1 min", out_rel)
     # a blocked/failed prior run (exit 126) must never be reused, even with a file present
     assert Orchestrator(prof, resume=True)._reusable(cmd) is False
+
+
+def test_orchestrator_stops_when_precancelled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    calls: list[str] = []
+    monkeypatch.setattr(shell, "run", _counting_run(calls))
+    cancel = threading.Event()
+    cancel.set()  # cancelled before the first command -> the loop breaks immediately
+    Orchestrator(prof, cancel=cancel).run_nmap()
+    assert calls == []
 
 
 def test_cli_resume_preserves_history(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

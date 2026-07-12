@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import metadata
@@ -149,7 +150,18 @@ class AddCredentialDialog(QDialog):
         )
 
 
-class NmapWorker(QThread):
+class CancellableThread(QThread):
+    # why: a shared cancel Event that each worker threads into shell.run (which kills the child)
+    # and checks between steps, so the status-bar Cancel button stops in-flight recon promptly.
+    def __init__(self) -> None:
+        super().__init__()
+        self._cancel = threading.Event()
+
+    def cancel(self) -> None:
+        self._cancel.set()
+
+
+class NmapWorker(CancellableThread):
     line = Signal(str)
     done = Signal(int)
     failed = Signal(str)
@@ -161,7 +173,12 @@ class NmapWorker(QThread):
 
     def run(self) -> None:
         try:
-            orch = Orchestrator(self._profile, on_line=self.line.emit, udp_full=self._udp_full)
+            orch = Orchestrator(
+                self._profile,
+                on_line=self.line.emit,
+                udp_full=self._udp_full,
+                cancel=self._cancel,
+            )
             orch.run_nmap()
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
@@ -169,7 +186,7 @@ class NmapWorker(QThread):
         self.done.emit(len(self._profile.discovered_services))
 
 
-class CommandWorker(QThread):
+class CommandWorker(CancellableThread):
     line = Signal(str)
     done = Signal(int)
     failed = Signal(str)
@@ -183,7 +200,11 @@ class CommandWorker(QThread):
     def run(self) -> None:
         try:
             result = shell.run(
-                self._shell_line, self._output_file, cwd=self._cwd, on_line=self.line.emit
+                self._shell_line,
+                self._output_file,
+                cwd=self._cwd,
+                cancel=self._cancel,
+                on_line=self.line.emit,
             )
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
@@ -215,7 +236,7 @@ class SmbReconResult:
     creds: list[Credential]
 
 
-class SmbReconWorker(QThread):
+class SmbReconWorker(CancellableThread):
     line = Signal(str)
     done = Signal(object)  # SmbReconResult
     failed = Signal(str)
@@ -241,8 +262,12 @@ class SmbReconWorker(QThread):
         found: list[SmbFinding] = []
         auth_ok = False
         for step in steps:
+            if self._cancel.is_set():
+                break
             out = base / step.command.output_file
-            shell.run(step.command.shell_line, out, cwd=base, on_line=self.line.emit)
+            shell.run(
+                step.command.shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit
+            )
             if not step.tool:
                 continue
             try:
@@ -329,7 +354,7 @@ class FtpReconResult:
     creds: list[Credential]
 
 
-class FtpReconWorker(QThread):
+class FtpReconWorker(CancellableThread):
     line = Signal(str)
     done = Signal(object)  # FtpReconResult
     failed = Signal(str)
@@ -352,7 +377,7 @@ class FtpReconWorker(QThread):
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -365,6 +390,8 @@ class FtpReconWorker(QThread):
 
         nmap_text = ""
         for step in module.banner_steps(target, self._port):
+            if self._cancel.is_set():
+                break
             nmap_text = self._run_step(step.command.shell_line, step.command.output_file)
             if step.tool:
                 collected += parse_ftp_tool(step.tool, nmap_text)
@@ -388,6 +415,8 @@ class FtpReconWorker(QThread):
         queue: list[tuple[str, int]] = [("/", 0)]
         listed = 0
         while queue and listed < _FTP_MAX_DIRS:
+            if self._cancel.is_set():
+                break
             path, depth = queue.pop(0)
             if path in seen:
                 continue
@@ -438,7 +467,7 @@ class SshReconResult:
     summary: list[str]
 
 
-class SshReconWorker(QThread):
+class SshReconWorker(CancellableThread):
     line = Signal(str)
     done = Signal(object)  # SshReconResult
     failed = Signal(str)
@@ -460,7 +489,7 @@ class SshReconWorker(QThread):
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -470,6 +499,8 @@ class SshReconWorker(QThread):
         target = self._profile.target
         collected: list[SshFinding] = []
         for step in self._module.recon_steps(target, self._port):
+            if self._cancel.is_set():
+                break
             text = self._run_step(step.command.shell_line, step.command.output_file)
             if step.tool:
                 collected += parse_ssh_tool(step.tool, text)
@@ -506,7 +537,7 @@ class DnsReconResult:
     summary: list[str]
 
 
-class DnsReconWorker(QThread):
+class DnsReconWorker(CancellableThread):
     line = Signal(str)
     done = Signal(object)  # DnsReconResult
     failed = Signal(str)
@@ -529,7 +560,7 @@ class DnsReconWorker(QThread):
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -539,6 +570,8 @@ class DnsReconWorker(QThread):
         target = self._profile.target
         collected: list[DnsFinding] = []
         for step in self._module.recon_steps(target, self._domain or None, self._port):
+            if self._cancel.is_set():
+                break
             text = self._run_step(step.command.shell_line, step.command.output_file)
             if step.tool:
                 collected += parse_dns_tool(step.tool, text)
@@ -576,7 +609,7 @@ class LdapReconResult:
     creds: list[Credential]
 
 
-class LdapReconWorker(QThread):
+class LdapReconWorker(CancellableThread):
     line = Signal(str)
     done = Signal(object)  # LdapReconResult
     failed = Signal(str)
@@ -599,7 +632,7 @@ class LdapReconWorker(QThread):
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -611,6 +644,8 @@ class LdapReconWorker(QThread):
         collected: list[LdapFinding] = []
 
         for step in module.rootdse_steps(target, self._port):
+            if self._cancel.is_set():
+                break
             text = self._run_step(step.command.shell_line, step.command.output_file)
             if step.tool:
                 collected += parse_ldap_tool(step.tool, text)
@@ -666,7 +701,7 @@ class SimpleReconResult:
     summary: list[str]
 
 
-class SimpleReconWorker(QThread):
+class SimpleReconWorker(CancellableThread):
     line = Signal(str)
     done = Signal(object)  # SimpleReconResult
     failed = Signal(str)
@@ -687,7 +722,7 @@ class SimpleReconWorker(QThread):
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, on_line=self.line.emit)
+        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -697,6 +732,8 @@ class SimpleReconWorker(QThread):
         target = self._profile.target
         raw: dict[str, str] = {}
         for command, tool in self._spec.steps_fn(target):
+            if self._cancel.is_set():
+                break
             text = self._run_step(command.shell_line, command.output_file)
             if tool:  # unparsed steps (e.g. tftp GETs) still run, but carry no parser key
                 raw[tool] = text

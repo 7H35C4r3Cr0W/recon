@@ -106,6 +106,7 @@ def _fake_run_factory() -> object:
         *,
         cwd: Path | None = None,
         timeout: object | None = None,
+        cancel: object | None = None,
         on_line: object | None = None,
     ) -> object:
         if shell_line.startswith("nmap"):
@@ -156,6 +157,7 @@ def test_ldap_worker_denied_bind_writes_no_cred(
         *,
         cwd: Path | None = None,
         timeout: object | None = None,
+        cancel: object | None = None,
         on_line: object | None = None,
     ) -> object:
         out = Path(output_file)

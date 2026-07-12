@@ -28,6 +28,7 @@ def _fake_run(fixture_map: dict[str, str]) -> Callable[..., object]:
         *,
         cwd: Path | None = None,
         timeout: object | None = None,
+        cancel: object | None = None,
         on_line: object | None = None,
     ) -> object:
         text = ""

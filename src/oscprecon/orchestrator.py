@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 
 from oscprecon import shell
@@ -18,12 +19,14 @@ class Orchestrator:
         udp_full: bool = False,
         resume: bool = False,
         force: bool = False,
+        cancel: threading.Event | None = None,
     ) -> None:
         self.profile = profile
         self.on_line = on_line
         self.nmap = NmapModule(udp_full=udp_full)
         self.resume = resume
         self.force = force
+        self.cancel = cancel
         # why: --resume may reuse only commands that finished cleanly in a PRIOR run (exit 0).
         # Snapshot that history at construction — commands this run appends must not count as
         # reusable, and blocked/missing/timeout (non-zero) entries stay out so they re-run.
@@ -39,6 +42,9 @@ class Orchestrator:
     def _emit(self, text: str) -> None:
         if self.on_line is not None:
             self.on_line(text)
+
+    def _cancelled(self) -> bool:
+        return self.cancel is not None and self.cancel.is_set()
 
     def _reusable(self, cmd: Command) -> bool:
         # why: reuse a command's output only when its prior run finished with exit 0 AND the file is
@@ -65,6 +71,7 @@ class Orchestrator:
             cmd.shell_line,
             out_path,
             cwd=self.profile.directory,
+            cancel=self.cancel,
             on_line=self._emit,
         )
         self._counter += 1
@@ -97,6 +104,8 @@ class Orchestrator:
         raw: dict[str, str] = {}
 
         for cmd in self.nmap.commands(target, []):
+            if self._cancelled():
+                break
             raw[cmd.output_file] = self._run(cmd)
         self.profile.set_services(self.nmap.discovered_services(raw))
         self.profile.save()
@@ -108,7 +117,7 @@ class Orchestrator:
         ]
         # why: an empty port list would collapse NmapModule.commands back to the discovery
         # battery — only run the versioned scan when there is actually a TCP port to version.
-        if open_tcp:
+        if open_tcp and not self._cancelled():
             for cmd in self.nmap.commands(target, open_tcp):
                 raw[cmd.output_file] = self._run(cmd)
             self.profile.set_services(self.nmap.discovered_services(raw))

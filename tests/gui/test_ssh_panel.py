@@ -94,6 +94,7 @@ def _fake_run_factory() -> object:
         *,
         cwd: Path | None = None,
         timeout: float | None = None,
+        cancel: object | None = None,
         on_line: object | None = None,
     ) -> object:
         text = nmap if shell_line.startswith("nmap") else ""
@@ -134,6 +135,7 @@ def test_ssh_worker_handles_empty_output(
         *,
         cwd: Path | None = None,
         timeout: object | None = None,
+        cancel: object | None = None,
         on_line: object | None = None,
     ) -> object:
         out = Path(output_file)
