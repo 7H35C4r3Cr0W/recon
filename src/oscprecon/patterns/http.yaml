@@ -56,3 +56,21 @@
     - text: "Check the GitLab sign-up page (registration surface + username enumeration)"
       command: "curl -sI http://{target}:{port}/users/sign_up"
 # source: Obsidian: CPTS/Attacking Common Applications/Gitlab - Discovery & Enumeration.md
+
+- match:
+    service: http
+    field: note
+    value: "(?i)drupal"
+  suggest:
+    - text: "Drupal — read the version from CHANGELOG.txt (or the 'Generator' meta tag on /)"
+      command: "curl -s http://{target}:{port}/CHANGELOG.txt"
+# source: Obsidian: CPTS/Attacking Common Applications/Drupal - Discovery & Enumeration.md
+
+- match:
+    service: http
+    field: note
+    value: "(?i)coldfusion"
+  suggest:
+    - text: "ColdFusion — the admin login at /CFIDE/administrator confirms it and leaks the version"
+      command: "curl -sI http://{target}:{port}/CFIDE/administrator/"
+# source: Obsidian: CPTS/Attacking Common Applications/ColdFusion - Discovery & Enumeration.md
