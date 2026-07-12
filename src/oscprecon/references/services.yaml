@@ -75,11 +75,16 @@
   label: Kerberos
   module: kerberos
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-kerberos-88/index.html
+  tools:
+    - { name: "nmap -sV -p {port} {target}", purpose: "KDC server-time (clock-skew ref) + realm/DC confirm" }
+    - { name: "GetNPUsers.py {domain}/USER -dc-ip {target} -no-pass", purpose: "AS-REP check for ONE known user (edit USER; not a list brute)" }
 
 - match: { port: 110, proto: tcp }
   label: POP3
   module: pop3
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-pop.html
+  tools:
+    - { name: "nmap -sV --script pop3-capabilities,pop3-ntlm-info -p {port} {target}", purpose: "capabilities/STLS + AD host/domain via NTLM" }
 
 - match: { port: 111, proto: tcp }
   label: rpcbind
@@ -88,6 +93,8 @@
   tools:
     - { name: "rpcinfo {target}", purpose: "list RPC programs" }
     - { name: "showmount -e {target}", purpose: "NFS exports (if present)" }
+    - { name: "nmap --script rpcinfo,rpc-grind -p 111 {target}", purpose: "RPC program dump + fingerprint via NSE" }
+    - { name: "rpcinfo -T udp {target}", purpose: "UDP-only RPC programs the TCP probe misses" }
 
 - match: { port: 123, proto: udp }
   label: NTP
@@ -125,13 +132,15 @@
   label: IMAP
   module: imap
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-imap.html
+  tools:
+    - { name: "nmap -sV --script imap-capabilities,imap-ntlm-info -p {port} {target}", purpose: "capabilities + AD host/domain via NTLM" }
 
 - match: { port: 161, proto: udp }
   label: SNMP
   module: snmp
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-snmp/index.html
   tools:
-    - { name: "onesixtyone {target}", purpose: "probe common community strings" }
+    - { name: "onesixtyone -c /usr/share/seclists/Discovery/SNMP/common-snmp-community-strings-onesixtyone.txt {target}", purpose: "probe the small common-community list (§2-allowed; the bare form tests nothing)" }
     - { name: "snmpwalk -v2c -c public {target}", purpose: "walk the MIB (community 'public')" }
 
 - match: { port: 389, proto: tcp }
@@ -150,6 +159,7 @@
     - { name: "whatweb https://{target}:{port}", purpose: "fingerprint stack" }
     - { name: "curl -skI https://{target}:{port}/", purpose: "response headers" }
     - { name: "nmap --script ssl-cert -p {port} {target}", purpose: "cert CN/SAN — harvest vhosts / internal names" }
+    - { name: "nmap -sV --script ssl-enum-ciphers -p {port} {target}", purpose: "TLS versions + cipher suites (config recon)" }
 
 - match: { port: 445, proto: tcp }
   label: SMB
@@ -159,6 +169,7 @@
     - { name: "smbclient -L //{target}/ -N", purpose: "list shares via null session" }
     - { name: "netexec smb {target} -u '' -p '' --shares", purpose: "shares + perms via null session" }
     - { name: "enum4linux-ng -A {target}", purpose: "broad anonymous enumeration" }
+    - { name: "nmap -sV --script smb-enum-shares,smb-enum-sessions,smb-enum-domains -p 445 {target}", purpose: "NSE null-session cross-check" }
 
 - match: { port: 464, proto: tcp }
   label: kpasswd
@@ -214,6 +225,8 @@
   label: SSDP/UPnP
   module: upnp
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+  tools:
+    - { name: "nmap -sU --script upnp-info -p 1900 {target}", purpose: "UPnP device/service description (UDP — needs -sU)" }
 
 - match: { port: 2049, proto: tcp }
   label: NFS
@@ -254,7 +267,7 @@
   module: mdns
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
   tools:
-    - { name: "nmap --script dns-service-discovery -p {port} {target}", purpose: "advertised services" }
+    - { name: "nmap -sU --script dns-service-discovery -p {port} {target}", purpose: "advertised services (mDNS is UDP — needs -sU)" }
 
 - match: { port: 5432, proto: tcp }
   label: PostgreSQL
@@ -270,6 +283,7 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-winrm.html
   tools:
     - { name: "netexec winrm {target}", purpose: "WinRM banner + host/domain info (no creds)" }
+    - { name: "nmap -p {port} --script http-ntlm-info --script-args http-ntlm-info.root=/wsman {target}", purpose: "leak host/domain/OS build via WSMan NTLM" }
 
 - match: { port: 5986, proto: tcp }
   label: WinRM (HTTPS)
@@ -418,3 +432,48 @@
     - { name: "curl -s http://{target}:{port}/version", purpose: "Docker engine version (if unauth)" }
     - { name: "curl -s http://{target}:{port}/info", purpose: "host + container/image counts" }
     - { name: "curl -s http://{target}:{port}/containers/json", purpose: "list running containers" }
+
+# --- second-pass additions: mail-TLS, Oracle, ident, MSSQL-browser, SIP (recon-only) ---
+- match: { port: 113, proto: tcp }
+  label: ident
+  module: ident
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/113-pentesting-ident.html
+  tools:
+    - { name: "nmap -sV --script auth-owners -p 113 {target}", purpose: "map open sockets -> local usernames" }
+
+- match: { port: 993, proto: tcp }
+  label: IMAPS
+  module: imap
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-imap.html
+  tools:
+    - { name: "nmap --script ssl-cert,imap-capabilities -p 993 {target}", purpose: "cert CN/SAN + IMAP capabilities" }
+    - { name: "openssl s_client -connect {target}:993 -quiet", purpose: "TLS banner + cert (passive, no auth)" }
+
+- match: { port: 995, proto: tcp }
+  label: POP3S
+  module: pop3
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-pop.html
+  tools:
+    - { name: "nmap --script ssl-cert,pop3-capabilities -p 995 {target}", purpose: "cert CN/SAN + POP3 capabilities" }
+    - { name: "openssl s_client -connect {target}:995 -quiet", purpose: "TLS banner + cert (passive, no auth)" }
+
+- match: { port: 1521, proto: tcp }
+  label: Oracle TNS
+  module: oracle
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/1521-1522-1529-pentesting-oracle-listener/index.html
+  tools:
+    - { name: "nmap -sV --script oracle-tns-version -p 1521 {target}", purpose: "TNS listener version (not sid-brute)" }
+
+- match: { port: 1434, proto: udp }
+  label: MS-SQL Browser
+  module: mssql
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mssql-microsoft-sql-server/index.html
+  tools:
+    - { name: "nmap -sU --script ms-sql-info -p 1434 {target}", purpose: "instance names + dynamic TCP ports -> feeds 1433" }
+
+- match: { port: 5060, proto: udp }
+  label: SIP
+  module: sip
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-sip.html
+  tools:
+    - { name: "nmap -sU --script sip-methods -p 5060 {target}", purpose: "SIP OPTIONS methods + banner (not user-enum)" }

@@ -74,3 +74,8 @@
   why: "impacket-lookupsid resolves the domain SID and cycles RIDs to names (recon, like --rid-brute)"
   command: "impacket-lookupsid :@{target}"
 # source: Obsidian: 0.00 Methdology/.../General impacket syntax/lookupsid.md
+
+- description: "Domain password policy over null session"
+  why: "rpcclient getdompwinfo reads the password policy anonymously — read-only recon"
+  command: "rpcclient -U '' -N {target} -c getdompwinfo"
+# source: Obsidian: 0.00 Methdology/.../OSCP Random/oncybersec.md

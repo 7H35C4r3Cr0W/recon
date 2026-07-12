@@ -58,3 +58,21 @@
   why: "ldapdomaindump writes users/groups/computers/policy files — read-only recon"
   command: "ldapdomaindump ldap://{target}"
 # source: Obsidian: 0.01 Cheatsheets/Impacket Tools.md
+
+- description: "AS-REP-roastable accounts (DONT_REQ_PREAUTH) via LDAP filter"
+  why: "Bitwise filter lists pre-auth-disabled accounts — read-only enum (no ticket request)"
+  command: 'ldapsearch -x -H ldap://{target} -D USER@DOMAIN -w PASSWORD -b {basedn} "(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=4194304))" sAMAccountName'
+  requires: ["creds"]
+# source: Obsidian: 0.00 Methdology/.../Credentialed LDAP Enumeration.md
+
+- description: "SPN-owning (kerberoastable) accounts via LDAP filter"
+  why: "Lists accounts with a servicePrincipalName — read-only enum (no ticket request)"
+  command: 'ldapsearch -x -H ldap://{target} -D USER@DOMAIN -w PASSWORD -b {basedn} "(&(objectClass=user)(servicePrincipalName=*))" sAMAccountName servicePrincipalName'
+  requires: ["creds"]
+# source: Obsidian: 0.00 Methdology/.../Credentialed LDAP Enumeration.md
+
+- description: "Unconstrained-delegation accounts via LDAP filter"
+  why: "Bitwise filter lists TRUSTED_FOR_DELEGATION accounts — read-only enum"
+  command: 'ldapsearch -x -H ldap://{target} -D USER@DOMAIN -w PASSWORD -b {basedn} "(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=524288))" sAMAccountName'
+  requires: ["creds"]
+# source: Obsidian: 0.00 Methdology/.../Credentialed LDAP Enumeration.md

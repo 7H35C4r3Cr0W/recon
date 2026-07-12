@@ -69,6 +69,7 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
         "ssh-audit",
         "snmp-check",
         "snmpbulkwalk",
+        "openssl",  # s_client TLS banner/cert grab — passive read-only recon
         "windapsearch",
         "ldapdomaindump",
         "svn",
@@ -172,6 +173,7 @@ _INSTALL_HINTS: dict[str, str] = {
     "ldapdomaindump": "apt install python3-ldapdomaindump",
     "svn": "apt install subversion",
     "iscsiadm": "apt install open-iscsi",
+    "openssl": "apt install openssl",
     "redis-cli": "apt install redis-tools",
     "mongosh": "apt install mongodb-mongosh",
     "mongo": "apt install mongodb-clients",
