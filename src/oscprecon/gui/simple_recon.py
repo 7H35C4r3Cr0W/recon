@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from oscprecon.models import Command, Target
-from oscprecon.modules import ike, netbios, nfs, ntp, redis, smtp, snmp, tftp
+from oscprecon.modules import ike, mongodb, netbios, nfs, ntp, redis, smtp, snmp, tftp
 from oscprecon.modules.base import Module
 
 # The read-only, single-shape modules (recon_steps -> parse -> suggest) share one GUI panel + worker
@@ -48,6 +48,10 @@ def _ntp_steps(target: Target) -> list[tuple[Command, str]]:
 
 def _redis_steps(target: Target) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in redis.RedisModule().recon_steps(target)]
+
+
+def _mongodb_steps(target: Target) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in mongodb.MongoDbModule().recon_steps(target)]
 
 
 @dataclass(frozen=True)
@@ -130,5 +134,13 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(redis),
         redis.RedisModule,
         _redis_steps,
+    ),
+    "mongodb": SimpleReconSpec(
+        "mongodb",
+        "Run full MongoDB recon (version · databases · collections)",
+        "MongoDB recon — unauth version/databases/collections (read-only); else Tier-2.",
+        _manual(mongodb),
+        mongodb.MongoDbModule,
+        _mongodb_steps,
     ),
 }

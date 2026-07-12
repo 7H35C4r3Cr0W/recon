@@ -1,0 +1,32 @@
+# MongoDB manual follow-ups (Tier-2 — shown, never auto-run). All read-only enum; {target}/{port}
+# filled from the active profile. MongoDB with access-control off needs no creds; these deepen the
+# enumeration on a specific database. Swap <db>/<coll> for a name from the auto-enum.
+- description: "Server status: host, version, uptime, storage engine"
+  why: "serverStatus exposes build/host details without touching data — read-only"
+  command: "mongosh --host {target} --port {port} --quiet --eval \"printjson(db.serverStatus().host)\""
+# source: Obsidian: Boxes/Rooms/HTB/0.1 Starting Point/Mongod.md
+
+- description: "List collections in a chosen database"
+  why: "Maps a database's collections — read-only namespace walk"
+  command: "mongosh --host {target} --port {port} --quiet --eval \"db.getSiblingDB('<db>').getCollectionNames()\""
+# source: Obsidian: Boxes/Rooms/HTB/0.1 Starting Point/Mongod.md
+
+- description: "Read a bounded document sample from a collection"
+  why: "find().limit(10) reads a small sample to hunt for creds — read-only, never writes"
+  command: "mongosh --host {target} --port {port} --quiet --eval \"db.getSiblingDB('<db>').getCollection('<coll>').find().limit(10)\""
+# source: Obsidian: Boxes/Rooms/HTB/0.1 Starting Point/Mongod.md
+
+- description: "Show which account the connection is authorized as"
+  why: "connectionStatus reveals whether the anonymous connection has any roles — read-only"
+  command: "mongosh --host {target} --port {port} --quiet --eval \"printjson(db.runCommand({connectionStatus:1}))\""
+# source: Obsidian: 0.00 Methdology/.../Other Services/3306/MongoDB
+
+- description: "Legacy mongo shell for old servers (wire v6)"
+  why: "modern mongosh refuses MongoDB <=3.6 (wire-version too low); the legacy client speaks it — read-only"
+  command: "mongo --host {target} --port {port} --quiet --eval \"db.getMongo().getDBNames()\""
+# source: Obsidian: Boxes/Rooms/HTB/0.1 Starting Point/Mongod.md
+
+- description: "Replica set / sharding status"
+  why: "rs.status()/sh.status() reveal cluster topology — read-only"
+  command: "mongosh --host {target} --port {port} --quiet --eval \"printjson(rs.status())\""
+# source: Obsidian: 0.00 Methdology/.../Other Services/3306/MongoDB

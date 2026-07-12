@@ -1,0 +1,21 @@
+# MongoDB recon next-steps (unauth read-only; no writes / no RCE). Sourced from the HTB Mongod box,
+# where an access-control-off MongoDB let `show dbs` -> `use <db>` -> `find()` read data directly.
+- match:
+    service: mongodb
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "MongoDB answers unauthenticated — list a database's collections (read-only)"
+      command: "mongosh --host {target} --port 27017 --quiet --eval \"db.getSiblingDB('admin').getCollectionNames()\""
+    - text: "Read a bounded document sample to look for stored secrets (read-only, never writes)"
+      command: "mongosh --host {target} --port 27017 --quiet --eval \"db.getSiblingDB('admin').getCollection('system.users').find().limit(10)\""
+# source: Obsidian: Boxes/Rooms/HTB/0.1 Starting Point/Mongod.md
+
+- match:
+    service: mongodb
+    field: value
+    value: "^wire-version-mismatch$"
+  suggest:
+    - text: "mongosh is too new for this server (old wire protocol) — use the legacy mongo shell"
+      command: "mongo --host {target} --port 27017 --quiet --eval \"db.getMongo().getDBNames()\""
+# source: Obsidian: Boxes/Rooms/HTB/0.1 Starting Point/Mongod.md

@@ -77,6 +77,28 @@ def test_netbios_worker_parses_and_writes_findings(
     assert any("domain controller" in line.lower() for line in result.summary)
 
 
+def test_mongodb_worker_parses_and_writes_findings(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.14"))
+    monkeypatch.setattr(
+        shell,
+        "run",
+        _fake_run(
+            {
+                "print(db.version())": "mongodb/version.txt",
+                "print('DB '+n)": "mongodb/databases.txt",
+                "print(n+'.'+c)": "mongodb/collections.txt",
+            }
+        ),
+    )
+    result = mw.SimpleReconWorker(prof, "mongodb")._drive()
+    assert result.module == "mongodb"
+    assert any(line.startswith("→") for line in result.summary)  # unauth suggestion surfaced
+    kinds = {f.get("kind") for f in findings_mod.load_findings(prof.directory)}
+    assert {"access", "version", "database", "collection"} <= kinds
+
+
 def test_worker_empty_output_writes_nothing(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

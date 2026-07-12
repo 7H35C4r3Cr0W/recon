@@ -18,6 +18,28 @@ Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
 
+### Phase 2 · MongoDB module (mongodb) — DONE
+Second DB service module after Redis (the template). Read-only unauth Tier-1 auto-enum via the shared
+SimpleReconSpec (no bespoke panel/worker), name `mongodb` matching the existing services.yaml stub.
+- **engine** (`modules/mongodb/`): `MongoDbModule` triggers 27017/8/9 + `mongodb`/`mongod`; 3 recon
+  steps — version / listDatabases / per-DB collections — all `print()`-wrapped `--eval` so output is
+  **identical across mongosh and the legacy `mongo` shell** (which render objects very differently) and
+  auth-required always surfaces via the asserting `getDBNames()` helper. All read-only (no
+  insert/update/drop/eval); host is the only variable (validated `Target.ip`).
+- **parsers** (`parsers.py`): dual-shell tolerant — ANSI/OSC + banner strip, `[missing]`/`[blocked]`
+  sentinel skip, and access classification (unauth / auth-required / connection-error / **wire-version
+  -mismatch**). The wire note encodes the HTB Mongod insight: modern mongosh refuses old MongoDB (3.6 =
+  wire v6) → retry with the legacy `mongo` shell (why both clients are allow-listed). Collection/db
+  names captured permissively (spaces/unicode/symbols) while rejecting error-stack lines.
+- **Tier-2** `manual_commands.yaml` (6): serverStatus, collections-in-`<db>`, bounded `find().limit()`
+  doc sample, connectionStatus, replica/shard status, and the legacy-`mongo` fallback.
+- **pattern** `patterns/mongodb.yaml` (2 rules, `# source:` HTB Mongod): unauth → read collections/docs;
+  wire-mismatch → legacy shell. **GUI**: one `SIMPLE_SPECS` entry (shared panel auto-wires).
+- Fixtures + parser/module/GUI tests. **Adversarial 3-lens review** (7 agents, refute-biased verify):
+  4 raised → 1 confirmed (name char-class silent-drop) + 2 downgraded parser polish, all fixed; the
+  27018/27019-vs-hardcoded-27017 finding was refuted (triggers has no dispatch call-site; panel only
+  opens for the 27017 node — same as Redis hardcoding 6379). Four gates green.
+
 ### Full vault coverage build (DONE — user authorized adding everything recon-useful)
 User approved expanding the §2 allow-list for read-only enum tools and wiring everything. Tracked as
 6 tasks, all committed + gate-green:
@@ -39,8 +61,8 @@ User approved expanding the §2 allow-list for read-only enum tools and wiring e
 
 **Coverage now: 99 tool-hints / 94 service rules, 26 pattern rules / 48 suggestions, 60 allow-listed
 tools, 16 module packages.** The vault is essentially exhausted for recon syntax (2nd pass was mostly
-fixes + protocol-gap fills). **Remaining follow-ups** (not blockers): full Tier-1 modules for Mongo/
-MSSQL/MySQL/Postgres (Redis done; the rest have tool-hints); a Kerberos module home for the AS-REP/SPN
+fixes + protocol-gap fills). **Remaining follow-ups** (not blockers): full Tier-1 modules for
+MSSQL/MySQL/Postgres (Redis + Mongo done; the rest have tool-hints); a Kerberos module home for the AS-REP/SPN
 manuals; `openssl s_client` STARTTLS variants for 110/143. Skipped as too-borderline for §2:
 ssl-heartbleed, rmi-vuln-classloader, IIS http-iis-short-name-brute (policy blocks *brute*), and the
 new-binaries tnscmd10g/ident-user-enum/svmap/braa (nmap covers them).
