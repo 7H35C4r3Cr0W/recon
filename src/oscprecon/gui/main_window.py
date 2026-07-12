@@ -1169,7 +1169,9 @@ class MainWindow(QMainWindow):
         self._run_button.setEnabled(
             self._profile is not None and self._tasks.can_start(exclusive=True)
         )
-        self._service_tree.setEnabled(self._profile is not None and self._tasks.can_start())
+        # why: keep the tree browseable (selecting a service is read-only) — only the launch
+        # buttons in the tool panel are gated on capacity, via set_running.
+        self._service_tree.setEnabled(self._profile is not None)
         self._tool_panel.set_running(not self._tasks.can_start())
 
     def _launch(self, worker: QThread, label: str, *, exclusive: bool = False) -> None:
