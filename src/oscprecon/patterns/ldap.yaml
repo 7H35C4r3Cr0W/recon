@@ -17,4 +17,15 @@
   suggest:
     - text: "AD LDAP enum over a null bind — users, groups, domain SID, and risky account flags"
       command: "netexec ldap {target} -u '' -p '' --users --groups --get-sid --password-not-required --trusted-for-delegation"
+    - text: "AS-REP roast attempt — request tickets for pre-auth-disabled accounts (enumeration; crack off-host only if in scope, not run here)"
+      command: "netexec ldap {target} -u '' -p '' --asreproast /tmp/asrep.txt"
 # source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+
+- match:
+    service: ldap
+    field: kind
+    value: "user"
+  suggest:
+    - text: "AD user '{value}' found — collect discovered users into users.txt, then request AS-REP tickets (no pre-auth needed)"
+      command: "GetNPUsers.py {domain}/ -dc-ip {target} -no-pass -usersfile users.txt"
+# source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md
