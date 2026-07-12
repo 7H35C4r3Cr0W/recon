@@ -208,6 +208,7 @@
   tools:
     - { name: "nmap --script ms-sql-info,ms-sql-ntlm-info -p {port} {target}", purpose: "instance + NTLM info" }
     - { name: "nmap --script ms-sql-empty-password,ms-sql-config -p {port} {target}", purpose: "single sa-empty check + config" }
+    - { name: "impacket-mssqlclient sa:@{target}", purpose: "single sa-empty check, then read-only DB enum (Tier-2)" }
 
 - match: { port: 1900, proto: udp }
   label: SSDP/UPnP
@@ -238,6 +239,7 @@
   tools:
     - { name: "nmap --script mysql-info -p {port} {target}", purpose: "server info" }
     - { name: "nmap --script mysql-empty-password,mysql-variables -p {port} {target}", purpose: "single root-empty check + variables" }
+    - { name: "mysql -h {target} -P {port} -u root", purpose: "single root-no-password check, then SHOW DATABASES (Tier-2)" }
 
 - match: { port: 3389, proto: tcp }
   label: RDP
@@ -258,6 +260,9 @@
   label: PostgreSQL
   module: postgresql
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-postgresql.html
+  tools:
+    - { name: "psql -h {target} -p {port} -U postgres", purpose: "single postgres-superuser check, then \\l / \\dt (Tier-2)" }
+    - { name: "nmap -sV -p {port} {target}", purpose: "PostgreSQL version banner" }
 
 - match: { port: 5985, proto: tcp }
   label: WinRM
@@ -277,13 +282,16 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-redis.html
   tools:
     - { name: "nmap --script redis-info -p {port} {target}", purpose: "server info (if unauth)" }
+    - { name: "redis-cli -h {target} -p {port} INFO", purpose: "unauth server INFO (version/role/persistence)" }
+    - { name: "redis-cli -h {target} -p {port} config get *", purpose: "unauth running-config (dir/dbfilename/requirepass)" }
 
 - match: { port: 27017, proto: tcp }
   label: MongoDB
   module: mongodb
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/27017-27018-mongodb.html
   tools:
-    - { name: "nmap --script mongodb-info -p {port} {target}", purpose: "server info (if unauth)" }
+    - { name: "nmap --script mongodb-info,mongodb-databases -p {port} {target}", purpose: "server info + DB list (if unauth)" }
+    - { name: "mongosh --host {target} --port {port} --quiet --eval 'show dbs'", purpose: "list databases on an unauth MongoDB" }
 
 # --- Alternate HTTP/HTTPS ports (per CLAUDE.md §9) -> http module ---
 - { match: { port: 80, proto: tcp },   label: HTTP,      module: http, hacktricks: &web https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-web/index.html,
@@ -377,3 +385,36 @@
   tools:
     - { name: "svn ls svn://{target}/", purpose: "anonymous listing of an svnserve repo root" }
     - { name: "nmap --script svn-info -p {port} {target}", purpose: "fingerprint SVN server/repo UUID+revision" }
+
+# --- unauth read-only data/API services (§12; curl/nmap only) ---
+- match: { port: 9200, proto: tcp }
+  label: Elasticsearch
+  module: elasticsearch
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/9200-pentesting-elasticsearch.html
+  tools:
+    - { name: "curl -s http://{target}:{port}/_cat/indices", purpose: "list indices (if unauth)" }
+    - { name: "curl -s http://{target}:{port}/_cluster/health", purpose: "cluster health + node count" }
+
+- match: { port: 5984, proto: tcp }
+  label: CouchDB
+  module: couchdb
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/5984-pentesting-couchdb.html
+  tools:
+    - { name: "curl -s http://{target}:{port}/_all_dbs", purpose: "list databases (if unauth)" }
+    - { name: "curl -s http://{target}:{port}/_membership", purpose: "cluster membership" }
+
+- match: { port: 11211, proto: tcp }
+  label: Memcached
+  module: memcached
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/11211-memcache/index.html
+  tools:
+    - { name: "nmap --script memcached-info -p {port} {target}", purpose: "stats/version/slabs (unauth)" }
+
+- match: { port: 2375, proto: tcp }
+  label: Docker API
+  module: docker
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/2375-pentesting-docker.html
+  tools:
+    - { name: "curl -s http://{target}:{port}/version", purpose: "Docker engine version (if unauth)" }
+    - { name: "curl -s http://{target}:{port}/info", purpose: "host + container/image counts" }
+    - { name: "curl -s http://{target}:{port}/containers/json", purpose: "list running containers" }
