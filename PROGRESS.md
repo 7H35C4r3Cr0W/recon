@@ -10,11 +10,26 @@ Running record of what's been built, in order, so any session can pick up mid-st
 ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp) + status footer QoL. All 14 done,
 reviewed, hardened, GUI'd (347 tests).
 
-**Phase 2, Phase 4 (graph view), and Phase 3 (pattern library — 23 rules / 39 suggestions across 10
-services + AD depth + 5 web apps) are all COMPLETE.** Next candidates:
-Phase 5 QoL (`--resume`, Obsidian export, project file ops §19, audit log §6a, concurrent-copy lock
-§6b) and Phase 6 (doctor + exam preset). Optional: extend the pattern library to more services
-(ssh/smtp/tftp/netbios/ike/vhost) from the notes as boxes surface them.
+**Phase 2, Phase 4 (graph view), Phase 3 (pattern library — 23 rules / 39 suggestions), and the
+first Phase 5 block (resume + full Obsidian output story) are COMPLETE.** Next candidates:
+remaining Phase 5 QoL (bounded parallel exec + status-bar cancel, report-viewer tab, reference search
+box, Recent-profile right-click actions, TRACKER.md sync-on-root, dark/light theme, project file ops
+§19, audit log §6a, concurrent-copy lock §6b) and Phase 6 (doctor + exam preset). Report EDB hits are
+still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
+pattern library to more services from the notes as boxes surface them.
+
+### Phase 5 · block 1: resume + Obsidian output (DONE)
+- **`--resume` / `--force`** (`orchestrator.py` + `cli.py`): reuse only commands that finished cleanly
+  in a prior run (exit 0 + output file still on disk, non-empty); blocked/missing/timeout and
+  aborted-mid-run (no exit-0 record) re-run; `--force` re-runs all. CLI `--resume` LOADS the prior
+  profile so `command_history` survives (`Profile.create` would overwrite it). 5 tests.
+- **Report enrichment (§18)**: `report.md` now renders a **Per-service findings** section (§18 #5,
+  grouped by module with Obsidian `#<module>` tags, handles both finding shapes) and a **HackTricks
+  link** per discovered service (§18 #4, via `references.match`). 6 tests.
+- **Obsidian Vault export (§17 Mode 2)**: new `vault_export.py` snapshots a profile into a folder of
+  linked notes (index + target/services/findings/credentials/commands/notes), frontmatter + wikilinks,
+  **creds redacted** (`creds.redact`). Headless `oscprecon-cli export-vault <dest> -p <profile>` +
+  wired `File → Export to Obsidian Vault...` GUI action. 4 engine + 2 pytest-qt tests.
 
 ### Phase 3 — DONE (engine + gates + report + GUI + note-sourced patterns for 8 services).
 The user's Obsidian vault is now a LOCAL copy at **`vault:`** (the
