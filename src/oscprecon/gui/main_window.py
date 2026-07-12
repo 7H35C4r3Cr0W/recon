@@ -44,6 +44,7 @@ from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.task_status_bar import TaskStatusBar
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
+from oscprecon.manual_commands import expand, load_manual_commands
 from oscprecon.models import Credential, DiscoveredService, Finding, Target
 from oscprecon.modules.base import Module
 from oscprecon.modules.dns import DnsFinding, DnsModule, parse_dns_tool
@@ -793,6 +794,9 @@ def _slug(command: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "-", base) or "command"
 
 
+_SCAN_PRESETS = Path(__file__).parent.parent / "references" / "scan_presets.yaml"
+
+
 def _contained_path(base: Path, rel: str) -> Path | None:
     # why: the http Output field is user-editable — an absolute or ../ value would let a tool write
     # outside the profile. Refuse anything that does not resolve inside the profile directory.
@@ -935,6 +939,15 @@ class MainWindow(QMainWindow):
         run_action = QAction("Run Full Recon", self)
         run_action.triggered.connect(self._on_run)
         scan_menu.addAction(run_action)
+
+        presets_menu = scan_menu.addMenu("Nmap presets")
+        for preset in load_manual_commands(_SCAN_PRESETS):
+            action = QAction(preset.description, self)
+            action.setToolTip(preset.why)
+            action.triggered.connect(
+                lambda _checked=False, cmd=preset.command: self._on_scan_preset(cmd)
+            )
+            presets_menu.addAction(action)
 
         edit_menu = self.menuBar().addMenu("&Edit")
         add_cred_action = QAction("Add Credential...", self)
@@ -1276,6 +1289,15 @@ class MainWindow(QMainWindow):
             if edb_worker.isRunning():
                 edb_worker.wait()
         super().closeEvent(event)
+
+    def _on_scan_preset(self, command: str) -> None:
+        # why: pre-fill the command builder with a nmap preset (target filled) for the user to
+        # review and Run — never auto-executed (§7). Needs a profile for the target.
+        if self._profile is None:
+            return
+        filled = expand(command, target=self._profile.target.ip)
+        self._tool_panel.prefill_command(filled)
+        self._tool_panel.append_output(f"[preset] loaded: {filled}")
 
     def _on_run(self) -> None:
         if self._profile is None or not self._tasks.can_start(exclusive=True):

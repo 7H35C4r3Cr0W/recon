@@ -1,0 +1,52 @@
+# Nmap scan presets (§8, §2-allowed) surfaced under Scan -> Nmap presets. Each pre-fills the command
+# builder with {target} filled from the active profile; the user reviews and clicks Run. These are
+# copy-to-terminal variants BEYOND the module's fixed passes — vault-mined, recon-only (no brute).
+- description: "Full TCP sweep, speed-tuned"
+  why: "Finish the -p- pass fast under exam time pressure"
+  command: "nmap -p- --min-rate 2000 -T4 {target}"
+# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
+
+- description: "Full TCP sweep, host assumed up (-Pn)"
+  why: "Windows/filtered hosts that drop ICMP echo would otherwise scan as down"
+  command: "nmap -p- -Pn {target}"
+# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Initial Recon.md
+
+- description: "UDP top-100, versioned + default scripts"
+  why: "The module's UDP pass has no -sV/-sC; this versions the common UDP services"
+  command: "nmap -sU -sV -sC --top-ports 100 {target}"
+# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
+
+- description: "Vuln NSE category sweep (opt-in, slow/noisy)"
+  why: "§8 allows --script vuln — flags known service weaknesses, detection only"
+  command: "nmap -sV --script vuln {target}"
+# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Initial Recon.md
+
+- description: "OS fingerprint (needs root)"
+  why: "TCP/IP stack fingerprint steers Linux-vs-Windows follow-ups"
+  command: "nmap -O --osscan-guess {target}"
+# source: Obsidian: Courses/HTB/.../OSCP/Plan/Chapter 6/6.3.3. Port Scanning with Nmap.md
+
+- description: "Connect scan (works through a proxychains/SOCKS pivot)"
+  why: "SYN scans can't traverse a SOCKS proxy; -sT full-handshake does"
+  command: "nmap -sT -Pn -n {target}"
+# source: Obsidian: Courses/HTB/.../OSCP/Plan/Chapter 6/6.3.3. Port Scanning with Nmap.md
+
+- description: "Max-intensity version detection"
+  why: "For stubborn/unknown services the default -sV can't identify"
+  command: "nmap -sV --version-intensity 9 {target}"
+# source: Obsidian: Courses/HTB/.../CPTS/Review-Cheatsheet/Network Enumeration with NMAP.md
+
+- description: "Source-port 53 full sweep (firewall bypass)"
+  why: "Slip past stateless firewalls that trust source port 53"
+  command: "nmap -p- -Pn --source-port 53 {target}"
+# source: Obsidian: Courses/HTB/.../CPTS/Review-Cheatsheet/Network Enumeration with NMAP.md
+
+- description: "AD signature-port profile (is it a DC?)"
+  why: "Confirm a Domain Controller fast from its signature ports"
+  command: "nmap -p 53,88,135,139,389,445,464,593,636,3268,3269,5985 {target}"
+# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
+
+- description: "Ping-sweep host discovery (edit to a subnet for pivoting)"
+  why: "Find live hosts across a range when pivoting into an internal/AD network"
+  command: "nmap -sn -n {target}"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One/Linux/1.4-Linux-Scanning.md

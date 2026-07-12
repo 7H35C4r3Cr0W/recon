@@ -304,6 +304,12 @@ class ToolPanel(QWidget):
         if isinstance(command, str):
             self._command.setText(command)
 
+    def prefill_command(self, command: str) -> None:
+        # why: external callers (Scan -> Nmap presets) drop a command into the generic builder for
+        # the user to review + Run; switch to the generic page so it's visible. Never auto-runs.
+        self._command.setText(command)
+        self._stack.setCurrentIndex(0)
+
     def _emit_run(self) -> None:
         command = self._command.text().strip()
         if command:
