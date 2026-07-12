@@ -18,6 +18,48 @@ def _now_stamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
 
 
+def _finding_line(finding: dict[str, Any]) -> str:
+    # why: findings.json carries two shapes — most modules use kind/value/detail (+snmp note);
+    # http/vhost use port/path/status/note. Render each into one readable Obsidian bullet.
+    kind = str(finding.get("kind", "")).strip()
+    if kind:
+        value = str(finding.get("value", "")).strip()
+        extra = " · ".join(
+            part
+            for part in (
+                str(finding.get("detail", "")).strip(),
+                str(finding.get("note", "")).strip(),
+            )
+            if part
+        )
+        head = f"**{kind}** — {value}" if value else f"**{kind}**"
+        return f"{head} ({extra})" if extra else head
+    parts: list[str] = []
+    path = str(finding.get("path", "")).strip()
+    if path:
+        parts.append(f"`{path}`")
+    status = finding.get("status")
+    if status:
+        parts.append(f"→ {status}")
+    redirect = str(finding.get("redirect_to", "")).strip()
+    if redirect:
+        parts.append(f"⇒ {redirect}")
+    note = str(finding.get("note", "")).strip()
+    if note:
+        parts.append(note)
+    port = finding.get("port")
+    prefix = f"[{port}] " if port else ""
+    return (prefix + " ".join(parts)).strip() or "(finding)"
+
+
+def _group_findings(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, list[str]] = {}
+    for finding in raw:
+        module = str(finding.get("module", "")).strip() or "other"
+        groups.setdefault(module, []).append(_finding_line(finding))
+    return [{"module": module, "lines": groups[module]} for module in sorted(groups)]
+
+
 class Reporter:
     def __init__(self, profile: Profile) -> None:
         self.profile = profile
@@ -43,8 +85,9 @@ class Reporter:
         notes = ""
         if profile.notes_path.exists():
             notes = profile.notes_path.read_text(encoding="utf-8").strip()
+        raw_findings = findings_mod.load_findings(profile.directory)
         suggestions = suggest_for(
-            findings_mod.load_findings(profile.directory),
+            raw_findings,
             target=profile.target.ip,
             domain=profile.target.hostname or "",
             has_credential=bool(profile.credentials()),
@@ -59,6 +102,7 @@ class Reporter:
             },
             "status": profile.status,
             "services": services,
+            "finding_groups": _group_findings(raw_findings),
             "command_history": profile.command_history,
             "tags": profile.tags,
             "notes": notes,

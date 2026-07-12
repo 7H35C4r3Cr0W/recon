@@ -41,6 +41,19 @@ _No open ports discovered yet._
 _Run nmap to populate this section._
 {% endfor %}
 
+## Per-service findings
+{% for g in finding_groups %}
+
+### {{ g.module }}
+#{{ g.module }}
+{% for line in g.lines %}
+- {{ line }}
+{% endfor %}
+{% else %}
+
+_No service findings yet — run the service modules._
+{% endfor %}
+
 ## Suggested next steps
 {% for s in suggestions %}
 
