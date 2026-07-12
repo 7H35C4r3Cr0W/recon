@@ -16,10 +16,22 @@ class Orchestrator:
         *,
         on_line: Callable[[str], None] | None = None,
         udp_full: bool = False,
+        resume: bool = False,
+        force: bool = False,
     ) -> None:
         self.profile = profile
         self.on_line = on_line
         self.nmap = NmapModule(udp_full=udp_full)
+        self.resume = resume
+        self.force = force
+        # why: --resume may reuse only commands that finished cleanly in a PRIOR run (exit 0).
+        # Snapshot that history at construction — commands this run appends must not count as
+        # reusable, and blocked/missing/timeout (non-zero) entries stay out so they re-run.
+        self._completed = {
+            str(entry.get("output_file"))
+            for entry in profile.command_history
+            if entry.get("exit_code") == 0 and entry.get("output_file")
+        }
         # why: command ids must stay unique across re-scans of the same profile, whose
         # command_history persists — so continue numbering, don't reset to 0.
         self._counter = len(profile.command_history)
@@ -28,9 +40,27 @@ class Orchestrator:
         if self.on_line is not None:
             self.on_line(text)
 
-    def _run(self, cmd: Command) -> str:
-        self._emit(f"$ {cmd.shell_line}")
+    def _reusable(self, cmd: Command) -> bool:
+        # why: reuse a command's output only when its prior run finished with exit 0 AND the file is
+        # still on disk and non-empty — an aborted run (killed before its history entry was written)
+        # leaves no exit-0 record and re-runs. --force forces a re-run regardless.
+        if not self.resume or self.force or cmd.output_file not in self._completed:
+            return False
         out_path = self.profile.directory / cmd.output_file
+        try:
+            return out_path.is_file() and out_path.stat().st_size > 0
+        except OSError:
+            return False
+
+    def _run(self, cmd: Command) -> str:
+        out_path = self.profile.directory / cmd.output_file
+        if self._reusable(cmd):
+            self._emit(f"[resume] reusing {cmd.output_file} — skipping: {cmd.shell_line}")
+            try:
+                return out_path.read_text(encoding="utf-8")
+            except OSError:
+                return ""
+        self._emit(f"$ {cmd.shell_line}")
         result = shell.run(
             cmd.shell_line,
             out_path,
