@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QAction, QCloseEvent
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 
 from oscprecon import config, findings, references, shell, vault_export
 from oscprecon.audit import Auditor
+from oscprecon.gui import theme
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
 from oscprecon.gui.widgets.graph_view import GraphView
@@ -806,6 +807,7 @@ def _contained_path(base: Path, rel: str) -> Path | None:
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
+        theme.apply_theme(config.load_prefs().get("theme", theme.DEFAULT_THEME))
         self.setWindowTitle("oscp-recon")
         self.resize(1200, 720)
         self._profile: Profile | None = None
@@ -951,6 +953,17 @@ class MainWindow(QMainWindow):
         self._report_action.setShortcut("Ctrl+R")
         self._report_action.toggled.connect(self._on_toggle_report)
         view_menu.addAction(self._report_action)
+
+        theme_menu = view_menu.addMenu("Theme")
+        self._theme_group = QActionGroup(self)
+        current_theme = theme.normalize(config.load_prefs().get("theme", theme.DEFAULT_THEME))
+        for name in theme.THEMES:
+            action = QAction(name.capitalize(), self, checkable=True)
+            action.setChecked(name == current_theme)
+            action.triggered.connect(lambda _checked=False, n=name: self._set_theme(n))
+            self._theme_group.addAction(action)
+            theme_menu.addAction(action)
+
         wordlists_action = QAction("Browse Wordlists...", self)
         wordlists_action.triggered.connect(self._on_browse_wordlists)
         view_menu.addAction(wordlists_action)
@@ -1021,6 +1034,12 @@ class MainWindow(QMainWindow):
             self._graph_action.setChecked(False)
             self._report_view.reload()  # render the current report.md
         self._central_stack.setCurrentIndex(2 if checked else 0)
+
+    def _set_theme(self, name: str) -> None:
+        theme.apply_theme(name)
+        prefs = config.load_prefs()
+        prefs["theme"] = theme.normalize(name)
+        config.save_prefs(prefs)
 
     def _on_graph_service_open(self, port: int, proto: str) -> None:
         # the graph's "Open service tooling" button jumps to the three-pane view + selects the svc
