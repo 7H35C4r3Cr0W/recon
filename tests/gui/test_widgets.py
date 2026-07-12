@@ -128,10 +128,12 @@ def test_page_visit_buffered_during_scan(qtbot: QtBot, tmp_path: Path) -> None:
     qtbot.addWidget(window)
     prof = Profile.create(tmp_path, "buf", Target(ip="10.0.0.1"))
     window._set_profile(prof)
-    window._worker = QThread()  # simulate a scan in progress
+    worker = QThread()
+    window._tasks.add(worker, "nmap", exclusive=True)  # simulate a run in progress
     window._on_page_visited("smb", "https://book.hacktricks.wiki/smb")
     assert prof.references_visited == []  # buffered, not recorded yet
     assert window._pending_visits == [("smb", "https://book.hacktricks.wiki/smb")]
-    window._finish_worker()  # joins the (unstarted) worker and drains the buffer
+    window._tasks.remove(worker)
+    window._post_run_refresh()  # drains the buffer once the run clears
     assert any(v["url"] == "https://book.hacktricks.wiki/smb" for v in prof.references_visited)
     assert window._pending_visits == []
