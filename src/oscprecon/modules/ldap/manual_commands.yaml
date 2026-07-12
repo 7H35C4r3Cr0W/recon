@@ -48,3 +48,13 @@
   command: "GetADUsers.py -all {domain}/USER:PASS -dc-ip {target}"
   requires: ["creds"]
 # source: Obsidian: 0.00 Methdology/.../OSCP Random/445 SMB.md
+
+- description: "Anonymous LDAP user enumeration (windapsearch)"
+  why: "windapsearch lists users over an anonymous bind — read-only recon"
+  command: "windapsearch --dc-ip {target} -u '' -U"
+# source: Obsidian: 0.00 Methdology/.../Other Services/Other/389 _ LDAP.md
+
+- description: "Dump AD to HTML/CSV over anonymous bind"
+  why: "ldapdomaindump writes users/groups/computers/policy files — read-only recon"
+  command: "ldapdomaindump ldap://{target}"
+# source: Obsidian: 0.01 Cheatsheets/Impacket Tools.md

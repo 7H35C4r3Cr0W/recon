@@ -39,3 +39,13 @@
   why: "-Oa un-hides OCTET-STRINGs stored as hex (paths, creds-in-plaintext leaks)"
   command: "snmpwalk -v2c -c public -Oa {target}"
 # source: Obsidian: 0.01 Cheatsheets/.../OSCP/SNMP.md
+
+- description: "Human-readable SNMP dump (snmp-check)"
+  why: "snmp-check renders users/uptime/network/processes/storage in one view — read-only"
+  command: "snmp-check -c public {target}"
+# source: Obsidian: 0.00 Methdology/.../OSCP Random/saisathvik1.md
+
+- description: "Bulk-walk the whole MIB (fewer round-trips)"
+  why: "snmpbulkwalk pulls the MIB far faster than snmpwalk on large trees — read-only"
+  command: "snmpbulkwalk -v2c -c public {target}"
+# source: Obsidian: 0.00 Methdology/.../OSCP Random/Random Cheat Sheet.md

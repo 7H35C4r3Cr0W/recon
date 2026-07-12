@@ -64,3 +64,13 @@
   why: "--spider (edit SHARE) lists share contents recursively — read-only recon"
   command: "netexec smb {target} -u '' -p '' --spider SHARE --regex ."
 # source: Obsidian: 0.00 Methdology/.../Active Directory Methdology/Full AD enum.md
+
+- description: "SAMR users + groups dump over null session"
+  why: "impacket-samrdump enumerates domain users/groups anonymously (read-only)"
+  command: "impacket-samrdump {target}"
+# source: Obsidian: 0.01 Cheatsheets/Impacket Tools.md
+
+- description: "SID lookup + RID cycling over null session"
+  why: "impacket-lookupsid resolves the domain SID and cycles RIDs to names (recon, like --rid-brute)"
+  command: "impacket-lookupsid :@{target}"
+# source: Obsidian: 0.00 Methdology/.../General impacket syntax/lookupsid.md

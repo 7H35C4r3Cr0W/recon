@@ -21,6 +21,7 @@
   tools:
     - { name: "nmap --script ssh2-enum-algos,ssh-hostkey -p {port} {target}", purpose: "algorithms + host keys" }
     - { name: "nmap --script ssh-auth-methods --script-args ssh.user=root -p {port} {target}", purpose: "offered auth methods for a user" }
+    - { name: "ssh-audit {target}", purpose: "audit kex/cipher/MAC/host-key config (no login)" }
 
 - match: { port: 23, proto: tcp }
   label: Telnet
@@ -101,6 +102,7 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/135-pentesting-msrpc.html
   tools:
     - { name: "nmap --script msrpc-enum -p {port} {target}", purpose: "enumerate exposed MSRPC/DCOM endpoints" }
+    - { name: "impacket-rpcdump {target}", purpose: "dump MSRPC/DCOM endpoints + endpoint mapper" }
     - { name: "rpcinfo -p {target}", purpose: "list registered RPC programs (portmapper)" }
 
 - match: { port: 137, proto: udp }
@@ -360,3 +362,18 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/8009-pentesting-apache-jserv-protocol-ajp.html
   tools:
     - { name: "nmap --script ajp-methods -p {port} {target}", purpose: "list HTTP methods on the AJP13 connector" }
+
+- match: { port: 3260, proto: tcp }
+  label: iSCSI
+  module: iscsi
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/3260-pentesting-iscsi.html
+  tools:
+    - { name: "iscsiadm -m discovery -t st -p {target}", purpose: "SendTargets discovery of exported iSCSI targets/LUNs" }
+
+- match: { port: 3690, proto: tcp }
+  label: SVN
+  module: svn
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/3690-pentesting-subversion-svn-server.html
+  tools:
+    - { name: "svn ls svn://{target}/", purpose: "anonymous listing of an svnserve repo root" }
+    - { name: "nmap --script svn-info -p {port} {target}", purpose: "fingerprint SVN server/repo UUID+revision" }
