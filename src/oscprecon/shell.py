@@ -73,7 +73,7 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
         "ldapdomaindump",
         "svn",
         "iscsiadm",
-        # database clients — unauth read-only enum + single default-cred (Tier-2); no list-brute flag
+        # database clients — unauth read-only enum + single default-cred (Tier-2), no list-brute
         "redis-cli",
         "mongosh",
         "mongo",
