@@ -49,3 +49,18 @@
 - description: "SMB vuln NSE scripts"
   why: "Flag known SMB vulns (MS17-010, etc.) — enumeration/detection only"
   command: "nmap --script smb-vuln-* -p 445 {target}"
+
+- description: "List domain users over a null session (SAMR)"
+  why: "rpcclient enumdomusers over the null session enumerates users read-only"
+  command: "rpcclient -U '' -N {target} -c 'enumdomusers'"
+# source: Obsidian: 0.00 Methdology/.../Other Services/Other/135 _ RPC.md
+
+- description: "List active SMB logon sessions (null)"
+  why: "--sessions maps who is currently connected — read-only recon"
+  command: "netexec smb {target} -u '' -p '' --sessions"
+# source: Obsidian: 0.00 Methdology/.../Active Directory Methdology/Full AD enum.md
+
+- description: "Enumerate every filename in a null-readable share"
+  why: "--spider (edit SHARE) lists share contents recursively — read-only recon"
+  command: "netexec smb {target} -u '' -p '' --spider SHARE --regex ."
+# source: Obsidian: 0.00 Methdology/.../Active Directory Methdology/Full AD enum.md

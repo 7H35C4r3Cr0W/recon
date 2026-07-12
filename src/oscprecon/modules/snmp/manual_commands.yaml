@@ -34,3 +34,8 @@
 - description: "SNMP recon via nmap NSE"
   why: "sysDescr, engine info, interfaces, processes, netstat in one pass — no brute script. Recon"
   command: "nmap -sU -sV --script snmp-info,snmp-sysdescr,snmp-interfaces,snmp-processes -p 161 {target}"
+
+- description: "Walk the MIB rendering hex strings as ASCII"
+  why: "-Oa un-hides OCTET-STRINGs stored as hex (paths, creds-in-plaintext leaks)"
+  command: "snmpwalk -v2c -c public -Oa {target}"
+# source: Obsidian: 0.01 Cheatsheets/.../OSCP/SNMP.md

@@ -31,3 +31,20 @@
   why: "Re-query as a known user (creds already gathered) — a single bind, not a brute force"
   command: 'ldapsearch -x -H ldap://{target}:{port} -D "USER@DOMAIN" -w PASSWORD -b "{basedn}" "(objectClass=user)" sAMAccountName'
   requires: ["creds"]
+
+- description: "Dump AD-integrated DNS records over a null bind"
+  why: "netexec ldap get-network reads AD DNS zones anonymously — read-only recon"
+  command: "netexec ldap {target} -u '' -p '' -M get-network -o ALL=true"
+# source: Obsidian: 0.00 Methdology/.../Active Directory Methdology/Full AD enum.md
+
+- description: "Enumerate AdminSDHolder-protected accounts"
+  why: "--admin-count lists high-value protected accounts — read-only recon"
+  command: "netexec ldap {target} -u USER -p PASS --admin-count"
+  requires: ["creds"]
+# source: Obsidian: 0.00 Methdology/.../Active Directory Methdology/Full AD enum.md
+
+- description: "All users with last-logon + pwdLastSet"
+  why: "GetADUsers enumerates account metadata (enumeration script, no cracking)"
+  command: "GetADUsers.py -all {domain}/USER:PASS -dc-ip {target}"
+  requires: ["creds"]
+# source: Obsidian: 0.00 Methdology/.../OSCP Random/445 SMB.md

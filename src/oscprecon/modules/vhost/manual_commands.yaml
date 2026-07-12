@@ -41,3 +41,8 @@
 - description: "Zone transfer attempt"
   why: "A misconfigured NS may hand over the full zone"
   command: "dig axfr {domain} @{target}"
+
+- description: "Subdomain sweep via dnsenum (internet scraping off)"
+  why: "Alternate subdomain brute engine using the target DNS server — content discovery"
+  command: "dnsenum --dnsserver {target} --enum -p 0 -s 0 -f /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt {domain}"
+# source: Obsidian: CPTS/Review-Cheatsheet/Footprinting.md

@@ -26,3 +26,23 @@
 - description: "Reverse PTR lookup for a discovered IP"
   why: "Map an IP back to a hostname to expand the target picture — recon"
   command: "dig @{target} -x TARGET_IP"
+
+- description: "DC-locator: enumerate every domain controller in the forest"
+  why: "The _ldap._tcp.dc._msdcs SRV record lists all DCs — key AD recon"
+  command: "dig @{target} _ldap._tcp.dc._msdcs.{domain} SRV +short"
+# source: Obsidian: Boxes/.../Dante/172.16.1.20/53.md
+
+- description: "Locate Kerberos KDC hosts"
+  why: "The _kerberos._tcp SRV record points at the KDC(s) — recon"
+  command: "dig @{target} _kerberos._tcp.{domain} SRV +short"
+# source: Obsidian: Boxes/.../Dante/172.16.1.20/53.md
+
+- description: "SOA — primary nameserver + admin contact"
+  why: "The SOA record names the authoritative server and admin mailbox — recon"
+  command: "dig @{target} {domain} SOA +short"
+# source: Obsidian: CPTS/Footprinting/Digging DNS.md
+
+- description: "One-pass standard record sweep"
+  why: "dnsrecon std pulls A/NS/MX/SOA/SRV/TXT in one go — recon"
+  command: "dnsrecon -n {target} -d {domain} -t std"
+# source: Obsidian: OSCP/6.3.1 DNS Enumeration.md

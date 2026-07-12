@@ -81,3 +81,18 @@
 - description: "Virtual-host hint (see the vhost module next)"
   why: "If a domain is known, the IP may serve additional vhosts"
   command: "curl -sk {url} -H 'Host: {domain}'"
+
+- description: "Nikto web-server scan"
+  why: "Baseline scan for known files, dangerous methods, and server misconfigs (§9 names it)"
+  command: "nikto -h {url}"
+# source: Obsidian: EJPT/.../Scanning Web Application with Nikto.md
+
+- description: "cgi-bin script discovery"
+  why: "CGI scripts are a distinct, often-missed attack surface"
+  command: "gobuster dir -u {url} -w /usr/share/seclists/Discovery/Web-Content/CGIs.txt -x cgi,pl,sh"
+# source: Obsidian: 0.01 Cheatsheets/.../Directory Discovery/feroxbuster.md
+
+- description: "Alternative content discovery (dirsearch)"
+  why: "A second discovery engine surfaces paths the raft sweep misses"
+  command: "dirsearch -e php,asp,aspx,jsp,txt,conf,config,bak,backup,old,db,sql -u {url}"
+# source: Obsidian: 0.00 Methdology/.../OSCP Random/Random Cheat Sheet.md
