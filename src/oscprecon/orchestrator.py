@@ -27,14 +27,15 @@ class Orchestrator:
         self.resume = resume
         self.force = force
         self.cancel = cancel
-        # why: --resume may reuse only commands that finished cleanly in a PRIOR run (exit 0).
-        # Snapshot that history at construction — commands this run appends must not count as
-        # reusable, and blocked/missing/timeout (non-zero) entries stay out so they re-run.
-        self._completed = {
-            str(entry.get("output_file"))
-            for entry in profile.command_history
-            if entry.get("exit_code") == 0 and entry.get("output_file")
-        }
+        # why: --resume reuse must key on the LATEST history entry per output_file, not any-ever.
+        # command_history only appends, so a later force-run that truncated a file (exit != 0) must
+        # override the earlier exit-0 record, and a command whose args changed (e.g. the versioned
+        # scan's -p port set grew) must re-run even though the output_file name is unchanged.
+        self._last_by_output: dict[str, dict[str, object]] = {}
+        for entry in profile.command_history:
+            output_file = entry.get("output_file")
+            if output_file:
+                self._last_by_output[str(output_file)] = entry
         # why: command ids must stay unique across re-scans of the same profile, whose
         # command_history persists — so continue numbering, don't reset to 0.
         self._counter = len(profile.command_history)
@@ -47,10 +48,13 @@ class Orchestrator:
         return self.cancel is not None and self.cancel.is_set()
 
     def _reusable(self, cmd: Command) -> bool:
-        # why: reuse a command's output only when its prior run finished with exit 0 AND the file is
-        # still on disk and non-empty — an aborted run (killed before its history entry was written)
-        # leaves no exit-0 record and re-runs. --force forces a re-run regardless.
-        if not self.resume or self.force or cmd.output_file not in self._completed:
+        # why: reuse a command's output only when its MOST RECENT prior run finished with exit 0, was
+        # produced by the SAME shell_line (args unchanged), and the file is still on disk + non-empty.
+        # A later truncating force-run (exit != 0) or a changed command re-runs; --force always re-runs.
+        if not self.resume or self.force:
+            return False
+        last = self._last_by_output.get(cmd.output_file)
+        if last is None or last.get("exit_code") != 0 or last.get("shell_line") != cmd.shell_line:
             return False
         out_path = self.profile.directory / cmd.output_file
         try:

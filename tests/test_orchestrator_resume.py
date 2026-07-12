@@ -71,16 +71,56 @@ def test_resume_reruns_missing_output(tmp_path: Path, monkeypatch: pytest.Monkey
 
 
 def test_reusable_ignores_nonzero_exit(tmp_path: Path) -> None:
+    from oscprecon.models import Command
+
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     out_rel = "nmap/tcp-top1000.txt"
     (prof.directory / "nmap" / "tcp-top1000.txt").write_text(_NMAP_OUT, encoding="utf-8")
+    shell_line = "nmap --top-ports 1000 x"
     prof.add_command(
-        {"id": "cmd-001", "output_file": out_rel, "exit_code": 126, "shell_line": "nmap x"}
+        {"id": "cmd-001", "output_file": out_rel, "exit_code": 126, "shell_line": shell_line}
     )
+    cmd = Command("nmap", shell_line, "why", "< 1 min", out_rel)
+    # a blocked/failed prior run (exit 126) must never be reused, even with a file present
+    assert Orchestrator(prof, resume=True)._reusable(cmd) is False
+
+
+def test_reusable_honours_latest_entry_not_any_exit0(tmp_path: Path) -> None:
     from oscprecon.models import Command
 
-    cmd = Command("nmap", "nmap --top-ports 1000 x", "why", "< 1 min", out_rel)
-    # a blocked/failed prior run (exit 126) must never be reused, even with a file present
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    out_rel = "nmap/tcp-full.txt"
+    (prof.directory / "nmap" / "tcp-full.txt").write_text(_NMAP_OUT, encoding="utf-8")
+    shell_line = "nmap -p- x"
+    # an earlier clean run, then a later force-run that truncated + was cancelled (exit -9)
+    prof.add_command(
+        {"id": "cmd-001", "output_file": out_rel, "exit_code": 0, "shell_line": shell_line}
+    )
+    prof.add_command(
+        {"id": "cmd-002", "output_file": out_rel, "exit_code": -9, "shell_line": shell_line}
+    )
+    cmd = Command("nmap", shell_line, "why", "5-15 min", out_rel)
+    # the LATEST entry (-9) wins — the stale exit-0 must not resurrect the truncated file
+    assert Orchestrator(prof, resume=True)._reusable(cmd) is False
+
+
+def test_reusable_reruns_when_command_args_changed(tmp_path: Path) -> None:
+    from oscprecon.models import Command
+
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    out_rel = "nmap/tcp-versioned.txt"
+    (prof.directory / "nmap" / "tcp-versioned.txt").write_text(_NMAP_OUT, encoding="utf-8")
+    prof.add_command(
+        {
+            "id": "cmd-001",
+            "output_file": out_rel,
+            "exit_code": 0,
+            "shell_line": "nmap -sV -sC -p 80,443 x",
+        }
+    )
+    # a later resume discovered 8080 -> the versioned command's -p set changed but the output_file
+    # is the same; the file must NOT be reused (8080 would never get versioned)
+    cmd = Command("nmap", "nmap -sV -sC -p 80,443,8080 x", "why", "1-5 min", out_rel)
     assert Orchestrator(prof, resume=True)._reusable(cmd) is False
 
 
