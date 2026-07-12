@@ -13,10 +13,23 @@ reviewed, hardened, GUI'd (347 tests).
 **Phase 2, Phase 4 (graph view), Phase 3 (pattern library — 23 rules / 39 suggestions), and the
 first Phase 5 block (resume + full Obsidian output story) are COMPLETE.** Next candidates:
 remaining Phase 5 QoL (report-viewer tab, reference search box, Recent-profile right-click actions,
-TRACKER.md sync-on-root, dark/light theme, project file ops §19, audit log §6a, concurrent-copy lock
-§6b) and Phase 6 (doctor + exam preset). Report EDB hits are
+TRACKER.md sync-on-root, dark/light theme, project file ops §19, concurrent-copy lock §6b) and
+Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
+
+### Phase 5 · block 3: audit log (§6a) (DONE)
+Append-only `<profile>/audit.jsonl` trail. **Engine** `audit.py`: `record()` writes {ts, actor,
+action, profile, details} best-effort (a serialization/I/O failure is logged, never raised),
+redacts secret-named detail fields to `<redacted len=N>`, rotates into `audit-archive/` past 5 MB;
+`Auditor` binds dir+name for terse call sites; `load_entries` feeds the report. **GUI wiring**: an
+`Auditor` bound per profile in `_set_profile`; emit points at `run`/`run-finished` (centralized in
+`_launch`/`_release`, covering every task), profile created/opened/saved/exported/closed, dry-run,
+add-to-report, and credential-added (field names + source only — never the secret value). **Report**:
+a `## Audit trail` appendix (after Command log), most-recent-N capped, details escaped for markdown.
+Caught + fixed a self-inflicted hang: an audit-wiring test started a bare `QThread` (default `run()`
+= a forever `exec()` loop) so `_release`'s `worker.wait()` blocked — the concurrent-run pileup had
+masked it. Full suite RC=0 (~429 tests).
 
 ### Phase 5 · block 2: bounded parallel execution + task status bar (DONE)
 Shipped in 6 sub-chunks, each gate-green: **(A)** `gui/task_manager.py` — `TaskManager` caps
