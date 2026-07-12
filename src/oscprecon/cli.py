@@ -53,9 +53,9 @@ def scan(
     # would overwrite profile.json and erase every record of what already finished.
     if resume and (directory / "profile.json").exists():
         prof = Profile.load(directory)
-        # why: on resume the loaded profile's stored target is authoritative (run_nmap scans it), so a
-        # differing CLI ip would be silently ignored — scanning the wrong host. Refuse the mismatch
-        # rather than guess; the user opens the right profile or creates a new one for the new IP.
+        # why: on resume the loaded profile's stored target is authoritative (run_nmap scans it),
+        # so a differing CLI ip would be silently ignored — scanning the wrong host. Refuse the
+        # mismatch rather than guess; the user opens the right profile or creates a new one.
         if prof.target.ip != ip:
             typer.echo(
                 f"[error] --resume target mismatch: profile '{profile}' targets {prof.target.ip}, "

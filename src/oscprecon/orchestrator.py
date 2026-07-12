@@ -48,9 +48,9 @@ class Orchestrator:
         return self.cancel is not None and self.cancel.is_set()
 
     def _reusable(self, cmd: Command) -> bool:
-        # why: reuse a command's output only when its MOST RECENT prior run finished with exit 0, was
-        # produced by the SAME shell_line (args unchanged), and the file is still on disk + non-empty.
-        # A later truncating force-run (exit != 0) or a changed command re-runs; --force always re-runs.
+        # why: reuse only when the MOST RECENT run for this output_file finished exit 0, was made by
+        # the SAME shell_line (args unchanged), and the file is on disk + non-empty. A later
+        # truncating force-run (exit != 0) or a changed command re-runs; --force always re-runs.
         if not self.resume or self.force:
             return False
         last = self._last_by_output.get(cmd.output_file)
