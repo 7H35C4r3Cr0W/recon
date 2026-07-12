@@ -4,7 +4,7 @@ from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QPushButton
 from pytestqt.qtbot import QtBot
 
-from oscprecon.gui.main_window import MainWindow
+from oscprecon.gui.main_window import CancellableThread, MainWindow
 from oscprecon.gui.task_manager import TaskManager
 from oscprecon.gui.widgets.task_status_bar import TaskStatusBar
 from oscprecon.models import Target
@@ -18,6 +18,27 @@ class _DummyWorker(QThread):
 
     def cancel(self) -> None:
         self.cancelled = True
+
+
+class _BlockingWorker(CancellableThread):
+    # a real in-flight worker: blocks in run() until its cancel Event is set (5s safety net)
+    def run(self) -> None:
+        self._cancel.wait(timeout=5.0)
+
+
+def test_cancel_button_stops_a_real_inflight_worker(qtbot: QtBot, tmp_path: Path) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.5")))
+    worker = _BlockingWorker()
+    window._launch(worker, "smb full")  # starts the thread; it blocks in run()
+    assert window._tasks.active_count == 1
+
+    buttons = window._task_bar.findChildren(QPushButton)
+    assert len(buttons) == 1  # the ✕ for the running task
+    buttons[0].click()  # cancel -> worker._cancel.set() -> run() returns -> finished -> _release
+    qtbot.waitUntil(lambda: window._tasks.active_count == 0, timeout=5000)
+    assert window._run_button.isEnabled() is True  # drained, exclusive nmap available again
 
 
 def test_status_bar_lists_tasks_with_working_cancel(qtbot: QtBot) -> None:
