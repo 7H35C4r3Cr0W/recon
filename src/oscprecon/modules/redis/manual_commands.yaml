@@ -1,0 +1,26 @@
+# Redis manual follow-ups (Tier-2 — shown, never auto-run). All read-only enum; {target}/{port}
+# filled from the active profile. Redis has no list-brute flag, so a single default check is Tier-2.
+- description: "Enumerate keys (bounded, non-blocking)"
+  why: "--scan iterates keys without the O(N) blocking of KEYS * — read-only"
+  command: "redis-cli -h {target} -p {port} --scan"
+# source: Obsidian: 0.01 Cheatsheets/.../3306/Redis.md
+
+- description: "Server INFO section: keyspace"
+  why: "Shows per-db key counts — where the data lives"
+  command: "redis-cli -h {target} -p {port} INFO keyspace"
+# source: Obsidian: 0.01 Cheatsheets/.../3306/Redis.md
+
+- description: "Read the on-disk write path"
+  why: "CONFIG GET dir/dbfilename reveals where Redis persists (RCE-adjacent recon)"
+  command: "redis-cli -h {target} -p {port} CONFIG GET dir"
+# source: Obsidian: 0.01 Cheatsheets/.../3306/Redis.md
+
+- description: "List loaded modules"
+  why: "MODULE LIST shows native modules (a foothold surface) — read-only"
+  command: "redis-cli -h {target} -p {port} MODULE LIST"
+# source: Obsidian: 0.01 Cheatsheets/.../3306/Redis.md
+
+- description: "Single default-auth check (Tier-2)"
+  why: "One attempt with the classic default password — not a brute"
+  command: "redis-cli -h {target} -p {port} -a foobared INFO"
+# source: Obsidian: 0.01 Cheatsheets/.../3306/Redis.md

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from oscprecon.models import Command, Target
-from oscprecon.modules import ike, netbios, nfs, ntp, smtp, snmp, tftp
+from oscprecon.modules import ike, netbios, nfs, ntp, redis, smtp, snmp, tftp
 from oscprecon.modules.base import Module
 
 # The read-only, single-shape modules (recon_steps -> parse -> suggest) share one GUI panel + worker
@@ -44,6 +44,10 @@ def _ike_steps(target: Target) -> list[tuple[Command, str]]:
 
 def _ntp_steps(target: Target) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in ntp.NtpModule().recon_steps(target)]
+
+
+def _redis_steps(target: Target) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in redis.RedisModule().recon_steps(target)]
 
 
 @dataclass(frozen=True)
@@ -118,5 +122,13 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(ntp),
         ntp.NtpModule,
         _ntp_steps,
+    ),
+    "redis": SimpleReconSpec(
+        "redis",
+        "Run full Redis recon (INFO · CONFIG · CLIENT LIST)",
+        "Redis recon — unauth INFO/CONFIG/CLIENT LIST (read-only); default-auth check is Tier-2.",
+        _manual(redis),
+        redis.RedisModule,
+        _redis_steps,
     ),
 }

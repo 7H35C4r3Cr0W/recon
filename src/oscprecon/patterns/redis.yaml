@@ -1,0 +1,11 @@
+# Redis recon next-steps from Andre's notes (unauth read-only; no key writes / no RCE).
+- match:
+    service: redis
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "Redis answers unauthenticated — enumerate keys (bounded) and read the persistence path"
+      command: "redis-cli -h {target} -p 6379 --scan"
+    - text: "Read the on-disk write path (RCE-adjacent recon — note only, don't write)"
+      command: "redis-cli -h {target} -p 6379 CONFIG GET dir"
+# source: Obsidian: 0.01 Cheatsheets .../3306/Redis.md
