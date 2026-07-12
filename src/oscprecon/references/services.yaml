@@ -12,6 +12,7 @@
   tools:
     - { name: "nmap --script ftp-anon -p {port} {target}", purpose: "check anonymous FTP access" }
     - { name: "curl -s ftp://{target}/", purpose: "list root over anonymous FTP" }
+    - { name: "nmap --script ftp-syst -p {port} {target}", purpose: "FTP system/OS type" }
 
 - match: { port: 22, proto: tcp }
   label: SSH
@@ -25,6 +26,8 @@
   label: Telnet
   module: telnet
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-telnet.html
+  tools:
+    - { name: "nmap --script telnet-encryption,telnet-ntlm-info -p {port} {target}", purpose: "encryption support + NTLM host/domain leak" }
 
 - match: { port: 25, proto: tcp }
   label: SMTP
@@ -63,6 +66,9 @@
   label: Finger
   module: finger
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-finger.html
+  tools:
+    - { name: "finger @{target}", purpose: "list logged-in / present accounts (seeds usernames)" }
+    - { name: "nmap --script finger -p {port} {target}", purpose: "finger service info via NSE" }
 
 - match: { port: 88, proto: tcp }
   label: Kerberos
@@ -93,6 +99,9 @@
   label: MSRPC
   module: msrpc
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/135-pentesting-msrpc.html
+  tools:
+    - { name: "nmap --script msrpc-enum -p {port} {target}", purpose: "enumerate exposed MSRPC/DCOM endpoints" }
+    - { name: "rpcinfo -p {target}", purpose: "list registered RPC programs (portmapper)" }
 
 - match: { port: 137, proto: udp }
   label: NetBIOS-NS
@@ -129,6 +138,7 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ldap.html
   tools:
     - { name: "ldapsearch -x -H ldap://{target} -s base", purpose: "root DSE / naming contexts" }
+    - { name: "nmap --script ldap-rootdse -p {port} {target}", purpose: "root DSE via NSE" }
 
 - match: { port: 443, proto: tcp }
   label: HTTPS
@@ -137,6 +147,7 @@
   tools:
     - { name: "whatweb https://{target}:{port}", purpose: "fingerprint stack" }
     - { name: "curl -skI https://{target}:{port}/", purpose: "response headers" }
+    - { name: "nmap --script ssl-cert -p {port} {target}", purpose: "cert CN/SAN — harvest vhosts / internal names" }
 
 - match: { port: 445, proto: tcp }
   label: SMB
@@ -168,6 +179,8 @@
   label: IPMI
   module: ipmi
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+  tools:
+    - { name: "nmap -sU --script ipmi-version,ipmi-cipher-zero -p {port} {target}", purpose: "IPMI version + cipher-zero auth weakness" }
 
 - match: { port: 636, proto: tcp }
   label: LDAPS
@@ -192,6 +205,7 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mssql-microsoft-sql-server/index.html
   tools:
     - { name: "nmap --script ms-sql-info,ms-sql-ntlm-info -p {port} {target}", purpose: "instance + NTLM info" }
+    - { name: "nmap --script ms-sql-empty-password,ms-sql-config -p {port} {target}", purpose: "single sa-empty check + config" }
 
 - match: { port: 1900, proto: udp }
   label: SSDP/UPnP
@@ -221,6 +235,7 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mysql.html
   tools:
     - { name: "nmap --script mysql-info -p {port} {target}", purpose: "server info" }
+    - { name: "nmap --script mysql-empty-password,mysql-variables -p {port} {target}", purpose: "single root-empty check + variables" }
 
 - match: { port: 3389, proto: tcp }
   label: RDP
@@ -228,6 +243,7 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-rdp.html
   tools:
     - { name: "nmap --script rdp-ntlm-info -p {port} {target}", purpose: "NTLM / host info" }
+    - { name: "nmap --script rdp-enum-encryption -p {port} {target}", purpose: "security layers + NLA requirement" }
 
 - match: { port: 5353, proto: udp }
   label: mDNS
@@ -245,6 +261,8 @@
   label: WinRM
   module: winrm
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-winrm.html
+  tools:
+    - { name: "netexec winrm {target}", purpose: "WinRM banner + host/domain info (no creds)" }
 
 - match: { port: 5986, proto: tcp }
   label: WinRM (HTTPS)
@@ -312,3 +330,33 @@
 - { match: { product_contains: "Microsoft IIS" }, label: IIS, module: http, hacktricks: *web }
 - { match: { product_contains: Apache },   label: Apache httpd, module: http, hacktricks: *web }
 - { match: { product_contains: nginx },    label: nginx,   module: http, hacktricks: *web }
+
+# --- Services added from vault mining (recon-only, §2-allowed tools) ---
+- match: { port: 631, proto: tcp }
+  label: IPP/CUPS
+  module: ipp
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-631-internet-printing-protocol-ipp.html
+  tools:
+    - { name: "nmap --script cups-info,cups-queue-info -p {port} {target}", purpose: "CUPS server info + print-queue contents" }
+    - { name: "curl http://{target}:{port}/printers/", purpose: "list configured printers via the CUPS web UI" }
+
+- match: { port: 1099, proto: tcp }
+  label: Java RMI
+  module: rmi
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/1099-pentesting-java-rmi.html
+  tools:
+    - { name: "nmap --script rmi-dumpregistry -p {port} {target}", purpose: "dump bound objects in the RMI registry" }
+
+- match: { port: 5900, proto: tcp }
+  label: VNC
+  module: vnc
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-vnc.html
+  tools:
+    - { name: "nmap -sV --script vnc-info,vnc-title -p {port} {target}", purpose: "VNC version + auth types + desktop title" }
+
+- match: { port: 8009, proto: tcp }
+  label: AJP
+  module: ajp
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/8009-pentesting-apache-jserv-protocol-ajp.html
+  tools:
+    - { name: "nmap --script ajp-methods -p {port} {target}", purpose: "list HTTP methods on the AJP13 connector" }
