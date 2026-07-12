@@ -1,0 +1,11 @@
+# NFS recon next-steps from Andre's Obsidian notes (read-only mount; unmount when done).
+# nfs findings the module emits: export, world-readable, access, file, banner.
+
+- match:
+    service: nfs
+    field: kind
+    value: "world-readable"
+  suggest:
+    - text: "Export '{value}' is world-readable — mount it read-only and inspect, then unmount"
+      command: "sudo mkdir -p /mnt/nfs && sudo mount -t nfs -o ro,nolock {target}:{value} /mnt/nfs && ls -laR /mnt/nfs"
+# source: Obsidian: 0.01 Cheatsheets .../Other/2049 _ NFS.md

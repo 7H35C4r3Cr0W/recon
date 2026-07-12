@@ -1,0 +1,11 @@
+# LDAP recon next-steps from Andre's Obsidian notes (anonymous enumeration).
+# ldap findings the module emits: bind, info, naming-context, user.
+
+- match:
+    service: ldap
+    field: kind
+    value: "naming-context"
+  suggest:
+    - text: "Dump the '{value}' context anonymously, then grep it for embedded creds (AD often stores secrets in description/info fields)"
+      command: "ldapsearch -x -H ldap://{target} -b '{value}'"
+# source: Obsidian: 0.01 Cheatsheets .../Other/389 _ LDAP.md

@@ -1,0 +1,15 @@
+# DNS recon next-steps from Andre's Obsidian notes. Set {domain} if the profile has no hostname yet.
+# dns findings the module emits: record, recursion, version, zone-transfer.
+
+- match:
+    service: dns
+  suggest:
+    - text: "Enumerate name servers (NS)"
+      command: "dig {domain} @{target} -t NS +noall +answer"
+    - text: "Enumerate mail servers (MX)"
+      command: "dig {domain} @{target} -t MX +noall +answer"
+    - text: "Enumerate TXT records (often leak hostnames / SPF / internal notes)"
+      command: "dig {domain} @{target} -t TXT +noall +answer"
+    - text: "Attempt a full zone transfer (AXFR) — dumps every record if the server allows it"
+      command: "dig {domain} @{target} axfr"
+# source: Obsidian: 0.01 Cheatsheets .../Other/53 _ DNS.md

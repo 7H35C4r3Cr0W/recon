@@ -1,0 +1,11 @@
+# FTP recon next-steps from Andre's Obsidian notes (recon only — no upload/exploit).
+# ftp findings the module emits: auth, banner, note.
+
+- match:
+    service: ftp
+    field: kind
+    value: "auth"
+  suggest:
+    - text: "Anonymous FTP works — mirror the whole tree locally (faster/more complete than one-file gets)"
+      command: "wget -r \"ftp://{target}/\""
+# source: Obsidian: 0.01 Cheatsheets .../21 (FTP)/21 (FTP).md
