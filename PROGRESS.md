@@ -18,6 +18,25 @@ Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
 
+### Vault mining pass (DONE for allowed-tool items; decisions pending)
+Ran an 8-area adversarial mining workflow over `/home/hacker/Documents/notes-vault` (90 candidates,
+deduped against services.yaml + patterns + manual_commands). Wired the §2-allowed subset in 3 commits:
+services.yaml → **61 tool-hints** (was 43; new ports VNC/AJP/IPP/Java-RMI + Telnet/Finger/MSRPC/IPMI/
+WinRM tools + FTP/LDAP/HTTPS/MSSQL/MySQL/RDP NSE); http.yaml patterns (file/backup ferox, nikto, PRTG,
+Splunk, WP sitemap/xmlrpc) → **25 rules / 46 suggestions**; manuals (nikto — §9 named it, was unwired;
+DNS DC-locator/Kerberos SRV; SMB rpcclient/netexec null; SNMP -Oa; NFS statfs NSE; vhost dnsenum; LDAP
+get-network/admin-count). Every command passes shell.policy + provenance + forbidden gates.
+
+**DEFERRED — need a §2 allow-list decision before wiring** (all read-only enum, but not on the §2 list):
+`impacket-samrdump/lookupsid/rpcdump` (§2 already permits "impacket enum scripts" in spirit),
+`ssh-audit`, `snmp-check`, `snmpbulkwalk`, `windapsearch`, `ldapdomaindump`, and interactive DB clients
+`impacket-mssqlclient / redis-cli / mongo / mysql / psql` (need new modules for MSSQL/MySQL/Postgres/
+Redis/Mongo + single-default-cred Tier-2), plus niche `svn` / `iscsiadm`. Any accepted binary also goes
+in `oscprecon-cli doctor`. **Structural**: an nmap-variants "manual" set (UDP `-sU -sV -sC`, `--script
+vuln` opt-in, `-Pn`, connect-scan-for-pivot, AD-port DC profile) has no home (nmap is a file, not a
+package). **Second-pass thin areas**: mail (110/143/993/995), Kerberos(88), bare UDP (1900/5353).
+Dropped: IIS `http-iis-short-name-brute` (policy correctly blocks any `--script *brute*`).
+
 ### Phase 5 · adversarial review + fixes (DONE)
 Ran a 6-dimension multi-agent adversarial review over the whole session's Phase 5 diff (37 agents;
 each finding double-verified by refute-biased skeptics — 5 of 15 candidates survived). All 5 fixed,
