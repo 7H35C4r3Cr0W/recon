@@ -9,3 +9,12 @@
     - text: "Dump the '{value}' context anonymously, then grep it for embedded creds (AD often stores secrets in description/info fields)"
       command: "ldapsearch -x -H ldap://{target} -b '{value}'"
 # source: Obsidian: 0.01 Cheatsheets .../Other/389 _ LDAP.md
+
+- match:
+    service: ldap
+    field: kind
+    value: "naming-context"
+  suggest:
+    - text: "AD LDAP enum over a null bind — users, groups, domain SID, and risky account flags"
+      command: "netexec ldap {target} -u '' -p '' --users --groups --get-sid --password-not-required --trusted-for-delegation"
+# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md

@@ -1,0 +1,10 @@
+# SMTP recon next-steps from Andre's Obsidian notes. smtp findings: banner, verb, open-relay, ntlm.
+
+- match:
+    service: smtp
+    field: kind
+    value: "verb"
+  suggest:
+    - text: "VRFY/EXPN supported — enumerate valid users with nmap's RCPT/VRFY check (usernames feed SMB/SSH/kerberos)"
+      command: "nmap --script smtp-enum-users -p 25 {target}"
+# source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md

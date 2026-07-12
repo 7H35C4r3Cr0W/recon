@@ -1,0 +1,11 @@
+# NetBIOS recon next-steps from Andre's Obsidian notes.
+# netbios findings the module emits: hostname, domain, role, user, mac.
+
+- match:
+    service: netbios
+    field: kind
+    value: "domain"
+  suggest:
+    - text: "NetBIOS domain '{value}' — pivot to broad SMB/AD enumeration"
+      command: "enum4linux-ng -A {target}"
+# source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md

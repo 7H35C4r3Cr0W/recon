@@ -48,6 +48,25 @@ def test_blocks_wpscan_credential_brute() -> None:
     assert shell.policy_violation(["wpscan", "--url", "http://x/", "--enumerate", "u"]) is None
 
 
+def test_allows_ad_recon_pattern_commands() -> None:
+    # the AD pattern-library suggestions (netexec null/single-cred enum, enum4linux) must run
+    assert shell.policy_violation(["enum4linux", "-a", "10.0.0.1"]) is None
+    assert (
+        shell.policy_violation(["netexec", "smb", "10.0.0.1", "-u", "", "-p", "", "--groups"])
+        is None
+    )
+    assert (
+        shell.policy_violation(["netexec", "ldap", "10.0.0.1", "-u", "", "-p", "", "--get-sid"])
+        is None
+    )
+    assert (
+        shell.policy_violation(
+            ["netexec", "ldap", "10.0.0.1", "-u", "u", "-p", "p", "--kerberoasting", "k.out"]
+        )
+        is None
+    )
+
+
 def test_blocks_ike_scan_pskcrack() -> None:
     # -P/--pskcrack writes the aggressive-mode PSK hash to disk for offline cracking (§12) — blocked
     assert shell.policy_violation(["ike-scan", "-A", "--pskcrack", "10.0.0.1"]) is not None
