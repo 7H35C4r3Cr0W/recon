@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QAction, QCloseEvent
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import config, findings, references, shell, vault_export
+from oscprecon.audit import Auditor
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
 from oscprecon.gui.widgets.graph_view import GraphView
@@ -806,6 +808,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("oscp-recon")
         self.resize(1200, 720)
         self._profile: Profile | None = None
+        self._auditor: Auditor | None = None
         self._tasks = TaskManager()
         self._task_bar = TaskStatusBar(self._tasks)
         self._recent_menu: QMenu
@@ -959,8 +962,13 @@ class MainWindow(QMainWindow):
             )
             self._recent_menu.addAction(action)
 
+    def _audit_action(self, action: str, **details: Any) -> None:
+        if self._auditor is not None:
+            self._auditor.record(action, details=details)
+
     def _set_profile(self, profile: Profile) -> None:
         self._profile = profile
+        self._auditor = Auditor(profile.directory, profile.profile_name)
         target = profile.target
         label = f"{profile.profile_name} — {target.ip}"
         if target.hostname:
@@ -1082,6 +1090,7 @@ class MainWindow(QMainWindow):
             return
         self._tool_panel.clear_output()
         self._set_profile(profile)
+        self._audit_action("profile-created", target=profile.target.ip)
         self._tool_panel.append_output(f"[created] {profile.directory}")
 
     def _on_open(self) -> None:
@@ -1101,12 +1110,14 @@ class MainWindow(QMainWindow):
             return
         self._tool_panel.clear_output()
         self._set_profile(profile)
+        self._audit_action("profile-opened")
         self._tool_panel.append_output(f"[opened] {path}")
 
     def _on_save(self) -> None:
         if self._profile is not None:
             self._notes_pane.flush()
             self._profile.save()
+            self._audit_action("profile-saved")
             self._tool_panel.append_output("[saved]")
 
     def _on_export_vault(self) -> None:
@@ -1122,6 +1133,7 @@ class MainWindow(QMainWindow):
         self._notes_pane.flush()
         self._profile.save()
         out = vault_export.export_vault(self._profile, Path(chosen))
+        self._audit_action("profile-exported", dest=str(out))
         self._tool_panel.append_output(f"[exported] {out}")
         QMessageBox.information(
             self,
@@ -1142,6 +1154,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Missing fields", "Username and secret are required.")
             return
         self._profile.add_credential(cred)
+        # why: §6a — log field names + source only; the audit engine never writes the secret value.
+        self._audit_action(
+            "credential-added",
+            username=cred.username,
+            domain=cred.domain,
+            secret_type=cred.secret_type,
+            source=cred.source,
+        )
         self._tool_panel.append_output(f"[cred] added {cred.username} (source: {cred.source})")
 
     def _on_browse_wordlists(self) -> None:
@@ -1177,13 +1197,16 @@ class MainWindow(QMainWindow):
     def _launch(self, worker: QThread, label: str, *, exclusive: bool = False) -> None:
         self._tasks.add(worker, label, exclusive=exclusive)
         worker.finished.connect(lambda: self._release(worker))
+        self._audit_action("run", label=label, exclusive=exclusive)
         self._refresh_busy()
         worker.start()
 
     def _release(self, worker: QThread) -> None:
         worker.wait()  # finished has fired — returns immediately
+        label = next((task.label for task in self._tasks.tasks() if task.worker is worker), "")
         self._tasks.remove(worker)
         worker.deleteLater()
+        self._audit_action("run-finished", label=label)
         self._post_run_refresh()
 
     def _post_run_refresh(self) -> None:
@@ -1200,6 +1223,7 @@ class MainWindow(QMainWindow):
         # why: destroying the window while a QThread runs aborts the process and can truncate
         # profile.json — wait for every in-flight task (and EDB lookup) to finish first.
         self._notes_pane.flush()
+        self._audit_action("profile-closed")
         for task in self._tasks.tasks():
             worker = task.worker
             if isinstance(worker, QThread) and worker.isRunning():
@@ -1259,6 +1283,7 @@ class MainWindow(QMainWindow):
         self._launch(worker, f"http:{port}")
 
     def _on_http_dry_run(self, command: str) -> None:
+        self._audit_action("dry-run", command=command)
         self._tool_panel.append_output(f"[dry-run] {command}")
 
     def _on_http_add_report(self, command: str) -> None:
@@ -1268,6 +1293,7 @@ class MainWindow(QMainWindow):
         manual_dir.mkdir(parents=True, exist_ok=True)
         with (manual_dir / "commands.txt").open("a", encoding="utf-8") as history:
             history.write(command + "\n")
+        self._audit_action("add-to-report", command=command)
         self._tool_panel.append_output(f"[report] queued: {command}")
 
     def _parse_http_output(self, struct_path: Path, tool: str, port: int) -> None:
