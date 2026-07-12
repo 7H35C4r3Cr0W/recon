@@ -7,6 +7,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 from oscprecon import findings as findings_mod
+from oscprecon import references
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
 
@@ -72,16 +73,21 @@ class Reporter:
 
     def _context(self) -> dict[str, Any]:
         profile = self.profile
-        services = [
-            {
-                "port": service.port,
-                "proto": service.proto.value,
-                "service": service.service,
-                "product": service.product,
-                "version": service.version,
-            }
-            for service in profile.discovered_services
-        ]
+        rules = references.load_rules()
+        services = []
+        for service in profile.discovered_services:
+            ref = references.match(service, rules)
+            services.append(
+                {
+                    "port": service.port,
+                    "proto": service.proto.value,
+                    "service": service.service,
+                    "product": service.product,
+                    "version": service.version,
+                    "hacktricks": ref.hacktricks if ref else "",
+                    "label": ref.label if ref else "",
+                }
+            )
         notes = ""
         if profile.notes_path.exists():
             notes = profile.notes_path.read_text(encoding="utf-8").strip()

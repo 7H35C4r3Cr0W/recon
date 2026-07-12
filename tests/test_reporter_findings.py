@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from oscprecon import findings as findings_mod
-from oscprecon.models import Target
+from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 from oscprecon.reporter import Reporter, _finding_line
 
@@ -52,3 +52,13 @@ def test_report_findings_placeholder_when_empty(tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     report = Reporter(prof).render()
     assert "_No service findings yet" in report
+
+
+def test_report_links_hacktricks_per_service(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    prof.set_services(
+        [DiscoveredService(port=445, proto=Proto.TCP, service="microsoft-ds", discovered_at="")]
+    )
+    report = Reporter(prof).render()
+    assert "**HackTricks:**" in report
+    assert "book.hacktricks.wiki" in report  # a real reference URL was matched for SMB
