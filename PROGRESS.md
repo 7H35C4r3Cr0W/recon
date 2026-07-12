@@ -10,20 +10,19 @@ Running record of what's been built, in order, so any session can pick up mid-st
 ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp) + status footer QoL. All 14 done,
 reviewed, hardened, GUI'd (347 tests).
 
-**Phase 4 graph view is COMPLETE** (chunks 1–3d: data model + persistence, rendering + View→Graph
-toggle, node-detail/status/note sidebar, PNG/SVG export, relates-to edge drawing, minimap +
-node-type filter). All §16 graph items done. **NEXT: Phase 3** — now unblocked by the mounted Obsidian
-notes (see below / memory `obsidian-notes-location`).
+**Phase 2, Phase 4 (graph view), and Phase 3 (pattern library) are all COMPLETE.** Next candidates:
+Phase 5 QoL (`--resume`, Obsidian export, project file ops §19, audit log §6a, concurrent-copy lock
+§6b) and Phase 6 (doctor + exam preset). Optional: extend the pattern library to more services
+(ssh/smtp/tftp/netbios/ike/vhost) from the notes as boxes surface them.
 
-### ⚠️ ORDER — we JUMPED Phase 3 → Phase 4 (user decision 2026-07-11). DO NOT SKIP PHASE 3.
-**Phase 3 (pattern library + suggestion engine) is DEFERRED, not done — now UNBLOCKED.** The user's
-Obsidian vault is mounted at **`/media/sf_notes-vault2`** (see memory `obsidian-notes-location`);
-`0.01 Cheatsheets/All_In_One` is the flagged goldmine of raw port/service syntax, `Boxes/` has per-box
-writeups. These are the `# source:` provenance for §15. **Plan: finish the Phase 4 minimap+filter
-polish, THEN do Phase 3** using those notes. **§21 rule when building Phase 3: extract recon INSIGHTS
-only — cite `# source:`, NEVER commit the raw notes / prose / creds / wordlists.** Phase 3 deliverables
-owed: `patterns/engine.py`, per-service `patterns/<svc>.yaml` (provenance build-gate), "Recon next
-steps" tool-panel section (pre-fill, no autorun), report "Suggested next steps" with citations.
+### Phase 3 — DONE (engine + gates + report + GUI + note-sourced patterns for 8 services).
+The user's Obsidian vault is now a LOCAL copy at **`vault:`** (the
+earlier vboxsf mount `/media/sf_notes-vault2` returned `Protocol error` on host-authored files —
+they were OneDrive online-only placeholders; the local copy fixed it; see memory
+`obsidian-notes-location`). Patterns were authored from `0.01 Cheatsheets` + `0.00 Methdology/.../1.
+Enumeration` (esp. `Ports and tools.md`), recon-only, each `# source:`-cited. **§21 rule for adding
+more: extract recon INSIGHTS only — cite `# source:`, NEVER commit the raw notes / prose / creds /
+wordlists.** The tool runs commands via `shlex.split` (no shell) — one command per suggestion, no `;`.
 
 **NOW: Phase 4 — Bloodhound-style graph view (§16, §23).** Deliverables: `gui/widgets/graph_view.py`
 (QWebEngineView + vendored offline Cytoscape.js, NO runtime CDN), `QWebChannel` GraphBridge
@@ -64,6 +63,22 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 3 · step 2: note-sourced pattern library (8 services) — Phase 3 COMPLETE
+- Authored `patterns/*.yaml` from Andre's local Obsidian vault (`/home/hacker/Documents/notes-vault`),
+  recon-only, each entry `# source:`-cited: **smb** (enum4linux -a / smb-enum-users / smbmap -H,-R /
+  rpcclient null / smbclient share browse), **http** (feroxbuster+gobuster raft content discovery /
+  whatweb / wpscan -e + wp-json users — brute lines excluded), **ftp** (anon → wget -r mirror), **nfs**
+  (world-readable → ro mount + ls -laR), **dns** (dig NS/MX/TXT/AXFR), **ldap** (naming-context →
+  anon ldapsearch dump), **snmp** (community → snmpwalk that community), **ntp** (ntpq -pn peers).
+  12 rules total.
+- **Engine gap fixed first**: HTTP findings are `{port,path,note}` not `{kind,value,detail}`, so
+  `detail_contains` now searches ALL finding fields and `_context` exposes ALL fields for
+  interpolation ({path}/{port} for http). Backward-compatible.
+- Both build-gates (`check_provenance` + `check_forbidden`) run over the shipped dir in the test suite;
+  a firing test asserts the shipped patterns produce sourced suggestions. **Verified end-to-end**: a
+  report with smb/http findings renders the "Suggested next steps" section with interpolated commands +
+  `_source:` citations. SSH/SMTP/IKE/TFTP/NetBIOS left to their modules' `suggest()` (notes thin/covered).
 
 ### Phase 3 · step 1b: GUI "Recon next steps" panel (pre-fill, no auto-run)
 - **tool_panel**: a "Recon next steps" QGroupBox (below the module stack) lists the pattern-library
