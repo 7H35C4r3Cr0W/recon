@@ -64,14 +64,19 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 
 ## Log (newest first)
 
-### Phase 3 · step 2: note-sourced pattern library (8 services) — Phase 3 COMPLETE
+### Phase 3 · step 2: note-sourced pattern library (10 services, 18 rules) — Phase 3 COMPLETE
 - Authored `patterns/*.yaml` from Andre's local Obsidian vault (`/home/hacker/Documents/notes-vault`),
   recon-only, each entry `# source:`-cited: **smb** (enum4linux -a / smb-enum-users / smbmap -H,-R /
-  rpcclient null / smbclient share browse), **http** (feroxbuster+gobuster raft content discovery /
-  whatweb / wpscan -e + wp-json users — brute lines excluded), **ftp** (anon → wget -r mirror), **nfs**
-  (world-readable → ro mount + ls -laR), **dns** (dig NS/MX/TXT/AXFR), **ldap** (naming-context →
-  anon ldapsearch dump), **snmp** (community → snmpwalk that community), **ntp** (ntpq -pn peers).
-  12 rules total.
+  rpcclient null / smbclient share browse + **AD**: netexec smb null groups/computers/sessions,
+  SYSVOL grab, credentialed expansion, kerberoast/asreproast REQUESTS), **http** (feroxbuster+gobuster
+  raft content discovery / whatweb / nmap http-enum NSE / wpscan -e + wp-json users — brute excluded),
+  **ftp** (anon → wget -r mirror), **nfs** (world-readable → ro mount), **dns** (dig NS/MX/TXT/AXFR),
+  **ldap** (naming-context → anon ldapsearch dump + **AD** netexec ldap null enum + AS-REP; user →
+  GetNPUsers), **snmp** (community → snmpwalk), **ntp** (ntpq -pn), **smtp** (VRFY → smtp-enum-users),
+  **netbios** (domain → enum4linux-ng AD pivot). Classic `enum4linux` added to the exec allowlist.
+  **Verified**: an AD box (smb-auth + ldap contexts/users + a cred) yields a coherent 12-step recon
+  plan. Every pattern command passes the exec policy (except the intentional sudo-mount copy-to-terminal
+  one). SSH/IKE/TFTP/vhost left to their modules (thin/covered notes).
 - **Engine gap fixed first**: HTTP findings are `{port,path,note}` not `{kind,value,detail}`, so
   `detail_contains` now searches ALL finding fields and `_context` exposes ALL fields for
   interpolation ({path}/{port} for http). Backward-compatible.
