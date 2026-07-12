@@ -1,0 +1,11 @@
+# SNMP recon next-steps from Andre's Obsidian notes.
+# snmp findings the module emits: community, banner, user, process, interface, note.
+
+- match:
+    service: snmp
+    field: kind
+    value: "community"
+  suggest:
+    - text: "Community '{value}' valid — walk the full MIB with it (system, users, processes, software)"
+      command: "snmpwalk -v2c -c {value} {target} 1"
+# source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md

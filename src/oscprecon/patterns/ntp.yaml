@@ -1,0 +1,8 @@
+# NTP recon next-steps from Andre's Obsidian notes. ntp findings the module emits: info, stratum.
+
+- match:
+    service: ntp
+  suggest:
+    - text: "List the NTP peers this host syncs with — maps the upstream time hierarchy"
+      command: "ntpq -pn {target}"
+# source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md
