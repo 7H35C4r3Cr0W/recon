@@ -60,6 +60,25 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
         "impacket-GetADUsers.py",
         "impacket-GetNPUsers.py",
         "impacket-GetUserSPNs.py",
+        # read-only impacket enum scripts (§2 "impacket enum scripts", no cracking on-host)
+        "impacket-samrdump",
+        "impacket-lookupsid",
+        "impacket-rpcdump",
+        "impacket-mssqlclient",
+        # read-only service enum tools (behaviourally equivalent to already-allowed enum)
+        "ssh-audit",
+        "snmp-check",
+        "snmpbulkwalk",
+        "windapsearch",
+        "ldapdomaindump",
+        "svn",
+        "iscsiadm",
+        # database clients — unauth read-only enum + single default-cred (Tier-2); no list-brute flag
+        "redis-cli",
+        "mongosh",
+        "mongo",
+        "mysql",
+        "psql",
     }
 )
 
@@ -142,6 +161,22 @@ _INSTALL_HINTS: dict[str, str] = {
     "rpcinfo": "apt install rpcbind",
     "ntpq": "apt install ntpsec",
     "ntpdate": "apt install ntpsec-ntpdate",
+    "impacket-samrdump": "apt install impacket-scripts",
+    "impacket-lookupsid": "apt install impacket-scripts",
+    "impacket-rpcdump": "apt install impacket-scripts",
+    "impacket-mssqlclient": "apt install impacket-scripts",
+    "ssh-audit": "apt install ssh-audit",
+    "snmp-check": "apt install snmpcheck",
+    "snmpbulkwalk": "apt install snmp",
+    "windapsearch": "pipx install windapsearch-py  (or git clone ropnop/windapsearch)",
+    "ldapdomaindump": "apt install python3-ldapdomaindump",
+    "svn": "apt install subversion",
+    "iscsiadm": "apt install open-iscsi",
+    "redis-cli": "apt install redis-tools",
+    "mongosh": "apt install mongodb-mongosh",
+    "mongo": "apt install mongodb-clients",
+    "mysql": "apt install default-mysql-client",
+    "psql": "apt install postgresql-client",
 }
 
 

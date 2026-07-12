@@ -131,3 +131,28 @@ def test_blocks_netexec_spray_bypasses(tmp_path: object) -> None:
     assert not blocked(["netexec", "smb", "10.0.0.1", "-u", "administrator", "-p", ""])
     assert not blocked(["netexec", "smb", "10.0.0.1", "-u=guest", "-p=guest"])
     assert not blocked(["netexec", "smb", "10.0.0.1", "-u", "", "-p", "", "--shares"])
+
+
+def test_allows_newly_wired_readonly_enum_tools() -> None:
+    def ok(argv: list[str]) -> bool:
+        return shell.policy_violation(argv) is None
+
+    # read-only impacket enum + service enum tools are now on the allow-list
+    assert ok(["impacket-samrdump", "corp.local/:@10.0.0.1"])
+    assert ok(["impacket-lookupsid", ":@10.0.0.1"])
+    assert ok(["impacket-rpcdump", "10.0.0.1"])
+    assert ok(["ssh-audit", "10.0.0.1"])
+    assert ok(["snmp-check", "-c", "public", "10.0.0.1"])
+    assert ok(["snmpbulkwalk", "-v2c", "-c", "public", "10.0.0.1"])
+    assert ok(["windapsearch", "--dc-ip", "10.0.0.1", "-u", "", "-U"])
+    assert ok(["ldapdomaindump", "ldap://10.0.0.1"])
+    assert ok(["svn", "ls", "svn://10.0.0.1/"])
+    assert ok(["iscsiadm", "-m", "discovery", "-t", "st", "-p", "10.0.0.1"])
+    # DB clients — single default-cred (Tier-2) read-only enum
+    assert ok(["mysql", "-h", "10.0.0.1", "-u", "root"])
+    assert ok(["psql", "-h", "10.0.0.1", "-U", "postgres"])
+    assert ok(["redis-cli", "-h", "10.0.0.1", "INFO"])
+    assert ok(["mongosh", "--host", "10.0.0.1", "--quiet"])
+    assert ok(["impacket-mssqlclient", "sa:@10.0.0.1"])
+    # the blanket brute/spray flag guard still applies to the new tools
+    assert shell.policy_violation(["mysql", "-h", "10.0.0.1", "--passwords", "x"]) is not None
