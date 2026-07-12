@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import config, findings, references, shell
+from oscprecon import config, findings, references, shell, vault_export
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.widgets.graph_view import GraphView
 from oscprecon.gui.widgets.notes_pane import NotesPane
@@ -875,6 +875,10 @@ class MainWindow(QMainWindow):
         self._save_action.triggered.connect(self._on_save)
         file_menu.addAction(self._save_action)
 
+        self._export_vault_action = QAction("Export to Obsidian Vault...", self)
+        self._export_vault_action.triggered.connect(self._on_export_vault)
+        file_menu.addAction(self._export_vault_action)
+
         file_menu.addSeparator()
         exit_action = QAction("Exit", self)
         exit_action.setShortcut("Ctrl+Q")
@@ -1066,6 +1070,27 @@ class MainWindow(QMainWindow):
             self._notes_pane.flush()
             self._profile.save()
             self._tool_panel.append_output("[saved]")
+
+    def _on_export_vault(self) -> None:
+        if self._profile is None:
+            QMessageBox.warning(self, "No profile", "Open or create a profile first.")
+            return
+        chosen = QFileDialog.getExistingDirectory(
+            self, "Export to Obsidian Vault", str(config.workspace_root())
+        )
+        if not chosen:
+            return
+        # why: flush the in-editor notes and persist findings/creds so the snapshot is current.
+        self._notes_pane.flush()
+        self._profile.save()
+        out = vault_export.export_vault(self._profile, Path(chosen))
+        self._tool_panel.append_output(f"[exported] {out}")
+        QMessageBox.information(
+            self,
+            "Vault exported",
+            f"Snapshot written to:\n{out}\n\nThis is a point-in-time copy (re-export to refresh). "
+            "Credential secret values are redacted.",
+        )
 
     def _on_add_credential(self) -> None:
         if self._profile is None:
