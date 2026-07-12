@@ -10,7 +10,8 @@ Running record of what's been built, in order, so any session can pick up mid-st
 ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp) + status footer QoL. All 14 done,
 reviewed, hardened, GUI'd (347 tests).
 
-**Phase 2, Phase 4 (graph view), and Phase 3 (pattern library) are all COMPLETE.** Next candidates:
+**Phase 2, Phase 4 (graph view), and Phase 3 (pattern library — 23 rules / 39 suggestions across 10
+services + AD depth + 5 web apps) are all COMPLETE.** Next candidates:
 Phase 5 QoL (`--resume`, Obsidian export, project file ops §19, audit log §6a, concurrent-copy lock
 §6b) and Phase 6 (doctor + exam preset). Optional: extend the pattern library to more services
 (ssh/smtp/tftp/netbios/ike/vhost) from the notes as boxes surface them.
@@ -63,6 +64,19 @@ Specs are authoritative in CLAUDE.md; this is the pointer list.
 4. Update this file with each chunk and commit it alongside that chunk.
 
 ## Log (newest first)
+
+### Phase 3 · step 3: web-app discovery patterns (23 rules / 39 suggestions)
+- Mined the CPTS "Attacking Common Applications" discovery notes for HTTP app patterns that fire on
+  the whatweb `note`: **Tomcat** (/docs version, manager/host-manager console), **Jenkins** (login-page
+  version), **GitLab** (/explore public projects, /users/sign_up), **Drupal** (CHANGELOG.txt version),
+  **ColdFusion** (/CFIDE/administrator). All discovery/recon-only — no default-cred brute / WAR upload.
+- Added credentialed **GPP hunt** to smb.yaml (`netexec -M gpp_password -M gpp_autologin`, SYSVOL creds).
+- Stopped at the honest edge of the vault: IIS tilde-enum (needs a non-wrapped short-name scanner /
+  the policy-blocked `http-iis-short-name-brute` NSE) and the MSSQL path (no module emits a trigger)
+  don't map to wrapped/allowlisted recon commands, so they're deliberately excluded.
+- **Verified end-to-end**: a Tomcat box renders general content-discovery + the Tomcat manager check;
+  an AD box renders the full null-session → credentialed-expansion → LDAP/AS-REP → GPP chain. Gates +
+  exec policy clean (except the intentional sudo-mount copy-to-terminal line).
 
 ### Phase 3 · step 2: note-sourced pattern library (10 services, 18 rules) — Phase 3 COMPLETE
 - Authored `patterns/*.yaml` from Andre's local Obsidian vault (`/home/hacker/Documents/notes-vault`),
