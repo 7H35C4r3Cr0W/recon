@@ -124,9 +124,8 @@ def _matches(match: dict[str, Any], finding: dict[str, Any], has_credential: boo
     if "has_credential" in match and bool(match["has_credential"]) != has_credential:
         return False
     if "detail_contains" in match:
-        haystack = " ".join(
-            str(finding.get(key, "")) for key in ("kind", "value", "detail")
-        ).lower()
+        # search EVERY finding field — works across shapes (smb kind/value/detail; http path/note)
+        haystack = " ".join(str(value) for value in finding.values()).lower()
         if str(match["detail_contains"]).lower() not in haystack:
             return False
     return not (
@@ -137,16 +136,13 @@ def _matches(match: dict[str, Any], finding: dict[str, Any], has_credential: boo
 
 
 def _context(finding: dict[str, Any], target: str, domain: str) -> dict[str, str]:
-    context = {
-        "target": target,
-        "domain": domain,
-        "module": str(finding.get("module", "")),
-        "kind": str(finding.get("kind", "")),
-        "value": str(finding.get("value", "")),
-        "detail": str(finding.get("detail", "")),
-    }
+    # expose EVERY finding field for interpolation ({value}/{kind} for smb, {path}/{note}/{port} for
+    # http) plus {target}/{domain} and a {<kind>} alias (a `share` finding exposes {share}).
+    context: dict[str, str] = {"target": target, "domain": domain}
+    for key, value in finding.items():
+        context[key] = str(value)
     kind = str(finding.get("kind", ""))
-    if kind:  # a finding of kind share/user/community exposes {share}/{user}/{community}
+    if kind:
         context[kind] = str(finding.get("value", ""))
     return context
 

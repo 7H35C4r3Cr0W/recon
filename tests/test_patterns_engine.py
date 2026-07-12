@@ -50,6 +50,34 @@ def test_suggest_for_matches_and_interpolates() -> None:
     assert all(s.source_box for s in suggestions)  # every suggestion cites its source
 
 
+def test_suggest_matches_http_shape_finding() -> None:
+    # http findings are {port, path, note} (no kind/value/detail); match note, interpolate path/port
+    rules = [
+        engine.PatternRule(
+            service="http",
+            match={"service": "http", "field": "note", "value": "WordPress"},
+            suggest=[
+                {
+                    "text": "WordPress at {path}",
+                    "command": "wpscan --url http://{target}:{port}{path} -e u",
+                }
+            ],
+            source="notes.md",
+        )
+    ]
+    findings: list[dict[str, Any]] = [
+        {"module": "http", "port": 8080, "path": "/blog/", "status": 200, "note": "WordPress 6.1"}
+    ]
+    suggestions = engine.suggest_for(findings, target="10.0.0.1", rules=rules)
+    assert suggestions and suggestions[0].text == "WordPress at /blog/"
+    assert suggestions[0].command_template == "wpscan --url http://10.0.0.1:8080/blog/ -e u"
+    # detail_contains also searches the note field now
+    rules2 = [
+        engine.PatternRule("http", {"service": "http", "detail_contains": "wordpress"}, ["x"], "n")
+    ]
+    assert engine.suggest_for(findings, target="10.0.0.1", rules=rules2)
+
+
 def test_suggest_for_dedups_identical() -> None:
     findings: list[dict[str, Any]] = [
         {"module": "smb", "kind": "share", "value": "IT", "detail": "readable"},
