@@ -58,10 +58,11 @@ def _finding_line(finding: dict[str, Any]) -> str:
 
 
 def _audit_summary(details: dict[str, Any]) -> str:
-    # why: keep the markdown table intact — escape pipes and bound each value.
+    # why: keep the markdown table intact — collapse CR/LF (a pasted multi-line value would break
+    # the row and inject raw markdown into report.md), escape pipes, and bound each value.
     parts = []
     for key, value in details.items():
-        text = str(value).replace("|", "\\|")
+        text = str(value).replace("\r", " ").replace("\n", " ").replace("|", "\\|")
         if len(text) > 60:
             text = text[:57] + "…"
         parts.append(f"{key}={text}")

@@ -72,6 +72,17 @@ def test_report_audit_placeholder_when_empty(tmp_path: Path) -> None:
     assert "_No audit events recorded yet._" in report
 
 
+def test_audit_summary_neutralizes_newlines(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    # a pasted multi-line value must not break the markdown table row / inject a heading
+    audit.record(prof.directory, "b", "add-to-report", details={"command": "curl x\n# ROOTED"})
+    report = Reporter(prof).render()
+    trail = report[report.index("## Audit trail") :]
+    assert "\n# ROOTED" not in trail  # no injected H1
+    row = next(line for line in trail.splitlines() if "add-to-report" in line)
+    assert "# ROOTED" in row  # the text survives, collapsed onto the single table row
+
+
 def test_report_links_hacktricks_per_service(tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     prof.set_services(
