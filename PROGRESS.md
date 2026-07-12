@@ -18,6 +18,33 @@ Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
 
+### Full vault coverage build (DONE — user authorized adding everything recon-useful)
+User approved expanding the §2 allow-list for read-only enum tools and wiring everything. Tracked as
+6 tasks, all committed + gate-green:
+- **Allow-list**: `shell.py` ALLOWED_TOOLS 44 → **60** — impacket enum trio + mssqlclient, ssh-audit,
+  snmp-check, snmpbulkwalk, windapsearch, ldapdomaindump, svn, iscsiadm, openssl, DB clients
+  (redis-cli/mongosh/mongo/mysql/psql). Read-only/Tier-2 only; `--passwords`/spray guard still applies.
+- **Wired into existing modules**: impacket samrdump/lookupsid (smb), windapsearch/ldapdomaindump
+  (ldap), snmp-check/snmpbulkwalk (snmp), rpcdump/ssh-audit/SVN/iSCSI (services.yaml).
+- **DB + data services**: MSSQL/MySQL/Postgres/Redis/Mongo clients + Elasticsearch/CouchDB/Memcached/
+  Docker tool-hints. **Redis** built as a full Tier-1 auto-enum module (INFO/CONFIG/CLIENT LIST parser
+  + findings + pattern + panel).
+- **Scan → Nmap presets**: mined nmap variants (UDP -sU -sV -sC, --script vuln opt-in, connect-scan
+  for pivot, AD-DC port profile, source-port-53, version-intensity…) pre-fill the command builder.
+- **`oscprecon-cli doctor`**: wrapped-tool presence check with install hints.
+- **Second mining pass** (mail/Kerberos/UDP/rpcbind/rsync + anything-else, 40 items): fixed the SNMP
+  `onesixtyone` no-op + mDNS missing `-sU`; added POP3/IMAP(S) caps+NTLM, Kerberos, ident, Oracle TNS,
+  MS-SQL Browser, SIP, SSDP, HTTPS ssl-enum-ciphers, SMB smb-enum NSE, WinRM wsman NTLM, rpcbind
+  rpc-grind; LDAP AS-REP/kerberoast/delegation bitwise filters; SMB getdompwinfo.
+
+**Coverage now: 99 tool-hints / 94 service rules, 26 pattern rules / 48 suggestions, 60 allow-listed
+tools, 16 module packages.** The vault is essentially exhausted for recon syntax (2nd pass was mostly
+fixes + protocol-gap fills). **Remaining follow-ups** (not blockers): full Tier-1 modules for Mongo/
+MSSQL/MySQL/Postgres (Redis done; the rest have tool-hints); a Kerberos module home for the AS-REP/SPN
+manuals; `openssl s_client` STARTTLS variants for 110/143. Skipped as too-borderline for §2:
+ssl-heartbleed, rmi-vuln-classloader, IIS http-iis-short-name-brute (policy blocks *brute*), and the
+new-binaries tnscmd10g/ident-user-enum/svmap/braa (nmap covers them).
+
 ### Vault mining pass (DONE for allowed-tool items; decisions pending)
 Ran an 8-area adversarial mining workflow over `/home/hacker/Documents/notes-vault` (90 candidates,
 deduped against services.yaml + patterns + manual_commands). Wired the §2-allowed subset in 3 commits:
