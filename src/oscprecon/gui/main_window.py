@@ -38,6 +38,7 @@ from oscprecon.gui.task_manager import TaskManager
 from oscprecon.gui.widgets.graph_view import GraphView
 from oscprecon.gui.widgets.notes_pane import NotesPane
 from oscprecon.gui.widgets.reference_pane import ReferencePane
+from oscprecon.gui.widgets.report_view import ReportView
 from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.task_status_bar import TaskStatusBar
 from oscprecon.gui.widgets.tool_panel import ToolPanel
@@ -863,9 +864,11 @@ class MainWindow(QMainWindow):
 
         self._graph_view = GraphView()
         self._graph_view.service_open_requested.connect(self._on_graph_service_open)
+        self._report_view = ReportView()
         self._central_stack = QStackedWidget()
         self._central_stack.addWidget(splitter)  # 0: three-pane
         self._central_stack.addWidget(self._graph_view)  # 1: graph
+        self._central_stack.addWidget(self._report_view)  # 2: report preview
         self.setCentralWidget(self._central_stack)
 
         self._notes_pane = NotesPane()
@@ -943,6 +946,11 @@ class MainWindow(QMainWindow):
         self._graph_action.setShortcut("Ctrl+G")
         self._graph_action.toggled.connect(self._on_toggle_graph)
         view_menu.addAction(self._graph_action)
+        self._report_action = QAction("Report Preview", self)
+        self._report_action.setCheckable(True)
+        self._report_action.setShortcut("Ctrl+R")
+        self._report_action.toggled.connect(self._on_toggle_report)
+        view_menu.addAction(self._report_action)
         wordlists_action = QAction("Browse Wordlists...", self)
         wordlists_action.triggered.connect(self._on_browse_wordlists)
         view_menu.addAction(wordlists_action)
@@ -979,6 +987,7 @@ class MainWindow(QMainWindow):
         self._tool_panel.set_profile(profile)
         self._service_tree.populate(profile.discovered_services, force=True)
         self._graph_view.set_profile(profile)
+        self._report_view.set_profile(profile)
         self._update_status_footer()
         self._refresh_suggestions()
         self._notes_pane.set_profile(profile)
@@ -1003,8 +1012,15 @@ class MainWindow(QMainWindow):
 
     def _on_toggle_graph(self, checked: bool) -> None:
         if checked:
+            self._report_action.setChecked(False)  # graph and report are mutually exclusive views
             self._graph_view.reload()  # refresh from the latest findings/creds/graph.json
         self._central_stack.setCurrentIndex(1 if checked else 0)
+
+    def _on_toggle_report(self, checked: bool) -> None:
+        if checked:
+            self._graph_action.setChecked(False)
+            self._report_view.reload()  # render the current report.md
+        self._central_stack.setCurrentIndex(2 if checked else 0)
 
     def _on_graph_service_open(self, port: int, proto: str) -> None:
         # the graph's "Open service tooling" button jumps to the three-pane view + selects the svc
@@ -1224,6 +1240,8 @@ class MainWindow(QMainWindow):
             self._graph_view.set_profile(self._profile)
             self._refresh_suggestions()
             self._update_status_footer()
+            if self._central_stack.currentIndex() == 2:
+                self._report_view.reload()  # live-refresh the report if it's the visible view
         self._refresh_busy()
 
     def closeEvent(self, event: QCloseEvent) -> None:
