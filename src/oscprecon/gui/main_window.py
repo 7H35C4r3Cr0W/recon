@@ -977,7 +977,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"oscp-recon — {profile.profile_name}")
         self._tool_panel.set_target(target.ip)
         self._tool_panel.set_profile(profile)
-        self._service_tree.populate(profile.discovered_services)
+        self._service_tree.populate(profile.discovered_services, force=True)
         self._graph_view.set_profile(profile)
         self._update_status_footer()
         self._refresh_suggestions()
@@ -1210,13 +1210,20 @@ class MainWindow(QMainWindow):
         self._post_run_refresh()
 
     def _post_run_refresh(self) -> None:
+        # why: this fires on EVERY worker completion (up to 4 in parallel). Refresh only what a
+        # background run can change — services tree, graph, suggestions, status — and never reload
+        # the notes editor / command builder / window title / recent menu (that churns the user's
+        # context mid-work). The tree/notes widgets are idempotent, so an unchanged set is a no-op.
         if self._profile is not None:
             if self._pending_visits:
                 for label, url in self._pending_visits:
                     self._profile.add_reference_visited(label, url)
                 self._pending_visits.clear()
                 self._profile.save()
-            self._set_profile(self._profile)
+            self._service_tree.populate(self._profile.discovered_services)
+            self._graph_view.set_profile(self._profile)
+            self._refresh_suggestions()
+            self._update_status_footer()
         self._refresh_busy()
 
     def closeEvent(self, event: QCloseEvent) -> None:

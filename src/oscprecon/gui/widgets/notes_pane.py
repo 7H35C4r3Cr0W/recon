@@ -27,6 +27,10 @@ class NotesPane(QWidget):
         layout.addWidget(self._status)
 
     def set_profile(self, profile: Profile) -> None:
+        # why: a no-op re-set with the same profile (fired on every background worker completion)
+        # must not reload the editor — setPlainText resets cursor/scroll/undo while the user types.
+        if profile is self._profile:
+            return
         self.flush()
         self._profile = profile
         self._loading = True

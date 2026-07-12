@@ -14,6 +14,7 @@ class ServiceTree(QTreeWidget):
 
     def __init__(self) -> None:
         super().__init__()
+        self._signature: tuple[tuple[int, str, str, str, str], ...] = ()
         self.setHeaderLabels(["Port", "Service", "Product"])
         self.setColumnWidth(0, 90)
         self.setColumnWidth(1, 120)
@@ -31,7 +32,17 @@ class ServiceTree(QTreeWidget):
         if menu.exec(self.viewport().mapToGlobal(pos)) is action:
             self.treat_as_http.emit(service)
 
-    def populate(self, services: list[DiscoveredService]) -> None:
+    def populate(self, services: list[DiscoveredService], *, force: bool = False) -> None:
+        # why: skip the clear()+rebuild when the service set is unchanged — a rebuild drops the
+        # user's current selection, and background service recon (which never adds ports) would
+        # otherwise churn it on every completion. force=True on a genuine profile switch, where a
+        # coincidentally-identical signature must still rebind the items to the new profile.
+        signature = tuple(
+            (s.port, s.proto.value, s.service, s.product, s.version) for s in services
+        )
+        if not force and signature == self._signature:
+            return
+        self._signature = signature
         self.clear()
         for proto in (Proto.TCP, Proto.UDP):
             members = sorted((s for s in services if s.proto == proto), key=lambda s: s.port)
