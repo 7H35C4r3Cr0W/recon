@@ -154,3 +154,18 @@ def test_cli_resume_preserves_history(tmp_path: Path, monkeypatch: pytest.Monkey
     assert calls == []  # nothing re-ran under --resume
     # history preserved (not wiped by a fresh Profile.create)
     assert len(Profile.load(tmp_path / "b").command_history) == prior
+
+
+def test_cli_resume_rejects_target_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(shell, "run", _counting_run([]))
+    runner = CliRunner()
+    first = runner.invoke(app, ["scan", "10.10.10.5", "-p", "b", "--workspace", str(tmp_path)])
+    assert first.exit_code == 0
+    # resuming with a DIFFERENT ip must error, not silently scan the stored target
+    mismatch = runner.invoke(
+        app, ["scan", "10.10.10.99", "-p", "b", "--workspace", str(tmp_path), "--resume"]
+    )
+    assert mismatch.exit_code == 2
+    assert "target mismatch" in mismatch.output
