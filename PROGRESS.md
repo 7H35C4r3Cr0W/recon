@@ -12,11 +12,26 @@ reviewed, hardened, GUI'd (347 tests).
 
 **Phase 2, Phase 4 (graph view), Phase 3 (pattern library — 23 rules / 39 suggestions), and the
 first Phase 5 block (resume + full Obsidian output story) are COMPLETE.** Next candidates:
-remaining Phase 5 QoL (bounded parallel exec + status-bar cancel, report-viewer tab, reference search
-box, Recent-profile right-click actions, TRACKER.md sync-on-root, dark/light theme, project file ops
-§19, audit log §6a, concurrent-copy lock §6b) and Phase 6 (doctor + exam preset). Report EDB hits are
+remaining Phase 5 QoL (report-viewer tab, reference search box, Recent-profile right-click actions,
+TRACKER.md sync-on-root, dark/light theme, project file ops §19, audit log §6a, concurrent-copy lock
+§6b) and Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
+
+### Phase 5 · block 2: bounded parallel execution + task status bar (DONE)
+Shipped in 6 sub-chunks, each gate-green: **(A)** `gui/task_manager.py` — `TaskManager` caps
+concurrent workers (default 4) with an exclusive slot for nmap discovery (it mutates the Profile
+from its own thread). **(B)** `shell.run(cancel=Event)` — a monitor thread kills the child the moment
+the event is set; `ShellResult.cancelled`. **(C1)** `findings.add_findings` now holds a lock (recon
+workers write it from their threads — read-modify-write was clobber-prone). **(C2)** `CancellableThread`
+base; NmapWorker/CommandWorker + 6 recon workers thread `self._cancel` into every `shell.run` and
+check it between steps; `Orchestrator(cancel=…)`. **(C3)** MainWindow migrated off the single
+`self._worker` slot to the TaskManager — nmap exclusive, service/command runs parallel; lifecycle on
+the QThread `finished` signal (`_launch`/`_release`); the shared parse slots
+(`_http_parse`/`_vhost_parse`/`_wildcard_out`/`_treat_http_ctx`) were replaced by per-worker
+completion closures so parallel CommandWorkers can't collide; `TaskStatusBar` shows a chip + ✕ Cancel
+per running task. ~17 new tests (TaskManager policy, shell cancel, findings concurrency, orchestrator
+pre-cancel, status-bar/gating/exclusivity/release).
 
 ### Phase 5 · block 1: resume + Obsidian output (DONE)
 - **`--resume` / `--force`** (`orchestrator.py` + `cli.py`): reuse only commands that finished cleanly
