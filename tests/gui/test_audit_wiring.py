@@ -10,7 +10,8 @@ from oscprecon.profile import Profile
 
 
 class _Dummy(QThread):
-    pass
+    def run(self) -> None:  # finish at once; the default QThread.run() spins an event loop forever
+        return
 
 
 def _actions(profile_dir: Path) -> list[str]:
@@ -31,11 +32,13 @@ def test_open_and_save_are_audited(qtbot: QtBot, tmp_path: Path) -> None:
 def test_launch_and_finish_are_audited(qtbot: QtBot, tmp_path: Path) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
-    window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.5")))
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    window._set_profile(prof)
     worker = _Dummy()
     window._launch(worker, "smb full")
-    window._release(worker)
-    entries = audit.load_entries(window._profile.directory)  # type: ignore[union-attr]
+    # the worker finishes immediately; spin the loop until finished -> _release fires
+    qtbot.waitUntil(lambda: window._tasks.active_count == 0, timeout=3000)
+    entries = audit.load_entries(prof.directory)
     run = next(e for e in entries if e["action"] == "run")
     assert run["details"]["label"] == "smb full"
     assert any(e["action"] == "run-finished" for e in entries)
