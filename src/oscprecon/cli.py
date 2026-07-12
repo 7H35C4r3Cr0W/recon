@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import typer
 
-from oscprecon import config, vault_export
+from oscprecon import config, shell, vault_export
 from oscprecon.models import Target
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
@@ -92,6 +93,25 @@ def export_vault_cmd(
         raise typer.Exit(2)
     out = vault_export.export_vault(Profile.load(directory), dest)
     typer.echo(f"[exported] {out} (snapshot — creds.json values redacted)")
+
+
+@app.command()
+def doctor() -> None:
+    """Check that each wrapped recon tool is installed; print install hints for the missing ones."""
+    tools = sorted(shell.ALLOWED_TOOLS)
+    missing = [tool for tool in tools if shutil.which(tool) is None]
+    typer.echo(f"[doctor] {len(tools) - len(missing)}/{len(tools)} wrapped tools found on PATH")
+    if not missing:
+        typer.echo("[doctor] all wrapped tools present — exam-ready.")
+        return
+    typer.echo(f"[doctor] {len(missing)} missing (install the ones you need):")
+    for tool in missing:
+        typer.echo(f"  {tool:24}  {shell.install_hint(tool)}")
+    # why: alternatives cover the same capability — don't alarm the user about skipping them.
+    typer.echo(
+        "\nNote: alternatives are fine to skip — netexec covers nxc/crackmapexec, and "
+        "GetX.py covers impacket-GetX.py (and vice-versa)."
+    )
 
 
 def main() -> None:
