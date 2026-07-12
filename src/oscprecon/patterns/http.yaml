@@ -1,0 +1,25 @@
+# HTTP/web recon next-steps, derived from Andre's Obsidian methodology notes (content discovery +
+# fingerprint + WordPress ENUMERATION only — the notes' password-brute lines are excluded per §2).
+# http findings are {port, path, status, note}.
+
+- match:
+    service: http
+  suggest:
+    - text: "Content discovery — directories with your raft wordlist + common extensions (add -k for https)"
+      command: "feroxbuster -u http://{target}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,asp,xml,html,js,sql,gz,zip"
+    - text: "Alternative content discovery with gobuster"
+      command: "gobuster dir -u http://{target}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt -t 50 -x php,asp,xml,html,js,sql,gz,zip"
+    - text: "Fingerprint the web stack"
+      command: "whatweb http://{target}:{port}/"
+# source: Obsidian: 0.01 Cheatsheets .../80 (Web services)/80 _ Web services.md; .../Directory Discovery/feroxbuster.md; .../Technology Discovery/Whatweb.md
+
+- match:
+    service: http
+    field: note
+    value: "(?i)wordpress"
+  suggest:
+    - text: "WordPress detected — enumerate vulnerable themes/plugins + users (enumeration only — no password brute)"
+      command: "wpscan --url http://{target}:{port}/ -e vt,tt,u,ap"
+    - text: "Pull usernames from the WordPress REST API"
+      command: "curl -s http://{target}:{port}/wp-json/wp/v2/users"
+# source: Obsidian: 0.01 Cheatsheets .../80 (Web services)/Wordpress.md

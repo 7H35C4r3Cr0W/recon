@@ -1,0 +1,42 @@
+# SMB recon next-steps, derived from Andre's Obsidian methodology notes (enumeration only — no brute
+# force / no exploitation). Findings the smb module emits: signing, auth, share, user, policy.
+
+- match:
+    service: smb
+  suggest:
+    - text: "Deeper user enumeration — enum4linux -a often surfaces users the -ng run misses (slower)"
+      command: "enum4linux -a {target}"
+    - text: "Username enumeration via nmap NSE"
+      command: "nmap -sV --script smb-enum-users -p 139,445 {target}"
+# source: Obsidian: 0.01 Cheatsheets .../139&445 (SMB)/Scripts and username enum.md
+
+- match:
+    service: smb
+    field: kind
+    value: "auth"
+  suggest:
+    - text: "Anon/guest SMB session works — map share access with smbmap (tests anon+guest by default)"
+      command: "smbmap -H {target}"
+    - text: "Null-session RPC enumeration — users, groups, domain info"
+      command: "rpcclient -U '' -N {target}"
+# source: Obsidian: 0.01 Cheatsheets OSCP-Notes/Enumeration.md; .../139&445 (SMB)/smbmap.md
+
+- match:
+    service: smb
+    field: kind
+    value: "share"
+  suggest:
+    - text: "Share '{value}' found — recurse the share trees to see what's readable"
+      command: "smbmap -H {target} -R"
+    - text: "Browse the share directly with smbclient (bounded recursive listing)"
+      command: "smbclient \"//{target}/{value}\" -N -c 'recurse on; ls'"
+# source: Obsidian: 0.01 Cheatsheets .../139&445 (SMB)/smbmap.md; OSCP-Notes/Enumeration.md
+
+- match:
+    service: smb
+    field: kind
+    value: "user"
+  suggest:
+    - text: "User '{value}' discovered — cross-check enum4linux -a and nmap smb-enum-users (each surfaces users the other misses)"
+      command: "nmap -sV --script smb-enum-users -p 139,445 {target}"
+# source: Obsidian: 0.01 Cheatsheets .../139&445 (SMB)/Scripts and username enum.md

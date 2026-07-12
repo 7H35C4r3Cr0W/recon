@@ -89,6 +89,20 @@ def test_suggest_for_dedups_identical() -> None:
 
 
 def test_shipped_patterns_pass_gates() -> None:
-    # the real patterns/ dir must ALWAYS pass both gates (currently empty; enforced as entries land)
+    # the real patterns/ dir must ALWAYS pass both gates (enforced as entries land)
     assert engine.check_provenance() == []
     assert engine.check_forbidden() == []
+
+
+def test_shipped_patterns_fire_on_findings() -> None:
+    # the shipped smb/http patterns must load + fire on the real finding shapes, all sourced
+    findings: list[dict[str, Any]] = [
+        {"module": "smb", "kind": "auth", "value": "authenticated", "detail": "null"},
+        {"module": "smb", "kind": "share", "value": "IT", "detail": "READ"},
+        {"module": "http", "port": 80, "path": "/", "status": 200, "note": "WordPress 6.1"},
+    ]
+    suggestions = engine.suggest_for(findings, target="10.10.10.5")  # loads shipped patterns/
+    commands = " ".join(s.command_template or "" for s in suggestions)
+    assert "smbmap -H 10.10.10.5" in commands
+    assert "wpscan --url http://10.10.10.5:80/" in commands
+    assert suggestions and all(s.source_box for s in suggestions)
