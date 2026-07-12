@@ -11,7 +11,9 @@
       command: "gobuster dir -u http://{target}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt -t 50 -x php,asp,xml,html,js,sql,gz,zip"
     - text: "Fingerprint the web stack"
       command: "whatweb http://{target}:{port}/"
-# source: Obsidian: 0.01 Cheatsheets .../80 (Web services)/80 _ Web services.md; .../Directory Discovery/feroxbuster.md; .../Technology Discovery/Whatweb.md
+    - text: "nmap web NSE — title, headers, allowed methods, and http-enum's common-path sweep"
+      command: "nmap --script http-enum,http-title,http-headers,http-methods -p {port} {target}"
+# source: Obsidian: 0.01 Cheatsheets .../80 (Web services)/80 _ Web services.md; .../Directory Discovery/feroxbuster.md; .../Technology Discovery/Whatweb.md; .../1. Initial Recon/Ports and tools.md
 
 - match:
     service: http
