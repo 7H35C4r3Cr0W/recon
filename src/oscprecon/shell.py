@@ -209,6 +209,7 @@ class ShellResult:
     duration_s: float
     missing_tool: str | None = None
     blocked: str | None = None
+    cancelled: bool = False
 
 
 def run(
@@ -217,6 +218,7 @@ def run(
     *,
     cwd: Path | None = None,
     timeout: float | None = None,
+    cancel: threading.Event | None = None,
     on_line: Callable[[str], None] | None = None,
 ) -> ShellResult:
     argv = shlex.split(shell_line)
@@ -266,6 +268,7 @@ def run(
     )
 
     timed_out = False
+    cancelled = False
     watchdog: threading.Timer | None = None
     if timeout is not None:
         # why: the streaming read blocks until the child closes stdout, so proc.wait(timeout=)
@@ -278,6 +281,23 @@ def run(
 
         watchdog = threading.Timer(timeout, _kill)
         watchdog.start()
+
+    monitor: threading.Thread | None = None
+    if cancel is not None:
+        cancel_event = cancel
+
+        def _watch_cancel() -> None:
+            nonlocal cancelled
+            # why: the read loop blocks in the pipe, so a side thread is the only way a cancel
+            # takes effect promptly — poll the child and kill it the moment the event is set.
+            while proc.poll() is None:
+                if cancel_event.wait(0.2):
+                    cancelled = True
+                    proc.kill()
+                    return
+
+        monitor = threading.Thread(target=_watch_cancel, daemon=True)
+        monitor.start()
 
     exit_code = -1
     try:
@@ -295,10 +315,20 @@ def run(
         if proc.poll() is None:
             proc.kill()
             proc.wait()
+        if monitor is not None:
+            monitor.join(timeout=1.0)
 
     if timed_out and on_line is not None:
         on_line(f"[timeout] killed after {timeout}s")
+    if cancelled and on_line is not None:
+        on_line("[cancelled] killed on request")
 
     return ShellResult(
-        shell_line, exit_code, output_file, started, _now_iso(), time.monotonic() - start
+        shell_line,
+        exit_code,
+        output_file,
+        started,
+        _now_iso(),
+        time.monotonic() - start,
+        cancelled=cancelled,
     )
