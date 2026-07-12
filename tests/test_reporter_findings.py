@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from oscprecon import audit
 from oscprecon import findings as findings_mod
 from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
@@ -52,6 +53,23 @@ def test_report_findings_placeholder_when_empty(tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     report = Reporter(prof).render()
     assert "_No service findings yet" in report
+
+
+def test_report_renders_audit_trail(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    audit.record(prof.directory, "b", "run", details={"label": "smb full"})
+    audit.record(prof.directory, "b", "credential-added", details={"username": "svc"})
+    report = Reporter(prof).render()
+    assert "## Audit trail" in report
+    assert "run" in report and "smb full" in report
+    assert "credential-added" in report
+    assert report.index("## Command log") < report.index("## Audit trail")  # appendix last
+
+
+def test_report_audit_placeholder_when_empty(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    report = Reporter(prof).render()
+    assert "_No audit events recorded yet._" in report
 
 
 def test_report_links_hacktricks_per_service(tmp_path: Path) -> None:

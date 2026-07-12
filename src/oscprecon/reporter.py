@@ -6,10 +6,14 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
+from oscprecon import audit, references
 from oscprecon import findings as findings_mod
-from oscprecon import references
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
+
+# why: §6a — the report's Audit-trail appendix shows the most recent events; older ones stay in
+# audit.jsonl (and audit-archive/). Cap keeps the report readable on a long engagement.
+_AUDIT_CAP = 200
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -53,6 +57,17 @@ def _finding_line(finding: dict[str, Any]) -> str:
     return (prefix + " ".join(parts)).strip() or "(finding)"
 
 
+def _audit_summary(details: dict[str, Any]) -> str:
+    # why: keep the markdown table intact — escape pipes and bound each value.
+    parts = []
+    for key, value in details.items():
+        text = str(value).replace("|", "\\|")
+        if len(text) > 60:
+            text = text[:57] + "…"
+        parts.append(f"{key}={text}")
+    return ", ".join(parts)
+
+
 def _group_findings(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
     groups: dict[str, list[str]] = {}
     for finding in raw:
@@ -92,6 +107,19 @@ class Reporter:
         if profile.notes_path.exists():
             notes = profile.notes_path.read_text(encoding="utf-8").strip()
         raw_findings = findings_mod.load_findings(profile.directory)
+        all_audit = audit.load_entries(profile.directory)
+        shown_audit = all_audit[-_AUDIT_CAP:]
+        audit_rows = [
+            {
+                "ts": entry.get("ts", ""),
+                "actor": entry.get("actor", ""),
+                "action": entry.get("action", ""),
+                "summary": _audit_summary(
+                    entry.get("details", {}) if isinstance(entry.get("details"), dict) else {}
+                ),
+            }
+            for entry in shown_audit
+        ]
         suggestions = suggest_for(
             raw_findings,
             target=profile.target.ip,
@@ -109,6 +137,8 @@ class Reporter:
             "status": profile.status,
             "services": services,
             "finding_groups": _group_findings(raw_findings),
+            "audit_rows": audit_rows,
+            "audit_total": len(all_audit),
             "command_history": profile.command_history,
             "tags": profile.tags,
             "notes": notes,

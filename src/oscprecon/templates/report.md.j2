@@ -81,3 +81,20 @@ _No pattern suggestions yet — sourced `patterns/*.yaml` entries populate this 
 {% if not command_history %}
 _No commands run yet._
 {% endif %}
+
+## Audit trail
+{% if audit_total > audit_rows | length %}
+
+_Showing the {{ audit_rows | length }} most recent of {{ audit_total }} events — older events remain in `audit.jsonl`._
+{% endif %}
+{% if audit_rows %}
+
+| Time | Actor | Action | Details |
+| ---- | ----- | ------ | ------- |
+{% for a in audit_rows %}
+| {{ a.ts }} | {{ a.actor }} | {{ a.action }} | {{ a.summary }} |
+{% endfor %}
+{% else %}
+
+_No audit events recorded yet._
+{% endif %}
