@@ -101,5 +101,6 @@ def test_manual_commands_are_recon_only() -> None:
     assert len(entries) >= 5
     for entry in entries:
         command = entry["command"]
-        assert shlex.split(command)[0] in {"snmpwalk", "nmap", "onesixtyone"}
+        allowed = {"snmpwalk", "snmpbulkwalk", "snmp-check", "nmap", "onesixtyone"}
+        assert shlex.split(command)[0] in allowed
         assert "--passwords" not in command and "--continue-on-success" not in command
