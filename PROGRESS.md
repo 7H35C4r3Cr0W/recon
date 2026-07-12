@@ -18,6 +18,24 @@ Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
 
+### Phase 5 · adversarial review + fixes (DONE)
+Ran a 6-dimension multi-agent adversarial review over the whole session's Phase 5 diff (37 agents;
+each finding double-verified by refute-biased skeptics — 5 of 15 candidates survived). All 5 fixed,
+each with a regression test:
+- **(high) orchestrator reuse** — `_completed` admitted any-ever exit-0, so a later truncating
+  force-run resurrected a partial file and the versioned scan was skipped when a resume found a new
+  port. Now key the LATEST entry per `output_file` and require exit-0 **+** matching `shell_line`.
+- **(med) `--resume` wrong target** — the CLI `ip` arg was silently ignored (stored target scanned);
+  now errors on mismatch.
+- **(med) parallel UI churn** — every worker completion re-ran `_set_profile`, reloading the notes
+  editor (cursor/undo reset) and rebuilding the tree (selection dropped). `NotesPane.set_profile` and
+  `ServiceTree.populate` are now idempotent; `_post_run_refresh` is lightweight.
+- **(med) vault frontmatter** — raw f-strings produced invalid YAML on ordinary nmap version strings
+  (`(workgroup: X)`); now `yaml.safe_dump`.
+- **(low) audit table** — `_audit_summary` now collapses CR/LF (a pasted multi-line value broke the
+  markdown row). Plus a real in-flight-worker cancel test (the earlier hang bug's coverage gap).
+Two headline severities were verifier-downgraded and one "injection" framing flagged a false-positive.
+
 ### Phase 5 · block 3: audit log (§6a) (DONE)
 Append-only `<profile>/audit.jsonl` trail. **Engine** `audit.py`: `record()` writes {ts, actor,
 action, profile, details} best-effort (a serialization/I/O failure is logged, never raised),
