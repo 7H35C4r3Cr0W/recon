@@ -25,3 +25,34 @@
     - text: "Pull usernames from the WordPress REST API"
       command: "curl -s http://{target}:{port}/wp-json/wp/v2/users"
 # source: Obsidian: 0.01 Cheatsheets .../80 (Web services)/Wordpress.md
+
+- match:
+    service: http
+    field: note
+    value: "(?i)tomcat"
+  suggest:
+    - text: "Apache Tomcat — confirm the version from the docs page"
+      command: "curl -s http://{target}:{port}/docs/"
+    - text: "Look for the Tomcat manager / host-manager consoles (foothold if weak/default creds)"
+      command: "curl -sI http://{target}:{port}/manager/html"
+# source: Obsidian: CPTS/Attacking Common Applications/Tomcat - Discovery & Enumeration.md
+
+- match:
+    service: http
+    field: note
+    value: "(?i)jenkins"
+  suggest:
+    - text: "Jenkins — grab the version from the login page footer and check whether auth is disabled"
+      command: "curl -s http://{target}:{port}/login"
+# source: Obsidian: CPTS/Attacking Common Applications/Jenkins - Discovery & Enumeration.md
+
+- match:
+    service: http
+    field: note
+    value: "(?i)gitlab"
+  suggest:
+    - text: "GitLab — browse public projects for committed secrets / SSH keys"
+      command: "curl -s http://{target}:{port}/explore"
+    - text: "Check the GitLab sign-up page (registration surface + username enumeration)"
+      command: "curl -sI http://{target}:{port}/users/sign_up"
+# source: Obsidian: CPTS/Attacking Common Applications/Gitlab - Discovery & Enumeration.md
