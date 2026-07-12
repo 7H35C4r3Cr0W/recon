@@ -1,9 +1,39 @@
 from pathlib import Path
 
+import yaml
+
 from oscprecon import findings as findings_mod
 from oscprecon import vault_export
 from oscprecon.models import Credential, DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
+
+
+def _frontmatter_block(md: str) -> str:
+    # extract text between the first two '---' fences
+    assert md.startswith("---\n")
+    return md.split("---\n", 2)[1]
+
+
+def test_frontmatter_stays_valid_yaml_with_colon_in_version(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path / "ws", "b", Target(ip="10.10.10.5"))
+    # an ordinary nmap -sV Samba line yields a version with an embedded ": " (workgroup: ...)
+    prof.set_services(
+        [
+            DiscoveredService(
+                port=445,
+                proto=Proto.TCP,
+                service="netbios-ssn",
+                product="Samba smbd",
+                version="4.6.2 (workgroup: WORKGROUP)",
+                discovered_at="",
+            )
+        ]
+    )
+    out = vault_export.export_vault(prof, tmp_path / "vault")
+    note = (out / "services" / "445-tcp-netbios-ssn.md").read_text(encoding="utf-8")
+    parsed = yaml.safe_load(_frontmatter_block(note))  # must not raise + round-trips
+    assert parsed["version"] == "4.6.2 (workgroup: WORKGROUP)"
+    assert parsed["port"] == 445
 
 
 def _seeded_profile(tmp_path: Path) -> Profile:

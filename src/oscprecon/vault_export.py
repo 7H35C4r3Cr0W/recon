@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from oscprecon import creds as creds_mod
 from oscprecon import findings as findings_mod
 from oscprecon import references
@@ -21,14 +23,13 @@ def _slug(text: str, fallback: str = "item") -> str:
 
 
 def _frontmatter(fields: dict[str, Any]) -> str:
-    lines = ["---"]
-    for key, value in fields.items():
-        if isinstance(value, list):
-            lines.append(f"{key}: [{', '.join(str(item) for item in value)}]")
-        else:
-            lines.append(f"{key}: {value}")
-    lines.append("---")
-    return "\n".join(lines)
+    # why: values carry free-form target-derived text (e.g. nmap version "smbd 4.6.2 (workgroup: X)"
+    # embeds ": ") — hand-formatting produced invalid YAML that Obsidian silently drops. safe_dump
+    # quotes/escapes every scalar. sort_keys=False keeps our field order; lists render inline.
+    body = yaml.safe_dump(
+        fields, sort_keys=False, allow_unicode=True, default_flow_style=None
+    ).strip()
+    return f"---\n{body}\n---"
 
 
 def _service_note_name(service: DiscoveredService) -> str:
