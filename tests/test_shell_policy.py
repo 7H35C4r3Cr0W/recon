@@ -194,9 +194,26 @@ def test_blocks_postgresql_server_modifying_primitives() -> None:
     assert blocked("SELECT pg_read_file('/etc/passwd')")
     assert blocked("SELECT pg_ls_dir('/')")
     assert blocked("SELECT lo_export(1, '/tmp/x')")
+    # review-hardening: variants + evasions that earlier slipped through
+    assert blocked("DO $body$ BEGIN PERFORM 1; END $body$")  # tagged dollar-quote (not just $$)
+    assert blocked("DO $$ BEGIN PERFORM 1; END $$")
+    assert blocked("CREATE/**/EXTENSION plpython3u")  # block-comment splits keyword
+    assert blocked("CREATE/**/FUNCTION f() RETURNS int AS $x$ x $x$ LANGUAGE sql")
+    assert blocked("ALTER/**/ROLE postgres SUPERUSER")
+    assert blocked("ALTER USER postgres WITH SUPERUSER")  # USER is an alias of ROLE
+    assert blocked("DROP USER victim")
+    assert blocked("SELECT pg_read_binary_file('/etc/shadow')")  # binary_ infix variant
+    assert blocked("SELECT pg_ls_waldir()")
+    assert blocked("SELECT pg_ls_logdir()")
+    assert blocked("SELECT pg_stat_file('/etc/passwd')")
+    assert blocked("GRANT pg_read_server_files TO app")
+    assert blocked("COPY (SELECT 1) TO PROGRAM 'id'")
     # read-only enumeration must NOT be blocked (no simplistic substring false positives)
     assert not blocked("SELECT version()")
     assert not blocked("SELECT datname FROM pg_database")
     assert not blocked("SELECT rolname FROM pg_roles")
+    assert not blocked("SELECT rolcanlogin FROM pg_roles")
     assert not blocked("SELECT current_user, version()")
     assert not blocked("SELECT schema_name FROM information_schema.schemata")
+    assert not blocked("SELECT copy FROM audit_log")  # a column named 'copy' is not the COPY stmt
+    assert not blocked("SELECT datname FROM pg_database WHERE datname = 'copydb'")

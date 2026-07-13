@@ -42,6 +42,39 @@ findings, each fixed with a regression test in small commits:
   YAML/HTML/CSS/JS/template resources and the 3 console entry points load from a clean venv.
 - 511 → tests green after the pass; four gates + offscreen GUI suite clean.
 
+### Phase 2 · PostgreSQL module (postgresql) — DONE
+Fifth and final DB service module (module name `postgresql`, matching the services.yaml stub).
+Banner-only per §12, but distinct from the mysql/mssql twins in two ways below.
+- **Tier-1 is credential-free `nmap -sV -p {port}` version detection ONLY**: there is no unauth
+  PostgreSQL info NSE (the only pgsql script is `pgsql-brute`, forbidden + policy-blocked), so none is
+  invented and no login is attempted. Test asserts the argv carries no `-U`/`-c`/`--script`/creds.
+- **Non-standard port propagation** (the mysql/mssql modules silently hardcoded their default): the
+  discovered port now flows through the shared simple-recon chain — panel `recon_requested(module,
+  port)` → `tool_panel.simple_recon_requested(str,int)` → `SimpleReconWorker(profile, module, port)` →
+  `steps_fn(target, port)` → `recon_steps(target, port)`. PostgreSQL honours it in the command, the
+  output filename (`nmap-sv-{port}.txt`), and a `port` finding; mysql/mssql recon_steps now take the
+  port too (default when 0). No silent 5432 fallback (regression-tested end-to-end + panel-emits-port).
+- **parser** (`parsers.py`): structural `^<port>/tcp open [ssl/]postgresql\b` match → service / version
+  (product prefix stripped) / TLS-wrapped / port findings. A bare "PostgreSQL" log/error line is never a
+  finding; `[ \t]` anti-newline-bleed; CRLF + `[missing]`/`[blocked]` sentinel + malformed-safe; dedup.
+- **shell-policy hardening**: the DB-client backstop gained a PostgreSQL keyword regex (`_PG_FORBIDDEN_RE`)
+  blocking COPY…TO/FROM/PROGRAM, CREATE/DROP FUNCTION/EXTENSION/ROLE/DATABASE, ALTER ROLE, DO $$,
+  pg_read_file/pg_write_file/pg_ls_dir, lo_import/export on the custom-command path — WITHOUT
+  false-positiving read-only enum (SELECT … FROM pg_database/pg_roles). Applies to all DB clients.
+- **Tier-2** `manual_commands.yaml` (6): single postgres superuser check (terminal-only — GUI disables
+  stdin), postgres:postgres default-cred, and creds-gated version/databases/roles/current-user enum, all
+  via the libpq connection URI (`postgresql://user:pass@host:port/db`) so creds work under argv exec
+  (`PGPASSWORD=` would not). **pattern** `patterns/postgresql.yaml` (2, `# source:`): fires only on real
+  identification (never a bare open 5432) and interpolates target+port. **GUI**: one `SIMPLE_SPECS` entry.
+- 12 parser + 6 module + postgres shell-policy + pattern-engine + 3 GUI (worker, non-standard port,
+  panel-emits-port) tests. 537 pass; wheel ships the new resources. **Adversarial 5-lens review**
+  (11 agents): parser / port-propagation / tier-boundaries / manual-safety / patterns / GUI-lifecycle /
+  packaging all came back **clean**; 6 confirmed findings, all in the new custom-command policy backstop
+  (defense-in-depth), all fixed: tagged dollar-quote `DO $body$…$body$` bypass, `/**/` comment splitting
+  `CREATE/**/FUNCTION`, `ALTER/DROP USER` role-aliases, `pg_read_binary_file`/`pg_ls_*dir`/`pg_stat_file`
+  variants, `GRANT pg_read_server_files`, and a `SELECT copy FROM` false positive. Backstop now strips
+  SQL comments before matching + uses keyword-family regexes. `6628bc8` + policy hardening follow-up.
+
 ### Phase 2 · MySQL module (mysql) — DONE
 Fourth DB service module — banner-only per CLAUDE.md §12 (MySQL = "Banner only"; root default-cred is
 user judgment, Tier-2), built as the direct twin of MSSQL. Shared `SimpleReconSpec`, name `mysql`
@@ -141,9 +174,9 @@ User approved expanding the §2 allow-list for read-only enum tools and wiring e
 
 **Coverage now: 99 tool-hints / 94 service rules, 26 pattern rules / 48 suggestions, 60 allow-listed
 tools, 16 module packages.** The vault is essentially exhausted for recon syntax (2nd pass was mostly
-fixes + protocol-gap fills). **Remaining follow-ups** (not blockers): full Tier-1 modules for
-Postgres (Redis + Mongo full auto-enum, MSSQL + MySQL banner-only per §12 — all done; Postgres
-still tool-hints only); a Kerberos module home for the AS-REP/SPN
+fixes + protocol-gap fills). **Remaining follow-ups** (not blockers): all five DB modules
+(Redis + Mongo full auto-enum; MSSQL + MySQL + PostgreSQL banner-only per §12) are done — remaining
+is a Kerberos module home for the AS-REP/SPN
 manuals; `openssl s_client` STARTTLS variants for 110/143. Skipped as too-borderline for §2:
 ssl-heartbleed, rmi-vuln-classloader, IIS http-iis-short-name-brute (policy blocks *brute*), and the
 new-binaries tnscmd10g/ident-user-enum/svmap/braa (nmap covers them).

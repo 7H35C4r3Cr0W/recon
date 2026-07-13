@@ -47,7 +47,7 @@ reference), plus a Bloodhound-style graph view (`Ctrl+G`).
   parsed into a service tree. Non-standard HTTP/DB ports get their own per-port nodes and output.
 - **Per-service modules** — HTTP (granular feroxbuster/gobuster/ffuf/dirsearch builder), vhost, SMB
   (tiered null/guest auto-recon), FTP, SSH, DNS, LDAP, SMTP, NFS, SNMP, TFTP, NetBIOS, IKE, NTP, and
-  read-only DB modules (Redis, MongoDB, MSSQL, MySQL). Each ships Tier-1 auto recon, Tier-2 manual
+  read-only DB modules (Redis, MongoDB, MSSQL, MySQL, PostgreSQL). Each ships Tier-1 auto recon, Tier-2 manual
   follow-ups, a parser, and pattern-library "recon next steps".
 - **Findings & credentials** persist to `findings.json` / `creds.json` (mode 600); anonymous/null
   enum auto-records a credential entry consumed by later modules.

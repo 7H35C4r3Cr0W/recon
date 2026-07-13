@@ -93,7 +93,8 @@ _FORBIDDEN_FLAGS: frozenset[str] = frozenset({"--continue-on-success", "--passwo
 # why: the DB clients are allow-listed for read-only enum (§12), but the custom-command path lets a
 # user hand-type a query — refuse file-write / read / OS-exec / DDL primitives (not recon).
 _DB_CLIENTS: frozenset[str] = frozenset({"mysql", "psql", "mongosh", "mongo", "redis-cli"})
-# plain file/OS primitives (any DB client): substring-matched on the whitespace-normalised query.
+# plain file/OS primitives (any DB client): substring-matched on the normalised query. The PG
+# pg_*_file / pg_ls_*dir family is a regex below (variants like pg_read_binary_file evade a substr).
 _DB_FORBIDDEN_SUBSTR: tuple[str, ...] = (
     "into outfile",
     "into dumpfile",
@@ -102,25 +103,34 @@ _DB_FORBIDDEN_SUBSTR: tuple[str, ...] = (
     "sys_eval",
     "lo_import",
     "lo_export",
-    "pg_read_file",
-    "pg_write_file",
-    "pg_ls_dir",
     "\\!",
 )
 # PostgreSQL server-modifying / file / OS primitives — a keyword regex, NOT a blunt substring, so
 # read-only enum (SELECT ... FROM pg_database / pg_roles, current_user) is never blocked by chance.
-# `copy ... to|from|program` needs COPY as a real word before to/from, so `SELECT ... FROM` is safe.
+# Comments are stripped and whitespace normalised first (below), so /**/ and tab/newline variants +
+# tagged dollar-quotes (DO $body$…$body$) cannot split keywords. The COPY branch requires COPY to be
+# followed by a target (a `(` or a non-keyword identifier), so `SELECT copy FROM t` (a column named
+# copy) is NOT blocked while `COPY t TO`/`COPY (SELECT …) TO PROGRAM` is.
 _PG_FORBIDDEN_RE = re.compile(
-    r"\bcopy\b[^;]*\b(?:to|from|program)\b"
+    r"\bcopy\s*(?:\(|(?!(?:from|to|program|select|with)\b)[\"a-z_])[^;]*\b(?:to|from|program)\b"
     r"|\bcreate\s+(?:or\s+replace\s+)?(?:function|extension|role|database|user)\b"
-    r"|\bdrop\s+(?:role|database|function|extension)\b"
-    r"|\balter\s+role\b"
-    r"|\bdo\s+\$\$",
+    r"|\bdrop\s+(?:role|user|database|function|extension)\b"
+    r"|\balter\s+(?:role|user)\b"
+    r"|\bgrant\b[^;]*\bpg_(?:read|write|execute)_server\w*\b"
+    r"|\bdo\b[^;]*\$[a-z0-9_]*\$"
+    r"|\bpg_(?:read|write)_(?:binary_)?file\b"
+    r"|\bpg_ls_\w*dir\b"
+    r"|\bpg_stat_file\b",
 )
 
 
 def _db_primitive_violation(tool: str, argv: list[str]) -> str | None:
-    joined = re.sub(r"\s+", " ", " ".join(argv[1:])).lower()
+    raw = " ".join(argv[1:])
+    # strip SQL comments (block + line) BEFORE collapsing whitespace, so a comment can't hide/split
+    # a keyword; PostgreSQL treats a comment as whitespace, so this mirrors the server's own lexer.
+    raw = re.sub(r"/\*.*?\*/", " ", raw, flags=re.DOTALL)
+    raw = re.sub(r"--[^\n]*", " ", raw)
+    joined = re.sub(r"\s+", " ", raw).lower()
     for primitive in _DB_FORBIDDEN_SUBSTR:
         if primitive in joined:
             return f"{tool} {primitive.strip()} is a file/OS primitive, not recon (forbidden)"
