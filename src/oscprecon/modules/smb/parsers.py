@@ -6,8 +6,44 @@ from typing import Any
 
 
 @dataclass
+class SmbEntry:
+    name: str
+    is_dir: bool
+    size: int = 0
+
+
+# smbclient `ls`: "  <name>  <attrs>  <size>  <DOW> <Mon> <DD> <HH:MM:SS> <YYYY>". Anchor on the
+# trailing date so a name with spaces survives; attrs is a letter combo (D=dir, A/N/H/R/S/L).
+_SMB_LS = re.compile(
+    r"^\s+(?P<name>.*\S)\s+(?P<attrs>[DAHRSNL]+)\s+(?P<size>\d+)\s+"
+    r"\w{3}\s+\w{3}\s+\d+\s+[\d:]+\s+\d{4}\s*$"
+)
+# lines smbclient interleaves with a streamed file's content (`get file -`), plus its banners
+_SMB_NOISE = re.compile(r"^(getting file |NT_STATUS|\s*\d+ blocks of size|Domain=|OS=|Try \"help)")
+
+
+def parse_smbclient_ls(text: str) -> list[SmbEntry]:
+    entries: list[SmbEntry] = []
+    for line in text.splitlines():
+        match = _SMB_LS.match(line.rstrip())
+        if match is None:
+            continue
+        name = match.group("name").strip()
+        if name in (".", ".."):
+            continue
+        is_dir = "D" in match.group("attrs")
+        entries.append(SmbEntry(name, is_dir, 0 if is_dir else int(match.group("size"))))
+    return entries
+
+
+def strip_smbclient_noise(text: str) -> str:
+    # drop smbclient's status/banner lines so a peek shows the FILE, not the tool chatter
+    return "\n".join(line for line in text.splitlines() if not _SMB_NOISE.match(line))
+
+
+@dataclass
 class SmbFinding:
-    kind: str  # auth | signing | share | user | policy | note
+    kind: str  # auth | signing | share | user | policy | note | peek
     value: str
     detail: str = ""
     module: str = "smb"

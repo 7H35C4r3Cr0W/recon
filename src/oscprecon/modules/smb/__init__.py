@@ -1,20 +1,29 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import shlex
 from dataclasses import dataclass
 
 from oscprecon.models import Command, Credential, Finding, Port, ScanResults, Target
 from oscprecon.modules.base import Module
+from oscprecon.modules.peek import PEEK_MAX_FILES
+from oscprecon.modules.peek import is_peekable as _peek_is_peekable
+from oscprecon.modules.peek import peek_snippet as peek_snippet  # re-export
 from oscprecon.modules.smb.parsers import (
+    SmbEntry,
     SmbFinding,
     netexec_auth_ok,
     parse_smb_tool,
+    parse_smbclient_ls,
     readable_shares,
+    strip_smbclient_noise,
 )
 
 __all__ = [
+    "PEEK_MAX_FILES",
     "SMB_SERVICE_NAMES",
+    "SmbEntry",
     "SmbFinding",
     "SmbModule",
     "SmbStep",
@@ -22,12 +31,21 @@ __all__ = [
     "backslash_unc",
     "escaped_unc",
     "forward_unc",
+    "is_share_peekable",
     "netexec_auth_ok",
     "parse_smb_tool",
+    "parse_smbclient_ls",
+    "peek_snippet",
     "readable_shares",
+    "strip_smbclient_noise",
     "to_backslash_command",
     "to_escaped_command",
 ]
+
+
+def is_share_peekable(entry: SmbEntry) -> bool:
+    return _peek_is_peekable(entry.name, entry.is_dir, entry.size)
+
 
 SMB_SERVICE_NAMES = frozenset({"microsoft-ds", "netbios-ssn", "smb", "microsoft-ds?"})
 _SMB_PORTS = frozenset({139, 445})
@@ -240,6 +258,25 @@ class SmbModule(Module):
                 ),
             )
         ]
+
+    def share_peek_step(self, target: Target, share: str, name: str, method: str) -> SmbStep:
+        # stream a small, already-listed text file to stdout (§12: bounded triage read). smbclient
+        # uses backslash paths inside a share; the status line it prints is stripped from the peek.
+        host = target.ip
+        auth = "-U 'guest%'" if method == "guest" else "-N"
+        unc = shlex.quote(f"//{host}/{share}")
+        inner = f'get "{name.replace("/", chr(92))}" -'
+        digest = hashlib.sha1(f"{share}/{name}".encode(), usedforsecurity=False).hexdigest()[:8]
+        slug = re.sub(r"[^A-Za-z0-9._-]", "-", f"{share}-{name}").strip("-")[:40] or "file"
+        return SmbStep(
+            Command(
+                "smb",
+                f"smbclient {unc} {auth} -c {shlex.quote(inner)}",
+                f"Peek: preview the head of {share}/{name} (small text file).",
+                "< 15s",
+                f"smb/peek/{slug}-{digest}.txt",
+            ),
+        )
 
     def commands(self, target: Target, ports: list[Port]) -> list[Command]:
         steps = (

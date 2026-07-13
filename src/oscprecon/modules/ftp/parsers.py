@@ -4,6 +4,11 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from oscprecon.modules.peek import extension as _extension
+from oscprecon.modules.peek import (
+    peek_snippet as peek_snippet,  # re-export for the ftp module + tests
+)
+
 
 @dataclass
 class FtpFinding:
@@ -30,26 +35,7 @@ class FtpEntry:
 
     @property
     def extension(self) -> str:
-        head, dot, ext = self.name.rpartition(".")
-        return ext.lower() if dot and head else ""  # "" for no-ext and dotfiles (.bashrc)
-
-
-_NON_PRINTABLE = re.compile(r"[^\x09\x0a\x0d\x20-\x7e]")  # keep tab/LF/CR + printable ASCII
-
-
-def peek_snippet(text: str, limit: int = 60) -> str:
-    """A safe, bounded preview of a small file's content for quick triage.
-
-    Strips control/non-printable bytes and collapses whitespace so nothing hostile or noisy reaches
-    the UI; caps the length; and calls out binary content instead of showing garbage.
-    """
-    stripped = _NON_PRINTABLE.sub("", text)
-    if text and len(stripped) < len(text) * 0.7:  # >30% non-printable -> treat as binary
-        return "(binary or non-text content)"
-    collapsed = " ".join(stripped.split())
-    if not collapsed:
-        return "(empty)"
-    return collapsed[:limit] + ("…" if len(collapsed) > limit else "")
+        return _extension(self.name)
 
 
 # Unix `ls -l`: perms, links, owner, group, size, month, day, time/year, then the name. The name is

@@ -17,6 +17,8 @@ from oscprecon.modules.ftp.parsers import (
     peek_snippet,
     subdirs,
 )
+from oscprecon.modules.peek import PEEK_MAX_BYTES, PEEK_MAX_FILES
+from oscprecon.modules.peek import is_peekable as _peek_is_peekable
 
 __all__ = [
     "FTP_SERVICE_NAMES",
@@ -41,57 +43,9 @@ __all__ = [
 FTP_SERVICE_NAMES = frozenset({"ftp", "ftp-data", "ftps", "ftps-data"})
 _FTP_PORTS = frozenset({21})
 
-# Bounded content peek (§12: reads are triage, not bulk exfil). Only small text-like files, capped.
-PEEK_MAX_BYTES = 8192  # only peek files the listing already shows as this small
-PEEK_MAX_FILES = 8  # at most this many peeks per walk, so it's never a download storm
-_PEEK_TEXT_EXT = frozenset(
-    {
-        "txt",
-        "log",
-        "conf",
-        "config",
-        "cfg",
-        "ini",
-        "xml",
-        "json",
-        "yaml",
-        "yml",
-        "md",
-        "csv",
-        "sh",
-        "bash",
-        "php",
-        "html",
-        "htm",
-        "js",
-        "py",
-        "sql",
-        "env",
-        "properties",
-        "inc",
-        "bak",
-        "old",
-        "asp",
-        "aspx",
-        "jsp",
-        "pl",
-        "rb",
-        "pem",
-        "pub",
-        "key",
-        "htpasswd",
-        "htaccess",
-        "cnf",
-    }
-)
-
 
 def is_peekable(entry: FtpEntry) -> bool:
-    # small, non-dir, text-like (a known text ext, or no ext — often a config/script). Size 0
-    # is skipped so we never fetch something we can't bound.
-    if entry.is_dir or entry.size <= 0 or entry.size > PEEK_MAX_BYTES:
-        return False
-    return entry.extension == "" or entry.extension in _PEEK_TEXT_EXT
+    return _peek_is_peekable(entry.name, entry.is_dir, entry.size)  # shared triage gate (§12)
 
 
 def ftp_file_url(target: str, port: int, path: str) -> str:

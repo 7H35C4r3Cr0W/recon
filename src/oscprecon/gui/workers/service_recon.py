@@ -11,14 +11,12 @@ from oscprecon.gui.workers.base import CancellableThread
 from oscprecon.models import Credential, Target
 from oscprecon.modules.dns import DnsFinding, DnsModule, parse_dns_tool
 from oscprecon.modules.ftp import (
-    PEEK_MAX_FILES,
     FtpFinding,
     FtpModule,
     is_peekable,
     nmap_anon_ok,
     parse_ftp_listing,
     parse_ftp_tool,
-    peek_snippet,
 )
 from oscprecon.modules.ftp import (
     anon_credential as ftp_anon_credential,
@@ -32,14 +30,18 @@ from oscprecon.modules.ldap import (
 from oscprecon.modules.ldap import (
     anon_credential as ldap_anon_credential,
 )
+from oscprecon.modules.peek import PEEK_MAX_FILES, peek_snippet
 from oscprecon.modules.smb import (
     SmbFinding,
     SmbModule,
     SmbStep,
     anon_credential,
+    is_share_peekable,
     netexec_auth_ok,
     parse_smb_tool,
+    parse_smbclient_ls,
     readable_shares,
+    strip_smbclient_noise,
 )
 from oscprecon.modules.ssh import SshFinding, SshModule, parse_ssh_tool
 from oscprecon.parsing import run_parser
@@ -129,11 +131,41 @@ class SmbReconWorker(CancellableThread):
                 collected += followup
             # dedup: full/shares modes enumerate shares via both null and guest, so the same
             # readable share can appear twice — list each once (dict.fromkeys preserves order).
-            for share in dict.fromkeys(readable_shares(collected)):
-                self._run_phase(module.share_steps(target, share, method))
+            collected += self._walk_shares(target, method, readable_shares(collected))
 
         self._write_findings(collected)
         return SmbReconResult(self._summarize(collected, method), creds)
+
+    def _run_smb_step(self, step: SmbStep) -> str:
+        base = self._profile.directory
+        out = base / step.command.output_file
+        shell.run(
+            step.command.shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit
+        )
+        try:
+            return out.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+
+    def _walk_shares(self, target: Target, method: str, shares: list[str]) -> list[SmbFinding]:
+        # list each readable share's root, surface its files as findings, and peek small text ones —
+        # a bounded content triage across all shares (§12), never bulk exfil.
+        found: list[SmbFinding] = []
+        budget = PEEK_MAX_FILES
+        for share in dict.fromkeys(shares):
+            if self._cancel.is_set():
+                break
+            ls_step = self._module.share_steps(target, share, method)[0]
+            for entry in parse_smbclient_ls(self._run_smb_step(ls_step)):
+                path = f"{share}/{entry.name}"
+                detail = "" if entry.is_dir else f"{entry.size} bytes"
+                found.append(SmbFinding("dir" if entry.is_dir else "file", path, detail))
+                if budget > 0 and is_share_peekable(entry):
+                    step = self._module.share_peek_step(target, share, entry.name, method)
+                    snippet = peek_snippet(strip_smbclient_noise(self._run_smb_step(step)))
+                    found.append(SmbFinding("peek", path, snippet))
+                    budget -= 1
+        return found
 
     def _write_findings(self, collected: list[SmbFinding]) -> None:
         if not collected:
@@ -152,6 +184,14 @@ class SmbReconWorker(CancellableThread):
             readable = set(readable_shares(collected))
             summary.append(f"Shares ({len(names)}):")
             summary.extend(f"  {n}{' [READ]' if n in readable else ''}" for n in names)
+        share_files = [f.value for f in collected if f.kind == "file"]
+        if share_files:
+            summary.append(f"Share files ({len(share_files)}):")
+            summary.extend(f"  {f}" for f in sorted(set(share_files))[:20])
+        peeks = [(f.value, f.detail) for f in collected if f.kind == "peek"]
+        if peeks:
+            summary.append(f"Peeked contents ({len(peeks)}):")
+            summary.extend(f"  {path} → {snippet}" for path, snippet in peeks)
         users = sorted({f.value for f in collected if f.kind == "user"})
         if users:
             shown = ", ".join(users[:10])
