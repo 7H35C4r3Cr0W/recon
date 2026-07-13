@@ -6,8 +6,8 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (108 files) · `ruff check` + `ruff format --check` clean ·
-  **721 tests** pass (incl. 193 offscreen GUI) · `test_packaging` green (wheel ships resources).
+- **Verified:** `mypy --strict` clean (109 files) · `ruff check` + `ruff format --check` clean ·
+  **732 tests** pass (incl. 194 offscreen GUI) · `test_packaging` green (wheel ships resources).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
 ## Status legend
@@ -409,22 +409,24 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
 tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-**⏭ Finding-aware HackTricks integration — Phase 1 (vendor + index). GATE CLEARED.**
+**⏭ Credential-spraying GUI (finishes the owner's cred-spray request).** The amendment + engine are
+done + committed; what remains is the user-facing surface.
 
-- **Why this one:** the owner confirmed the offline-vendored-markdown approach is OSCP-legal; the
-  CLAUDE.md §2/§27 gate is now **applied** (`bf42f1e` — offline vendoring allowed, live scraping still
-  forbidden). It's deterministic and offline once the markdown is vendored.
-- **Phase 1 scope:** vendor a bounded network-services-pentesting markdown snapshot under
-  `references/hacktricks/`, a refresh script, and a `service/module → file+anchor` index; ship in the
-  wheel; offline-load test. Needs one-time network access to fetch the repo at vendor time. (Section
-  extraction + finding-aware UX are later phases — see the memory.)
+- **Scope:** a **spray panel** (pick target services + creds from the vault → preview the command →
+  Run) driven by a spray worker that passes `shell.run(spray=True)` **only** when `config.spray_enabled`;
+  an **editable cred-vault UI** (add / edit / delete on `creds.json`). Clean, **Burp-style** layout
+  (UX north-star). Tests: worker gates on the setting; vault CRUD; spray commands stay single-target.
+- **Then:** finding-aware HackTricks Phase 1 (vendor + index) — §2/§27 gate already cleared (`bf42f1e`);
+  needs one-time network at vendor time.
 
 **Parallel future tracks (need an owner decision / gate):**
-- **Credential store + OSCP-legal password spraying** (owner request; hydra smb/ftp/ssh, editable cred
-  vault). **Verified OSCP-legal**, but it **reverses the tool's recon-only identity** (§1) and the §2
-  hydra/spray ban + `shell.policy_violation` enforcement — so it needs an explicit **CLAUDE.md §1/§2
-  amendment first** (draft on request) and should be **opt-in / off-by-default** to keep the exam-legal
-  default for the public release. See [[cred-spray-scope-change]].
+- **Credential spraying (opt-in, off by default)** — CLAUDE.md §1/§2/§2a amendment ✅ (`ab9829f`) +
+  **engine ✅** (`e4fcf7d`/`2923177`/`6ea11cc`): `config.spray_enabled` gate, gated
+  `shell.policy_violation(spray=)`, `spray.py` builder, editable cred vault, wordlist gating,
+  Preferences toggle. **NEXT: the spray GUI** — spray panel + editable cred-vault UI (Burp-clean); the
+  run worker passes `spray=True` ONLY when `config.spray_enabled`. See [[cred-spray-scope-change]].
+- **Finding-aware HackTricks integration** — §2/§27 gate ✅; Phase 1 (vendor + index) ready (needs
+  one-time network at vendor time).
 - **Phase 6 distribution** (installer / tool-update-resilient parsers / single-click app / splash).
 
 **Blocked:** live validation + timed mock (authorized target required). Full detail in the build memory

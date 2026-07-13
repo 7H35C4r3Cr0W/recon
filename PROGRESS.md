@@ -39,6 +39,24 @@ New `modules/kerberos/` — the 20th service module, wired into the shared Simpl
   (no `-usersfile`/`-request`/cracking tools), SimpleRecon worker parse, pattern firing. The
   parametrized `test_simple_panel_manual_followups_stay_legal` now covers kerberos too.
 
+### Credential spraying — opt-in, off by default (§2a) — ENGINE DONE
+Owner-approved scope change (verified OSCP-legal). CLAUDE.md amended (`ab9829f`): §1 recon-only →
+recon-first, §2 hydra/spray gated, new §2a Spray-mode contract, Tier-3 Forbidden → Gated. Engine
+across 3 chunks:
+- **spray 1/N (`e4fcf7d`):** `config.spray_enabled` (default false) + accessor; `shell.policy_violation
+  (argv, *, spray=False)` — default byte-identical, `spray=True` unlocks ONLY the credential-attempt
+  category (SPRAY_TOOLS hydra/medusa, --passwords/--continue-on-success, wpscan -P/-U, netexec
+  list-spray, nmap *-brute) and STILL blocks Metasploit/SQLMap/DB-primitive/ike-PSK/searchsploit-PoC/
+  ntpdate; `shell.run(..., spray=False)`.
+- **spray 2/N (`2923177`):** `spray.py` (SPRAY_SERVICES smb/winrm/ldap=netexec + ssh/ftp/rdp=hydra;
+  build_spray_command single-target; write_spray_lists 0600; vault_material passwords-only);
+  `creds.delete_credential`; `wordlists` password-list gating (surfaced only in Spray mode).
+- **spray 3/N (`6ea11cc`):** Preferences Scan-tab "Enable Spray mode" toggle (off by default, §2a
+  warning).
+Safety: every spray command is BLOCKED by the default policy and clears ONLY with spray=True (tested
+per service). NEXT: the spray GUI (panel + editable cred-vault UI, Burp-clean; worker gates on
+config.spray_enabled). 732 tests green.
+
 ### Report Exploit-DB-hit persistence — DONE (lookup-only §14)
 searchsploit runs live in the reference pane; now its hits persist and land in the report.
 - **`src/oscprecon/edb.py`** — per-profile `edb.json` store: `add_edb(service, product, version, hits)`
