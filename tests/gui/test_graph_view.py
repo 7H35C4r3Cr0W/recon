@@ -76,11 +76,12 @@ def test_graph_view_constructs_fallback(qtbot: QtBot, tmp_path: Path) -> None:
 def test_main_window_graph_toggle(qtbot: QtBot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window._central_stack.currentIndex() == 0
+    assert window._central_stack.currentWidget() is window._dashboard  # home view with no profile
     window._graph_action.setChecked(True)
     assert window._central_stack.currentIndex() == 1
     window._graph_action.setChecked(False)
     assert window._central_stack.currentIndex() == 0
+    window._dashboard.shutdown()
 
 
 def test_graph_service_open_switches_back_and_selects(qtbot: QtBot, tmp_path: Path) -> None:

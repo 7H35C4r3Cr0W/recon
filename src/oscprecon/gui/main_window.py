@@ -57,12 +57,14 @@ from oscprecon.gui.workers import (
     SshReconResult,
     SshReconWorker,
 )
+from oscprecon.gui.workspace import WorkspaceDashboard
 from oscprecon.manual_commands import expand, load_manual_commands
 from oscprecon.models import Credential, DiscoveredService, Target
 from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
 from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
+from oscprecon.workspace import locks
 
 # Workers moved to oscprecon.gui.workers; re-exported here so existing imports/tests keep working.
 __all__ = [
@@ -123,6 +125,7 @@ class MainWindow(QMainWindow):
         self.resize(1200, 720)
         self._profile: Profile | None = None
         self._auditor: Auditor | None = None
+        self._locked_dir: Path | None = None  # the profile dir we currently hold an edit-lock on
         self._tasks = TaskManager()
         self._task_bar = TaskStatusBar(self._tasks)
         self._recent_menu: QMenu
@@ -178,10 +181,15 @@ class MainWindow(QMainWindow):
         self._graph_view = GraphView()
         self._graph_view.service_open_requested.connect(self._on_graph_service_open)
         self._report_view = ReportView()
+        self._dashboard = WorkspaceDashboard()
+        self._dashboard.open_requested.connect(lambda d: self._open_path(Path(str(d))))
+        self._dashboard.create_requested.connect(self._on_new)
+        self._dashboard.status_message.connect(self._tool_panel.append_output)
         self._central_stack = QStackedWidget()
         self._central_stack.addWidget(splitter)  # 0: three-pane
         self._central_stack.addWidget(self._graph_view)  # 1: graph
         self._central_stack.addWidget(self._report_view)  # 2: report preview
+        self._central_stack.addWidget(self._dashboard)  # 3: workspace dashboard (home)
         self.setCentralWidget(self._central_stack)
 
         self._notes_pane = NotesPane()
@@ -262,6 +270,10 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(add_cred_action)
 
         view_menu = self.menuBar().addMenu("&View")
+        workspace_action = QAction("Workspace Dashboard", self)
+        workspace_action.setShortcut("Ctrl+0")
+        workspace_action.triggered.connect(self._show_workspace)
+        view_menu.addAction(workspace_action)
         view_menu.addAction(self._notes_dock.toggleViewAction())
         self._graph_action = QAction("Graph", self)
         self._graph_action.setCheckable(True)
@@ -304,18 +316,65 @@ class MainWindow(QMainWindow):
             self._recent_menu.addAction(action)
 
     def _audit_action(self, action: str, **details: Any) -> None:
+        if self._profile is not None and self._profile.read_only:
+            return  # read-only mode makes no writes — including the audit log
         if self._auditor is not None:
             self._auditor.record(action, details=details)
 
+    def _release_lock(self) -> None:
+        if self._locked_dir is not None:
+            locks.release(self._locked_dir)
+            self._locked_dir = None
+
+    def _resolve_lock(self, profile: Profile) -> bool:
+        # returns True to proceed (may set profile.read_only), False if the user cancels. A stale /
+        # malformed / absent lock proceeds (recovered by _set_profile); a LIVE lock held by another
+        # instance prompts for read-only vs cancel.
+        directory = profile.directory
+        if directory == self._locked_dir:
+            return True  # already ours
+        info, _malformed = locks.read_lock(directory)
+        if info is None or locks.is_stale(info):
+            return True
+        detail = (
+            f"PID {info.pid} on {info.hostname} (v{info.app_version}, since {info.started_at[:19]})"
+        )
+        box = QMessageBox(self)
+        box.setWindowTitle("Profile in use")
+        box.setText(f"“{profile.profile_name}” is open in another window.\n\n{detail}")
+        ro_btn = box.addButton("Open read-only", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is ro_btn:
+            profile.read_only = True
+            return True
+        return False
+
     def _set_profile(self, profile: Profile) -> None:
+        self._release_lock()  # drop the previously-open profile's edit lock
+        if not profile.read_only:
+            acquired = locks.acquire(profile.directory)
+            if acquired is None:
+                acquired = locks.recover_stale(profile.directory)  # clears a stale/malformed lock
+            if acquired is not None:
+                self._locked_dir = profile.directory
+            else:  # a live / foreign lock we can't take -> fall back to read-only
+                profile.read_only = True
         self._profile = profile
         self._auditor = Auditor(profile.directory, profile.profile_name)
+        if not profile.read_only:
+            profile.mark_opened()
+            profile.save()  # persist last_opened_at
         target = profile.target
         label = f"{profile.profile_name} — {target.ip}"
         if target.hostname:
             label += f" ({target.hostname})"
+        if profile.read_only:
+            label += "   [READ-ONLY]"
         self._target_label.setText(label)
-        self.setWindowTitle(f"oscp-recon — {profile.profile_name}")
+        ro = " [read-only]" if profile.read_only else ""
+        self.setWindowTitle(f"oscp-recon — {profile.profile_name}{ro}")
+        self._central_stack.setCurrentIndex(0)  # leave the dashboard, show the three-pane view
         self._tool_panel.set_target(target.ip)
         self._tool_panel.set_profile(profile)
         self._service_tree.populate(profile.discovered_services, force=True)
@@ -342,6 +401,12 @@ class MainWindow(QMainWindow):
                 has_credential=bool(self._profile.credentials()),
             )
         )
+
+    def _show_workspace(self) -> None:
+        self._graph_action.setChecked(False)
+        self._report_action.setChecked(False)
+        self._dashboard.refresh()  # rescan off-thread
+        self._central_stack.setCurrentWidget(self._dashboard)
 
     def _on_toggle_graph(self, checked: bool) -> None:
         if checked:
@@ -389,6 +454,7 @@ class MainWindow(QMainWindow):
             self._set_profile(profile)
             self._tool_panel.append_output(f"[restored] {candidate}")
             return
+        self._show_workspace()  # nothing to restore -> land on the workspace dashboard
 
     def _on_service_selected(self, service: object) -> None:
         selected = service if isinstance(service, DiscoveredService) else None
@@ -418,8 +484,8 @@ class MainWindow(QMainWindow):
             self._reference_pane.show_exploits(hits)
 
     def _on_page_visited(self, label: str, url: str) -> None:
-        if self._profile is None:
-            return
+        if self._profile is None or self._profile.read_only:
+            return  # read-only: don't record reference visits
         if self._tasks.active_count > 0:
             # why: a worker may be saving profile.json on its thread — buffer the visit and persist
             # it in _post_run_refresh rather than dropping it or racing the save.
@@ -463,6 +529,8 @@ class MainWindow(QMainWindow):
         if profile is None:
             QMessageBox.warning(self, "Corrupt profile", f"{path}/profile.json could not be read.")
             return
+        if not self._resolve_lock(profile):
+            return  # user cancelled a locked-profile prompt
         self._tool_panel.clear_output()
         self._set_profile(profile)
         self._audit_action("profile-opened")
@@ -501,6 +569,9 @@ class MainWindow(QMainWindow):
         if self._profile is None:
             QMessageBox.information(self, "No profile", "Open or create a profile first.")
             return
+        if self._profile.read_only:
+            QMessageBox.information(self, "Read-only", "This profile is open read-only.")
+            return
         dialog = AddCredentialDialog(self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -537,17 +608,20 @@ class MainWindow(QMainWindow):
         # needs an all-clear (it mutates the profile from its thread); parallel service recon just
         # needs room under the concurrency cap.
         any_running = self._tasks.active_count > 0
+        read_only = self._profile is not None and self._profile.read_only
         self._new_action.setEnabled(not any_running)
         self._open_action.setEnabled(not any_running)
-        self._save_action.setEnabled(not any_running)
+        self._save_action.setEnabled(not any_running and not read_only)
         self._recent_menu.setEnabled(not any_running)
         self._run_button.setEnabled(
-            self._profile is not None and self._tasks.can_start(exclusive=True)
+            self._profile is not None and self._tasks.can_start(exclusive=True) and not read_only
         )
         # why: keep the tree browseable (selecting a service is read-only) — only the launch
-        # buttons in the tool panel are gated on capacity, via set_running.
+        # buttons in the tool panel are gated on capacity, via set_running. A read-only profile
+        # disables every recon launch (a worker would write findings/creds -> ReadOnlyError).
         self._service_tree.setEnabled(self._profile is not None)
-        self._tool_panel.set_running(not self._tasks.can_start())
+        self._tool_panel.set_running(read_only or not self._tasks.can_start())
+        self._notes_pane.setEnabled(not read_only)  # no notes edits in read-only
 
     def _launch(self, worker: QThread, label: str, *, exclusive: bool = False) -> None:
         # admission primitive: register with the TaskManager, guarantee release on `finished`
@@ -602,7 +676,7 @@ class MainWindow(QMainWindow):
         # the notes editor / command builder / window title / recent menu (that churns the user's
         # context mid-work). The tree/notes widgets are idempotent, so an unchanged set is a no-op.
         if self._profile is not None:
-            if self._pending_visits:
+            if self._pending_visits and not self._profile.read_only:
                 for label, url in self._pending_visits:
                     self._profile.add_reference_visited(label, url)
                 self._pending_visits.clear()
@@ -620,7 +694,8 @@ class MainWindow(QMainWindow):
         # profile.json — so we wait for every in-flight task. But wait() on the GUI thread with no
         # prior cancel freezes the window for the tool's full remaining runtime; cancel first so
         # shell.run kills the child group and each worker returns promptly, then wait to tear down.
-        self._notes_pane.flush()
+        if self._profile is None or not self._profile.read_only:
+            self._notes_pane.flush()  # no notes write in read-only mode
         self._audit_action("profile-closed")
         self._tasks.cancel_all()
         for edb_worker in list(self._edb_workers):
@@ -632,6 +707,8 @@ class MainWindow(QMainWindow):
         for edb_worker in list(self._edb_workers):
             if edb_worker.isRunning():
                 edb_worker.wait()
+        self._dashboard.shutdown()  # stop any in-flight workspace scan
+        self._release_lock()  # best-effort lock release on shutdown
         super().closeEvent(event)
 
     def _on_scan_preset(self, command: str) -> None:
