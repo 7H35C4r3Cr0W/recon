@@ -13,7 +13,7 @@ A **PySide6 desktop GUI recon orchestrator** for OSCP exam prep and exam day, bu
 1. **Learn** — work each box on Lain Kusanagi's OSCP-like list manually to build muscle memory.
 2. **Build** — turn each box's lessons into reusable, OSCP-exam-legal recon automation.
 
-The tool is **recon-only**. It wraps standard OSCP-allowed enumeration tools, surfaces findings in a Bloodhound-style graph, links inline to HackTricks and Exploit-DB references, and produces Obsidian-friendly markdown reports. It does **not** exploit, brute-force auth, chain attacks, or call any LLM at runtime.
+The tool is **recon-first**. It wraps standard OSCP-allowed enumeration tools, surfaces findings in a Bloodhound-style graph, links inline to HackTricks and Exploit-DB references, and produces Obsidian-friendly markdown reports. It does **not** exploit, chain attacks, or call any LLM at runtime. **Credential spraying** — OSCP-legal against your own authorized targets — is supported as an **explicit, opt-in, off-by-default** capability (see § 2a); with Spray mode **off** (the default) the tool is strictly recon-only and blocks all brute/spray.
 
 ---
 
@@ -39,8 +39,7 @@ The OSCP exam has strict tooling rules. This tool must be exam-legal by default 
 
 - **Metasploit / msfvenom / meterpreter** — exam allows one use total; not for recon. Out of this tool entirely.
 - **SQLMap** — exam restrictions too tight. Not wrapped.
-- **Brute-force auth tools** — `hydra`, `medusa`, `patator`, `crowbar`. Banned on exam.
-- **Password spray combos** — `netexec --users <list> --passwords <list>`, `wpscan --passwords`, similar.
+- **Credential brute / spraying in the DEFAULT (recon-only) mode** — `hydra`, `medusa`, `patator`, `crowbar`, list-driven `netexec` spraying (`-u <list> -p <list>`, `--continue-on-success`), `wpscan --passwords`. These are **OSCP-legal against your own authorized targets** and are supported **only** in opt-in Spray mode (§ 2a); they are **never** run in the default mode, and never against the exam VPN / control panel or any out-of-scope host.
 - **Commercial scanners** — Nessus, Burp Pro, Acunetix, Qualys.
 - **AI / LLM calls at runtime** — banned during exam. The tool runs offline/local.
 - **Automated exploit chains** — no scan → vuln-match → run-exploit → shell pipelines.
@@ -55,13 +54,23 @@ This is the line every service module must respect:
 |---|---|---|
 | **Tier 1 — Auto** | Null session / anonymous access checks; single well-known account with empty password (`guest:''`) | Runs on one click, streams to output files |
 | **Tier 2 — Shown, not auto** | Single-attempt default credentials against a well-known account (`administrator:''`, `admin:''`, `sa:sa`) | Pre-filled in Manual Follow-ups tab; user clicks Run |
-| **Tier 3 — Forbidden** | Iterating a list of usernames or passwords; anything list-driven; `--continue-on-success` | Not wrapped. Not shown. Not proposed. |
+| **Tier 3 — Gated (opt-in Spray mode)** | Iterating a list of usernames/passwords; list-driven spraying; `--continue-on-success` | **OFF by default.** Enabled only in opt-in Spray mode (§ 2a); target-scoped; user selects creds + confirms before it runs |
 
-**Definitional line:** A single attempt against a well-known account with an empty/default password is recon-adjacent. Iterating a list is brute force.
+**Definitional line:** A single attempt against a well-known account with an empty/default password is recon-adjacent (Tier 2). Iterating a list is credential spraying (Tier 3) — OSCP-legal against authorized targets, but **gated behind opt-in Spray mode (§ 2a), off by default**.
 
 ### Content discovery vs. credential brute force
 
-`feroxbuster`/`gobuster`/`ffuf`/`dirsearch` against web paths is **content discovery** — allowed. Hitting a login form with a wordlist is **credential brute force** — banned. The wordlist picker in the GUI filters out `seclists/Passwords/` entirely.
+`feroxbuster`/`gobuster`/`ffuf`/`dirsearch` against web paths is **content discovery** — always allowed. Hitting a login form with a password wordlist is **credential brute force** — allowed **only** in opt-in Spray mode (§ 2a). The wordlist picker filters out `seclists/Passwords/` in the default mode, and surfaces password lists only when Spray mode is on.
+
+### 2a. Credential spraying — opt-in, off by default
+
+Password spraying / credential brute against **your own authorized targets** is OSCP-legal (OffSec bans automated *exploitation*, not credential attacks — verified vs. the OSCP Exam Guide/FAQ). It is therefore **supported**, but as an **explicit, opt-in capability that is OFF BY DEFAULT** so the tool stays exam-legal-by-default for anyone who runs it (this matters for the public release). Rules:
+
+- **Off by default.** A `spray_enabled` setting (default `false`) gates everything below. With it off, `shell.run` blocks every brute/spray tool exactly as it does today, and the wordlist picker still filters `seclists/Passwords/`. Nothing about the default posture changes.
+- **What Spray mode unlocks (only when on):** `hydra`, `medusa`, list-driven `netexec` spraying (`-u <list> -p <list>`, `--continue-on-success`), `wpscan --passwords`, and password wordlists in the picker — against SMB / FTP / SSH / WinRM / HTTP-login etc. on the **active profile's single target**.
+- **Still forbidden even in Spray mode:** Metasploit / meterpreter, SQLMap, commercial scanners, LLM calls, automated exploit *chains*, and spraying anything other than the assigned target (never the exam VPN / control panel or an out-of-scope host — that is a hard, non-negotiable scope limit).
+- **Cred vault:** sprays draw from the editable `creds.json` store (add / edit / delete in the GUI). The user selects which credentials / combinations to spray and **confirms before anything runs** — it never auto-sprays.
+- **Tooling preference:** prefer `netexec` (already wrapped) for SMB/WinRM; `hydra`/`medusa` for FTP/SSH/etc. Secrets stay redacted in reports / audit / logs as always. UX: a clean, Burp-style surface.
 
 ---
 
@@ -657,7 +666,7 @@ Each follows the same shape (auto Tier 1, `manual_commands.yaml` for Tier 2). Fu
 Cross-cutting. Used by HTTP, vhost, and any future module taking a wordlist.
 
 - `src/oscprecon/wordlists.py` — scans configured paths at app start; indexes each with: full path, filename, category (inferred from path — `web-content`, `dns`, `usernames`, `fuzzing`, etc.), file size, line count.
-- **Filters out `seclists/Passwords/` entirely** — password brute is out of scope. Any wordlist under a path containing `/Passwords/` is suppressed.
+- **Filters out `seclists/Passwords/` by default** — password lists are suppressed unless opt-in Spray mode (§ 2a) is enabled. Any wordlist under a path containing `/Passwords/` is hidden in the default (recon-only) mode, and surfaced only when Spray mode is on.
 - **`WordlistPicker` widget** — searchable dropdown with category chips, favorites pinned top, per-module recent, size + line count per entry.
 - **Persistence:** per-profile last-used in `profile.json`; app-wide favorites in `~/.config/oscprecon/favorites.json`.
 
@@ -1271,7 +1280,7 @@ uv run ruff format --check
 ### No, don't propose
 
 - Anything from the Forbidden list in § 2
-- Wrapping Metasploit, SQLMap, hydra, or commercial tools
+- Wrapping Metasploit, SQLMap, or commercial tools (hydra/medusa/spraying are allowed **only** in opt-in Spray mode — § 2a — off by default)
 - LLM/AI calls at runtime — even "optional"
 - Auto-exploitation gated behind flags
 - Downloading, executing, transforming Exploit-DB PoCs
