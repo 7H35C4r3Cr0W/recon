@@ -164,6 +164,18 @@ def test_postgresql_panel_emits_configured_port(qtbot: QtBot) -> None:
     ]  # module + the non-standard port, not a 5432 default
 
 
+def test_kerberos_worker_parses_and_writes_findings(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.161"))
+    monkeypatch.setattr(shell, "run", _fake_run({"nmap -sV -p 88": "kerberos/nmap-sv.txt"}))
+    result = mw.SimpleReconWorker(prof, "kerberos")._drive()
+    assert result.module == "kerberos"
+    kinds = {f.get("kind") for f in findings_mod.load_findings(prof.directory)}
+    assert {"service", "server-time"} <= kinds
+    assert any("Domain Controller" in line for line in result.summary)  # Tier-1 → DC suggestion
+
+
 def test_worker_empty_output_writes_nothing(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -1,0 +1,34 @@
+# Kerberos / AD (88) recon next-steps — enumeration only, NO cracking (§2). Findings the module emits:
+# kind ∈ service | server-time | user-no-preauth | spn | user.
+
+- match:
+    service: kerberos
+    field: kind
+    value: "service"
+  suggest:
+    - text: "Kerberos KDC on 88 → this host is a Domain Controller. Enumerate users (SMB RID cycling / LDAP), then AS-REP-check known users and list SPNs with valid creds."
+# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+
+- match:
+    service: kerberos
+    field: kind
+    value: "user-no-preauth"
+  suggest:
+    - text: "{value} has Kerberos pre-auth disabled (AS-REP roastable) — a notable misconfiguration; record it. Collecting the AS-REP is enumeration; cracking is out of scope."
+# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+
+- match:
+    service: kerberos
+    field: kind
+    value: "spn"
+  suggest:
+    - text: "SPN {value} is Kerberoastable — record the service account. Requesting the ticket is enumeration; cracking is out of scope."
+# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+
+- match:
+    service: kerberos
+    field: kind
+    value: "server-time"
+  suggest:
+    - text: "KDC server time is {value} — note the clock skew; Kerberos auth fails beyond ~5 minutes. Sync the local clock (faketime / ntpdate) before authenticated AD enum."
+# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md

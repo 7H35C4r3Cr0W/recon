@@ -1,0 +1,10 @@
+Starting Nmap 7.94 ( https://nmap.org )
+Nmap scan report for dc.htb.local (10.10.10.161)
+Host is up (0.021s latency).
+
+PORT   STATE SERVICE      VERSION
+88/tcp open  kerberos-sec Microsoft Windows Kerberos (server time: 2024-06-01 12:34:56Z)
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Service detection performed. Please report any incorrect results.
+Nmap done: 1 IP address (1 host up) scanned in 8.12 seconds

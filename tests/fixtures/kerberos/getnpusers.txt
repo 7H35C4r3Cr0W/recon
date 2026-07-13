@@ -1,0 +1,8 @@
+Impacket v0.11.0 - Copyright 2023 Fortra
+
+[*] Getting TGT for svc-alfresco
+$krb5asrep$23$svc-alfresco@HTB.LOCAL:AAAAAAAAAAAAAAAAAAAAAAAA$FAKEHASHBLOBFORTESTINGONLYDEADBEEFDEADBEEFDEADBEEF
+[-] User administrator doesn't have UF_DONT_REQUIRE_PREAUTH set
+[-] User guest doesn't have UF_DONT_REQUIRE_PREAUTH set
+[*] Getting TGT for backup-svc
+$krb5asrep$23$backup-svc@HTB.LOCAL:BBBBBBBBBBBBBBBBBBBBBBBB$FAKEHASHBLOBFORTESTINGONLYCAFEBABECAFEBABECAFEBABE

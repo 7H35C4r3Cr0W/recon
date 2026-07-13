@@ -160,16 +160,20 @@ Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` �
   now have provenance-cited, forbidden-gate-clean, policy-clean pattern entries (47 rules).
 - ✅ **Report Exploit-DB-hit persistence** — DONE: `edb.py` → per-profile `edb.json` + an "Exploit-DB
   references" report section. Lookup-only (§14): EDB-ID/title/URL only, never the local PoC path.
-- **AD/Kerberos enum workflow polish** — *recommended next chunk.* Surface GetNPUsers/GetUserSPNs
-  listing as Tier-2/module (enumeration only, no cracking). Last well-defined in-scope deterministic
-  chunk; the recon/report core now has no known coverage gaps.
+- ✅ **AD/Kerberos enum workflow** — DONE: `modules/kerberos` (Tier-1 credential-free `nmap -sV -p88`
+  KDC confirm; Tier-2 enum-only single-user AS-REP + GetADUsers/GetUserSPNs). Parser records
+  principals/SPNs but **never the AS-REP/TGS hash**; no `-usersfile`, no `-request`, no cracking.
+- **Finding-aware HackTricks integration** — *recommended next chunk (owner greenlit direction).*
+  Vendor the CC-licensed HackTricks markdown offline and surface the relevant section per finding.
+  **Gate: propose a CLAUDE.md §2/§27 edit first** (permit offline vendoring, still forbid live
+  scraping) + attribution. Phase 1 = vendor + index. Deterministic/offline once permitted.
 - **Timed mock exam (Phase 6).** A timed dry run against a standalone + AD set. Blocked on an authorized
-  live target. (The exam-mode *scan profile* it would exercise is now built.)
+  live target.
 - **Distribution & resilience (future, not greenlit).** Public GitHub release: tool-update-resilient
   parsers, `doctor`→safe installer, single-click contained app, splash screen. See the build memory.
-- **Finding-aware HackTricks integration (future, not greenlit).** Surface the relevant HackTricks
-  section per finding (offline vendored repo). **Needs a CLAUDE.md §27 change first** (§27 currently
-  forbids scraping/caching HackTricks). Reconcile with owner + attribute (CC BY-NC-SA) before any work.
+
+**The in-scope, deterministic recon/report backlog is now exhausted** — 20 modules, patterns 20/20,
+exam profile, portability, EDB persistence, and AD/Kerberos all shipped.
 
 *(The concurrent-copy profile lock, CLAUDE.md §6b, the status footer §19, and the audit log §6a are now
 built — see the Workspace Dashboard section.)*

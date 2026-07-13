@@ -50,9 +50,10 @@ reference), plus a Bloodhound-style graph view (`Ctrl+G`).
   or `exam` (speed-tuned, tight, exam-legal — no vuln NSE) — via Preferences, `Scan → Run recon with
   profile`, or `oscprecon-cli scan --scan-profile`.
 - **Per-service modules** — HTTP (granular feroxbuster/gobuster/ffuf/dirsearch builder), vhost, SMB
-  (tiered null/guest auto-recon), FTP, SSH, DNS, LDAP, SMTP, NFS, SNMP, TFTP, NetBIOS, IKE, NTP, and
-  read-only DB modules (Redis, MongoDB, MSSQL, MySQL, PostgreSQL). Each ships Tier-1 auto recon, Tier-2 manual
-  follow-ups, a parser, and pattern-library "recon next steps".
+  (tiered null/guest auto-recon), FTP, SSH, DNS, LDAP, SMTP, NFS, SNMP, TFTP, NetBIOS, IKE, NTP,
+  **Kerberos/AD** (KDC confirm + enum-only AS-REP/SPN follow-ups, no cracking), and read-only DB modules
+  (Redis, MongoDB, MSSQL, MySQL, PostgreSQL). Each ships Tier-1 auto recon, Tier-2 manual follow-ups, a
+  parser, and pattern-library "recon next steps".
 - **Findings & credentials** persist to `findings.json` / `creds.json` (mode 600); anonymous/null
   enum auto-records a credential entry consumed by later modules.
 - **Reports** — `report.md` (Obsidian-friendly frontmatter + callouts, prior versions archived) with a

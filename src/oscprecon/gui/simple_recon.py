@@ -7,6 +7,7 @@ from pathlib import Path
 from oscprecon.models import Command, Target
 from oscprecon.modules import (
     ike,
+    kerberos,
     mongodb,
     mssql,
     mysql,
@@ -54,6 +55,10 @@ def _netbios_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _ike_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in ike.IkeModule().recon_steps(target)]
+
+
+def _kerberos_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in kerberos.KerberosModule().recon_steps(target)]
 
 
 def _ntp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
@@ -144,6 +149,16 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(ike),
         ike.IkeModule,
         _ike_steps,
+    ),
+    "kerberos": SimpleReconSpec(
+        "kerberos",
+        "Run Kerberos recon (KDC confirm · server time)",
+        "Kerberos/AD recon — Tier-1 is credential-free nmap -sV (KDC + clock-skew). User/SPN "
+        "enumeration (single-user AS-REP, GetADUsers/GetUserSPNs) are Tier-2 manual follow-ups; "
+        "enumeration only, no cracking on-host.",
+        _manual(kerberos),
+        kerberos.KerberosModule,
+        _kerberos_steps,
     ),
     "ntp": SimpleReconSpec(
         "ntp",

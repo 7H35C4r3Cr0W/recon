@@ -9,18 +9,35 @@ Running record of what's been built, in order, so any session can pick up mid-st
 **See [`PROJECT_MAP.md`](PROJECT_MAP.md) for the authoritative status map** (subsystem-by-subsystem
 ✅/🚧/⏭/🕒/⛔/❌, dependency graph, forward phases). This "Next up" is the one-line pointer.
 
-Phases 0–5, all 19 recon modules (each with pattern next-steps, 47 rules), Phase 4 graph (incl. §16
+Phases 0–5, all **20 recon modules** (each with pattern next-steps, 51 rules), Phase 4 graph (incl. §16
 reinforcements), the full Workspace Dashboard & Organization upgrade, the **exam-mode scan profile**,
-**project file operations §19**, and **report Exploit-DB-hit persistence** are **DONE** — 709 tests
-green. Phase 6 is partial: `doctor` + status footer + audit log + concurrent-copy lock + exam profile
-done; only the *timed* mock exam remains (blocked on a live target). **The recon/report core now has no
-known coverage gaps.**
+**project file operations §19**, **report Exploit-DB-hit persistence**, and the **AD/Kerberos enum
+module** are **DONE** — 721 tests green. Phase 6 is partial: `doctor` + status footer + audit log +
+concurrent-copy lock + exam profile done; only the *timed* mock exam remains (blocked on a live target).
 
-**Recommended next chunk (do one at a time):** **AD/Kerberos enumeration workflow polish** — surface
-GetNPUsers/GetUserSPNs listing as Tier-2/module, enumeration only (no cracking, §2). It's the last
-well-defined in-scope deterministic chunk. **After it, the in-scope backlog is essentially exhausted:**
-remaining tracks are FUTURE / not greenlit (distribution phase; finding-aware HackTricks — needs a
-CLAUDE.md §27 change) and BLOCKED (live acceptance testing + timed mock, need an authorized target).
+**The in-scope, deterministic recon/report backlog is now exhausted.** Recommended next chunk:
+**finding-aware HackTricks integration, Phase 1 (vendor + index)** — owner greenlit the direction
+(offline-vendored CC-licensed markdown, OSCP-legal). **Gate: propose a CLAUDE.md §2/§27 edit first**
+(permit offline vendoring, still forbid live scraping) + attribution. Parallel future track:
+distribution phase (installer / resilient parsers / single-click app / splash — not greenlit).
+**Blocked:** live acceptance testing + timed mock exam (need an authorized target).
+
+### AD/Kerberos enum module — DONE (enumeration only, no cracking §2)
+New `modules/kerberos/` — the 20th service module, wired into the shared SimpleRecon panel.
+- **Tier-1 (credential-free):** `nmap -sV -p 88` confirms the KDC (a DC) + reads its server time
+  (Kerberos clock-skew reference). Parser → `service` / `server-time` findings + a "this is a DC"
+  suggestion.
+- **Tier-2 manual follow-ups** (`manual_commands.yaml`, shown/never-auto): single-user AS-REP check
+  `GetNPUsers.py {domain}/USER -no-pass` (edit USER — **not a userlist**, so not a list brute); creds-
+  gated `GetADUsers.py -all` (user listing), `GetUserSPNs.py` (SPN listing, **no `-request`**), and an
+  LDAP SPN query. All impacket scripts are §2-allowed enum scripts.
+- **Parsers** for GetNPUsers/GetUserSPNs/GetADUsers: extract the **principal / SPN / username** —
+  **NEVER the AS-REP or TGS hash** (that's cracking material, out of scope). `patterns/kerberos.yaml`
+  (4 entries) says "cracking is out of scope" explicitly.
+- **Tests (+12 → 721):** parser tests (incl. an assertion the hash blob never reaches a finding),
+  module tests (triggers, Tier-1 command, DC suggestion), manual-command policy-clean + enum-only
+  (no `-usersfile`/`-request`/cracking tools), SimpleRecon worker parse, pattern firing. The
+  parametrized `test_simple_panel_manual_followups_stay_legal` now covers kerberos too.
 
 ### Report Exploit-DB-hit persistence — DONE (lookup-only §14)
 searchsploit runs live in the reference pane; now its hits persist and land in the report.

@@ -6,8 +6,8 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (106 files) · `ruff check` + `ruff format --check` clean ·
-  **709 tests** pass (incl. 191 offscreen GUI) · `test_packaging` green (wheel ships resources).
+- **Verified:** `mypy --strict` clean (108 files) · `ruff check` + `ruff format --check` clean ·
+  **721 tests** pass (incl. 193 offscreen GUI) · `test_packaging` green (wheel ships resources).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
 ## Status legend
@@ -55,16 +55,17 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 
 ## 3. Recon modules — ✅ (core) · 🚧 (breadth)
 
-- **Status:** ✅ for the 19 built modules; 🚧 as a set (extended §12 services not modularized).
+- **Status:** ✅ for the 20 built modules; 🚧 as a set (extended §12 services not modularized).
 - **Files:** `modules/base.py` (ABC) + `modules/nmap.py` + `modules/<svc>/{__init__.py,parsers.py,
   manual_commands.yaml}` for: **http, vhost, smb, ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios,
-  ike, ntp** and read-only DB modules **redis, mongodb, mssql, mysql, postgresql**.
+  ike, ntp, kerberos** and read-only DB modules **redis, mongodb, mssql, mysql, postgresql**.
 - **Does:** each module gives Tier-1 auto recon (credential-free), Tier-2 manual follow-ups, a parser →
-  `findings.json`, and pattern "recon next steps". HTTP reproduces the §9 feroxbuster line via controls
-  and handles non-standard ports; SMB is tiered (null/guest, never list-driven).
-- **Complete:** all 19 modules ship engine + parser tests + fixtures + `manual_commands.yaml` +
-  `services.yaml` hints. PostgreSQL is the newest, hardened via the DB-primitive backstop.
-- **Complete:** **all 19 modules now have `patterns/*.yaml`** (47 rules; ssh/ike/tftp/vhost added).
+  `findings.json`, and pattern "recon next steps". HTTP reproduces the §9 feroxbuster line via controls;
+  SMB is tiered (null/guest, never list-driven); **kerberos** confirms the KDC (Tier-1 `nmap -sV`) and
+  offers enum-only AD follow-ups (single-user AS-REP, GetADUsers/GetUserSPNs) — **no cracking, and the
+  parser records principals/SPNs but never the AS-REP/TGS hash**.
+- **Complete:** all 20 modules ship engine + parser tests + fixtures + `manual_commands.yaml` +
+  `services.yaml` hints, and **all 20 now have `patterns/*.yaml`** (51 rules).
 - **Remaining:** extended §12 services (rsync, finger, memcached, elasticsearch, couchdb, docker, etcd,
   zookeeper, vnc, webdav, ipmi, ipp, mdns, upnp) are **not** dedicated modules (❌ until a real box
   needs one).
@@ -220,7 +221,8 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 | Project file ops (`Open by IP`, `Import`/`Export .tar.gz`) | ✅ **Done** | profile model, workspace index | `workspace/portability.py` + File menu + CLI `export-project`/`import-project`; traversal-safe import, warns `creds.json` included |
 | Pattern coverage for ssh/ike/tftp/vhost | ✅ **Done** | pattern engine | all 19 modules now have `patterns/*.yaml` (47 rules); commands policy-clean |
 | Report EDB-hit persistence | ✅ **Done** | references, profile store | `edb.py`→`edb.json` + report section; lookup-only (no PoC path) |
-| AD / Kerberos enum workflow polish | ⏭ **Next** | smb/ldap modules (✅) | Enumeration only (GetNPUsers/GetUserSPNs listing), no cracking |
+| AD / Kerberos enum workflow | ✅ **Done** | smb/ldap modules | `modules/kerberos` (Tier-1 KDC confirm + enum-only Tier-2); parser stores no hashes |
+| Finding-aware HackTricks integration | ⏭ **Next** (gated) | §27 change first | Vendor HackTricks markdown offline → section-aware surfacing. **Needs a CLAUDE.md §2/§27 edit first** (see phases) |
 | Timed mock-exam dry run | ⛔ | exam preset (✅) + live targets | The "timed" part needs authorized targets |
 | AD / Kerberos enum workflow polish | 🕒 | smb/ldap modules (✅) | Enumeration only, no cracking |
 
@@ -328,7 +330,7 @@ flowchart TD
 |---|---|---|---|---|
 | Shell & command policy | ✅ | High (`test_shell_policy`, `test_shell_cancel`) | Any new module bypassing the chokepoint | Keep it the only exec path |
 | Task lifecycle | ✅ | High (`test_task_lifecycle/manager`, `test_workers`) | Cancellation under profile switch | None — stable |
-| Service modules | ✅ (19) | High (per-module + parser tests + 47 patterns) | Tier-2 drift toward brute | None — all 19 have patterns |
+| Service modules | ✅ (20) | High (per-module + parser tests + 51 patterns) | Tier-2 drift toward brute | None — all 20 have patterns; kerberos enum-only |
 | PostgreSQL | ✅ | High (`test_postgresql_*`) | DB-primitive backstop coverage | None — hardened |
 | GUI architecture | ✅ | High (`tests/gui/*`) | Worker lifecycle regressions | None — refactor landed |
 | Profiles | ✅ | High (`test_config/organization`) | Future schema migrations | Keep schema backward-compatible |
@@ -358,8 +360,8 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
   quick/default/full/exam). Only the *timed* mock-exam dry run remains, which is ⛔ (needs a live target).
 - **Phase 2 — Project portability & recovery** ✅ — `File → Open by IP`, `Import Project` (.tar.gz),
   `Export Project` (.tar.gz, warns `creds.json` included) + CLI equivalents. Traversal-safe import.
-- **Phase 3 — Recon depth** ⏭ **Next** — pattern YAMLs for ssh/ike/tftp/vhost; report EDB-hit
-  persistence; AD/Kerberos enum workflow polish (enumeration only). Deps: pattern engine + modules (done).
+- **Phase 3 — Recon depth** ✅ — pattern YAMLs (20/20 modules), report EDB-hit persistence, and the
+  AD/Kerberos enum module (enumeration only) all shipped.
 - **Phase 4 — Extended services (only as needed)** 🕒/❌ — dedicated modules for §12 services *actually
   encountered on a box* (rsync, finger, memcached, elasticsearch, couchdb, …). Never speculative.
 - **Phase 5 — Live validation** ⛔ — 3 authorized lab targets, live parser validation, performance
@@ -402,22 +404,24 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 
 ## Immediate next chunk
 
-**⏭ AD / Kerberos enumeration workflow polish.**
+**The in-scope, deterministic recon/report backlog is now exhausted** (20 modules + patterns 20/20,
+exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
+tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-- **Why this one:** it is the last well-defined **in-scope, deterministic** chunk — the recon/report
-  core now has no known coverage gaps (patterns 19/19, EDB references persisted). The impacket enum
-  scripts are already allow-listed; this makes AD enumeration a first-class flow.
-- **Completion definition:** a focused Kerberos/AD **enumeration** surface — e.g. surface
-  `GetNPUsers.py` (AS-REP user listing) and `GetUserSPNs.py` (SPN listing) as Tier-2 manual commands /
-  a small module, driven by discovered users + a domain, **enumeration only (no cracking on-host, §2)**;
-  parser + fixtures; pattern entries; tests. Consumes propagated creds when present.
-- **Explicitly excludes:** any hash cracking / roasting-to-crack, the *timed* mock-exam (⛔), and live
-  validation.
+**⏭ Finding-aware HackTricks integration — Phase 1 (vendor + index), gated on a CLAUDE.md §2/§27 edit.**
 
-**After this, the in-scope backlog is essentially exhausted** — the remaining tracks are **future /
-not greenlit** (Phase 6 distribution: installer / resilient parsers / single-click app / splash; and
-the HackTricks deep-integration idea — both need an owner decision, the latter also a §27 change) and
-**blocked** (live validation + timed mock, need an authorized target). Good moment to pick a direction.
+- **Why this one:** the owner confirmed the offline-vendored-markdown approach is OSCP-legal and wants
+  it built "at the right time". It's deterministic and offline once permitted.
+- **Gate (do first):** propose a CLAUDE.md §2/§27 edit distinguishing *vendoring the CC-licensed
+  HackTricks markdown offline* (to allow) from *live scraping/caching of the site at runtime* (still
+  out). §27 currently forbids both; get explicit sign-off + attribution before coding.
+- **Phase 1 scope:** vendor a bounded network-services-pentesting markdown snapshot under
+  `references/hacktricks/`, a refresh script, and a `service/module → file+anchor` index; ship in the
+  wheel; offline-load test. (Section extraction + finding-aware UX are later phases — see the memory.)
+
+**Parallel future tracks (need an owner decision):** Phase 6 distribution (installer / tool-update-
+resilient parsers / single-click app / splash). **Blocked:** live validation + timed mock (authorized
+target required). Full detail in the build memory ([[hacktricks-integration]], [[distribution-goals]]).
 
 ---
 

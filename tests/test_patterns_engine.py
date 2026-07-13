@@ -186,6 +186,35 @@ def test_ssh_ike_tftp_vhost_patterns_fire_and_commands_are_policy_clean() -> Non
     assert all(s.source_box for s in suggestions)  # provenance carried through
 
 
+def test_kerberos_patterns_fire_on_real_finding_shapes() -> None:
+    findings: list[dict[str, Any]] = [
+        {"module": "kerberos", "kind": "service", "value": "kerberos-sec", "detail": "MS Kerberos"},
+        {
+            "module": "kerberos",
+            "kind": "user-no-preauth",
+            "value": "svc-alfresco@HTB.LOCAL",
+            "detail": "AS-REP roastable",
+        },
+        {
+            "module": "kerberos",
+            "kind": "spn",
+            "value": "CIFS/dc.htb.local",
+            "detail": "Kerberoastable account: sql_svc",
+        },
+        {
+            "module": "kerberos",
+            "kind": "server-time",
+            "value": "2024-06-01 12:34:56Z",
+            "detail": "",
+        },
+    ]
+    texts = " ".join(s.text for s in engine.suggest_for(findings, target="10.10.10.5"))
+    assert "Domain Controller" in texts
+    assert "svc-alfresco@HTB.LOCAL" in texts and "AS-REP roastable" in texts
+    assert "CIFS/dc.htb.local" in texts and "Kerberoastable" in texts
+    assert "clock skew" in texts
+
+
 def test_postgresql_pattern_does_not_fire_on_unrelated_findings() -> None:
     # must NOT fire on a bare open 5432 or a non-postgresql finding — requires real identification
     findings: list[dict[str, Any]] = [

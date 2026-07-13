@@ -1,0 +1,26 @@
+# Kerberos / AD manual follow-ups (Tier-2 — shown, never auto-run; §2 impacket enum scripts, no
+# cracking on-host). AS-REP checks target ONE known user (edit USER) — never a username list, so this
+# stays enumeration, not a list-driven brute. {target}/{domain}/{user}/{password} come from the profile.
+
+- description: "AS-REP check for ONE known user (no creds)"
+  why: "GetNPUsers on a single known user — is pre-auth disabled? Enumeration, NOT a list brute. Edit USER."
+  command: "GetNPUsers.py {domain}/USER -dc-ip {target} -no-pass"
+
+- description: "KDC server time (Kerberos clock-skew reference)"
+  why: "Kerberos auth fails outside a ~5-min skew; read the KDC time before authed enum. Read-only recon"
+  command: "nmap -sV -p 88 {target}"
+
+- description: "Enumerate all domain users (GetADUsers, requires creds)"
+  why: "Authenticated user listing over LDAP/Kerberos — feeds AS-REP/SPN targeting. Enumeration only"
+  command: "GetADUsers.py -all {domain}/{user}:{password} -dc-ip {target}"
+  requires: ["creds"]
+
+- description: "List Kerberoastable SPNs (GetUserSPNs, requires creds)"
+  why: "Lists service accounts with SPNs — no -request, so no ticket is dumped. Enumeration only"
+  command: "GetUserSPNs.py {domain}/{user}:{password} -dc-ip {target}"
+  requires: ["creds"]
+
+- description: "SPN discovery via LDAP (requires creds)"
+  why: "Alternative Kerberoast-target discovery straight from AD. Edit the base DN. Enumeration only"
+  command: "ldapsearch -x -H ldap://{target} -D '{user}@{domain}' -w '{password}' -b 'dc=DOMAIN,dc=LOCAL' '(servicePrincipalName=*)' sAMAccountName servicePrincipalName"
+  requires: ["creds"]
