@@ -1,0 +1,118 @@
+# 88tcp/udp - Pentesting Kerberos
+
+## Basic Information
+
+**Kerberos** operates on a principle where it authenticates users without directly managing their access to resources. This is an important distinction because it underlines the protocol's role in security frameworks.
+
+In environments like **Active Directory**, **Kerberos** is instrumental in establishing the identity of users by validating their secret passwords. This process ensures that each user's identity is confirmed before they interact with network resources. However, **Kerberos** does not extend its functionality to evaluate or enforce the permissions a user has over specific resources or services. Instead, it provides a secure way of authenticating users, which is a critical first step in the security process.
+
+After authentication by **Kerberos**, the decision-making process regarding access to resources is delegated to individual services within the network. These services are then responsible for evaluating the authenticated user's rights and permissions, based on the information provided by **Kerberos** about the user's privileges. This design allows for a separation of concerns between authenticating the identity of users and managing their access rights, enabling a more flexible and secure approach to resource management in distributed networks.
+
+**Default Port:** 88/tcp/udp
+
+```
+PORT   STATE SERVICE
+88/tcp open  kerberos-sec
+```
+
+### **To learn how to abuse Kerberos you should read the post about** [**Active Directory**](../../windows-hardening/active-directory-methodology/index.html)**.**
+
+## Kerberos-only environments: client prep and troubleshooting
+
+When NTLM is disabled on domain services (SMB/WinRM/etc.), you must authenticate with Kerberos. Common pitfalls and a working workflow:
+
+- Time synchronization is mandatory. If your host clock is skewed by more than a few minutes you will see `KRB_AP_ERR_SKEW` and all Kerberos auth will fail. Sync against the DC:
+
+```bash
+# quick one-shot sync (requires sudo)
+sudo ntpdate <dc.fqdn> || sudo chronyd -q 'server <dc.fqdn> iburst'
+```
+
+- Generate a valid krb5.conf for the target realm/domain. `netexec` (CME fork) can output one for you while testing SMB:
+
+```bash
+# Generate krb5.conf and install it
+netexec smb <dc.fqdn> -u <user> -p '<pass>' -k --generate-krb5-file krb5.conf
+sudo cp krb5.conf /etc/krb5.conf
+```
+
+- Obtain a TGT and verify the ccache:
+
+```bash
+kinit <user>
+klist
+```
+
+- Use Kerberos with SMB tooling (no passwords sent, uses your ccache):
+
+```bash
+# netexec / CME
+netexec smb <dc.fqdn> -k            # lists shares, runs modules using Kerberos
+# impacket examples also support -k / --no-pass to use the ccache
+smbclient --kerberos //<dc.fqdn>/IPC$
+```
+
+- GSSAPI SSH single sign-on (OpenSSH to Windows OpenSSH server):
+
+```bash
+# Ensure krb5.conf is correct and you have a TGT (kinit)
+# Use the FQDN that matches the host SPN. Wrong names cause: "Server not found in Kerberos database"
+ssh -o GSSAPIAuthentication=yes <user>@<host.fqdn>
+```
+
+Tips:
+- Ensure your `/etc/hosts` resolves the exact FQDN you will SSH/SMB to, and that it comes before any bare domain entries if you are overriding DNS. SPN mismatches break GSSAPI.
+- If NTLM is disabled on SMB you may see `STATUS_NOT_SUPPORTED` with NTLM attempts; add `-k` to force Kerberos.
+
+## More
+
+### Shodan
+
+- `port:88 kerberos`
+
+### MS14-068
+
+The MS14-068 flaw permits an attacker to tamper with a legitimate user's Kerberos login token to falsely claim elevated privileges, such as being a Domain Admin. This counterfeit claim is mistakenly validated by the Domain Controller, enabling unauthorized access to network resources across the Active Directory forest.
+
+https://adsecurity.org/?p=541
+
+Other exploits: [https://github.com/SecWiki/windows-kernel-exploits/tree/master/MS14-068/pykek](https://github.com/SecWiki/windows-kernel-exploits/tree/master/MS14-068/pykek)
+
+## References
+
+- [NetExec (CME) wiki – Kerberos and krb5.conf generation](https://www.netexec.wiki/)
+- [OpenSSH GSSAPIAuthentication](https://man.openbsd.org/ssh_config#GSSAPIAuthentication)
+- [MIT Kerberos – Using Kerberos on UNIX](https://web.mit.edu/kerberos/krb5-1.12/doc/user/user_config.html)
+- [0xdf – HTB: TheFrizz](https://0xdf.gitlab.io/2025/08/23/htb-thefrizz.html)
+
+## HackTricks Automatic Commands
+
+```
+Protocol_Name: Kerberos    #Protocol Abbreviation if there is one.
+Port_Number:  88   #Comma separated if there is more than one.
+Protocol_Description: AD Domain Authentication         #Protocol Abbreviation Spelled out
+
+Entry_1:
+  Name: Notes
+  Description: Notes for Kerberos
+  Note: |
+    Kerberos operates on a principle where it authenticates users without directly managing their access to resources. This is an important distinction because it underlines the protocol's role in security frameworks.
+    In environments like **Active Directory**, Kerberos is instrumental in establishing the identity of users by validating their secret passwords. This process ensures that each user's identity is confirmed before they interact with network resources. However, Kerberos does not extend its functionality to evaluate or enforce the permissions a user has over specific resources or services. Instead, it provides a secure way of authenticating users, which is a critical first step in the security process.
+
+    https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-kerberos-88/index.html
+
+Entry_2:
+  Name: Pre-Creds
+  Description: Brute Force to get Usernames
+  Command: nmap -p 88 --script=krb5-enum-users --script-args krb5-enum-users.realm="{Domain_Name}",userdb={Big_Userlist} {IP}
+
+Entry_3:
+  Name: With Usernames
+  Description: Brute Force with Usernames and Passwords
+  Note: consider git clone https://github.com/ropnop/kerbrute.git ./kerbrute -h
+
+Entry_4:
+  Name: With Creds
+  Description: Attempt to get a list of user service principal names
+  Command: GetUserSPNs.py -request -dc-ip {IP} active.htb/svc_tgs
+```

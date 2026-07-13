@@ -1,0 +1,107 @@
+{
+  "dns": {
+    "file": "pages/dns.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-dns/index.html",
+    "title": "53 - Pentesting DNS"
+  },
+  "ftp": {
+    "file": "pages/ftp.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ftp/index.html",
+    "title": "21 - Pentesting FTP"
+  },
+  "http": {
+    "file": "pages/http.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-web/index.html",
+    "title": "80,443 - Pentesting Web Methodology"
+  },
+  "ike": {
+    "file": "pages/ike.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/ipsec-ike-vpn-pentesting/index.html",
+    "title": "500/udp - Pentesting IPsec/IKE VPN"
+  },
+  "kerberos": {
+    "file": "pages/kerberos.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-kerberos-88/index.html",
+    "title": "88tcp/udp - Pentesting Kerberos"
+  },
+  "ldap": {
+    "file": "pages/ldap.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ldap/index.html",
+    "title": "389, 636, 3268, 3269 - Pentesting LDAP"
+  },
+  "mongodb": {
+    "file": "pages/mongodb.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/27017-27018-mongodb/index.html",
+    "title": "27017,27018 - Pentesting MongoDB"
+  },
+  "mssql": {
+    "file": "pages/mssql.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mssql-microsoft-sql-server/index.html",
+    "title": "1433 - Pentesting MSSQL - Microsoft SQL Server"
+  },
+  "mysql": {
+    "file": "pages/mysql.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mysql/index.html",
+    "title": "3306 - Pentesting Mysql"
+  },
+  "netbios": {
+    "file": "pages/netbios.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/137-138-139-pentesting-netbios/index.html",
+    "title": "137,138,139 - Pentesting NetBios"
+  },
+  "nfs": {
+    "file": "pages/nfs.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/nfs-service-pentesting/index.html",
+    "title": "2049 - Pentesting NFS Service"
+  },
+  "ntp": {
+    "file": "pages/ntp.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ntp/index.html",
+    "title": "123/udp - Pentesting NTP"
+  },
+  "postgresql": {
+    "file": "pages/postgresql.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-postgresql/index.html",
+    "title": "5432,5433 - Pentesting Postgresql"
+  },
+  "rdp": {
+    "file": "pages/rdp.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-rdp/index.html",
+    "title": "3389 - Pentesting RDP"
+  },
+  "redis": {
+    "file": "pages/redis.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/6379-pentesting-redis/index.html",
+    "title": "6379 - Pentesting Redis"
+  },
+  "smb": {
+    "file": "pages/smb.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smb/index.html",
+    "title": "139,445 - Pentesting SMB"
+  },
+  "smtp": {
+    "file": "pages/smtp.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smtp/index.html",
+    "title": "25,465,587 - Pentesting SMTP/s"
+  },
+  "snmp": {
+    "file": "pages/snmp.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-snmp/index.html",
+    "title": "161,162,10161,10162/udp - Pentesting SNMP"
+  },
+  "ssh": {
+    "file": "pages/ssh.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ssh/index.html",
+    "title": "22 - Pentesting SSH/SFTP"
+  },
+  "tftp": {
+    "file": "pages/tftp.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/69-udp-tftp/index.html",
+    "title": "69 - UDP TFTP"
+  },
+  "winrm": {
+    "file": "pages/winrm.md",
+    "url": "https://book.hacktricks.wiki/en/network-services-pentesting/5985-5986-pentesting-winrm/index.html",
+    "title": "5985,5986 - Pentesting WinRM"
+  }
+}

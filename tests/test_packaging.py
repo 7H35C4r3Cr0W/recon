@@ -18,6 +18,9 @@ def test_runtime_resources_resolve_package_relative() -> None:
     assert len(list((PKG / "patterns").glob("*.yaml"))) >= 10
     assert len(list((PKG / "templates").glob("*"))) >= 1
     assert len(list(PKG.glob("modules/*/manual_commands.yaml"))) >= 14
+    # vendored HackTricks offline snapshot (index + per-service markdown)
+    assert (PKG / "references" / "hacktricks" / "index.json").exists()
+    assert len(list((PKG / "references" / "hacktricks" / "pages").glob("*.md"))) >= 18
     # workspace backend + dashboard GUI packages
     for module in ("index", "search", "health", "locks", "activity", "views", "bulk", "models"):
         assert (PKG / "workspace" / f"{module}.py").exists()
@@ -42,6 +45,8 @@ def test_wheel_bundles_runtime_resources(tmp_path: pathlib.Path) -> None:
         return any(sub in n for n in names)
 
     assert has("oscprecon/references/services.yaml")
+    assert has("oscprecon/references/hacktricks/index.json")
+    assert len([n for n in names if "/hacktricks/pages/" in n and n.endswith(".md")]) >= 18
     assert has("oscprecon/gui/graph_html/index.html")
     assert has("oscprecon/gui/graph_html/cytoscape.min.js")
     assert len([n for n in names if n.endswith("manual_commands.yaml")]) >= 14
