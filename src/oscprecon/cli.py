@@ -4,7 +4,8 @@ from pathlib import Path
 
 import typer
 
-from oscprecon import config, doctor as doctor_mod, vault_export
+from oscprecon import config, vault_export
+from oscprecon import doctor as doctor_mod
 from oscprecon.models import Target
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
@@ -164,7 +165,7 @@ def doctor(
         False, "--yes", "-y", help="Skip the confirmation prompt (non-interactive install)."
     ),
 ) -> None:
-    """Check each wrapped tool; print install hints, and with --install offer to apt-install them."""
+    """Check each wrapped tool; print install hints, optionally apt-install the missing ones."""
     report = doctor_mod.scan()
     total = len(report.tools)
     missing = report.missing
@@ -181,7 +182,9 @@ def doctor(
         "GetX.py covers impacket-GetX.py (and vice-versa)."
     )
     if not install:
-        typer.echo("\nRe-run `doctor --install` to apt-install them (asks before running anything).")
+        typer.echo(
+            "\nRe-run `doctor --install` to apt-install them (asks before running anything)."
+        )
         return
     plan = doctor_mod.install_plan(report)
     if plan.manual:

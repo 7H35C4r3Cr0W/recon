@@ -39,6 +39,21 @@ New `modules/kerberos/` — the 20th service module, wired into the shared Simpl
   (no `-usersfile`/`-request`/cracking tools), SimpleRecon worker parse, pattern firing. The
   parametrized `test_simple_panel_manual_followups_stay_legal` now covers kerberos too.
 
+### `doctor` → guided safe installer (distribution item 2)
+`oscprecon-cli doctor` gained a guided installer + a GUI Help→Doctor status view. Safety-first:
+- **`src/oscprecon/doctor.py`** engine: `scan()` (per-tool present/missing + hint), `install_plan()`
+  (deduped apt packages derived ONLY from allow-listed tools' curated hints via a strict
+  `^apt install <pkg>` regex — non-apt pipx/git hints become MANUAL, never auto-run), `install()`
+  (shows the exact `[sudo] apt-get install -y <pkgs>`, requires explicit confirm unless `--yes`,
+  injectable runner, catches OSError when apt/sudo absent → tells the user the command). No shell, no
+  user input in the command — packages can't smuggle metacharacters.
+- **CLI**: `doctor --install [--yes]` (status output preserved; points to `--install` otherwise).
+- **GUI**: Help → Doctor… read-only dialog (present ✓ + missing with hints); installation stays in the
+  CLI (apt needs a terminal/sudo).
+- Tests: engine (scan/plan dedup+manual-split/`_apt_package` injection-safety/confirm gating/runner/
+  missing-apt OSError), CLI (--install runs one curated apt argv via a fake runner; cancel path), GUI
+  dialog. Independent code-review run on the diff.
+
 ### Parser tool-update resilience — never crash on drifted tool output (`595d55a`)
 The owner's top public-release worry. Two layers:
 - **Containment net:** `src/oscprecon/parsing.py::run_parser(parse, *, label, on_line=None)` wraps a

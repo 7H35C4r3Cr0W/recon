@@ -6,8 +6,8 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (115 files) · `ruff check` + `ruff format --check` clean ·
-  **813 tests** pass (incl. 210 offscreen GUI) · `test_packaging` green (wheel ships resources,
+- **Verified:** `mypy --strict` clean (117 files) · `ruff check` + `ruff format --check` clean ·
+  **825 tests** pass (incl. 212 offscreen GUI) · `test_packaging` green (wheel ships resources,
   incl. the vendored HackTricks snapshot).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
@@ -410,19 +410,17 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
 tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-Cred-spraying, HackTricks (Phases 1–2), and **parser tool-update resilience** are done. Next for the
-public-release goal:
+Cred-spraying, HackTricks (Phases 1–2), parser resilience, and the **`doctor` guided safe installer**
+(distribution item 2 — `doctor --install` builds only allow-listed curated `apt` packages, explicit
+confirm, + a GUI Help→Doctor view) are done. Next for the public-release goal — pick one:
 
-**⏭ `doctor` → guided safe installer (distribution item 2).** Tell a user exactly what to install on a
-fresh Kali.
-
-- **Scope:** extend `oscprecon-cli doctor` (already lists missing tools) into a guided, SAFE installer:
-  detect the host, show the `apt`/`pipx` command per missing §2-allowed tool, and offer to install with
-  **explicit confirmation** (never silent, never a forbidden tool). Plus a first-run host-readiness
-  check in the GUI. Deterministic.
-- **Alternatives:** HackTricks Phase 3 polish (more kind→section maps, cleaner mdBook render, offer the
-  §27 live-fetch relax); parser resilience deepening (multi-tool-version fixtures). All in the build
-  memory ([[distribution-goals]], [[hacktricks-integration]]).
+- **⏭ Single-click contained app + splash (distribution items 4–5).** A one-file/AppImage bundle that
+  launches the GUI on click, with a `QSplashScreen` showing ASCII-art branding (Burp-style). Needs a
+  bundler choice (PyInstaller/Briefcase/AppImage). — **highest public-release value.**
+- **HackTricks Phase 3** — more kind→section maps, cleaner mdBook rendering, and the owner-FYSA §27
+  live-fetch relax.
+- **Parser resilience deepening** — multi-tool-version fixtures (prove partial extraction, not just
+  no-crash). All in the build memory ([[distribution-goals]], [[hacktricks-integration]]).
 
 **Parallel future tracks (need an owner decision / gate):**
 - **Credential spraying (opt-in, off by default)** — ✅ **COMPLETE** end-to-end: CLAUDE.md §1/§2/§2a

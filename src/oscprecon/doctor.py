@@ -37,6 +37,44 @@ class DoctorReport:
         return [tool for tool in self.tools if tool.present]
 
 
+# Interchangeable tools: if ANY member is on PATH, the others aren't real gaps. The FIRST member is
+# PREFERRED — the one installed when the whole group is missing (so we never pull deprecated
+# crackmapexec when netexec covers it). Mirrors the CLI's "alternatives are fine to skip" note.
+_ALTERNATIVE_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
+    ("netexec", frozenset({"netexec", "nxc", "crackmapexec"})),
+    ("impacket-GetADUsers.py", frozenset({"GetADUsers.py", "impacket-GetADUsers.py"})),
+    ("impacket-GetNPUsers.py", frozenset({"GetNPUsers.py", "impacket-GetNPUsers.py"})),
+    ("impacket-GetUserSPNs.py", frozenset({"GetUserSPNs.py", "impacket-GetUserSPNs.py"})),
+)
+
+
+def _group_for(tool: str) -> tuple[str, frozenset[str]] | None:
+    for preferred, members in _ALTERNATIVE_GROUPS:
+        if tool in members:
+            return preferred, members
+    return None
+
+
+def effective_missing(report: DoctorReport) -> list[ToolStatus]:
+    # Real gaps only: a tool covered by a present alternative isn't missing, and a wholly-missing
+    # group is represented ONCE by its preferred member (so we install one package, not three).
+    present = {tool.name for tool in report.found}
+    by_name = {tool.name: tool for tool in report.tools}
+    result: list[ToolStatus] = []
+    seen_groups: set[frozenset[str]] = set()
+    for tool in report.missing:
+        group = _group_for(tool.name)
+        if group is None:
+            result.append(tool)
+            continue
+        preferred, members = group
+        if members & present or members in seen_groups:
+            continue
+        seen_groups.add(members)
+        result.append(by_name.get(preferred, tool))
+    return result
+
+
 def scan() -> DoctorReport:
     # shutil.which resolved at call time so a test/global monkeypatch of shutil.which takes effect.
     tools = tuple(
@@ -64,7 +102,7 @@ def install_plan(report: DoctorReport) -> InstallPlan:
     packages: list[str] = []
     manual: list[tuple[str, str]] = []
     seen: set[str] = set()
-    for tool in report.missing:
+    for tool in effective_missing(report):
         package = _apt_package(tool.hint)
         if package is None:
             manual.append((tool.name, tool.hint))
@@ -81,8 +119,11 @@ def _sudo_prefix() -> list[str]:
 
 
 def _default_runner(argv: list[str]) -> int:
-    # argv is [sudo?] apt-get install -y <curated packages> — a fixed verb + allow-listed package
-    # names, no shell, no user input.
+    # why: this is a package INSTALL, not a recon tool run — it deliberately does NOT go through
+    # shell.run (§24's chokepoint), which allow-lists only §2 recon binaries and would (correctly)
+    # refuse `apt-get`. argv here is a fixed `[sudo?] apt-get install -y <curated packages>` — the
+    # verb is constant and every package name comes from a strict-regex-parsed allow-listed hint, so
+    # there is no shell and no user input to smuggle. argv list, never shell=True.
     return subprocess.run(argv, check=False).returncode  # noqa: S603
 
 
@@ -97,10 +138,35 @@ def install(
     if not plan.packages:
         echo("[doctor] nothing to auto-install via apt.")
         return 0
-    argv = plan.apt_argv()
-    command = " ".join(argv)
-    echo(f"[doctor] will run: {command}")
+    command = " ".join(plan.apt_argv())
+    # why: one apt-get per package, not a batch — a single unavailable/renamed package (e.g.
+    # crackmapexec on current Kali) would abort a batched transaction and install NOTHING.
+    echo(
+        f"[doctor] will install {len(plan.packages)} package(s), each independently so one "
+        "unavailable package can't block the rest:"
+    )
+    echo(f"  {command}")
     if not assume_yes and (confirm is None or not confirm(command)):
         echo("[doctor] install cancelled.")
         return 1
-    return (runner or _default_runner)(argv)
+    run = runner or _default_runner
+    prefix = _sudo_prefix()
+    installed: list[str] = []
+    failed: list[str] = []
+    for package in plan.packages:
+        try:
+            code = run([*prefix, "apt-get", "install", "-y", package])
+        except OSError as exc:
+            # apt-get/sudo missing (non-Kali host) or otherwise not runnable — never crash; tell the
+            # user the exact command to run themselves.
+            echo(f"[doctor] could not launch the installer ({exc}); run it yourself:\n  {command}")
+            return 1
+        if code == 0:
+            installed.append(package)
+            echo(f"[doctor] installed {package}")
+        else:
+            failed.append(package)
+            echo(f"[doctor] {package}: apt-get exited {code} — skipped, continuing")
+    tail = f", {len(failed)} failed ({', '.join(failed)})" if failed else ""
+    echo(f"[doctor] done: {len(installed)} installed{tail}")
+    return 1 if failed else 0

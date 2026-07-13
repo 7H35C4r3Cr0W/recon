@@ -32,6 +32,7 @@ from oscprecon.gui import theme
 from oscprecon.gui.dialogs import (
     AddCredentialDialog,
     CredentialVaultDialog,
+    DoctorDialog,
     NewProfileDialog,
     SettingsDialog,
     SprayDialog,
@@ -353,6 +354,14 @@ class MainWindow(QMainWindow):
         wordlists_action = QAction("Browse Wordlists...", self)
         wordlists_action.triggered.connect(self._on_browse_wordlists)
         view_menu.addAction(wordlists_action)
+
+        help_menu = self.menuBar().addMenu("&Help")
+        doctor_action = QAction("Doctor (tool status)...", self)
+        doctor_action.triggered.connect(self._on_doctor)
+        help_menu.addAction(doctor_action)
+
+    def _on_doctor(self) -> None:
+        DoctorDialog(self).exec()
 
     def _rebuild_recent_menu(self) -> None:
         self._recent_menu.clear()
