@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import config, edb, findings, references, vault_export
+from oscprecon import config, edb, findings, references, spray, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.gui import theme
 from oscprecon.gui.dialogs import (
@@ -34,6 +34,7 @@ from oscprecon.gui.dialogs import (
     CredentialVaultDialog,
     NewProfileDialog,
     SettingsDialog,
+    SprayDialog,
 )
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
@@ -307,6 +308,11 @@ class MainWindow(QMainWindow):
                 lambda _checked=False, cmd=preset.command: self._on_scan_preset(cmd)
             )
             presets_menu.addAction(action)
+
+        scan_menu.addSeparator()
+        spray_action = QAction("Credential Spray...", self)
+        spray_action.triggered.connect(self._on_credential_spray)
+        scan_menu.addAction(spray_action)
 
         edit_menu = self.menuBar().addMenu("&Edit")
         add_cred_action = QAction("Add Credential...", self)
@@ -786,6 +792,39 @@ class MainWindow(QMainWindow):
         CredentialVaultDialog(self._profile, self).exec()
         self._audit_action("credential-vault-opened")
         self._refresh_suggestions()  # has_credential may have changed
+
+    def _on_credential_spray(self) -> None:
+        if self._profile is None:
+            QMessageBox.information(self, "No profile", "Open or create a profile first.")
+            return
+        if self._profile.read_only:
+            QMessageBox.information(self, "Read-only", "This profile is open read-only.")
+            return
+        dialog = SprayDialog(self._profile, config.load_settings().spray_enabled, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        # re-read the setting at launch — the single gate; never pass spray=True otherwise.
+        if not config.load_settings().spray_enabled:
+            return
+        users, passwords = spray.vault_material(self._profile.credentials())
+        if not users or not passwords:
+            QMessageBox.warning(
+                self, "Empty vault", "Add usernames and passwords in the Credential Vault first."
+            )
+            return
+        users_path, passwords_path = spray.write_spray_lists(
+            self._profile.directory, users, passwords
+        )
+        target = self._profile.target.ip
+        for service in dialog.selected_services():
+            if not self._tasks.can_start():
+                break
+            command = spray.build_spray_command(service, target, users_path, passwords_path)
+            output_file = self._profile.directory / "spray" / f"{service}.txt"
+            self._tool_panel.append_output(f"$ [spray] {command}")
+            self._audit_action("credential-spray", service=service, target=target)
+            worker = CommandWorker(command, output_file, cwd=self._profile.directory, spray=True)
+            self._start(worker, f"spray:{service}", lambda code: self._command_done(code, None))
 
     def _on_browse_wordlists(self) -> None:
         dialog = QDialog(self)

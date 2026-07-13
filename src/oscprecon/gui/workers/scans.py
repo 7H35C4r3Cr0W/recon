@@ -44,11 +44,16 @@ class CommandWorker(CancellableThread):
     done = Signal(int)
     failed = Signal(str)
 
-    def __init__(self, shell_line: str, output_file: Path, cwd: Path | None = None) -> None:
+    def __init__(
+        self, shell_line: str, output_file: Path, cwd: Path | None = None, spray: bool = False
+    ) -> None:
         super().__init__()
         self._shell_line = shell_line
         self._output_file = output_file
         self._cwd = cwd
+        # spray=True only from the gated spray flow (§2a); it relaxes the exec policy for exactly
+        # the credential-attempt category. Every other caller leaves it False (recon-only).
+        self._spray = spray
 
     def run(self) -> None:
         try:
@@ -58,6 +63,7 @@ class CommandWorker(CancellableThread):
                 cwd=self._cwd,
                 cancel=self._cancel,
                 on_line=self.line.emit,
+                spray=self._spray,
             )
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
