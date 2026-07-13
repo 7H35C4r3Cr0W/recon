@@ -11,14 +11,10 @@ from typing import Any
 from PySide6.QtCore import Qt, QThread
 from PySide6.QtGui import QAction, QActionGroup, QCloseEvent
 from PySide6.QtWidgets import (
-    QComboBox,
     QDialog,
-    QDialogButtonBox,
     QDockWidget,
     QFileDialog,
-    QFormLayout,
     QLabel,
-    QLineEdit,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -32,6 +28,7 @@ from PySide6.QtWidgets import (
 from oscprecon import config, findings, references, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.gui import theme
+from oscprecon.gui.dialogs import AddCredentialDialog, NewProfileDialog
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
 from oscprecon.gui.widgets.graph_view import GraphView
@@ -61,7 +58,7 @@ from oscprecon.gui.workers import (
     SshReconWorker,
 )
 from oscprecon.manual_commands import expand, load_manual_commands
-from oscprecon.models import Credential, DiscoveredService, Target
+from oscprecon.models import DiscoveredService, Target
 from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
 from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.patterns.engine import suggest_for
@@ -89,80 +86,6 @@ __all__ = [
     "SshReconResult",
     "SshReconWorker",
 ]
-
-
-class NewProfileDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("New Scan Profile")
-        self._name = QLineEdit()
-        self._ip = QLineEdit()
-        self._box = QComboBox()
-        self._box.addItem("(none)")
-
-        form = QFormLayout()
-        form.addRow("Profile name:", self._name)
-        form.addRow("Target IP / host:", self._ip)
-        form.addRow("Box (optional):", self._box)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-
-        layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-
-    def values(self) -> tuple[str, str]:
-        return self._name.text().strip(), self._ip.text().strip()
-
-
-class AddCredentialDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Add Credential")
-        self._username = QLineEdit()
-        self._secret = QLineEdit()
-        self._secret.setEchoMode(QLineEdit.EchoMode.Password)
-        self._secret_type = QComboBox()
-        self._secret_type.addItems(["password", "hash", "key"])
-        self._domain = QLineEdit()
-        self._source = QLineEdit()
-        self._notes = QLineEdit()
-
-        form = QFormLayout()
-        form.addRow("Username:", self._username)
-        form.addRow("Secret:", self._secret)
-        form.addRow("Type:", self._secret_type)
-        form.addRow("Domain:", self._domain)
-        form.addRow("Source:", self._source)
-        form.addRow("Notes:", self._notes)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-
-        layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-
-    def credential(self) -> Credential | None:
-        username = self._username.text().strip()
-        secret = self._secret.text()
-        if not username or not secret:
-            return None
-        return Credential(
-            username=username,
-            secret=secret,
-            secret_type=self._secret_type.currentText(),
-            domain=self._domain.text().strip(),
-            source=self._source.text().strip() or "manual",
-            notes=self._notes.text().strip(),
-        )
 
 
 def _app_version() -> str:
