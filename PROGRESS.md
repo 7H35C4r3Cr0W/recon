@@ -39,6 +39,20 @@ New `modules/kerberos/` — the 20th service module, wired into the shared Simpl
   (no `-usersfile`/`-request`/cracking tools), SimpleRecon worker parse, pattern firing. The
   parametrized `test_simple_panel_manual_followups_stay_legal` now covers kerberos too.
 
+### Parser tool-update resilience — never crash on drifted tool output (`595d55a`)
+The owner's top public-release worry. Two layers:
+- **Containment net:** `src/oscprecon/parsing.py::run_parser(parse, *, label, on_line=None)` wraps a
+  parser at the worker/GUI boundary; on ANY exception → log + emit `[parse-error] couldn't parse <tool>
+  … the tool may have changed` + return `[]`, so the recon step still completes. Wired at every runtime
+  parse site: `workers/simple.py` (`module.parse`), `workers/service_recon.py` (smb/ftp/ssh/dns/ldap via
+  `functools.partial` — no loop-closure bug), `main_window` (http/vhost).
+- **Per-parser:** `tests/test_parser_resilience.py` fuzzes every dispatcher (real tool keys) with 11
+  malformed/drifted inputs (empty, garbage, truncated/wrong-typed JSON, 8k line, control bytes, "new
+  format") asserting each returns a list, never raises. Found one raiser — http ffuf/gobuster/whatweb
+  JSON `int()` on a non-numeric field — fixed with a type-safe `_to_int` (bad value → 0).
+- Tests (+~60): the fuzz matrix; run_parser contains a raiser + passes success through; a
+  SimpleReconWorker survives a `parse()` that raises. 813 pass. (Deepening: multi-tool-version fixtures.)
+
 ### HackTricks integration Phase 2 — offline render + finding-aware jump (`7e5005e`, `f2fdef3`)
 Reference pane now surfaces the vendored HackTricks page:
 - **2a (`7e5005e`):** an "Offline" tab renders the vendored markdown via `QTextBrowser.setMarkdown`

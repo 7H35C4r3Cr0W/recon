@@ -152,6 +152,10 @@ subsystem-by-subsystem status map and forward plan.**
 
 ---
 
+- ✅ **Parser tool-update resilience** (`595d55a`) — `oscprecon.parsing.run_parser` containment net at
+  every parse boundary + a fuzz test over all 20 parsers (found+fixed one raiser). *Deepening:*
+  multi-tool-version fixtures. *Next recommended:* `doctor` → guided safe installer.
+
 ## Deferred / TODO (cross-cutting)
 
 Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` §27:

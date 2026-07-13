@@ -6,8 +6,8 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (114 files) · `ruff check` + `ruff format --check` clean ·
-  **752 tests** pass (incl. 209 offscreen GUI) · `test_packaging` green (wheel ships resources,
+- **Verified:** `mypy --strict` clean (115 files) · `ruff check` + `ruff format --check` clean ·
+  **813 tests** pass (incl. 210 offscreen GUI) · `test_packaging` green (wheel ships resources,
   incl. the vendored HackTricks snapshot).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
@@ -410,19 +410,19 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
 tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-Cred-spraying and HackTricks (Phases 1–2) are done. The strongest next chunk for the public-release
-goal is the owner's stated **top worry — tool-update resilience**:
+Cred-spraying, HackTricks (Phases 1–2), and **parser tool-update resilience** are done. Next for the
+public-release goal:
 
-**⏭ Parser tool-update resilience (Phase 6 / distribution item 1).** A wrapped tool changing its output
-must never crash the app.
+**⏭ `doctor` → guided safe installer (distribution item 2).** Tell a user exactly what to install on a
+fresh Kali.
 
-- **Scope:** audit the service parsers to degrade gracefully on unexpected/'new-version' output
-  (return what they can, never raise to the UI; surface "couldn't parse X"); add multi-version /
-  malformed fixtures per parser; a shared guard so a parser exception is contained. Deterministic, no
-  live target.
-- **Alternatives:** `doctor` → guided safe installer (distribution item 2 — tells a user exactly what to
-  `apt`/`pipx` install); HackTricks Phase 3 polish (more kind→section maps, cleaner rendering, offer the
-  §27 live-fetch relax). All in the build memory ([[distribution-goals]], [[hacktricks-integration]]).
+- **Scope:** extend `oscprecon-cli doctor` (already lists missing tools) into a guided, SAFE installer:
+  detect the host, show the `apt`/`pipx` command per missing §2-allowed tool, and offer to install with
+  **explicit confirmation** (never silent, never a forbidden tool). Plus a first-run host-readiness
+  check in the GUI. Deterministic.
+- **Alternatives:** HackTricks Phase 3 polish (more kind→section maps, cleaner mdBook render, offer the
+  §27 live-fetch relax); parser resilience deepening (multi-tool-version fixtures). All in the build
+  memory ([[distribution-goals]], [[hacktricks-integration]]).
 
 **Parallel future tracks (need an owner decision / gate):**
 - **Credential spraying (opt-in, off by default)** — ✅ **COMPLETE** end-to-end: CLAUDE.md §1/§2/§2a
