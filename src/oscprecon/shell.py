@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import shlex
 import shutil
+import signal
 import subprocess
 import threading
 import time
@@ -86,6 +88,22 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
 # why: forbidden even on an allowed binary — brute/spray is banned (§2). '--rid-brute' is NOT
 # here: RID cycling is recon (§11), so the check is precise, not a blanket 'brute' match.
 _FORBIDDEN_FLAGS: frozenset[str] = frozenset({"--continue-on-success", "--passwords"})
+
+# why: the DB clients are allow-listed for read-only enum (§12), but the custom-command path lets a
+# user hand-type a query — refuse file-write / arbitrary-read / OS-exec primitives (not recon).
+_DB_CLIENTS: frozenset[str] = frozenset({"mysql", "psql", "mongosh", "mongo", "redis-cli"})
+_DB_FORBIDDEN_SUBSTR: tuple[str, ...] = (
+    "into outfile",
+    "into dumpfile",
+    "load_file",
+    "sys_exec",
+    "sys_eval",
+    "lo_import",
+    "lo_export",
+    "pg_read_file",
+    "pg_ls_dir",
+    "\\!",
+)
 
 # why: searchsploit is display-only (§14) — these flags copy/open/update a PoC, not display it.
 _SEARCHSPLOIT_FORBIDDEN: frozenset[str] = frozenset(
@@ -259,7 +277,23 @@ def policy_violation(argv: list[str]) -> str | None:
         # why: ntpdate WITHOUT -q SETS the local clock (modifies local state, needs root). Recon is
         # query-only — the module always passes -q; back-stop it here for the custom-command path.
         return "ntpdate without -q sets the local clock (forbidden — recon-only)"
+    if tool in _DB_CLIENTS:
+        joined = " ".join(argv[1:]).lower()
+        for primitive in _DB_FORBIDDEN_SUBSTR:
+            if primitive in joined:
+                return f"{tool} {primitive.strip()} is a file/OS primitive, not recon (forbidden)"
     return None
+
+
+def _terminate(proc: subprocess.Popen[str]) -> None:
+    # why: start_new_session makes proc.pid a process-group leader, so kill the whole group — else
+    # helpers a tool forks (enum4linux-ng -> smbclient/rpcclient, dnsenum -> dig) survive as orphans
+    # and can hold the stdout pipe open, so the read loop never hits EOF and timeout/cancel never
+    # actually lands. try/except guards the OS boundary (the group may already be gone).
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        proc.kill()
 
 
 @dataclass
@@ -340,7 +374,7 @@ def run(
         def _kill() -> None:
             nonlocal timed_out
             timed_out = True
-            proc.kill()
+            _terminate(proc)
 
         watchdog = threading.Timer(timeout, _kill)
         watchdog.start()
@@ -356,7 +390,7 @@ def run(
             while proc.poll() is None:
                 if cancel_event.wait(0.2):
                     cancelled = True
-                    proc.kill()
+                    _terminate(proc)
                     return
 
         monitor = threading.Thread(target=_watch_cancel, daemon=True)
@@ -376,7 +410,7 @@ def run(
         if watchdog is not None:
             watchdog.cancel()
         if proc.poll() is None:
-            proc.kill()
+            _terminate(proc)
             proc.wait()
         if monitor is not None:
             monitor.join(timeout=1.0)

@@ -156,3 +156,21 @@ def test_allows_newly_wired_readonly_enum_tools() -> None:
     assert ok(["impacket-mssqlclient", "sa:@10.0.0.1"])
     # the blanket brute/spray flag guard still applies to the new tools
     assert shell.policy_violation(["mysql", "-h", "10.0.0.1", "--passwords", "x"]) is not None
+
+
+def test_blocks_db_client_file_and_os_primitives() -> None:
+    def blocked(argv: list[str]) -> bool:
+        return shell.policy_violation(argv) is not None
+
+    # a hand-typed DB-client query that writes/reads files or runs OS commands is not recon (§2)
+    outfile = "SELECT 1 INTO OUTFILE '/var/www/x.php'"
+    assert blocked(["mysql", "-h", "x", "-u", "root", "-e", outfile])
+    assert blocked(["mysql", "-h", "x", "-u", "root", "-e", "SELECT LOAD_FILE('/etc/passwd')"])
+    assert blocked(["mysql", "-h", "x", "-u", "root", "-e", "SELECT sys_exec('id')"])
+    assert blocked(["psql", "-h", "x", "-c", "SELECT pg_read_file('/etc/passwd')"])
+    assert blocked(["psql", "-h", "x", "-c", "SELECT lo_export(1, '/tmp/x')"])
+    assert blocked(["mysql", "-h", "x", "-u", "root", "-e", "\\! id"])  # client shell escape
+    # read-only enum queries stay allowed
+    assert not blocked(["mysql", "-h", "x", "-u", "root", "-e", "SHOW DATABASES;"])
+    assert not blocked(["psql", "-h", "x", "-U", "postgres", "-c", "SELECT version();"])
+    assert not blocked(["redis-cli", "-h", "x", "INFO"])
