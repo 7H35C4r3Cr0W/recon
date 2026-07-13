@@ -18,6 +18,42 @@ Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
 
+### GUI architecture cleanup — behavior-preserving extraction of main_window.py — DONE (3 chunks)
+main_window.py 1633 → 945 lines with no behavior change (all signals, menu actions, auditing,
+cancellation, reports, module workflows preserved); one latent stale-profile bug fixed along the way.
+
+**Original responsibility map** (what main_window owned): 2 dialog classes; the CancellableThread base
++ 8 QThread worker classes (nmap/command/searchsploit + Smb/Ftp/Ssh/Dns/Ldap/Simple recon) + their
+Result dataclasses; worker launch/registration/cancellation/completion/release; profile
+create/open/save/close/recent; findings + credential persistence; notes flush; graph/report/vault
+export; audit events; menu + status-footer + busy-gate refresh; module-specific completion handlers;
+shutdown.
+
+**Extractions:**
+- **1/N `a136d05`** — workers → `src/oscprecon/gui/workers/` (base.py = CancellableThread; scans.py =
+  Nmap/Command/Searchsploit; service_recon.py = Smb/Ftp/Ssh/Dns/Ldap + Result dataclasses; simple.py =
+  SimpleReconWorker). Every signal, cancel path (`shell.run(cancel=)` + process-group kill), output
+  filename, per-worker profile ownership, and port propagation preserved verbatim; re-exported from
+  main_window via `__all__` so existing imports/tests keep working. tests/gui/test_workers.py.
+- **2/N `4f6debd`** — dialogs → `src/oscprecon/gui/dialogs/` (new_profile.py, credential.py), re-exported.
+  tests/gui/test_dialogs.py (accept/cancel/empty/validation/secret-masking).
+- **3/N `fb10c7c`** — centralized task lifecycle (`_start` = one line/done/failed wiring path; `_release`
+  idempotent) + **stale-profile protection**: every launcher captures the ORIGINATING profile and binds
+  it into the completion handler, so a worker that finishes after the user switched profiles persists
+  its creds/findings/service-mutations to the profile that started it (not the active one), and only
+  echoes to the panel when its origin is still active. Previously used `self._profile` (a late result
+  would have written another profile's data + shown A's results in B; the New/Open gating made it
+  UI-unreachable, so this is defense-in-depth made robust). tests/gui/test_task_lifecycle.py.
+
+**Deliberately kept in MainWindow** (no clean non-GUI boundary): profile create/open/save/export are
+thin orchestration over the existing `Profile` model + `config` recent-list + dialogs + `_set_profile`
+UI refresh — a "controller" would be pure indirection. closeEvent stays (cancel-then-wait, already
+tested deterministically). Completion handlers stay per-module (their summaries/creds differ) but now
+share `_record_creds` + the origin-guard for the genuinely-identical parts.
+
+**Verify:** four gates green, offscreen GUI suite green, 554 tests, clean-wheel install imports
+`gui.workers` + `gui.dialogs` from outside the checkout with re-exports intact.
+
 ### Repo-wide cleanup pass (adversarial review — 10 findings, all fixed) — DONE
 Area-partitioned review (10 subsystem finders + refute-biased verify, all reproduced) → 10 confirmed
 findings, each fixed with a regression test in small commits:
