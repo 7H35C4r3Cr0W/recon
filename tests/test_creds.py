@@ -72,3 +72,14 @@ def test_save_forces_0600_even_with_stale_tmp(tmp_path: Path) -> None:
     creds.save_creds(path, [Credential(username="u", secret="s")])
     assert _mode(path) == "0o600"
     assert not stale.exists()  # temp was atomically moved into place
+
+
+def test_delete_credential_removes_the_matching_entry(tmp_path: Path) -> None:
+    path = tmp_path / "creds.json"
+    keep = Credential(username="keep", secret="1")
+    drop = Credential(username="drop", secret="2")
+    creds.add_credential(path, keep)
+    creds.add_credential(path, drop)
+    remaining = creds.delete_credential(path, drop)
+    assert [c.username for c in remaining] == ["keep"]
+    assert [c.username for c in creds.load_creds(path)] == ["keep"]  # persisted

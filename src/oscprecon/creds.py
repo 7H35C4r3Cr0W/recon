@@ -85,3 +85,11 @@ def add_credential(path: Path, cred: Credential) -> list[Credential]:
     credentials.append(cred)
     save_creds(path, credentials)
     return credentials
+
+
+def delete_credential(path: Path, cred: Credential) -> list[Credential]:
+    # why: the vault is user-editable (add/edit/delete) for the spray workflow (§2a). Edit = the GUI
+    # deletes then re-adds. Matches on the identity key so an exact entry is removed.
+    remaining = [existing for existing in load_creds(path) if _key(existing) != _key(cred)]
+    save_creds(path, remaining)
+    return remaining

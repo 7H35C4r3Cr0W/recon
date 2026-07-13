@@ -109,3 +109,21 @@ def test_default_wordlists_have_no_password_leak() -> None:
         resolved = str(wordlist.path.resolve()).lower()
         for banned in ("password", "fasttrack", "wifite", "rockyou", "probable"):
             assert banned not in resolved, f"password list leaked: {wordlist.path}"
+
+
+def test_spray_mode_surfaces_credential_wordlists(tmp_path: Path) -> None:
+    # NOTE: keep this function name free of "password"/"passwd" — tmp_path is derived from it and
+    # the default filter matches that substring on every path part (would filter the control below).
+    root = tmp_path / "wl"
+    (root / "Discovery" / "Web-Content").mkdir(parents=True)
+    (root / "Passwords").mkdir(parents=True)
+    (root / "Discovery" / "Web-Content" / "common.txt").write_text("a\n", encoding="utf-8")
+    (root / "Passwords" / "rockyou.txt").write_text("secret\n", encoding="utf-8")
+
+    off = {w.path.name for w in wordlists.index_wordlists([root], include_passwords=False)}
+    assert "common.txt" in off and "rockyou.txt" not in off  # default: password list filtered
+
+    on = wordlists.index_wordlists([root], include_passwords=True)
+    names = {w.path.name for w in on}
+    assert {"common.txt", "rockyou.txt"} <= names  # Spray mode: password list surfaced
+    assert any(w.path.name == "rockyou.txt" and w.category == "passwords" for w in on)

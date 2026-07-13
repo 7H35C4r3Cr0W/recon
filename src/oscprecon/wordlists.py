@@ -74,15 +74,25 @@ def wordlist_paths() -> list[Path]:
     return [Path(part) for part in config.load_settings().wordlist_paths]
 
 
-def is_excluded(path: Path) -> bool:
+def is_excluded(path: Path, *, allow_passwords: bool = False) -> bool:
     for part in path.parts:
         lower = part.lower()
         if lower in _EXCLUDED_DIR_PARTS:
             return True
-        if any(sub in lower for sub in _EXCLUDED_NAME_SUBSTRINGS):
+        if not allow_passwords and any(sub in lower for sub in _EXCLUDED_NAME_SUBSTRINGS):
             return True
+    if allow_passwords:
+        return False  # Spray mode (§2a): password lists are surfaced, not filtered
     name = path.name.lower()
     return any(name.startswith(prefix) for prefix in _EXCLUDED_FILE_PREFIXES)
+
+
+def _is_password_list(path: Path) -> bool:
+    # a file is a "password list" iff the default filter would exclude it for being password-ish.
+    for part in path.parts:
+        if any(sub in part.lower() for sub in _EXCLUDED_NAME_SUBSTRINGS):
+            return True
+    return path.name.lower().startswith(_EXCLUDED_FILE_PREFIXES)
 
 
 def _category_for(path: Path) -> str:
@@ -105,7 +115,13 @@ def _count_lines(path: Path) -> int:
     return count
 
 
-def index_wordlists(paths: Iterable[Path] | None = None) -> list[Wordlist]:
+def index_wordlists(
+    paths: Iterable[Path] | None = None, *, include_passwords: bool | None = None
+) -> list[Wordlist]:
+    # include_passwords defaults to the Spray-mode gate (§2a): password lists are surfaced ONLY when
+    # the user has opted into Spray mode; the default (recon-only) behaviour is unchanged.
+    if include_passwords is None:
+        include_passwords = config.spray_enabled()
     search = list(paths) if paths is not None else wordlist_paths()
     seen: set[Path] = set()
     results: list[Wordlist] = []
@@ -117,14 +133,19 @@ def index_wordlists(paths: Iterable[Path] | None = None) -> list[Wordlist]:
                 continue
             resolved = entry.resolve()
             # why: check the symlink target too — an innocently-named link into Passwords/
-            # must not slip a password list through.
-            if is_excluded(entry) or is_excluded(resolved):
+            # must not slip a password list through (unless Spray mode is on).
+            if is_excluded(entry, allow_passwords=include_passwords) or is_excluded(
+                resolved, allow_passwords=include_passwords
+            ):
                 continue
             if resolved in seen:
                 continue
             category = _category_for(entry)
             if category == "other":
-                continue  # affirmative allowlist: withhold anything not a known recon category
+                if include_passwords and _is_password_list(entry):
+                    category = "passwords"  # Spray mode surfaces password lists
+                else:
+                    continue  # affirmative allowlist: withhold anything not a known recon category
             seen.add(resolved)
             try:
                 size = entry.stat().st_size
