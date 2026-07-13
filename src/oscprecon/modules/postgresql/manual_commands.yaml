@@ -1,0 +1,38 @@
+# PostgreSQL manual follow-ups (Tier-2 — shown, never auto-run). Single default-cred checks +
+# read-only enum; {target}/{port}/{user}/{password}/{database} filled from the active profile.
+# Iterating a user/password list is Tier-3 (out). Credentialed commands use the libpq connection URI
+# (postgresql://user:pass@host:port/db) because the app executes argv with no shell — `PGPASSWORD=… psql`
+# would NOT work. Commands that prompt for a password are terminal-only (the GUI disables stdin).
+- description: "Single postgres superuser check (terminal-only — prompts for password)"
+  why: "one interactive attempt as the postgres superuser; run in a terminal, not the GUI (stdin disabled)"
+  command: "psql -h {target} -p {port} -U postgres"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "Single postgres:postgres default-cred check (read-only version query)"
+  why: "one attempt with the classic default credential via the connection URI — not a list"
+  command: "psql postgresql://postgres:postgres@{target}:{port}/postgres -c 'SELECT version();'"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "Server version (requires working creds)"
+  why: "read-only SELECT version() once a login works — confirms access, not exploitation"
+  command: "psql postgresql://{user}:{password}@{target}:{port}/postgres -c 'SELECT version();'"
+  requires: ["creds"]
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "List databases (requires working creds)"
+  why: "read-only catalog query — what we can read, not exploitation"
+  command: "psql postgresql://{user}:{password}@{target}:{port}/postgres -c 'SELECT datname FROM pg_database'"
+  requires: ["creds"]
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "List roles (requires working creds)"
+  why: "read-only pg_roles enumeration — no role modification"
+  command: "psql postgresql://{user}:{password}@{target}:{port}/postgres -c 'SELECT rolname FROM pg_roles'"
+  requires: ["creds"]
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "Current user + connection info (requires working creds)"
+  why: "read-only session introspection once a login works"
+  command: "psql postgresql://{user}:{password}@{target}:{port}/postgres -c 'SELECT current_user, version()'"
+  requires: ["creds"]
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)

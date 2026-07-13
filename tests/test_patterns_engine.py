@@ -118,6 +118,9 @@ def test_shipped_patterns_fire_on_findings() -> None:
         {"module": "http", "port": 80, "path": "/", "status": 200, "note": "WordPress 6.1"},
         {"module": "mysql", "kind": "version", "value": "5.5.20-log", "detail": ""},
         {"module": "mssql", "kind": "version", "value": "Microsoft SQL Server 2019", "detail": ""},
+        # PostgreSQL on a NON-standard port — the pattern must interpolate that port
+        {"module": "postgresql", "kind": "port", "value": "5433", "detail": "non-standard"},
+        {"module": "postgresql", "kind": "version", "value": "12.1", "detail": ""},
     ]
     suggestions = engine.suggest_for(findings, target="10.10.10.5")  # loads shipped patterns/
     commands = " ".join(s.command_template or "" for s in suggestions)
@@ -126,4 +129,18 @@ def test_shipped_patterns_fire_on_findings() -> None:
     # DB-service patterns must fire + interpolate {target} (not just pass the provenance gate)
     assert "nmap -p 3306 --script mysql-empty-password 10.10.10.5" in commands
     assert "netexec mssql 10.10.10.5" in commands
+    # PostgreSQL default-cred check interpolates BOTH the target and the non-standard port
+    assert "postgresql://postgres:postgres@10.10.10.5:5433/postgres" in commands
     assert suggestions and all(s.source_box for s in suggestions)
+
+
+def test_postgresql_pattern_does_not_fire_on_unrelated_findings() -> None:
+    # must NOT fire on a bare open 5432 or a non-postgresql finding — requires real identification
+    findings: list[dict[str, Any]] = [
+        {"module": "nmap", "kind": "port", "value": "5432", "detail": "open"},
+        {"module": "http", "port": 80, "path": "/", "status": 200},
+    ]
+    cmds = " ".join(
+        s.command_template or "" for s in engine.suggest_for(findings, target="10.10.10.5")
+    )
+    assert "postgresql://" not in cmds

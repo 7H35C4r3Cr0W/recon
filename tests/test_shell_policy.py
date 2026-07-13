@@ -174,3 +174,29 @@ def test_blocks_db_client_file_and_os_primitives() -> None:
     assert not blocked(["mysql", "-h", "x", "-u", "root", "-e", "SHOW DATABASES;"])
     assert not blocked(["psql", "-h", "x", "-U", "postgres", "-c", "SELECT version();"])
     assert not blocked(["redis-cli", "-h", "x", "INFO"])
+
+
+def test_blocks_postgresql_server_modifying_primitives() -> None:
+    def blocked(sql: str) -> bool:
+        return shell.policy_violation(["psql", "svc", "-c", sql]) is not None
+
+    # server-write / file / OS / role-DDL primitives are blocked (case + whitespace insensitive)
+    assert blocked("COPY t TO '/tmp/x'")
+    assert blocked("COPY t FROM PROGRAM 'id'")
+    assert blocked("copy  t  to  '/tmp/x'")  # extra whitespace
+    assert blocked("CREATE FUNCTION f() RETURNS int AS $$ x $$ LANGUAGE sql")
+    assert blocked("create  or  replace  function f()")  # whitespace variant
+    assert blocked("CREATE EXTENSION plpython3u")
+    assert blocked("DO $$ BEGIN PERFORM 1; END $$")
+    assert blocked("ALTER ROLE postgres SUPERUSER")
+    assert blocked("create role hax with superuser")
+    assert blocked("DROP DATABASE prod")
+    assert blocked("SELECT pg_read_file('/etc/passwd')")
+    assert blocked("SELECT pg_ls_dir('/')")
+    assert blocked("SELECT lo_export(1, '/tmp/x')")
+    # read-only enumeration must NOT be blocked (no simplistic substring false positives)
+    assert not blocked("SELECT version()")
+    assert not blocked("SELECT datname FROM pg_database")
+    assert not blocked("SELECT rolname FROM pg_roles")
+    assert not blocked("SELECT current_user, version()")
+    assert not blocked("SELECT schema_name FROM information_schema.schemata")

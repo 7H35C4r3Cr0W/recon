@@ -714,10 +714,11 @@ class SimpleReconWorker(CancellableThread):
     done = Signal(object)  # SimpleReconResult
     failed = Signal(str)
 
-    def __init__(self, profile: Profile, module_name: str) -> None:
+    def __init__(self, profile: Profile, module_name: str, port: int = 0) -> None:
         super().__init__()
         self._profile = profile
         self._spec = SIMPLE_SPECS[module_name]
+        self._port = port
 
     def run(self) -> None:
         try:
@@ -739,7 +740,7 @@ class SimpleReconWorker(CancellableThread):
     def _drive(self) -> SimpleReconResult:
         target = self._profile.target
         raw: dict[str, str] = {}
-        for command, tool in self._spec.steps_fn(target):
+        for command, tool in self._spec.steps_fn(target, self._port):
             if self._cancel.is_set():
                 break
             text = self._run_step(command.shell_line, command.output_file)
@@ -1551,11 +1552,11 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
 
-    def _on_simple_recon(self, module_name: str) -> None:
+    def _on_simple_recon(self, module_name: str, port: int = 0) -> None:
         if self._profile is None or module_name not in SIMPLE_SPECS or not self._tasks.can_start():
             return
         self._tool_panel.append_output(f"[{module_name}] recon starting…")
-        worker = SimpleReconWorker(self._profile, module_name)
+        worker = SimpleReconWorker(self._profile, module_name, port)
         worker.line.connect(self._tool_panel.append_output)
         worker.done.connect(self._on_simple_done)
         worker.failed.connect(self._on_run_failed)

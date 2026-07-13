@@ -25,7 +25,7 @@ _COMMAND_ROLE = Qt.ItemDataRole.UserRole
 class SimpleReconPanel(QWidget):
     """One panel for any read-only single-shape module (nfs/snmp/tftp/netbios/ike/ntp/smtp)."""
 
-    recon_requested = Signal(str)  # module name
+    recon_requested = Signal(str, int)  # module name, discovered service port
     manual_requested = Signal(str)  # command
 
     def __init__(self, spec: SimpleReconSpec) -> None:
@@ -35,7 +35,7 @@ class SimpleReconPanel(QWidget):
         self._port = 0
 
         self._recon = QPushButton(spec.label)
-        self._recon.clicked.connect(lambda: self.recon_requested.emit(spec.module))
+        self._recon.clicked.connect(lambda: self.recon_requested.emit(spec.module, self._port))
         button_box = QGroupBox(
             "Tier 1 — read-only recon (streams to the output pane + findings.json)"
         )

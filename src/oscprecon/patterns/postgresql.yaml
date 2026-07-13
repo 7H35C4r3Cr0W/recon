@@ -1,0 +1,20 @@
+# PostgreSQL recon next-steps (Tier-1 is credential-free version detection; the default-cred check
+# below is a single-attempt Tier-2, shown/pre-filled, never a list). Fires only on real PostgreSQL
+# identification (a `service`/`version` finding from nmap -sV), never merely because 5432 is open.
+- match:
+    service: postgresql
+    field: kind
+    value: "^port$"
+  suggest:
+    - text: "PostgreSQL identified — single default-cred check as Tier-2 (postgres:'' then postgres:postgres)"
+      command: "psql postgresql://postgres:postgres@{target}:{port}/postgres -c 'SELECT version();'"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: postgresql
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "Note the exact PostgreSQL version and check searchsploit for it (display-only)"
+      command: "searchsploit postgresql"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)

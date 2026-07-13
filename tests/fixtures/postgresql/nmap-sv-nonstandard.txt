@@ -1,0 +1,9 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-13 09:40 EST
+Nmap scan report for 10.129.55.12
+Host is up (0.028s latency).
+
+PORT     STATE SERVICE    VERSION
+5433/tcp open  postgresql PostgreSQL DB 12.1
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 6.11 seconds

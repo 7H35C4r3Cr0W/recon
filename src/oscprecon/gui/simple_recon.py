@@ -5,61 +5,79 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from oscprecon.models import Command, Target
-from oscprecon.modules import ike, mongodb, mssql, mysql, netbios, nfs, ntp, redis, smtp, snmp, tftp
+from oscprecon.modules import (
+    ike,
+    mongodb,
+    mssql,
+    mysql,
+    netbios,
+    nfs,
+    ntp,
+    postgresql,
+    redis,
+    smtp,
+    snmp,
+    tftp,
+)
 from oscprecon.modules.base import Module
 
 # The read-only, single-shape modules (recon_steps -> parse -> suggest) share one GUI panel + worker
 # instead of a bespoke widget each. Each spec supplies the concrete step-builder (its shape differs:
 # snmp adds a public MIB walk, tftp fans out GETs over a fixed filename list) as a typed function so
-# the base Module (which has no step methods) never needs the attribute.
+# the base Module (which has no step methods) never needs the attribute. `port` is the discovered
+# service port; a module with a port-specific Tier-1 command honours it, not a hardcoded default.
 
 
-def _smtp_steps(target: Target) -> list[tuple[Command, str]]:
+def _smtp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in smtp.SmtpModule().recon_steps(target)]
 
 
-def _nfs_steps(target: Target) -> list[tuple[Command, str]]:
+def _nfs_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in nfs.NfsModule().recon_steps(target)]
 
 
-def _snmp_steps(target: Target) -> list[tuple[Command, str]]:
+def _snmp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     module = snmp.SnmpModule()
     steps = [*module.discovery_steps(target), module.walk_step(target)]
     return [(s.command, s.tool) for s in steps]
 
 
-def _tftp_steps(target: Target) -> list[tuple[Command, str]]:
+def _tftp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     module = tftp.TftpModule()
     steps = [module.enum_step(target), *(module.get_step(target, f) for f in tftp.COMMON_FILES)]
     return [(s.command, s.tool) for s in steps]
 
 
-def _netbios_steps(target: Target) -> list[tuple[Command, str]]:
+def _netbios_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in netbios.NetbiosModule().recon_steps(target)]
 
 
-def _ike_steps(target: Target) -> list[tuple[Command, str]]:
+def _ike_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in ike.IkeModule().recon_steps(target)]
 
 
-def _ntp_steps(target: Target) -> list[tuple[Command, str]]:
+def _ntp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in ntp.NtpModule().recon_steps(target)]
 
 
-def _redis_steps(target: Target) -> list[tuple[Command, str]]:
+def _redis_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in redis.RedisModule().recon_steps(target)]
 
 
-def _mongodb_steps(target: Target) -> list[tuple[Command, str]]:
+def _mongodb_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in mongodb.MongoDbModule().recon_steps(target)]
 
 
-def _mssql_steps(target: Target) -> list[tuple[Command, str]]:
-    return [(s.command, s.tool) for s in mssql.MssqlModule().recon_steps(target)]
+def _mssql_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in mssql.MssqlModule().recon_steps(target, port)]
 
 
-def _mysql_steps(target: Target) -> list[tuple[Command, str]]:
-    return [(s.command, s.tool) for s in mysql.MysqlModule().recon_steps(target)]
+def _mysql_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in mysql.MysqlModule().recon_steps(target, port)]
+
+
+def _postgresql_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in postgresql.PostgresqlModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -69,7 +87,7 @@ class SimpleReconSpec:
     intro: str  # panel intro line
     manual_yaml: Path
     factory: Callable[[], Module]  # for parse() + suggest() (uniform on the base Module)
-    steps_fn: Callable[[Target], list[tuple[Command, str]]]
+    steps_fn: Callable[[Target, int], list[tuple[Command, str]]]
 
 
 def _manual(pkg: object) -> Path:
@@ -166,5 +184,15 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(mysql),
         mysql.MysqlModule,
         _mysql_steps,
+    ),
+    "postgresql": SimpleReconSpec(
+        "postgresql",
+        "Run full PostgreSQL recon (nmap -sV version banner)",
+        "PostgreSQL recon — Tier-1 is credential-free nmap -sV version detection only; no login is "
+        "attempted. Default-cred (postgres:'' / postgres:postgres) and authed read-only enum are "
+        "Tier-2 manual follow-ups.",
+        _manual(postgresql),
+        postgresql.PostgresqlModule,
+        _postgresql_steps,
     ),
 }

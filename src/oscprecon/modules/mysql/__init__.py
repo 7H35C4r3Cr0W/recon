@@ -44,8 +44,8 @@ class MysqlModule(Module):
             for s in scan_results.services
         )
 
-    def recon_steps(self, target: Target) -> list[MysqlStep]:
-        shell_line = f"nmap -sV -p {_DEFAULT_PORT} --script {_INFO_SCRIPT} {target.ip}"
+    def recon_steps(self, target: Target, port: int = 0) -> list[MysqlStep]:
+        shell_line = f"nmap -sV -p {port or _DEFAULT_PORT} --script {_INFO_SCRIPT} {target.ip}"
         return [
             MysqlStep(
                 Command(

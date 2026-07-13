@@ -48,7 +48,7 @@ class ToolPanel(QWidget):
     ssh_recon_requested = Signal(int)  # port
     dns_recon_requested = Signal(str, int)  # (domain, port)
     ldap_recon_requested = Signal(str, int)  # (basedn, port)
-    simple_recon_requested = Signal(str)  # module name (nfs/snmp/tftp/netbios/ike/ntp/smtp)
+    simple_recon_requested = Signal(str, int)  # (module name, discovered service port)
 
     def __init__(self) -> None:
         super().__init__()

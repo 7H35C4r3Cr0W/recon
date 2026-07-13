@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -90,8 +91,9 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
 _FORBIDDEN_FLAGS: frozenset[str] = frozenset({"--continue-on-success", "--passwords"})
 
 # why: the DB clients are allow-listed for read-only enum (§12), but the custom-command path lets a
-# user hand-type a query — refuse file-write / arbitrary-read / OS-exec primitives (not recon).
+# user hand-type a query — refuse file-write / read / OS-exec / DDL primitives (not recon).
 _DB_CLIENTS: frozenset[str] = frozenset({"mysql", "psql", "mongosh", "mongo", "redis-cli"})
+# plain file/OS primitives (any DB client): substring-matched on the whitespace-normalised query.
 _DB_FORBIDDEN_SUBSTR: tuple[str, ...] = (
     "into outfile",
     "into dumpfile",
@@ -101,9 +103,32 @@ _DB_FORBIDDEN_SUBSTR: tuple[str, ...] = (
     "lo_import",
     "lo_export",
     "pg_read_file",
+    "pg_write_file",
     "pg_ls_dir",
     "\\!",
 )
+# PostgreSQL server-modifying / file / OS primitives — a keyword regex, NOT a blunt substring, so
+# read-only enum (SELECT ... FROM pg_database / pg_roles, current_user) is never blocked by chance.
+# `copy ... to|from|program` needs COPY as a real word before to/from, so `SELECT ... FROM` is safe.
+_PG_FORBIDDEN_RE = re.compile(
+    r"\bcopy\b[^;]*\b(?:to|from|program)\b"
+    r"|\bcreate\s+(?:or\s+replace\s+)?(?:function|extension|role|database|user)\b"
+    r"|\bdrop\s+(?:role|database|function|extension)\b"
+    r"|\balter\s+role\b"
+    r"|\bdo\s+\$\$",
+)
+
+
+def _db_primitive_violation(tool: str, argv: list[str]) -> str | None:
+    joined = re.sub(r"\s+", " ", " ".join(argv[1:])).lower()
+    for primitive in _DB_FORBIDDEN_SUBSTR:
+        if primitive in joined:
+            return f"{tool} {primitive.strip()} is a file/OS primitive, not recon (forbidden)"
+    hit = _PG_FORBIDDEN_RE.search(joined)
+    if hit is not None:
+        return f"{tool} '{hit.group(0)}' modifies the server / runs code, not recon (forbidden)"
+    return None
+
 
 # why: searchsploit is display-only (§14) — these flags copy/open/update a PoC, not display it.
 _SEARCHSPLOIT_FORBIDDEN: frozenset[str] = frozenset(
@@ -278,10 +303,9 @@ def policy_violation(argv: list[str]) -> str | None:
         # query-only — the module always passes -q; back-stop it here for the custom-command path.
         return "ntpdate without -q sets the local clock (forbidden — recon-only)"
     if tool in _DB_CLIENTS:
-        joined = " ".join(argv[1:]).lower()
-        for primitive in _DB_FORBIDDEN_SUBSTR:
-            if primitive in joined:
-                return f"{tool} {primitive.strip()} is a file/OS primitive, not recon (forbidden)"
+        db_violation = _db_primitive_violation(tool, argv)
+        if db_violation is not None:
+            return db_violation
     return None
 
 

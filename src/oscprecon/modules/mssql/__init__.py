@@ -42,8 +42,8 @@ class MssqlModule(Module):
             for s in scan_results.services
         )
 
-    def recon_steps(self, target: Target) -> list[MssqlStep]:
-        shell_line = f"nmap -sV -p {_DEFAULT_PORT} --script {_INFO_SCRIPTS} {target.ip}"
+    def recon_steps(self, target: Target, port: int = 0) -> list[MssqlStep]:
+        shell_line = f"nmap -sV -p {port or _DEFAULT_PORT} --script {_INFO_SCRIPTS} {target.ip}"
         return [
             MssqlStep(
                 Command(

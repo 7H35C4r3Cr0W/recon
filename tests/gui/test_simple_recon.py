@@ -123,6 +123,47 @@ def test_mysql_worker_parses_and_writes_findings(
     assert any(line.startswith("→") for line in result.summary)  # a Tier-2 suggestion surfaced
 
 
+def test_postgresql_worker_parses_and_writes_findings(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.129.55.12"))
+    monkeypatch.setattr(shell, "run", _fake_run({"nmap -sV -p 5432": "postgresql/nmap-sv.txt"}))
+    result = mw.SimpleReconWorker(prof, "postgresql", 5432)._drive()
+    assert result.module == "postgresql"
+    kinds = {f.get("kind") for f in findings_mod.load_findings(prof.directory)}
+    assert {"service", "version", "port"} <= kinds
+    assert any(line.startswith("→") for line in result.summary)  # a Tier-2 suggestion surfaced
+
+
+def test_postgresql_worker_honours_non_standard_port(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.129.55.12"))
+    # the non-standard fixture only comes back when the command actually targets -p 5433
+    monkeypatch.setattr(
+        shell, "run", _fake_run({"nmap -sV -p 5433": "postgresql/nmap-sv-nonstandard.txt"})
+    )
+    result = mw.SimpleReconWorker(prof, "postgresql", 5433)._drive()
+    assert result.module == "postgresql"
+    # the discovered port flowed into the command (fixture matched), the output path + the findings
+    assert (prof.directory / "postgresql" / "nmap-sv-5433.txt").exists()
+    stored = {(f.get("kind"), f.get("value")) for f in findings_mod.load_findings(prof.directory)}
+    assert ("port", "5433") in stored
+    assert ("version", "12.1") in stored
+
+
+def test_postgresql_panel_emits_configured_port(qtbot: QtBot) -> None:
+    panel = SimpleReconPanel(SIMPLE_SPECS["postgresql"])
+    qtbot.addWidget(panel)
+    panel.configure(DiscoveredService(5433, Proto.TCP, "postgresql"))
+    with qtbot.waitSignal(panel.recon_requested) as blocker:
+        panel._recon.click()
+    assert blocker.args == [
+        "postgresql",
+        5433,
+    ]  # module + the non-standard port, not a 5432 default
+
+
 def test_worker_empty_output_writes_nothing(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -151,14 +192,14 @@ def test_tool_panel_forwards_simple_signals(qtbot: QtBot, tmp_path: Path) -> Non
     qtbot.addWidget(panel)
     panel.set_profile(prof)
     panel.show_service(DiscoveredService(137, Proto.UDP, "netbios-ns"), _ref("netbios"))
-    modules: list[str] = []
+    modules: list[tuple[str, int]] = []
     manual: list[str] = []
-    panel.simple_recon_requested.connect(modules.append)
+    panel.simple_recon_requested.connect(lambda m, p: modules.append((m, p)))
     panel.run_requested.connect(manual.append)
     nb = panel._simple["netbios"]
     nb._recon.click()
     nb._on_manual_activated(nb._manual.item(0))
-    assert modules == ["netbios"]
+    assert modules == [("netbios", 137)]  # module + the discovered port propagate through
     assert manual and "10.10.10.5" in manual[0]
 
 
