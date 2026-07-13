@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
@@ -45,26 +46,34 @@ class SprayDialog(QDialog):
             banner.setStyleSheet("color: #c0392b; font-weight: bold;")
             layout.addWidget(banner)
 
-        vault_row = QHBoxLayout()
+        # ── Credentials ──────────────────────────────────────────────
+        creds_box = QGroupBox("Credentials")
+        creds_layout = QHBoxLayout(creds_box)
         self._vault_label = QLabel()
         manage = QPushButton("Manage vault…")
         manage.clicked.connect(self._on_manage_vault)
-        vault_row.addWidget(self._vault_label, stretch=1)
-        vault_row.addWidget(manage)
-        layout.addLayout(vault_row)
+        creds_layout.addWidget(self._vault_label, stretch=1)
+        creds_layout.addWidget(manage)
+        layout.addWidget(creds_box)
 
-        layout.addWidget(QLabel("Services to spray:"))
+        # ── Services ─────────────────────────────────────────────────
+        services_box = QGroupBox("Services to spray")
+        services_layout = QVBoxLayout(services_box)
         self._checks: dict[str, QCheckBox] = {}
         for service in spray.SPRAY_SERVICES:
             box = QCheckBox(service.label)
             box.toggled.connect(self._refresh_preview)
             self._checks[service.key] = box
-            layout.addWidget(box)
+            services_layout.addWidget(box)
+        layout.addWidget(services_box)
 
-        layout.addWidget(QLabel("Preview (runs against the vault's users × passwords):"))
+        # ── Command preview ──────────────────────────────────────────
+        preview_box = QGroupBox("Command preview (vault users × passwords, discovered ports)")
+        preview_layout = QVBoxLayout(preview_box)
         self._preview = QPlainTextEdit()
         self._preview.setReadOnly(True)
-        layout.addWidget(self._preview, stretch=1)
+        preview_layout.addWidget(self._preview)
+        layout.addWidget(preview_box, stretch=1)
 
         button_row = QHBoxLayout()
         self._run = QPushButton("Run selected sprays")

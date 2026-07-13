@@ -14,9 +14,9 @@ from oscprecon.models import Credential
 
 
 class AddCredentialDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, credential: Credential | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Add Credential")
+        self.setWindowTitle("Edit Credential" if credential is not None else "Add Credential")
         self._username = QLineEdit()
         self._secret = QLineEdit()
         self._secret.setEchoMode(QLineEdit.EchoMode.Password)
@@ -25,6 +25,14 @@ class AddCredentialDialog(QDialog):
         self._domain = QLineEdit()
         self._source = QLineEdit()
         self._notes = QLineEdit()
+        if credential is not None:  # prefill for edit
+            self._username.setText(credential.username)
+            self._secret.setText(credential.secret)
+            idx = self._secret_type.findText(credential.secret_type)
+            self._secret_type.setCurrentIndex(idx if idx >= 0 else 0)
+            self._domain.setText(credential.domain)
+            self._source.setText(credential.source)
+            self._notes.setText(credential.notes)
 
         form = QFormLayout()
         form.addRow("Username:", self._username)

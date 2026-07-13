@@ -22,6 +22,17 @@ remains is blocked on external resources:** the *timed* mock exam needs an autho
 interactive + cross-machine AppImage acceptance needs a real desktop / a second VM (see
 `packaging/ACCEPTANCE.md`). No deterministic next chunk — the next move is the owner's call.
 
+### Credential-spray Burp-clean UX polish
+Owner-expressed direction ("clean GUI, Burp's layout"). Applied to the credential surface:
+- **Credential Vault → a proper table** (Username / Domain / Type / Secret / Source / Confirmed) with
+  masked secrets. **Copy username** + **Copy secret** put values on the clipboard only — the plaintext
+  is never rendered in the UI. **Edit** (prefill via the Add dialog) alongside Add / Delete. A
+  **Confirmed** column surfaces which services a spray validated a credential against (from
+  `tested_against`). Read-only disables mutation but keeps copy.
+- **Add Credential dialog** gained edit-prefill (titled "Edit Credential").
+- **Spray dialog** reorganized into clean group-box sections (Credentials · Services · Command preview).
+- +3 tests (vault table masking, copy-to-clipboard-only, edit-replaces, confirmed column, read-only).
+
 ### Live HackTricks fetch/cache + durable creds + parser resilience + AppImage acceptance
 A sequenced workstream (owner-approved live HackTricks + the two permanent product rules). In order:
 - **Owner decisions + policy** — `docs/OWNER_DECISIONS.md` + CLAUDE.md §14a: live fetch/cache is
