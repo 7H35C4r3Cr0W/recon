@@ -44,7 +44,9 @@ The OSCP exam has strict tooling rules. This tool must be exam-legal by default 
 - **AI / LLM calls at runtime** — banned during exam. The tool runs offline/local.
 - **Automated exploit chains** — no scan → vuln-match → run-exploit → shell pipelines.
 - **PoC download / execute / transform** from Exploit-DB — lookup and linkout only.
-- **Anything that needs internet at runtime** — except direct probing of the target and live rendering of HackTricks / Exploit-DB pages in the reference pane. **Allowed exception:** a **build-time-vendored, offline snapshot** of the open-source HackTricks **markdown** (bundled in the wheel, read from disk, **attributed** per its licence — see § 27), used for finding-aware offline section rendering; it needs no runtime internet. **Still forbidden:** live scraping or runtime caching of the HackTricks / Exploit-DB **websites**.
+- **Anything that needs internet at runtime** — except direct probing of the target, live rendering of HackTricks / Exploit-DB pages in the reference pane, and the **owner-approved live HackTricks fetch/cache** described below (see § 14a). **Allowed exceptions:** (a) a **build-time-vendored, offline snapshot** of the open-source HackTricks **markdown** (bundled in the wheel, read from disk, **attributed** per its licence — see § 27), used for finding-aware offline section rendering; and (b) **owner-approved live HackTricks fetching** of the single canonical mapped page for the selected service, with local caching for later offline viewing (§ 14a). **The offline vendored snapshot remains the reliable fallback and is never less authoritative than the live cache.** **Still forbidden:** crawling the HackTricks site, scraping arbitrary URLs, and any scraping/download of Exploit-DB **PoC content** (Exploit-DB stays lookup + linkout only).
+
+  **Live-fetch privacy rule (non-negotiable):** Only the canonical HackTricks page URL selected from the local `references/services.yaml` map may be fetched. Local target data (IP, hostname, banners, product, version, findings, notes, commands, credentials) is used **only** to choose and filter local display content and **must never** be transmitted as query parameters, request bodies, or headers.
 
 ### Tier framing for credential-adjacent recon
 
@@ -723,6 +725,42 @@ Seed the YAML with:
 
 When a service is selected, the tool panel shows the `tools:` list. Each row is clickable → pre-fills the command builder with placeholders (`{target}`, `{port}`, `{share}`, etc.) expanded from the active profile. User clicks Run.
 
+### 14a. Live HackTricks fetch + cache (owner-approved)
+
+Owner-approved (see `docs/OWNER_DECISIONS.md`). This narrows the former blanket ban: live fetching,
+section extraction, and local caching of HackTricks reference pages **are allowed**, within tight
+boundaries. Three content tiers coexist, most-reliable first:
+
+1. **Vendored offline** — the build-time markdown snapshot (§ 2, § 27). Always available, no network,
+   the **reliable fallback**; never overridden in authority by the live cache.
+2. **Live cached** — a previously fetched-and-sanitized page held in the rebuildable XDG cache.
+3. **Live page** — the canonical URL rendered live in the reference pane (already allowed).
+
+**Allowed:**
+- User-initiated live fetch of a **mapped** HackTricks page; optional auto-fetch when enabled in Preferences.
+- Fetching **only** from approved canonical HackTricks hosts, over **HTTPS**.
+- Extracting relevant headings/sections and **local caching** for later offline viewing; manual refresh; cache clearing.
+- Falling back to the vendored offline snapshot on any failure.
+
+**Forbidden:**
+- Crawling the whole HackTricks site; scraping arbitrary/user-entered URLs; following links to unrelated domains.
+- Executing JavaScript from fetched content; downloading executable content; rendering unsanitized remote HTML.
+- Runtime LLM calls; telemetry; uploading project information.
+- Sending target addresses, credentials, findings, notes, commands, or any project data to HackTricks.
+- Scraping/downloading Exploit-DB **PoC** content (Exploit-DB stays `searchsploit` + linkout only).
+- Using fetched reference content to **automatically execute** commands.
+
+**Explicit rule:** *Only the canonical HackTricks page URL selected from the local reference map may be
+fetched. Local target data is used only to choose and filter local display content and must never be
+transmitted as query parameters, request bodies, or headers.*
+
+**Implementation constraints:** the fetch/parse/cache logic lives in a non-GUI subsystem
+(`references/live_hacktricks.py`), never in a Qt widget. Fetches run off the GUI thread, are
+cancellable, rate-limited, size/timeout-bounded, content-type-validated, reject cross-host redirects,
+and use a descriptive application User-Agent. A result for one service/project must never replace the
+reference shown for another. Cache lives under `~/.cache/oscprecon/hacktricks/` — **never** inside
+`creds.json`, findings, or other authoritative project data; clearing it never touches project data.
+
 ---
 
 ## 15. Pattern library
@@ -1271,6 +1309,7 @@ uv run ruff format --check
 - Pattern library entries (with `# source:`)
 - New entries in `references/services.yaml`
 - A **build-time-vendored, offline HackTricks markdown snapshot** — from the open-source repo, **attributed** per its licence (CC BY-NC-SA; confirm at vendor time), **size-bounded** to the network-services-pentesting pages, refreshed by a maintainer-run script (never fetched at runtime) — for finding-aware offline section surfacing (see § 2, § 14)
+- **Owner-approved live HackTricks fetch/cache** (§ 14a) — user-initiated (or Preferences-enabled auto) fetch of the single canonical mapped page over HTTPS from an allow-listed host, local section extraction + rebuildable XDG cache, manual refresh / clear, offline fallback. **Never** transmit target/project data; never crawl; never scrape Exploit-DB PoCs
 - Report template improvements
 - GUI widgets exposing existing engine functionality
 - Bounded parallel execution
@@ -1286,7 +1325,7 @@ uv run ruff format --check
 - LLM/AI calls at runtime — even "optional"
 - Auto-exploitation gated behind flags
 - Downloading, executing, transforming Exploit-DB PoCs
-- **Live scraping or runtime caching of the HackTricks / Exploit-DB _websites_** — fetching or persisting rendered pages at runtime (a build-time-vendored offline markdown snapshot is allowed — see "Yes to propose" and § 2)
+- **Crawling the HackTricks site, scraping arbitrary/user-entered URLs, or following links to unrelated domains** — the owner-approved live fetch (§ 14a) is limited to the single canonical mapped page per service; the vendored offline snapshot and the local cache remain the defaults. **Any scraping/download of Exploit-DB PoC content stays forbidden** (Exploit-DB = lookup + linkout only)
 - Rewrites of the tech stack — decided in § 3
 - Speculative abstractions for features not in the roadmap
 - Telemetry, update checks, login flows, cloud sync (an **offline, no-network branded splash screen** for the public-release build is the one allowed exception — owner-requested; see "Yes to propose")

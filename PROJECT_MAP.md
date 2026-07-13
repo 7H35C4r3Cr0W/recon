@@ -10,6 +10,8 @@ is the single "what is done / partial / next / blocked" view. Historical build d
   **837 tests** pass (incl. 216 offscreen GUI) · `test_packaging` green (wheel ships resources,
   incl. the vendored HackTricks snapshot; `packaging/` build infra excluded from the wheel).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
+- Owner-approved policy decisions: [`docs/OWNER_DECISIONS.md`](docs/OWNER_DECISIONS.md) (live
+  HackTricks fetch/cache is approved; project credentials are durable in `<project>/creds.json`).
 
 ## Status legend
 
