@@ -31,11 +31,24 @@ DEFAULT_SCAN_PROFILE = "default"
 DEFAULT_MAX_CONCURRENCY = 4
 CONCURRENCY_RANGE = (1, 16)
 FONT_SIZE_RANGE = (8, 24)  # 0 = "use the Qt default, don't override"
+# Live HackTricks fetch/cache (owner-approved, §14a) — OFF by default; the vendored offline snapshot
+# stays the reliable fallback. cache_days = how long a cached page is considered fresh.
+DEFAULT_HACKTRICKS_CACHE_DAYS = 14
+HACKTRICKS_CACHE_DAYS_RANGE = (1, 365)
 
 
 def config_dir() -> Path:
     raw = os.environ.get("XDG_CONFIG_HOME")
     base = Path(raw) if raw else Path.home() / ".config"
+    directory = base / APP_NAME
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def cache_dir() -> Path:
+    # why: rebuildable, NON-authoritative XDG cache (live HackTricks pages) — never project data.
+    raw = os.environ.get("XDG_CACHE_HOME")
+    base = Path(raw) if raw else Path.home() / ".cache"
     directory = base / APP_NAME
     directory.mkdir(parents=True, exist_ok=True)
     return directory
@@ -109,6 +122,11 @@ class Settings:
     # opt-in, OFF BY DEFAULT (CLAUDE.md §2a): unlocks OSCP-legal credential spraying (hydra/medusa/
     # netexec list-spray + password wordlists). With this false the tool is strictly recon-only.
     spray_enabled: bool = False
+    # Live HackTricks fetch/cache (§14a) — OFF by default; offline vendored pages stay the fallback.
+    hacktricks_live_enabled: bool = False
+    hacktricks_auto_refresh: bool = False  # auto-refresh stale cached pages when live is on
+    hacktricks_prefer_live: bool = False  # prefer a fresh live-cached page over vendored offline
+    hacktricks_cache_days: int = DEFAULT_HACKTRICKS_CACHE_DAYS
 
     def normalized(self) -> Settings:
         font = self.font_size
@@ -125,6 +143,10 @@ class Settings:
             if self.scan_profile in SCAN_PROFILES
             else DEFAULT_SCAN_PROFILE,
             spray_enabled=bool(self.spray_enabled),
+            hacktricks_live_enabled=bool(self.hacktricks_live_enabled),
+            hacktricks_auto_refresh=bool(self.hacktricks_auto_refresh),
+            hacktricks_prefer_live=bool(self.hacktricks_prefer_live),
+            hacktricks_cache_days=_clamp(self.hacktricks_cache_days, *HACKTRICKS_CACHE_DAYS_RANGE),
         )
 
     def to_prefs(self) -> dict[str, str]:
@@ -138,6 +160,10 @@ class Settings:
             "nmap_udp_full": "true" if self.nmap_udp_full else "false",
             "scan_profile": self.scan_profile,
             "spray_enabled": "true" if self.spray_enabled else "false",
+            "hacktricks_live_enabled": "true" if self.hacktricks_live_enabled else "false",
+            "hacktricks_auto_refresh": "true" if self.hacktricks_auto_refresh else "false",
+            "hacktricks_prefer_live": "true" if self.hacktricks_prefer_live else "false",
+            "hacktricks_cache_days": str(self.hacktricks_cache_days),
         }
 
 
@@ -151,6 +177,10 @@ def default_settings() -> Settings:
         nmap_udp_full=False,
         scan_profile=DEFAULT_SCAN_PROFILE,
         spray_enabled=False,
+        hacktricks_live_enabled=False,
+        hacktricks_auto_refresh=False,
+        hacktricks_prefer_live=False,
+        hacktricks_cache_days=DEFAULT_HACKTRICKS_CACHE_DAYS,
     )
 
 
@@ -170,6 +200,20 @@ def load_settings() -> Settings:
         nmap_udp_full=_parse_bool(prefs.get("nmap_udp_full"), base.nmap_udp_full),
         scan_profile=prefs.get("scan_profile", base.scan_profile),
         spray_enabled=_parse_bool(prefs.get("spray_enabled"), base.spray_enabled),
+        hacktricks_live_enabled=_parse_bool(
+            prefs.get("hacktricks_live_enabled"), base.hacktricks_live_enabled
+        ),
+        hacktricks_auto_refresh=_parse_bool(
+            prefs.get("hacktricks_auto_refresh"), base.hacktricks_auto_refresh
+        ),
+        hacktricks_prefer_live=_parse_bool(
+            prefs.get("hacktricks_prefer_live"), base.hacktricks_prefer_live
+        ),
+        hacktricks_cache_days=_parse_int(
+            prefs.get("hacktricks_cache_days"),
+            base.hacktricks_cache_days,
+            *HACKTRICKS_CACHE_DAYS_RANGE,
+        ),
     ).normalized()
 
 

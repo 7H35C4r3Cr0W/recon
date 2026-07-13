@@ -133,7 +133,13 @@ def test_settings_prefs_hold_only_known_non_secret_keys() -> None:
         "nmap_udp_full",
         "scan_profile",
         "spray_enabled",
+        "hacktricks_live_enabled",
+        "hacktricks_auto_refresh",
+        "hacktricks_prefer_live",
+        "hacktricks_cache_days",
     }
+    # none of these carry a secret — they are booleans, an int, paths, and enum names
+    assert "secret" not in " ".join(keys) and "password" not in " ".join(keys)
 
 
 def test_spray_enabled_defaults_off_and_roundtrips() -> None:
@@ -141,6 +147,25 @@ def test_spray_enabled_defaults_off_and_roundtrips() -> None:
     config.save_prefs({"spray_enabled": "true"})
     assert config.load_settings().spray_enabled is True
     assert config.spray_enabled() is True  # the accessor the engine reads
+
+
+def test_hacktricks_live_settings_default_off_and_roundtrip() -> None:
+    base = config.default_settings()
+    assert base.hacktricks_live_enabled is False  # OFF by default (§14a)
+    assert base.hacktricks_auto_refresh is False and base.hacktricks_prefer_live is False
+    assert base.hacktricks_cache_days == config.DEFAULT_HACKTRICKS_CACHE_DAYS
+    config.save_prefs(
+        {
+            "hacktricks_live_enabled": "true",
+            "hacktricks_auto_refresh": "true",
+            "hacktricks_prefer_live": "true",
+            "hacktricks_cache_days": "9999",  # out of range -> clamped
+        }
+    )
+    loaded = config.load_settings()
+    assert loaded.hacktricks_live_enabled is True and loaded.hacktricks_auto_refresh is True
+    assert loaded.hacktricks_prefer_live is True
+    assert loaded.hacktricks_cache_days == config.HACKTRICKS_CACHE_DAYS_RANGE[1]  # clamped to max
 
 
 def test_scan_profile_roundtrips() -> None:
