@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 
 from oscprecon import hacktricks
 from oscprecon.models import DiscoveredService
-from oscprecon.references import ExploitHit, ServiceRef
+from oscprecon.references import ExploitHit, ServiceRef, sections
 from oscprecon.references.live_hacktricks import LiveResult
 
 try:
@@ -200,7 +200,7 @@ class ReferencePane(QWidget):
         self._current_ref = ref
         self._label.setText(f"{ref.label} — {service.port}/{service.proto.value}")
         self._link.setText(f'<a href="{ref.hacktricks}">{ref.hacktricks}</a>')
-        self._show_offline(ref, findings or [])
+        self._show_offline(ref, findings or [], service.product)
         self._load(QUrl(ref.hacktricks))
         self.page_visited.emit(ref.label, ref.hacktricks)
         if service.product:
@@ -219,7 +219,9 @@ class ReferencePane(QWidget):
             item.setData(_LABEL_ROLE, f"EDB-{hit.edb_id}")
             self._exploits.addItem(item)
 
-    def _show_offline(self, ref: ServiceRef, findings: list[dict[str, Any]]) -> None:
+    def _show_offline(
+        self, ref: ServiceRef, findings: list[dict[str, Any]], product: str = ""
+    ) -> None:
         # render the vendored offline page (if any) and default to it; the live link stays visible
         # above and the Live tab is a click away. Offline-first is the exam-friendly default.
         page = hacktricks.page_for_module(ref.module)
@@ -240,15 +242,25 @@ class ReferencePane(QWidget):
         self._tabs.setCurrentIndex(self._offline_index)
         self._source_state.setText("Source: offline vendored snapshot")
         self._refresh_btn.setEnabled(self._live_enabled)
-        self._apply_finding_jump(ref.module, findings)
+        self._apply_finding_jump(ref.module, findings, product)
 
-    def _apply_finding_jump(self, module: str, findings: list[dict[str, Any]]) -> None:
-        # finding-aware: jump to the section matching a finding kind for this service (if any).
+    def _apply_finding_jump(
+        self, module: str, findings: list[dict[str, Any]], product: str = ""
+    ) -> None:
+        # relevance priority (§14a): a finding-kind heading first, then the detected product's own
+        # section, else leave at the top. Selection is LOCAL — never a server query.
         section = self._section_for_findings(module, findings)
         if section and self._jump_to(section):
             self._jump_hint.setText(f"↳ jumped to “{section}” — from your findings")
-        else:
-            self._offline.moveCursor(QTextCursor.MoveOperation.Start)
+            return
+        if product:
+            picks = sections.relevant_sections(self._offline_markdown, keywords=[], product=product)
+            top = picks[0] if picks else None
+            hit = top and top.heading and product.lower() in (top.heading + top.body).lower()
+            if hit and top is not None and self._jump_to(top.heading):
+                self._jump_hint.setText(f"↳ jumped to “{top.heading}” — matches {product}")
+                return
+        self._offline.moveCursor(QTextCursor.MoveOperation.Start)
 
     # ----- live HackTricks -------------------------------------------------
 

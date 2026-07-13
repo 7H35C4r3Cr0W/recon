@@ -339,6 +339,25 @@
 - { match: { service_name: "ssl/https" },    label: HTTPS, module: http, hacktricks: *web }
 - { match: { service_name: "ssl/https-alt" }, label: HTTPS, module: http, hacktricks: *web }
 
+# --- Service-name fallbacks for non-HTTP services on NON-STANDARD ports ---
+# Without these, e.g. MySQL on 33060 or SMB on a relocated port routes nowhere. Specificity 1 (service
+# name only), so a port/product match always wins; these only catch the odd-port case. Use canonical
+# nmap service names.
+- { match: { service_name: ftp },            label: FTP,   module: ftp,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ftp/index.html" }
+- { match: { service_name: ssh },            label: SSH,   module: ssh,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ssh.html" }
+- { match: { service_name: smtp },           label: SMTP,  module: smtp,  hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smtp/index.html" }
+- { match: { service_name: ldap },           label: LDAP,  module: ldap,  hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ldap.html" }
+- { match: { service_name: "microsoft-ds" }, label: SMB,   module: smb,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smb/index.html" }
+- { match: { service_name: "netbios-ssn" },  label: SMB,   module: smb,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smb/index.html" }
+- { match: { service_name: mysql },          label: MySQL, module: mysql, hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mysql.html" }
+- { match: { service_name: "ms-sql-s" },     label: MSSQL, module: mssql, hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-mssql-microsoft-sql-server/index.html" }
+- { match: { service_name: postgresql },     label: PostgreSQL, module: postgresql, hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-postgresql.html" }
+- { match: { service_name: redis },          label: Redis, module: redis, hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-redis.html" }
+- { match: { service_name: mongodb },        label: MongoDB, module: mongodb, hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/27017-27018-mongodb.html" }
+- { match: { service_name: snmp },           label: SNMP,  module: snmp,  hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-snmp/index.html" }
+- { match: { service_name: nfs },            label: NFS,   module: nfs,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/nfs-service-pentesting.html" }
+- { match: { service_name: ntp },            label: NTP,   module: ntp,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ntp.html" }
+
 # --- Product-specific overrides ---
 # Order matters: on an equal-specificity tie the first match wins, so list SPECIFIC apps
 # (Tomcat, Jenkins, ...) before the generic servers (Apache, nginx) — e.g. "Apache Tomcat"

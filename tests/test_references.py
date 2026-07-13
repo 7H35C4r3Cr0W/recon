@@ -71,6 +71,58 @@ def test_no_match_returns_none() -> None:
     assert references.match(_svc(1, Proto.TCP, "tcpwrapped")) is None
 
 
+def test_smb_445_and_odd_port_route_to_smb() -> None:
+    assert references.match(_svc(445, Proto.TCP, "microsoft-ds")).module == "smb"
+    # SMB relocated to a non-standard port still routes via the service-name fallback
+    assert references.match(_svc(4445, Proto.TCP, "microsoft-ds")).module == "smb"
+
+
+def test_https_443_and_ssl_http_alt_port_route_to_http() -> None:
+    assert references.match(_svc(443, Proto.TCP, "https")).module == "http"
+    assert references.match(_svc(8443, Proto.TCP, "ssl/http")).module == "http"
+    assert references.match(_svc(9999, Proto.TCP, "ssl/http")).module == "http"  # odd HTTPS port
+
+
+def test_database_on_nonstandard_port_routes_via_service_name() -> None:
+    # regression: DBs on relocated ports must reach their module (previously fell through to None)
+    assert references.match(_svc(33060, Proto.TCP, "mysql")).module == "mysql"
+    assert references.match(_svc(14330, Proto.TCP, "ms-sql-s")).module == "mssql"
+    assert references.match(_svc(6380, Proto.TCP, "redis")).module == "redis"
+    # the standard port still wins by specificity (port match > service-name fallback)
+    assert references.match(_svc(3306, Proto.TCP, "mysql")).label == "MySQL"
+
+
+def test_multiple_http_instances_each_route_independently() -> None:
+    a = references.match(_svc(8080, Proto.TCP, "http-alt"))
+    b = references.match(_svc(8000, Proto.TCP, "http"))
+    assert a.module == "http" and b.module == "http"
+    assert a.label != b.label  # distinct per-port labels, not a merged node
+
+
+def test_service_name_fallback_urls_are_live_fetchable() -> None:
+    # every mapped URL (incl. the new fallbacks) must satisfy the live-fetch allow-list
+    from oscprecon.references import live_hacktricks
+
+    for svc in (_svc(33060, Proto.TCP, "mysql"), _svc(2222, Proto.TCP, "ssh")):
+        ref = references.match(svc)
+        assert ref is not None and live_hacktricks.is_fetchable(ref.hacktricks)
+
+
+def test_edb_persistence_never_stores_the_poc_path(tmp_path: Path) -> None:
+    from oscprecon import edb
+
+    hit = references.ExploitHit(
+        edb_id="12345",
+        title="Example",
+        url="https://www.exploit-db.com/exploits/12345",
+        path="/usr/share/exploitdb/exploits/linux/remote/12345.py",
+    )
+    edb.add_edb(tmp_path, service="ssh:22", product="OpenSSH", version="8.4", hits=[hit])
+    stored = (tmp_path / "edb.json").read_text(encoding="utf-8")
+    assert "12345" in stored and "exploit-db.com" in stored  # the reference is recorded
+    assert "12345.py" not in stored and "/exploitdb/" not in stored  # but NEVER the PoC path
+
+
 def test_expand_hint() -> None:
     out = references.expand_hint("smbclient //{target}/{share} -N", target="10.10.10.5", share="IT")
     assert out == "smbclient //10.10.10.5/IT -N"
