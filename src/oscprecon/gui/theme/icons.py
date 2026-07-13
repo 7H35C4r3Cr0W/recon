@@ -19,6 +19,16 @@ _GLYPHS: dict[str, str] = {
     "add": '<path d="M12 5 V19 M5 12 H19"/>',
     "graph": '<circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="16" r="2.5"/>'
     '<circle cx="13" cy="6" r="2.5"/><path d="M7.8 16.6 L11.2 8 M14.6 7.5 L17 13.8"/>',
+    # primary-navigation glyphs
+    "home": '<path d="M4 11 L12 4 L20 11"/><path d="M6 10 V20 H18 V10"/>',
+    "target": '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/>',
+    "flag": '<path d="M6 3 V21"/><path d="M6 4 H17 L14 8 L17 12 H6"/>',
+    "key": '<circle cx="8" cy="12" r="4"/><path d="M11 12 H20 M17 12 V15 M20 12 V16"/>',
+    "note": '<rect x="5" y="4" width="14" height="16" rx="2"/>'
+    '<path d="M8 9 H16 M8 13 H16 M8 17 H13"/>',
+    "chart": '<rect x="5" y="4" width="14" height="16" rx="2"/>'
+    '<path d="M9 15 V17 M12 11 V17 M15 8 V17"/>',
+    "pulse": '<path d="M3 12 H8 L10 6 L14 18 L16 12 H21"/>',
 }
 
 

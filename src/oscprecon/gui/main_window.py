@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDockWidget,
     QFileDialog,
+    QHBoxLayout,
     QInputDialog,
     QLabel,
     QMainWindow,
@@ -42,7 +43,11 @@ from oscprecon.gui.dialogs import (
 )
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
+from oscprecon.gui.widgets.activity_view import ActivityView
+from oscprecon.gui.widgets.app_header import AppHeader
+from oscprecon.gui.widgets.findings_view import FindingsView
 from oscprecon.gui.widgets.graph_view import GraphView
+from oscprecon.gui.widgets.nav_rail import NavRail
 from oscprecon.gui.widgets.notes_pane import NotesPane
 from oscprecon.gui.widgets.reference_pane import ReferencePane
 from oscprecon.gui.widgets.report_view import ReportView
@@ -204,17 +209,43 @@ class MainWindow(QMainWindow):
         self._graph_view = GraphView()
         self._graph_view.service_open_requested.connect(self._on_graph_service_open)
         self._report_view = ReportView()
+        self._findings_view = FindingsView()
+        self._activity_view = ActivityView()
         self._dashboard = WorkspaceDashboard()
         self._dashboard.open_requested.connect(lambda d: self._open_path(Path(str(d))))
         self._dashboard.create_requested.connect(self._on_new)
         self._dashboard.status_message.connect(self._tool_panel.append_output)
         self._dashboard.profile_mutated.connect(self._on_dashboard_mutated)
         self._central_stack = QStackedWidget()
-        self._central_stack.addWidget(splitter)  # 0: three-pane
+        # index order is load-bearing (graph/report toggles + tests key on 0/1/2/3) — append only
+        self._central_stack.addWidget(splitter)  # 0: three-pane recon
         self._central_stack.addWidget(self._graph_view)  # 1: graph
         self._central_stack.addWidget(self._report_view)  # 2: report preview
         self._central_stack.addWidget(self._dashboard)  # 3: workspace dashboard (home)
-        self.setCentralWidget(self._central_stack)
+        self._central_stack.addWidget(self._findings_view)  # 4: findings
+        self._central_stack.addWidget(self._activity_view)  # 5: activity / audit
+
+        # app shell: compact header on top, primary nav rail on the left, central stack in the body
+        theme_name = theme.normalize(settings.theme)
+        self._header = AppHeader(theme_name)
+        self._header.home_requested.connect(self._show_workspace)
+        self._nav = NavRail(theme_name)
+        self._nav.navigate.connect(self._on_navigate)
+
+        body = QWidget()
+        body_layout = QHBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
+        body_layout.addWidget(self._nav)
+        body_layout.addWidget(self._central_stack, stretch=1)
+
+        shell = QWidget()
+        shell_layout = QVBoxLayout(shell)
+        shell_layout.setContentsMargins(0, 0, 0, 0)
+        shell_layout.setSpacing(0)
+        shell_layout.addWidget(self._header)
+        shell_layout.addWidget(body, stretch=1)
+        self.setCentralWidget(shell)
 
         self._notes_pane = NotesPane()
         self._notes_dock = QDockWidget("Notes", self)
@@ -464,12 +495,19 @@ class MainWindow(QMainWindow):
         self._target_label.setText(label)
         ro = " [read-only]" if profile.read_only else ""
         self.setWindowTitle(f"{APP_NAME} — {profile.profile_name}{ro}")
+        self._header.set_profile(
+            profile.profile_name, target.ip, target.hostname or "", read_only=profile.read_only
+        )
+        self._nav.set_enabled_keys(True)
         self._central_stack.setCurrentIndex(0)  # leave the dashboard, show the three-pane view
+        self._sync_nav()
         self._tool_panel.set_target(target.ip)
         self._tool_panel.set_profile(profile)
         self._service_tree.populate(profile.discovered_services, force=True)
         self._graph_view.set_profile(profile)
         self._report_view.set_profile(profile)
+        self._findings_view.set_profile(profile)
+        self._activity_view.set_profile(profile)
         self._update_status_footer()
         self._refresh_suggestions()
         self._notes_pane.set_profile(profile)
@@ -504,29 +542,89 @@ class MainWindow(QMainWindow):
             self._profile.organization = fresh.organization
             self._profile.tags = fresh.tags
 
+    # central-stack index -> nav key, so the rail highlight always matches the visible view
+    _INDEX_KEY = {0: "recon", 1: "graph", 2: "report", 3: "workspace", 4: "findings", 5: "activity"}
+
+    def _sync_nav(self) -> None:
+        self._nav.set_current(self._INDEX_KEY.get(self._central_stack.currentIndex(), "workspace"))
+
+    def _on_navigate(self, key: str) -> None:
+        # page destinations switch the central view; action destinations trigger a surface and let
+        # the highlight bounce back to the current page
+        if key == "workspace":
+            self._show_workspace()
+        elif key == "recon":
+            self._show_recon()
+        elif key == "graph":
+            self._graph_action.setChecked(True)
+        elif key == "report":
+            self._report_action.setChecked(True)
+        elif key == "findings":
+            self._show_findings()
+        elif key == "activity":
+            self._show_activity()
+        elif key == "credentials":
+            self._on_credential_vault()
+            self._sync_nav()
+        elif key == "notes":
+            self._notes_dock.setVisible(True)
+            self._notes_dock.raise_()
+            self._sync_nav()
+
     def _show_workspace(self) -> None:
         self._graph_action.setChecked(False)
         self._report_action.setChecked(False)
+        self._nav.set_enabled_keys(
+            self._profile is not None
+        )  # only Workspace works with no project
         self._dashboard.refresh()  # rescan off-thread
         self._central_stack.setCurrentWidget(self._dashboard)
+        self._sync_nav()
+
+    def _show_recon(self) -> None:
+        self._graph_action.setChecked(False)
+        self._report_action.setChecked(False)
+        self._central_stack.setCurrentIndex(0)
+        self._sync_nav()
+
+    def _show_findings(self) -> None:
+        self._graph_action.setChecked(False)
+        self._report_action.setChecked(False)
+        self._findings_view.reload()
+        self._central_stack.setCurrentWidget(self._findings_view)
+        self._sync_nav()
+
+    def _show_activity(self) -> None:
+        self._graph_action.setChecked(False)
+        self._report_action.setChecked(False)
+        self._activity_view.reload()
+        self._central_stack.setCurrentWidget(self._activity_view)
+        self._sync_nav()
 
     def _on_toggle_graph(self, checked: bool) -> None:
         if checked:
             self._report_action.setChecked(False)  # graph and report are mutually exclusive views
             self._graph_view.reload()  # refresh from the latest findings/creds/graph.json
         self._central_stack.setCurrentIndex(1 if checked else 0)
+        self._sync_nav()
 
     def _on_toggle_report(self, checked: bool) -> None:
         if checked:
             self._graph_action.setChecked(False)
             self._report_view.reload()  # render the current report.md
         self._central_stack.setCurrentIndex(2 if checked else 0)
+        self._sync_nav()
 
     def _set_theme(self, name: str) -> None:
         theme.apply_theme(name)
         settings = config.load_settings()
         settings.theme = theme.normalize(name)
         config.save_settings(settings)
+        self._restyle_shell(settings.theme)
+
+    def _restyle_shell(self, theme_name: str) -> None:
+        self._header.restyle(theme.normalize(theme_name))
+        self._nav.restyle(theme.normalize(theme_name))
 
     def _on_preferences(self) -> None:
         dialog = SettingsDialog(config.load_settings(), self)
@@ -539,6 +637,7 @@ class MainWindow(QMainWindow):
         theme.apply_theme(settings.theme)
         theme.apply_font(settings.font_size)
         self._sync_theme_menu(settings.theme)
+        self._restyle_shell(settings.theme)
         self._tasks.max_concurrency = settings.max_concurrency
         self._reference_pane.set_live_enabled(settings.hacktricks_live_enabled)
         self._update_status_footer()
@@ -1006,6 +1105,7 @@ class MainWindow(QMainWindow):
         self._service_tree.setEnabled(self._profile is not None)
         self._tool_panel.set_running(read_only or not self._tasks.can_start())
         self._notes_pane.setEnabled(not read_only)  # no notes edits in read-only
+        self._header.set_task_count(self._tasks.active_count)
 
     def _launch(self, worker: QThread, label: str, *, exclusive: bool = False) -> None:
         # admission primitive: register with the TaskManager, guarantee release on `finished`

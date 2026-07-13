@@ -42,14 +42,20 @@ Renaming the product to **Nabu** and lifting it toward a polished desktop produc
   relay-risk only when disabled; anon=access, null/world-readable/writable=exposure. Graph uses it,
   gains a **legend**, styles EDB refs apart from danger, and a regression guard proves credential
   secrets can never be surfaced by graph search.
+- **Main application shell + primary navigation** — a left **NavRail** (Workspace · Recon · Graph ·
+  Findings · Credentials · Notes · Report · Activity; page items switch the central stack, action
+  items open the vault / raise the notes dock) + a compact **AppHeader** (⌂ Workspace quick-return ·
+  project · target · READ-ONLY badge · running-task count). New read-only **FindingsView** (reuses the
+  conservative classifier) and **ActivityView** (audit.jsonl). Both theme-aware (light + dark),
+  `WA_StyledBackground` so panels paint, restyled on theme change; rendered + eyeballed both themes.
+  +7 tests. Existing graph/report toggle indices (0/1/2/3) preserved.
 
-**Remaining Nabu chunks (not yet done):** main application shell + primary navigation (Workspace /
-Recon / Graph / Findings / Credentials / Notes / Report / Activity + compact header); dashboard
-empty-state illustration + row hierarchy; three-pane recon visual polish; reference-pane presentation;
-dedicated Findings view; vault/spray UX polish; dialog/form uniformity; feedback/loading/error
-banners; full keyboard-shortcut + accessibility sweep; performance pass; `docs/screenshots/`
-(generated data only); the 22-angle adversarial refute-review; and the docs/packaging finalization.
-**Recommended single next chunk:** the main application shell + primary navigation.
+**Remaining Nabu chunks (not yet done):** dashboard empty-state illustration + row hierarchy;
+three-pane recon visual polish; reference-pane presentation; richer Findings view (filter/group/
+search); vault/spray UX polish; dialog/form uniformity; feedback/loading/error banners; full
+keyboard-shortcut + accessibility sweep; performance pass; `docs/screenshots/` (generated data only);
+the 22-angle adversarial refute-review; and the docs/packaging finalization. **Recommended single
+next chunk:** dashboard + three-pane recon visual polish (now that the shell/tokens are in place).
 
 ### Pre-live-testing polish (owner-requested)
 A run of owner-requested improvements before live-box testing:
