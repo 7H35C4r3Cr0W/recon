@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Nabu
+GenericName=Recon Workspace
+Comment=Recon-first, OSCP exam-legal enumeration workspace
+Exec=nabu
+Icon=nabu
+Terminal=false
+Categories=Network;Security;
+Keywords=nabu;oscp;recon;enumeration;nmap;pentest;

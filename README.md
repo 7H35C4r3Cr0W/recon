@@ -1,4 +1,6 @@
-# oscp-recon
+# Nabu
+
+*Local Recon Workspace* — internal package `oscprecon`; installs as `oscp-recon`.
 
 A **recon-first**, OSCP-exam-legal desktop GUI that orchestrates standard enumeration tools
 (nmap, feroxbuster/gobuster/ffuf, nikto/whatweb, smbclient/netexec, …), links each service to
@@ -30,15 +32,16 @@ forward plan, and [`PROGRESS.md`](PROGRESS.md) for the detailed build log.
 ```bash
 git clone <repo>/oscp-recon.git ~/oscp-recon && cd ~/oscp-recon
 uv sync                 # create the venv and install deps
-uv pip install -e .     # install the console scripts (oscp-recon, oscprecon-cli)
+uv pip install -e .     # install the console scripts (nabu, nabu-cli + legacy aliases)
 ```
 
 After `uv pip install -e .` the GUI is launchable from any terminal:
 
 ```bash
-oscp-recon              # launch the GUI
-python -m oscprecon     # equivalent
-oscprecon-cli scan 10.10.10.10 --profile htb-box   # headless nmap
+nabu                    # launch the GUI
+nabu-cli scan 10.10.10.10 --profile htb-box        # headless nmap
+python -m oscprecon     # equivalent GUI launch
+# legacy aliases kept for ≥1 release: oscp-recon, oscprecon, oscprecon-cli
 ```
 
 ## What it does
@@ -149,12 +152,12 @@ from them.
 ## Kali app menu / taskbar icon
 
 ```bash
-cp share/applications/oscp-recon.desktop ~/.local/share/applications/
+cp packaging/nabu.desktop ~/.local/share/applications/
+cp packaging/nabu.png ~/.local/share/icons/
 update-desktop-database ~/.local/share/applications/
 ```
 
-`oscp-recon` then appears under the Network/Security app menu (placeholder terminal icon;
-swap `Icon=` in the `.desktop` for your own).
+`Nabu` then appears under the Network/Security app menu (swap `Icon=` in the `.desktop` for your own).
 
 ## Development
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Build a single-file, double-click AppImage of the oscp-recon GUI for Linux / Kali.
+# Build a single-file, double-click AppImage of the Nabu GUI for Linux / Kali.
 #
-#   PRODUCES:  dist/oscp-recon-<version>-x86_64.AppImage   (download -> `chmod +x` -> double-click)
+#   PRODUCES:  dist/Nabu-<version>-x86_64.AppImage   (download -> `chmod +x` -> double-click)
 #
 # WHY AN APPIMAGE: it bundles the existing PySide6 app together with a relocatable standalone
 # CPython, so the end user needs no Python, no pip, no apt. Qt AND QtWebEngine (the graph view +
@@ -20,7 +20,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="$REPO/dist"
 BUILD="$REPO/build/appimage"
-APPDIR="$BUILD/oscp-recon.AppDir"
+APPDIR="$BUILD/nabu.AppDir"
 PYVER="${OSCPRECON_PYVER:-3.11}"
 ARCH="$(uname -m)"
 
@@ -56,7 +56,7 @@ rm -rf "$APPDIR/usr/python"
 cp -a "$PYROOT" "$APPDIR/usr/python"
 APP_PY="$APPDIR/usr/python/bin/python3"
 
-say "install oscp-recon (+ PySide6 with bundled Qt/QtWebEngine) into the bundle"
+say "install Nabu (+ PySide6 with bundled Qt/QtWebEngine) into the bundle"
 # The bundled copy is OURS to modify (not a system/shared Python): drop uv's EXTERNALLY-MANAGED
 # marker and install with the copy's own pip, overriding PEP 668. The copy stays relocatable.
 find "$APPDIR/usr/python" -name EXTERNALLY-MANAGED -delete 2>/dev/null || true
@@ -75,11 +75,11 @@ APPRUN
 chmod +x "$APPDIR/AppRun"
 
 say "install desktop entry + icon"
-install -Dm644 "$REPO/packaging/oscp-recon.desktop" "$APPDIR/usr/share/applications/oscp-recon.desktop"
-install -Dm644 "$REPO/packaging/oscp-recon.png" \
-    "$APPDIR/usr/share/icons/hicolor/256x256/apps/oscp-recon.png"
-cp "$REPO/packaging/oscp-recon.desktop" "$APPDIR/oscp-recon.desktop"
-cp "$REPO/packaging/oscp-recon.png" "$APPDIR/oscp-recon.png"
+install -Dm644 "$REPO/packaging/nabu.desktop" "$APPDIR/usr/share/applications/nabu.desktop"
+install -Dm644 "$REPO/packaging/nabu.png" \
+    "$APPDIR/usr/share/icons/hicolor/256x256/apps/nabu.png"
+cp "$REPO/packaging/nabu.desktop" "$APPDIR/nabu.desktop"
+cp "$REPO/packaging/nabu.png" "$APPDIR/nabu.png"
 
 # Qt AND QtWebEngine ship *inside* the PySide6 wheel we just installed, so they are already in the
 # AppDir — no linuxdeploy-plugin-qt needed (that plugin targets system-Qt apps, not PySide6's bundled
@@ -89,7 +89,7 @@ cp "$REPO/packaging/oscp-recon.png" "$APPDIR/oscp-recon.png"
 # bundle them for maximal portability, run `linuxdeploy --appdir <AppDir> -e <python>` before packing.
 
 say "pack the AppImage"
-OUT="$DIST/oscp-recon-${VERSION}-${ARCH}.AppImage"
+OUT="$DIST/Nabu-${VERSION}-${ARCH}.AppImage"
 ARCH="$ARCH" appimagetool "$APPDIR" "$OUT"
 
 say "done -> $OUT"

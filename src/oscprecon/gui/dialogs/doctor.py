@@ -21,7 +21,7 @@ class DoctorDialog(QDialog):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Doctor — wrapped tool status")
+        self.setWindowTitle("Nabu · Doctor — wrapped tool status")
         self.resize(560, 480)
 
         report = doctor.scan()

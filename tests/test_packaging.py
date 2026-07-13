@@ -59,8 +59,8 @@ def test_appimage_packaging_assets_are_present_and_well_formed() -> None:
     # NOT shipped in the wheel, but its inputs must stay valid so a maintainer can build on Kali.
     pkg = REPO / "packaging"
     script = pkg / "build-appimage.sh"
-    desktop = pkg / "oscp-recon.desktop"
-    icon = pkg / "oscp-recon.png"
+    desktop = pkg / "nabu.desktop"
+    icon = pkg / "nabu.png"
     assert script.exists() and desktop.exists() and icon.exists()
 
     icon_bytes = icon.read_bytes()
@@ -68,11 +68,14 @@ def test_appimage_packaging_assets_are_present_and_well_formed() -> None:
 
     desktop_text = desktop.read_text()
     assert "[Desktop Entry]" in desktop_text
-    assert "Exec=oscp-recon" in desktop_text
-    assert "Icon=oscp-recon" in desktop_text
+    assert "Name=Nabu" in desktop_text  # user-facing launcher identity is Nabu
+    assert "Exec=nabu" in desktop_text
+    assert "Icon=nabu" in desktop_text
 
     script_text = script.read_text()
     assert script_text.startswith("#!/usr/bin/env bash")
+    # user-facing AppImage artifact carries the Nabu name
+    assert "Nabu-${VERSION}" in script_text
     # runtime app must stay network-free; the AppImage entry runs the module, nothing forbidden
     assert "-m oscprecon" in script_text
     for forbidden in ("metasploit", "msfvenom", "sqlmap", "hydra", "curl http", "wget http"):

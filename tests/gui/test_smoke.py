@@ -10,7 +10,7 @@ from oscprecon.profile import Profile
 def test_main_window_constructs(qtbot: QtBot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window.windowTitle() == "oscp-recon"
+    assert window.windowTitle() == "Nabu"
     assert window._run_button.isEnabled() is False
 
 

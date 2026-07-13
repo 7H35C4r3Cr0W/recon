@@ -6,6 +6,7 @@ import sys
 from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtWidgets import QApplication, QSplashScreen
 
+from oscprecon.branding import APP_NAME
 from oscprecon.gui.main_window import MainWindow
 from oscprecon.gui.splash import make_splash
 
@@ -16,7 +17,8 @@ def main() -> int:
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QApplication(sys.argv)
-    app.setApplicationName("oscp-recon")
+    app.setApplicationName(APP_NAME)
+    app.setApplicationDisplayName(APP_NAME)
 
     splash: QSplashScreen | None = None
     try:

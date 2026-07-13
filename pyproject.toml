@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "oscp-recon"
 version = "0.0.1"
-description = "PySide6 desktop GUI recon orchestrator for OSCP prep and exam day (recon-only, exam-legal)."
+description = "Nabu — PySide6 desktop recon workspace for OSCP prep and exam day (recon-only, exam-legal)."
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
@@ -16,6 +16,10 @@ dependencies = [
 ]
 
 [project.scripts]
+# Preferred Nabu entry points.
+nabu = "oscprecon.gui.app:main"
+nabu-cli = "oscprecon.cli:app"
+# Legacy aliases — kept for ≥1 release so existing scripts/launchers don't break.
 oscprecon-cli = "oscprecon.cli:app"
 oscprecon = "oscprecon.gui.app:main"
 oscp-recon = "oscprecon.__main__:main"

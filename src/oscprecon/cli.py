@@ -12,7 +12,7 @@ from oscprecon.profile import Profile
 from oscprecon.workspace import portability
 
 app = typer.Typer(
-    help="oscprecon headless CLI — recon-only, OSCP exam-legal.",
+    help="Nabu — headless recon CLI (recon-only, OSCP exam-legal).",
     add_completion=False,
 )
 

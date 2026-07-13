@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 
 from oscprecon import config, edb, findings, references, spray, vault_export
 from oscprecon.audit import Auditor
+from oscprecon.branding import APP_NAME, APP_SUBTITLE, APP_TAGLINE
 from oscprecon.gui import theme
 from oscprecon.gui.dialogs import (
     AddCredentialDialog,
@@ -135,7 +136,7 @@ class MainWindow(QMainWindow):
         settings = config.load_settings()
         theme.apply_theme(settings.theme)
         theme.apply_font(settings.font_size)
-        self.setWindowTitle("oscp-recon")
+        self.setWindowTitle(APP_NAME)
         self.resize(1200, 720)
         self._profile: Profile | None = None
         self._auditor: Auditor | None = None
@@ -225,7 +226,7 @@ class MainWindow(QMainWindow):
         legal.setStyleSheet("color: gray;")
         status = self.statusBar()
         assert status is not None
-        status.addWidget(QLabel(f"oscp-recon v{_app_version()}"))
+        status.addWidget(QLabel(f"{APP_NAME} v{_app_version()}"))
         status.addWidget(self._status_profile)
         status.addWidget(self._status_workspace)
         status.addPermanentWidget(legal)
@@ -367,9 +368,24 @@ class MainWindow(QMainWindow):
         doctor_action = QAction("Doctor (tool status)...", self)
         doctor_action.triggered.connect(self._on_doctor)
         help_menu.addAction(doctor_action)
+        help_menu.addSeparator()
+        about_action = QAction(f"About {APP_NAME}...", self)
+        about_action.triggered.connect(self._on_about)
+        help_menu.addAction(about_action)
 
     def _on_doctor(self) -> None:
         DoctorDialog(self).exec()
+
+    def _on_about(self) -> None:
+        QMessageBox.about(
+            self,
+            f"About {APP_NAME}",
+            f"<h3>{APP_NAME}</h3>"
+            f"<p>{APP_TAGLINE} — v{_app_version()}</p>"
+            f"<p style='color:#8a94a6'>{APP_SUBTITLE}.<br>"
+            "Wraps standard OSCP-allowed enumeration tools; runs offline, "
+            "makes no exploit or LLM calls at runtime.</p>",
+        )
 
     def _rebuild_recent_menu(self) -> None:
         self._recent_menu.clear()
@@ -445,7 +461,7 @@ class MainWindow(QMainWindow):
             label += "   [READ-ONLY]"
         self._target_label.setText(label)
         ro = " [read-only]" if profile.read_only else ""
-        self.setWindowTitle(f"oscp-recon — {profile.profile_name}{ro}")
+        self.setWindowTitle(f"{APP_NAME} — {profile.profile_name}{ro}")
         self._central_stack.setCurrentIndex(0)  # leave the dashboard, show the three-pane view
         self._tool_panel.set_target(target.ip)
         self._tool_panel.set_profile(profile)
