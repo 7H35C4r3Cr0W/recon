@@ -8,6 +8,7 @@ from typing import Any
 
 from oscprecon import creds
 from oscprecon.models import Credential, DiscoveredService, Proto, Target
+from oscprecon.workspace.models import Organization, normalize_status, normalize_tag
 
 SCHEMA_VERSION = 1
 
@@ -98,6 +99,7 @@ class Profile:
     references_visited: list[dict[str, Any]] = field(default_factory=list)
     module_settings: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
+    organization: dict[str, Any] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
 
     @property
@@ -139,6 +141,9 @@ class Profile:
             references_visited=[dict(r) for r in raw.get("references_visited", [])],
             module_settings=dict(raw.get("module_settings", {})),
             tags=[str(t) for t in raw.get("tags", [])],
+            # normalize on load so an old profile (no organization) or a hand-edited one gets safe
+            # defaults + validated status/tags; unknown fields are dropped.
+            organization=Organization.from_dict(raw.get("organization")).to_dict(),
             schema_version=int(raw.get("schema_version", SCHEMA_VERSION)),
         )
 
@@ -154,6 +159,7 @@ class Profile:
             "user_notes_path": "notes.md",
             "module_settings": self.module_settings,
             "tags": self.tags,
+            "organization": Organization.from_dict(self.organization).to_dict(),
         }
         # why: a concurrent read (or a crash mid-write) must never see a half-written
         # profile.json — write a sibling temp then atomically replace.
@@ -171,6 +177,64 @@ class Profile:
 
     def touch(self) -> None:
         self.status["last_active"] = _now_iso()
+
+    def mark_opened(self) -> None:
+        self.status["last_opened_at"] = _now_iso()
+
+    # --- workspace organization metadata (status / tags / pinned / archived / display name) ---
+    def organization_meta(self) -> Organization:
+        return Organization.from_dict(self.organization)
+
+    def _save_organization(self, org: Organization) -> None:
+        # round-trip through from_dict so the persisted value is fully normalized (status validated,
+        # tags deduped, display name trimmed/capped); never carries secrets.
+        self.organization = Organization.from_dict(org.to_dict()).to_dict()
+        self.save()
+
+    def set_status(self, status: str) -> None:
+        org = self.organization_meta()
+        org.status = normalize_status(status)
+        self._save_organization(org)
+
+    def set_display_name(self, name: str) -> None:
+        org = self.organization_meta()
+        org.display_name = name
+        self._save_organization(org)
+
+    def set_pinned(self, pinned: bool) -> None:
+        org = self.organization_meta()
+        org.pinned = bool(pinned)
+        self._save_organization(org)
+
+    def set_archived(self, archived: bool) -> None:
+        org = self.organization_meta()
+        org.archived = bool(archived)
+        self._save_organization(org)
+
+    def add_tag(self, tag: str) -> bool:
+        normalized = normalize_tag(tag)
+        if normalized is None:
+            return False
+        org = self.organization_meta()
+        if any(t.lower() == normalized.lower() for t in org.tags):
+            return False  # already present (case-insensitive) — no duplicate, no write
+        org.tags.append(normalized)
+        self._save_organization(org)
+        return True
+
+    def remove_tag(self, tag: str) -> bool:
+        org = self.organization_meta()
+        kept = [t for t in org.tags if t.lower() != str(tag).strip().lower()]
+        if len(kept) == len(org.tags):
+            return False
+        org.tags = kept
+        self._save_organization(org)
+        return True
+
+    def set_tags(self, tags: list[str]) -> None:
+        org = self.organization_meta()
+        org.tags = tags
+        self._save_organization(org)
 
     @property
     def creds_path(self) -> Path:
