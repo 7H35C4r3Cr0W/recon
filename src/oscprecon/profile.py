@@ -274,6 +274,12 @@ class Profile:
         self._ensure_writable()
         creds.delete_credential(self.creds_path, cred)
 
+    def set_credentials(self, credentials: list[Credential]) -> None:
+        # why: bulk write-all for in-place updates (e.g. recording a confirmed spray into
+        # tested_against) — the dedup key ignores tested_against, so add_credential can't update it.
+        self._ensure_writable()
+        creds.save_creds(self.creds_path, credentials)
+
     @property
     def graph_path(self) -> Path:
         return self.directory / "graph.json"

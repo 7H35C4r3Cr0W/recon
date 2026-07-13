@@ -4,6 +4,7 @@ import hashlib
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
+from functools import partial
 from importlib import metadata
 from pathlib import Path
 from typing import Any
@@ -181,6 +182,7 @@ class MainWindow(QMainWindow):
         self._edb_context: tuple[str, str, str] | None = None  # (service label, product, version)
         self._live_request_id = 0
         self._live_workers: set[QThread] = set()
+        self._spray_pending = 0  # launched sprays still running; clean input lists when it hits 0
         self._pending_visits: list[tuple[str, str]] = []
 
         left = QWidget()
@@ -886,16 +888,58 @@ class MainWindow(QMainWindow):
         users_path, passwords_path = spray.write_spray_lists(
             self._profile.directory, users, passwords
         )
-        target = self._profile.target.ip
+        profile = self._profile  # capture: results/cleanup always target the ORIGINATING profile
+        target = profile.target.ip
+        launched = 0
         for service in dialog.selected_services():
             if not self._tasks.can_start():
                 break
             command = spray.build_spray_command(service, target, users_path, passwords_path)
-            output_file = self._profile.directory / "spray" / f"{service}.txt"
+            output_file = profile.directory / "spray" / f"{service}.txt"
             self._tool_panel.append_output(f"$ [spray] {command}")
             self._audit_action("credential-spray", service=service, target=target)
-            worker = CommandWorker(command, output_file, cwd=self._profile.directory, spray=True)
-            self._start(worker, f"spray:{service}", lambda code: self._command_done(code, None))
+            worker = CommandWorker(command, output_file, cwd=profile.directory, spray=True)
+            self._start(
+                worker,
+                f"spray:{service}",
+                partial(
+                    self._spray_done, profile=profile, service=service, output_file=output_file
+                ),
+            )
+            launched += 1
+        self._spray_pending = launched  # set before any queued done-callback runs (GUI thread)
+
+    def _spray_done(self, code: int, profile: Profile, service: str, output_file: Path) -> None:
+        self._record_spray_success(profile, service, output_file)
+        self._command_done(code, None)
+        self._spray_pending -= 1
+        if self._spray_pending <= 0:  # last spray of this launch finished -> drop the input lists
+            removed = spray.clean_spray_artifacts(profile.directory)
+            if removed and profile is self._profile:
+                self._tool_panel.append_output(f"[spray] removed input lists: {', '.join(removed)}")
+
+    def _record_spray_success(self, profile: Profile, service: str, output_file: Path) -> None:
+        # ADD-only confirmation into the originating project's creds.json — never removes a
+        # credential, never touches a different active project, never logs the secret.
+        try:
+            output = Path(output_file).read_text(encoding="utf-8")
+        except OSError:
+            return
+        cred_list = profile.credentials()
+        candidates = [(c.username, c.secret) for c in cred_list if c.secret_type == "password"]
+        confirmed = set(spray.parse_spray_success(service, output, candidates))
+        if not confirmed or profile.read_only:
+            return
+        label = f"spray-confirmed:{service}"
+        changed = False
+        for cred in cred_list:
+            if (cred.username, cred.secret) in confirmed and label not in cred.tested_against:
+                cred.tested_against.append(label)
+                changed = True
+        if changed:
+            profile.set_credentials(cred_list)
+            if profile is self._profile:
+                self._tool_panel.append_output(f"[spray] confirmed {len(confirmed)} credential(s)")
 
     def _on_browse_wordlists(self) -> None:
         dialog = QDialog(self)

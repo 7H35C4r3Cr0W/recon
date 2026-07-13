@@ -64,14 +64,19 @@ def save_creds(path: Path, credentials: list[Credential]) -> None:
     data = json.dumps(payload, indent=2).encode("utf-8")
     tmp = path.with_name(path.name + ".tmp")
     # why: the TEMP file holds the plaintext secret first — create/force it 0600 before writing
-    # (not at the process umask, which is often world/group-readable), then atomically replace.
+    # (not at the process umask, which is often world/group-readable), then atomically replace. On
+    # ANY failure, drop the partial temp and re-raise: the prior valid creds.json is left untouched.
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
-        os.fchmod(fd, 0o600)
-        os.write(fd, data)
-    finally:
-        os.close(fd)
-    tmp.replace(path)
+        try:
+            os.fchmod(fd, 0o600)
+            os.write(fd, data)
+        finally:
+            os.close(fd)
+        tmp.replace(path)  # atomic — only swaps in once the full write succeeded
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _key(cred: Credential) -> tuple[str, str, str, str]:

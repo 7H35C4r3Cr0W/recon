@@ -95,3 +95,52 @@ def build_spray_command(service_key: str, target: str, users: Path, passwords: P
     return service.template.format(
         target=target, users=shlex.quote(str(users)), passwords=shlex.quote(str(passwords))
     )
+
+
+# The generated spray INPUT lists — derived artifacts, NOT the credential store. They hold plaintext
+# secrets, so cleaning them up after a run is good hygiene. This tuple is the ONLY thing cleanup
+# removes: never creds.json, never the <service>.txt spray OUTPUT evidence, never a user's wordlist.
+_GENERATED_SPRAY_FILES = ("users.txt", "passwords.txt")
+
+
+def clean_spray_artifacts(profile_dir: Path) -> list[str]:
+    """Delete the generated users.txt / passwords.txt lists only; return the names removed."""
+    removed: list[str] = []
+    spray_dir = Path(profile_dir) / "spray"
+    for name in _GENERATED_SPRAY_FILES:
+        path = spray_dir / name
+        try:
+            if path.is_file():
+                path.unlink()
+                removed.append(name)
+        except OSError:
+            pass  # a cleanup failure is never fatal and never touches the credential store
+    return removed
+
+
+_NETEXEC_SERVICES = frozenset({"smb", "winrm", "ldap"})
+
+
+def parse_spray_success(
+    service_key: str, output: str, candidates: list[tuple[str, str]]
+) -> list[tuple[str, str]]:
+    """Confirmed (username, secret) pairs — anchored to the vault + service-specific markers.
+
+    Vault-anchored (we never guess creds out of noisy output) and service-specific — netexec marks a
+    valid login with ``[+] ...user:secret`` (optionally ``(Pwn3d!)``); hydra prints ``login:``/
+    ``password:``. A generic word like "success" is never treated as proof.
+    """
+    lines = output.splitlines()
+    netexec = service_key in _NETEXEC_SERVICES
+    confirmed: list[tuple[str, str]] = []
+    for user, secret in candidates:
+        for line in lines:
+            if netexec:
+                hit = "[+]" in line and f"{user}:{secret}" in line
+            else:
+                low = line.lower()
+                hit = "login:" in low and "password:" in low and user in line and secret in line
+            if hit:
+                confirmed.append((user, secret))
+                break
+    return confirmed
