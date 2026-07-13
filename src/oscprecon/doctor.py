@@ -22,6 +22,7 @@ class ToolStatus:
     name: str
     present: bool
     hint: str
+    optional: bool = False  # True = only needed when opt-in Spray mode (§2a) is on
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,14 @@ class DoctorReport:
     @property
     def found(self) -> list[ToolStatus]:
         return [tool for tool in self.tools if tool.present]
+
+    @property
+    def required(self) -> list[ToolStatus]:
+        return [tool for tool in self.tools if not tool.optional]
+
+    @property
+    def optional(self) -> list[ToolStatus]:
+        return [tool for tool in self.tools if tool.optional]
 
 
 # Interchangeable tools: if ANY member is on PATH, the others aren't real gaps. The FIRST member is
@@ -77,11 +86,17 @@ def effective_missing(report: DoctorReport) -> list[ToolStatus]:
 
 def scan() -> DoctorReport:
     # shutil.which resolved at call time so a test/global monkeypatch of shutil.which takes effect.
-    tools = tuple(
+    # Spray-mode tools (hydra/medusa) are scanned too but flagged optional — a recon-only user isn't
+    # missing anything without them, but a Spray-mode (§2a) user needs to know if they're absent.
+    required = tuple(
         ToolStatus(name, shutil.which(name) is not None, shell.install_hint(name))
         for name in sorted(shell.ALLOWED_TOOLS)
     )
-    return DoctorReport(tools)
+    spray = tuple(
+        ToolStatus(name, shutil.which(name) is not None, shell.install_hint(name), optional=True)
+        for name in sorted(shell.SPRAY_TOOLS)
+    )
+    return DoctorReport(required + spray)
 
 
 @dataclass(frozen=True)
@@ -103,6 +118,8 @@ def install_plan(report: DoctorReport) -> InstallPlan:
     manual: list[tuple[str, str]] = []
     seen: set[str] = set()
     for tool in effective_missing(report):
+        if tool.optional:
+            continue  # never auto-install a Spray-mode tool for a recon user; surface it separately
         package = _apt_package(tool.hint)
         if package is None:
             manual.append((tool.name, tool.hint))

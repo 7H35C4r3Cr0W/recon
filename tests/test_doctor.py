@@ -143,3 +143,20 @@ def test_assume_yes_skips_confirmation() -> None:
         echo=lambda _m: None,
     )
     assert code == 0 and len(ran) == 1
+
+
+def test_scan_includes_spray_tools_as_optional(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor.shutil, "which", lambda t: None)  # all missing
+    report = doctor.scan()
+    optional = {t.name for t in report.optional}
+    assert "hydra" in optional and "medusa" in optional
+    assert all(t.optional for t in report.optional)
+    assert "hydra" not in {t.name for t in report.required}  # not counted among required tools
+
+
+def test_install_plan_excludes_optional_spray_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor.shutil, "which", lambda t: None)  # all missing
+    plan = doctor.install_plan(doctor.scan())
+    # a recon-only user must never be auto-pushed hydra/medusa (Spray mode is opt-in / off default)
+    assert "hydra" not in plan.packages and "medusa" not in plan.packages
+    assert "hydra" not in {name for name, _ in plan.manual}

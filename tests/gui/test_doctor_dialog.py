@@ -37,3 +37,17 @@ def test_doctor_dialog_counts_alternatives_as_covered(
     qtbot.addWidget(d)
     assert "Missing" not in d._view.toHtml()
     assert "exam-ready" in d.findChildren(QLabel)[0].text()
+
+
+def test_doctor_dialog_shows_spray_tools_section(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # medusa missing, everything else present -> exam-ready + a separate Spray-mode tools section
+    monkeypatch.setattr(
+        doctor.shutil, "which", lambda t: None if t == "medusa" else f"/usr/bin/{t}"
+    )
+    d = DoctorDialog()
+    qtbot.addWidget(d)
+    html = d._view.toHtml()
+    assert "Spray-mode tools" in html and "medusa" in html
+    assert "Missing" not in html  # required tools all present -> no required-Missing section

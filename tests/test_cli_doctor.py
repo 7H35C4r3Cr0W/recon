@@ -57,3 +57,14 @@ def test_doctor_install_cancelled_without_yes(monkeypatch: pytest.MonkeyPatch) -
     assert ran == []  # runner never called
     assert result.exit_code == 1
     assert "cancelled" in result.output
+
+
+def test_doctor_lists_spray_tools_separately(monkeypatch: pytest.MonkeyPatch) -> None:
+    # all present EXCEPT hydra -> required complete (exam-ready); hydra in a spray-only section
+    monkeypatch.setattr(
+        doctor.shutil, "which", lambda tool: None if tool == "hydra" else f"/usr/bin/{tool}"
+    )
+    result = CliRunner().invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert "exam-ready" in result.output  # required tools all present
+    assert "Spray-mode tools" in result.output and "hydra" in result.output

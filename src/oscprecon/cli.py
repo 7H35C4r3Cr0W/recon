@@ -167,24 +167,31 @@ def doctor(
 ) -> None:
     """Check each wrapped tool; print install hints, optionally apt-install the missing ones."""
     report = doctor_mod.scan()
-    total = len(report.tools)
-    missing = report.missing
-    typer.echo(f"[doctor] {total - len(missing)}/{total} wrapped tools found on PATH")
-    if not missing:
-        typer.echo("[doctor] all wrapped tools present — exam-ready.")
-        return
-    typer.echo(f"[doctor] {len(missing)} missing (install the ones you need):")
-    for tool in missing:
-        typer.echo(f"  {tool.name:24}  {tool.hint}")
-    # why: alternatives cover the same capability — don't alarm the user about skipping them.
+    required = report.required
+    req_missing = [tool for tool in required if not tool.present]
+    opt_missing = [tool for tool in report.optional if not tool.present]
     typer.echo(
-        "\nNote: alternatives are fine to skip — netexec covers nxc/crackmapexec, and "
-        "GetX.py covers impacket-GetX.py (and vice-versa)."
+        f"[doctor] {len(required) - len(req_missing)}/{len(required)} wrapped tools found on PATH"
     )
-    if not install:
+    if req_missing:
+        typer.echo(f"[doctor] {len(req_missing)} missing (install the ones you need):")
+        for tool in req_missing:
+            typer.echo(f"  {tool.name:24}  {tool.hint}")
+        # why: alternatives cover the same capability — don't alarm the user about skipping them.
         typer.echo(
-            "\nRe-run `doctor --install` to apt-install them (asks before running anything)."
+            "\nNote: alternatives are fine to skip — netexec covers nxc/crackmapexec, and "
+            "GetX.py covers impacket-GetX.py (and vice-versa)."
         )
+    else:
+        typer.echo("[doctor] all wrapped tools present — exam-ready.")
+    if opt_missing:
+        typer.echo("\n[doctor] Spray-mode tools (only needed if you enable Spray mode, §2a):")
+        for tool in opt_missing:
+            typer.echo(f"  {tool.name:24}  {tool.hint}")
+    if not req_missing:
+        return
+    if not install:
+        typer.echo("\nRe-run `doctor --install` to apt-install the required ones (asks first).")
         return
     plan = doctor_mod.install_plan(report)
     if plan.manual:
