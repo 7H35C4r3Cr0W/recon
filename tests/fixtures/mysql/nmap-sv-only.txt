@@ -1,0 +1,9 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-12 09:40 EST
+Nmap scan report for 10.129.42.190
+Host is up (0.031s latency).
+
+PORT     STATE SERVICE VERSION
+3306/tcp open  mysql   MySQL 5.5.20-log
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 0.42 seconds

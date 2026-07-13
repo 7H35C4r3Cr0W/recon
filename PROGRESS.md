@@ -18,6 +18,35 @@ Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
 
+### Phase 2 · MySQL module (mysql) — DONE
+Fourth DB service module — banner-only per CLAUDE.md §12 (MySQL = "Banner only"; root default-cred is
+user judgment, Tier-2), built as the direct twin of MSSQL. Shared `SimpleReconSpec`, name `mysql`
+matching the existing services.yaml 3306 stub.
+- **engine** (`modules/mysql/`): `MysqlModule` triggers 3306 + service `mysql`; ONE Tier-1 step
+  `nmap -sV -p 3306 --script mysql-info` attempting NO credential — the pre-login handshake leaks
+  version / protocol / auth-plugin (test asserts argv carries no mysqluser/mysqlpass/-u/empty-password
+  + passes `shell.policy_violation`). suggest() nudges the single root-empty/root:root Tier-2 check.
+- **parsers** (`parsers.py`): version (structured `Version:` field, else the -sV service line — handles
+  MariaDB and the TLS-wrapped `ssl/mysql` banner), protocol, auth-plugin. The MSSQL review lessons were
+  applied up front: `[ \t]` anti-newline-bleed leading char-classes + `\s*$` trailing anchors on every
+  field regex (CRLF-safe), an -sV-only fallback, and the `[missing]`/`[blocked]` sentinel skip.
+- **Tier-2** `manual_commands.yaml` (6): nmap `mysql-empty-password` (single root+anonymous, not a
+  list), root:'' and root:root mysql-client logins, and creds-gated `mysql-variables`/`mysql-users`
+  NSE + `SHOW DATABASES`. NetExec has no mysql protocol (verified against the nmap DB), so the client
+  checks use the `mysql` client + nmap only; test enforces argv0 ∈ {nmap,mysql} and no
+  `INTO OUTFILE`/`LOAD_FILE`/`sys_exec`/`\!`.
+- **pattern** `patterns/mysql.yaml` (2 rules, `# source:` cheatsheet): version → Tier-2 default-cred
+  (2 suggests); legacy 4.x/5.x/MariaDB → searchsploit (display-only). **GUI**: one `SIMPLE_SPECS` entry.
+- 2 fixtures (nmap-info / -sV-only) + parser/module/GUI tests incl. MariaDB, `ssl/mysql`, CRLF, the
+  bare-line no-bleed, and `suggest([])`. Extended `test_patterns_engine` to positively assert the
+  mysql+mssql shipped patterns fire through the engine (closed a shared coverage gap the review found).
+  Repointed the `test_widgets` hints-only example 3306→3389/rdp (the new module moved 3306 to a
+  dedicated panel). **Adversarial 3-lens review** (10 agents): 6 confirmed / 1 refuted, **no medium+**
+  (the proactive lessons paid off) — `ssl/mysql` miss, CRLF auth-plugin drop, dead `mariadb` name, and
+  the MariaDB pattern hyphen all fixed; the custom-command DB-primitive backstop
+  (`INTO OUTFILE`/`LOAD_FILE`) is cross-cutting → ROADMAP Phase-6 TODO. Exam-legality clean
+  (`mysql-empty-password` root+anonymous confirmed Tier-2). Four gates green, 498 tests.
+
 ### Phase 2 · MSSQL module (mssql) — DONE
 Third DB service module (after Redis/Mongo), but banner-only per CLAUDE.md §12 (MSSQL = "Banner
 only" — default-cred is user judgment, not auto). No data auto-enum; the whole Tier-1 is an unauth
@@ -89,7 +118,7 @@ User approved expanding the §2 allow-list for read-only enum tools and wiring e
 **Coverage now: 99 tool-hints / 94 service rules, 26 pattern rules / 48 suggestions, 60 allow-listed
 tools, 16 module packages.** The vault is essentially exhausted for recon syntax (2nd pass was mostly
 fixes + protocol-gap fills). **Remaining follow-ups** (not blockers): full Tier-1 modules for
-MySQL/Postgres (Redis + Mongo full auto-enum, MSSQL banner-only per §12 — all done; MySQL/Postgres
+Postgres (Redis + Mongo full auto-enum, MSSQL + MySQL banner-only per §12 — all done; Postgres
 still tool-hints only); a Kerberos module home for the AS-REP/SPN
 manuals; `openssl s_client` STARTTLS variants for 110/143. Skipped as too-borderline for §2:
 ssl-heartbleed, rmi-vuln-classloader, IIS http-iis-short-name-brute (policy blocks *brute*), and the

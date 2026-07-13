@@ -1,0 +1,35 @@
+# MySQL manual follow-ups (Tier-2 — shown, never auto-run). Single default-cred checks + read-only
+# enum; {target}/{port} filled from the active profile. Iterating a user/password list is Tier-3 (out).
+# NetExec has no mysql protocol, so the client checks use the mysql client + nmap NSE only.
+- description: "Single root empty-password check (nmap NSE)"
+  why: "mysql-empty-password tries root/anonymous with a blank password — single well-known accounts, not a brute"
+  command: "nmap -p {port} --script mysql-empty-password {target}"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "Single root:'' login (mysql client)"
+  why: "one attempt with root + empty password — best run in a terminal, no wordlist"
+  command: "mysql -h {target} -u root"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "Single root:root default-cred check (mysql client)"
+  why: "one attempt with the classic default credential — not a list"
+  command: "mysql -h {target} -u root -proot"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "Server variables (nmap NSE, needs creds)"
+  why: "mysql-variables reads server config once a login works — read-only, no exploitation"
+  command: "nmap -p {port} --script mysql-variables --script-args mysqluser={user},mysqlpass={password} {target}"
+  requires: ["creds"]
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "Enumerate users (nmap NSE, needs creds)"
+  why: "mysql-users lists accounts once a login works — read-only enumeration, not cracking"
+  command: "nmap -p {port} --script mysql-users --script-args mysqluser={user},mysqlpass={password} {target}"
+  requires: ["creds"]
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- description: "List databases (requires working creds)"
+  why: "read-only SQL query once a login works — confirms what we can read, not exploitation"
+  command: "mysql -h {target} -u {user} -p{password} -e 'SHOW DATABASES;'"
+  requires: ["creds"]
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)

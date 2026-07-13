@@ -1,0 +1,18 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-12 09:40 EST
+Nmap scan report for 10.129.42.190
+Host is up (0.031s latency).
+
+PORT     STATE SERVICE VERSION
+3306/tcp open  mysql   MySQL 5.5.20-log
+| mysql-info:
+|   Protocol: 10
+|   Version: 5.5.20-log
+|   Thread ID: 8
+|   Capabilities flags: 63487
+|   Some Capabilities: SupportsTransactions, Speaks41ProtocolNew, LongColumnFlag, SupportsLoadDataLocal, Support41Auth, ConnectWithDatabase, DontAllowDatabaseTableColumn, IgnoreSigpipes, FoundRows, InteractiveClient, SupportsCompression, ODBCClient, SupportsMultipleStatments, SupportsAuthPlugins, SupportsMultipleResults, LongPassword, Speaks41ProtocolOld, IgnoreSpaceBeforeParenthesis, SwitchToSSLAfterHandshake
+|   Status: Autocommit
+|   Salt: b7Yay,d&yPu3_ZzQ)7Kf
+|_  Auth Plugin Name: mysql_native_password
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 0.42 seconds

@@ -1,0 +1,21 @@
+# MySQL recon next-steps (banner-only Tier-1; the default-cred checks below are single-attempt Tier-2,
+# shown/pre-filled, never a list). Sourced from the ports/services cheatsheet.
+- match:
+    service: mysql
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "MySQL reachable — single default-cred check as Tier-2 (root empty password, then root:root)"
+      command: "nmap -p 3306 --script mysql-empty-password {target}"
+    - text: "One-shot root login to confirm the default-cred misconfiguration (Tier-2, terminal)"
+      command: "mysql -h {target} -u root"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: mysql
+    field: value
+    value: "^(5\\.|4\\.|.*MariaDB)"
+  suggest:
+    - text: "Legacy MySQL/MariaDB line — more public advisories; check searchsploit for the exact version (display-only)"
+      command: "searchsploit mysql"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)

@@ -100,9 +100,14 @@ def test_shipped_patterns_fire_on_findings() -> None:
         {"module": "smb", "kind": "auth", "value": "authenticated", "detail": "null"},
         {"module": "smb", "kind": "share", "value": "IT", "detail": "READ"},
         {"module": "http", "port": 80, "path": "/", "status": 200, "note": "WordPress 6.1"},
+        {"module": "mysql", "kind": "version", "value": "5.5.20-log", "detail": ""},
+        {"module": "mssql", "kind": "version", "value": "Microsoft SQL Server 2019", "detail": ""},
     ]
     suggestions = engine.suggest_for(findings, target="10.10.10.5")  # loads shipped patterns/
     commands = " ".join(s.command_template or "" for s in suggestions)
     assert "smbmap -H 10.10.10.5" in commands
     assert "wpscan --url http://10.10.10.5:80/" in commands
+    # DB-service patterns must fire + interpolate {target} (not just pass the provenance gate)
+    assert "nmap -p 3306 --script mysql-empty-password 10.10.10.5" in commands
+    assert "netexec mssql 10.10.10.5" in commands
     assert suggestions and all(s.source_box for s in suggestions)
