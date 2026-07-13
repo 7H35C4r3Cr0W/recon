@@ -96,11 +96,11 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 - **Bounded parallel execution + status bar with cancel buttons** (real interrupt/cancel for in-flight scans — see Deferred below).
 - Reference search box; report viewer tab; single-file Obsidian frontmatter mode (default) + `File → Export to Obsidian Vault...`.
 - Profile actions (right-click Recent): Open Folder / Mark Done / Duplicate / Delete; TRACKER.md sync on root; dark/light theme.
-- **Queued additions (2026-07-11):**
-  - **Status footer** (CLAUDE.md §19) — app name+version, active profile, workspace root, "recon-only — OSCP exam legal". May land earlier alongside module UI.
-  - **Project file operations** (CLAUDE.md §19) — File → Open by IP / Import Project (.tar.gz) / Export Project (.tar.gz, warns `creds.json` included); each `~/oscprecon/<name>/` is a project file.
-  - **Full GUI audit log** (CLAUDE.md §6a) — append-only `<profile>/audit.jsonl` of every user action; report "Audit trail" appendix; wire emit points as earlier phases' UI lands (backfill is cheap).
-  - **Concurrent-copy lock** (CLAUDE.md §6b) — `<profile>/.lock` (flock) + "open read-only?" prompt + stale-lock (dead-PID) reclaim.
+- **Queued additions (2026-07-11) — reconciled 2026-07-13:**
+  - ✅ **Status footer** (CLAUDE.md §19) — built into `main_window.py` (`_update_status_footer`): app+version, active profile, workspace root, exam-legal reminder.
+  - ✅ **Full GUI audit log** (CLAUDE.md §6a) — `audit.py` + `<profile>/audit.jsonl`; feeds the dashboard Activity timeline.
+  - ✅ **Concurrent-copy lock** (CLAUDE.md §6b) — advisory `<profile>/.lock` + read-only prompt + stale-lock reclaim (delivered in the Workspace upgrade).
+  - 🕒 **Project file operations** (CLAUDE.md §19) — File → Open by IP / Import Project (.tar.gz) / Export Project (.tar.gz, warns `creds.json` included). **Still unbuilt** — the only remaining item from this list. (`bulk.export_project` is an Obsidian *vault* export, not the tarball backup.)
 
 **Exit:** pleasant to use under exam pressure; reports drop into Obsidian cleanly.
 
@@ -143,8 +143,9 @@ dialog:
   `config.Settings` layer (validate + clamp + atomic, no secrets). Mandatory secret protections are
   shown **locked-on** and cannot be disabled.
 
-Verified: four gates + offscreen GUI green (656 tests); wheel ships and imports `workspace/` +
-`gui/workspace/` from a clean venv.
+Verified: four gates + offscreen GUI green (657 tests); wheel ships and imports `workspace/` +
+`gui/workspace/` from a clean venv. **See [`PROJECT_MAP.md`](PROJECT_MAP.md) for the current
+subsystem-by-subsystem status map and forward plan.**
 
 ---
 
@@ -153,9 +154,13 @@ Verified: four gates + offscreen GUI green (656 tests); wheel ships and imports 
 Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` §27:
 
 - **Exam-profile preset + timed mock exam (Phase 6).** A tight/fast command-set preset (no `--script
-  vuln`, no deep recursion) and a timed dry run against a standalone + AD set.
+  vuln`, no deep recursion) and a timed dry run against a standalone + AD set. The *preset* is the
+  recommended next chunk (deterministic); the *timed mock* is blocked on an authorized live target.
+- **Project file operations (CLAUDE.md §19).** File → Open by IP / Import Project (.tar.gz) /
+  Export Project (.tar.gz, warns `creds.json` included). Deps (profile model + workspace index) are done.
 
-*(The concurrent-copy profile lock, CLAUDE.md §6b, is now built — see the Workspace Dashboard section.)*
+*(The concurrent-copy profile lock, CLAUDE.md §6b, the status footer §19, and the audit log §6a are now
+built — see the Workspace Dashboard section.)*
 
 <!-- Resolved and removed from this list (proven by code + tests):
      real scan cancellation (cancel Event + closeEvent cancel-then-wait);

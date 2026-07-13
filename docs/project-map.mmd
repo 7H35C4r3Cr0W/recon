@@ -1,0 +1,87 @@
+%% oscp-recon project map — status mind map.
+%% Status markers: ✅ complete · 🚧 partial · ⏭ next · 🕒 later · ⛔ blocked · ❌ out of scope.
+%% Confirmed from code + tests (see PROJECT_MAP.md), not from prose. Keep this readable — subsystems,
+%% not files. Render with any Mermaid 9.3+ tool.
+mindmap
+  root((OSCP Recon Workspace))
+    Core engine ✅
+      shell.run exec chokepoint + policy ✅
+      profile.py profiles + atomic writes ✅
+      orchestrator + resume/force ✅
+      reporter + Jinja2 template ✅
+      findings / creds / audit stores ✅
+      config.Settings typed layer ✅
+    Recon modules ✅
+      nmap two-stage TCP + UDP ✅
+      HTTP granular builder + alt ports ✅
+      vhost / smb tiered / ftp / ssh ✅
+      dns / ldap / smtp / nfs / snmp ✅
+      tftp / netbios / ike / ntp ✅
+      DB read-only redis mongo mssql mysql postgres ✅
+      Extended services elasticsearch couchdb vnc ❌
+    GUI ✅
+      Three-pane shell + service tree ✅
+      Command builder tool panel ✅
+      HackTricks + Exploit-DB reference pane ✅
+      Notes / report preview / wordlist picker ✅
+      Status footer + Nmap scan presets ✅
+      Preferences dialog eight tabs ✅
+    Workspace ✅
+      Index + organization metadata ✅
+      Dashboard home view ✅
+      Global search secret-safe ✅
+      Health checks + safe repairs ✅
+      Locks + read-only mode ✅
+      Activity timeline / saved views / bulk actions ✅
+    Data and persistence ✅
+      profile.json v1 + organization block ✅
+      findings.json ✅
+      creds.json mode-0600 redacted ✅
+      graph.json layout + notes ✅
+      audit.jsonl action log ✅
+    Findings and credentials ✅
+      Parser-extracted findings ✅
+      Anon-enum auto credential ✅
+      Secret redaction everywhere ✅
+    Graph ✅
+      Cytoscape.js vendored offline ✅
+      Drag reposition persisted ✅
+      Add note + minimap ✅
+      Export PNG / SVG ✅
+    Reports and exports ✅
+      report.md Obsidian frontmatter ✅
+      Prior report archived ✅
+      Export to Obsidian Vault ✅
+      Project tar.gz import/export 🕒
+    Safety ✅
+      Recon-only exec policy ✅
+      Tier 1-2-3 credential line ✅
+      Password wordlists filtered ✅
+      Exploit / brute / LLM ❌
+    Quality ✅
+      mypy strict ✅
+      ruff check + format ✅
+      pytest 657 + offscreen GUI 179 ✅
+      Fixture-based parser tests ✅
+    Packaging ✅
+      hatchling wheel + resources ✅
+      Console scripts x3 ✅
+      Gitea CI ✅
+      doctor tool check ✅
+    Current development ⏭
+      Project map documentation ✅
+      Next chunk exam-mode preset ⏭
+    Future development 🕒
+      Exam mode + timed mock 🕒
+      Project file ops open-by-ip import export 🕒
+      Pattern coverage ssh ike tftp vhost 🕒
+      Report EDB-hit persistence 🕒
+    Live validation ⛔
+      Three authorized lab targets ⛔
+      Live parser validation ⛔
+      Performance under load ⛔
+    Out of scope ❌
+      Metasploit sqlmap hydra ❌
+      Exploit chains / PoC exec ❌
+      LLM calls at runtime ❌
+      Commercial scanners ❌

@@ -6,17 +6,20 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 ## Next up
 
-**Phase 2 COMPLETE — all 14 modules have engine + adversarial review + GUI panel** (http, vhost, smb,
-ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios, ike, ntp) + status footer QoL. All 14 done,
-reviewed, hardened, GUI'd (347 tests).
+**See [`PROJECT_MAP.md`](PROJECT_MAP.md) for the authoritative status map** (subsystem-by-subsystem
+✅/🚧/⏭/🕒/⛔/❌, dependency graph, forward phases). This "Next up" is the one-line pointer.
 
-**Phase 2, Phase 4 (graph view), Phase 3 (pattern library — 23 rules / 39 suggestions), and the
-first Phase 5 block (resume + full Obsidian output story) are COMPLETE.** Next candidates:
-remaining Phase 5 QoL (report-viewer tab, reference search box, Recent-profile right-click actions,
-TRACKER.md sync-on-root, dark/light theme, project file ops §19, concurrent-copy lock §6b) and
-Phase 6 (doctor + exam preset). Report EDB hits are
-still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
-pattern library to more services from the notes as boxes surface them.
+Phases 0–5, all 19 recon modules (14 core + Redis/MongoDB/MSSQL/MySQL/PostgreSQL), Phase 3 pattern
+engine, Phase 4 graph (incl. §16 drag-persist/add-note/minimap/PNG-SVG export), and the full Workspace
+Dashboard & Organization upgrade (index, dashboard, search, health, locks, activity, saved views, bulk
+actions, Preferences/Settings) are **DONE** — 657 tests green. Phase 6 is partial: `doctor` + status
+footer + audit log + concurrent-copy lock done.
+
+**Recommended next chunk (do one at a time):** the **exam-mode profile preset** — the last Phase-6
+item that needs no live target (deterministic, depends only on completed subsystems). Later candidates:
+project file ops §19 (Open-by-IP / Import / Export `.tar.gz`), pattern YAMLs for ssh/ike/tftp/vhost,
+report EDB-hit persistence. **Blocked:** live acceptance testing + timed mock exam (need an authorized
+target — verification to date is fixtures + unit/GUI tests, not live boxes).
 
 ### Workspace Dashboard & Project Organization upgrade — DONE (deterministic; no live target)
 Turned the app from individually-opened profiles into an organized local workspace. New non-GUI

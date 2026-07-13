@@ -6,7 +6,8 @@ HackTricks and Exploit-DB, and produces Obsidian-friendly reports. It does **not
 brute-force credentials, or call any LLM at runtime.
 
 See [`CLAUDE.md`](CLAUDE.md) for the full project brief and hard constraints, [`ROADMAP.md`](ROADMAP.md)
-for the phase plan, and [`PROGRESS.md`](PROGRESS.md) for the current build state.
+for the phase plan, [`PROJECT_MAP.md`](PROJECT_MAP.md) for the subsystem-by-subsystem status map and
+forward plan, and [`PROGRESS.md`](PROGRESS.md) for the detailed build log.
 
 ## Requirements
 
