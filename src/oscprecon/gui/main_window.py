@@ -58,7 +58,7 @@ from oscprecon.gui.workers import (
     SshReconWorker,
 )
 from oscprecon.manual_commands import expand, load_manual_commands
-from oscprecon.models import DiscoveredService, Target
+from oscprecon.models import Credential, DiscoveredService, Target
 from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
 from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.patterns.engine import suggest_for
@@ -550,19 +550,51 @@ class MainWindow(QMainWindow):
         self._tool_panel.set_running(not self._tasks.can_start())
 
     def _launch(self, worker: QThread, label: str, *, exclusive: bool = False) -> None:
+        # admission primitive: register with the TaskManager, guarantee release on `finished`
+        # (fires once, after run() returns — so a raising done/failed slot can't wedge the slot),
+        # audit the start, refresh the busy-gates, and start the thread.
         self._tasks.add(worker, label, exclusive=exclusive)
         worker.finished.connect(lambda: self._release(worker))
         self._audit_action("run", label=label, exclusive=exclusive)
         self._refresh_busy()
         worker.start()
 
+    def _start(
+        self,
+        worker: CancellableThread,
+        label: str,
+        on_done: Callable[[Any], None],  # done payload is int (nmap/command) or a Result object
+        *,
+        exclusive: bool = False,
+    ) -> None:
+        # one lifecycle path for a line/done/failed worker: wire the streaming output, the result
+        # slot, and the failure slot, then admit via _launch. Callers bind the originating profile
+        # into `on_done` so a stale completion persists to the profile that started it, not the
+        # profile that happens to be active when it finishes. `signals`: every worker declares
+        # line/done/failed on its own subclass, not on the CancellableThread base mypy sees here.
+        signals: Any = worker
+        signals.line.connect(self._tool_panel.append_output)
+        signals.done.connect(on_done)
+        signals.failed.connect(self._on_run_failed)
+        self._launch(worker, label, exclusive=exclusive)
+
     def _release(self, worker: QThread) -> None:
+        if not any(task.worker is worker for task in self._tasks.tasks()):
+            return  # already released — never double-remove / double-audit / double-refresh
         worker.wait()  # finished has fired — returns immediately
         label = next((task.label for task in self._tasks.tasks() if task.worker is worker), "")
         self._tasks.remove(worker)
         worker.deleteLater()
         self._audit_action("run-finished", label=label)
         self._post_run_refresh()
+
+    def _record_creds(self, profile: Profile, creds: list[Credential]) -> None:
+        # creds always persist to the ORIGINATING profile; the echo line only shows when that
+        # profile is still active (else it would print into another profile's output pane).
+        for cred in creds:
+            profile.add_credential(cred)
+            if profile is self._profile:
+                self._tool_panel.append_output(f"[cred] {cred.username} (source: {cred.source})")
 
     def _post_run_refresh(self) -> None:
         # why: this fires on EVERY worker completion (up to 4 in parallel). Refresh only what a
@@ -616,10 +648,7 @@ class MainWindow(QMainWindow):
             return
         self._tool_panel.append_output("[nmap] starting…")
         worker = NmapWorker(self._profile)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(self._on_scan_done)
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, "nmap", exclusive=True)
+        self._start(worker, "nmap", self._on_scan_done, exclusive=True)
 
     def _on_run_command(self, command: str) -> None:
         if self._profile is None or not self._tasks.can_start():
@@ -632,10 +661,7 @@ class MainWindow(QMainWindow):
             history.write(command + "\n")
         self._tool_panel.append_output(f"$ {command}")
         worker = CommandWorker(command, output_file, cwd=self._profile.directory)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(lambda code: self._command_done(code, None))
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, _slug(command))
+        self._start(worker, _slug(command), lambda code: self._command_done(code, None))
 
     def _on_http_run(self, command: str, output_rel: str, tool: str, port: int) -> None:
         if self._profile is None or not self._tasks.can_start() or not output_rel:
@@ -648,17 +674,15 @@ class MainWindow(QMainWindow):
             return
         struct_path.parent.mkdir(parents=True, exist_ok=True)
         self._tool_panel.append_output(f"$ {command}")
-        worker = CommandWorker(
-            command, struct_path.with_suffix(".log"), cwd=self._profile.directory
-        )
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(
+        prof = self._profile
+        worker = CommandWorker(command, struct_path.with_suffix(".log"), cwd=prof.directory)
+        self._start(
+            worker,
+            f"http:{port}",
             lambda code: self._command_done(
-                code, lambda: self._parse_http_output(struct_path, tool, port)
-            )
+                code, lambda: self._parse_http_output(prof, struct_path, tool, port)
+            ),
         )
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, f"http:{port}")
 
     def _on_http_dry_run(self, command: str) -> None:
         self._audit_action("dry-run", command=command)
@@ -674,9 +698,9 @@ class MainWindow(QMainWindow):
         self._audit_action("add-to-report", command=command)
         self._tool_panel.append_output(f"[report] queued: {command}")
 
-    def _parse_http_output(self, struct_path: Path, tool: str, port: int) -> None:
-        if self._profile is None:
-            return
+    def _parse_http_output(self, profile: Profile, struct_path: Path, tool: str, port: int) -> None:
+        # `profile` is the originating profile captured at launch — findings persist there even if
+        # the user switched profiles; UI echoes only when it is still the active profile.
         try:
             text = struct_path.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -684,9 +708,12 @@ class MainWindow(QMainWindow):
         hits = parse_tool(tool, text, port)
         if hits:
             now = datetime.now(UTC).isoformat()
-            findings.add_findings(self._profile.directory, [h.to_dict(now) for h in hits])
-            self._tool_panel.append_output(f"[findings] +{len(hits)} from {tool} -> findings.json")
-        if detect_wordpress(text):
+            findings.add_findings(profile.directory, [h.to_dict(now) for h in hits])
+            if profile is self._profile:
+                self._tool_panel.append_output(
+                    f"[findings] +{len(hits)} from {tool} -> findings.json"
+                )
+        if detect_wordpress(text) and profile is self._profile:
             self._tool_panel.append_output(
                 "[wordpress] detected — follow-up: "
                 "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url <target>"
@@ -706,21 +733,19 @@ class MainWindow(QMainWindow):
         # (the parser would otherwise read the old file and report old vhosts as new).
         struct_path.unlink(missing_ok=True)
         self._tool_panel.append_output(f"$ {command}")
-        worker = CommandWorker(
-            command, struct_path.with_suffix(".log"), cwd=self._profile.directory
-        )
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(
+        prof = self._profile
+        worker = CommandWorker(command, struct_path.with_suffix(".log"), cwd=prof.directory)
+        self._start(
+            worker,
+            "vhost",
             lambda code: self._command_done(
-                code, lambda: self._parse_vhost_output(struct_path, tool, domain)
-            )
+                code, lambda: self._parse_vhost_output(prof, struct_path, tool, domain)
+            ),
         )
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, "vhost")
 
-    def _parse_vhost_output(self, struct_path: Path, tool: str, domain: str) -> None:
-        if self._profile is None:
-            return
+    def _parse_vhost_output(
+        self, profile: Profile, struct_path: Path, tool: str, domain: str
+    ) -> None:
         # ffuf/gobuster write -o (struct_path); dnsrecon/wfuzz write stdout (captured to the .log)
         path = struct_path if struct_path.exists() else struct_path.with_suffix(".log")
         try:
@@ -730,9 +755,10 @@ class MainWindow(QMainWindow):
         hits = parse_vhost_tool(tool, text, domain)
         if hits:
             now = datetime.now(UTC).isoformat()
-            findings.add_findings(self._profile.directory, [h.to_dict(now) for h in hits])
-            self._tool_panel.add_vhosts([h.vhost for h in hits])
-            self._tool_panel.append_output(f"[vhosts] +{len(hits)} -> findings.json")
+            findings.add_findings(profile.directory, [h.to_dict(now) for h in hits])
+            if profile is self._profile:
+                self._tool_panel.add_vhosts([h.vhost for h in hits])
+                self._tool_panel.append_output(f"[vhosts] +{len(hits)} -> findings.json")
 
     def _on_wildcard_detect(self, command: str, output_rel: str) -> None:
         if self._profile is None or not self._tasks.can_start():
@@ -743,12 +769,11 @@ class MainWindow(QMainWindow):
         out.parent.mkdir(parents=True, exist_ok=True)
         self._tool_panel.append_output(f"$ {command}")
         worker = CommandWorker(command, out, cwd=self._profile.directory)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(
-            lambda code: self._command_done(code, lambda: self._apply_wildcard_size(out))
+        self._start(
+            worker,
+            "wildcard",
+            lambda code: self._command_done(code, lambda: self._apply_wildcard_size(out)),
         )
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, "wildcard")
 
     def _apply_wildcard_size(self, out: Path) -> None:
         try:
@@ -775,43 +800,40 @@ class MainWindow(QMainWindow):
         probe_out = self._profile.directory / "http" / str(service.port) / "probe.txt"
         probe_out.parent.mkdir(parents=True, exist_ok=True)
         self._tool_panel.append_output(f"[probe] curl -sIk {url}")
-        worker = CommandWorker(f"curl -sIk {url}", probe_out, cwd=self._profile.directory)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(lambda code: self._probe_done(code, service))
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, f"probe:{service.port}")
+        prof = self._profile
+        worker = CommandWorker(f"curl -sIk {url}", probe_out, cwd=prof.directory)
+        self._start(
+            worker, f"probe:{service.port}", lambda code: self._probe_done(code, prof, service)
+        )
 
-    def _probe_done(self, exit_code: int, service: DiscoveredService) -> None:
-        if exit_code == 0 and self._profile is not None:
-            for discovered in self._profile.discovered_services:
-                if discovered.port == service.port and discovered.proto == service.proto:
-                    discovered.service = "http"
-            self._profile.save()
+    def _probe_done(self, exit_code: int, profile: Profile, service: DiscoveredService) -> None:
+        if exit_code != 0:
+            if profile is self._profile:
+                self._tool_panel.append_output("[probe] no HTTP response")
+            return
+        for discovered in profile.discovered_services:  # mutate the originating profile
+            if discovered.port == service.port and discovered.proto == service.proto:
+                discovered.service = "http"
+        profile.save()
+        if profile is self._profile:
             self._tool_panel.append_output(f"[http] port {service.port} now treated as HTTP")
-        else:
-            self._tool_panel.append_output("[probe] no HTTP response")
 
     def _on_smb_recon(self, mode: str) -> None:
         if self._profile is None or not self._tasks.can_start():
             return
         self._tool_panel.append_output(f"[smb] {mode} recon starting…")
-        worker = SmbReconWorker(self._profile, mode)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(self._on_smb_done)
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, f"smb {mode}")
+        prof = self._profile
+        worker = SmbReconWorker(prof, mode)
+        self._start(worker, f"smb {mode}", lambda r: self._on_smb_done(r, prof))
 
-    def _on_smb_done(self, result: object) -> None:
+    def _on_smb_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.
         try:
-            if isinstance(result, SmbReconResult) and self._profile is not None:
-                for cred in result.creds:
-                    self._profile.add_credential(cred)
-                    self._tool_panel.append_output(
-                        f"[cred] {cred.username} (source: {cred.source})"
-                    )
-                self._tool_panel.set_smb_summary(result.summary)
-                self._tool_panel.append_output("[smb] recon complete")
+            if isinstance(result, SmbReconResult):
+                self._record_creds(profile, result.creds)
+                if profile is self._profile:  # only touch the panel if this profile is still active
+                    self._tool_panel.set_smb_summary(result.summary)
+                    self._tool_panel.append_output("[smb] recon complete")
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
 
@@ -819,23 +841,18 @@ class MainWindow(QMainWindow):
         if self._profile is None or not self._tasks.can_start():
             return
         self._tool_panel.append_output(f"[ftp] {mode} recon on port {port} starting…")
-        worker = FtpReconWorker(self._profile, mode, port)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(self._on_ftp_done)
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, f"ftp:{port}")
+        prof = self._profile
+        worker = FtpReconWorker(prof, mode, port)
+        self._start(worker, f"ftp:{port}", lambda r: self._on_ftp_done(r, prof))
 
-    def _on_ftp_done(self, result: object) -> None:
+    def _on_ftp_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.
         try:
-            if isinstance(result, FtpReconResult) and self._profile is not None:
-                for cred in result.creds:
-                    self._profile.add_credential(cred)
-                    self._tool_panel.append_output(
-                        f"[cred] {cred.username} (source: {cred.source})"
-                    )
-                self._tool_panel.set_ftp_summary(result.summary)
-                self._tool_panel.append_output("[ftp] recon complete")
+            if isinstance(result, FtpReconResult):
+                self._record_creds(profile, result.creds)
+                if profile is self._profile:
+                    self._tool_panel.set_ftp_summary(result.summary)
+                    self._tool_panel.append_output("[ftp] recon complete")
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
 
@@ -843,16 +860,14 @@ class MainWindow(QMainWindow):
         if self._profile is None or not self._tasks.can_start():
             return
         self._tool_panel.append_output(f"[ssh] recon on port {port} starting…")
-        worker = SshReconWorker(self._profile, port)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(self._on_ssh_done)
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, f"ssh:{port}")
+        prof = self._profile
+        worker = SshReconWorker(prof, port)
+        self._start(worker, f"ssh:{port}", lambda r: self._on_ssh_done(r, prof))
 
-    def _on_ssh_done(self, result: object) -> None:
+    def _on_ssh_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.
         try:
-            if isinstance(result, SshReconResult):
+            if isinstance(result, SshReconResult) and profile is self._profile:
                 self._tool_panel.set_ssh_summary(result.summary)
                 self._tool_panel.append_output("[ssh] recon complete")
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
@@ -862,16 +877,14 @@ class MainWindow(QMainWindow):
         if self._profile is None or module_name not in SIMPLE_SPECS or not self._tasks.can_start():
             return
         self._tool_panel.append_output(f"[{module_name}] recon starting…")
-        worker = SimpleReconWorker(self._profile, module_name, port)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(self._on_simple_done)
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, module_name)
+        prof = self._profile
+        worker = SimpleReconWorker(prof, module_name, port)
+        self._start(worker, module_name, lambda r: self._on_simple_done(r, prof))
 
-    def _on_simple_done(self, result: object) -> None:
+    def _on_simple_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.
         try:
-            if isinstance(result, SimpleReconResult):
+            if isinstance(result, SimpleReconResult) and profile is self._profile:
                 self._tool_panel.set_simple_summary(result.module, result.summary)
                 self._tool_panel.append_output(f"[{result.module}] recon complete")
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
@@ -882,16 +895,14 @@ class MainWindow(QMainWindow):
             return
         scope = f"zone {domain}" if domain else "no zone (version + recursion only)"
         self._tool_panel.append_output(f"[dns] recon on port {port} — {scope} starting…")
-        worker = DnsReconWorker(self._profile, domain, port)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(self._on_dns_done)
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, f"dns:{port}")
+        prof = self._profile
+        worker = DnsReconWorker(prof, domain, port)
+        self._start(worker, f"dns:{port}", lambda r: self._on_dns_done(r, prof))
 
-    def _on_dns_done(self, result: object) -> None:
+    def _on_dns_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.
         try:
-            if isinstance(result, DnsReconResult):
+            if isinstance(result, DnsReconResult) and profile is self._profile:
                 self._tool_panel.set_dns_summary(result.summary)
                 self._tool_panel.append_output("[dns] recon complete")
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
@@ -902,23 +913,18 @@ class MainWindow(QMainWindow):
             return
         scope = f"base {basedn}" if basedn else "auto-discover base DN"
         self._tool_panel.append_output(f"[ldap] recon on port {port} — {scope} starting…")
-        worker = LdapReconWorker(self._profile, basedn, port)
-        worker.line.connect(self._tool_panel.append_output)
-        worker.done.connect(self._on_ldap_done)
-        worker.failed.connect(self._on_run_failed)
-        self._launch(worker, f"ldap:{port}")
+        prof = self._profile
+        worker = LdapReconWorker(prof, basedn, port)
+        self._start(worker, f"ldap:{port}", lambda r: self._on_ldap_done(r, prof))
 
-    def _on_ldap_done(self, result: object) -> None:
+    def _on_ldap_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.
         try:
-            if isinstance(result, LdapReconResult) and self._profile is not None:
-                for cred in result.creds:
-                    self._profile.add_credential(cred)
-                    self._tool_panel.append_output(
-                        f"[cred] {cred.username} (source: {cred.source})"
-                    )
-                self._tool_panel.set_ldap_summary(result.summary)
-                self._tool_panel.append_output("[ldap] recon complete")
+            if isinstance(result, LdapReconResult):
+                self._record_creds(profile, result.creds)
+                if profile is self._profile:
+                    self._tool_panel.set_ldap_summary(result.summary)
+                    self._tool_panel.append_output("[ldap] recon complete")
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
 
