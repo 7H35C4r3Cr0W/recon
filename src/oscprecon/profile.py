@@ -12,6 +12,11 @@ from oscprecon.workspace.models import Organization, normalize_status, normalize
 
 SCHEMA_VERSION = 1
 
+
+class ReadOnlyError(RuntimeError):
+    """Raised when a write is attempted on a profile opened read-only (lock held elsewhere)."""
+
+
 SERVICE_DIRS = [
     "nmap",
     "http",
@@ -101,6 +106,7 @@ class Profile:
     tags: list[str] = field(default_factory=list)
     organization: dict[str, Any] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
+    read_only: bool = False  # runtime-only (never persisted): true when the lock is held elsewhere
 
     @property
     def profile_json_path(self) -> Path:
@@ -147,7 +153,12 @@ class Profile:
             schema_version=int(raw.get("schema_version", SCHEMA_VERSION)),
         )
 
+    def _ensure_writable(self) -> None:
+        if self.read_only:
+            raise ReadOnlyError(f"profile '{self.profile_name}' is open read-only")
+
     def save(self) -> None:
+        self._ensure_writable()
         payload: dict[str, Any] = {
             "schema_version": self.schema_version,
             "profile_name": self.profile_name,
@@ -244,6 +255,7 @@ class Profile:
         return creds.load_creds(self.creds_path)
 
     def add_credential(self, cred: Credential) -> None:
+        self._ensure_writable()
         creds.add_credential(self.creds_path, cred)
 
     @property
@@ -266,6 +278,7 @@ class Profile:
         return data
 
     def save_graph(self, data: dict[str, Any]) -> None:
+        self._ensure_writable()
         # why: mirror profile.json's atomic write — a crash mid-write must not corrupt graph.json.
         tmp = self.directory / "graph.json.tmp"
         tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
