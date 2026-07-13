@@ -7,10 +7,10 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
 - **Verified:** `mypy --strict` clean (118 files) · `ruff check` + `ruff format --check` clean ·
-  **895 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
+  **899 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
   vendored HackTricks snapshot; `packaging/` build infra excluded from the wheel). Live-fetch +
   credential-durability paths independently refute-reviewed (0 credential-loss / allowlist-bypass /
-  data-leak defects; one confirmed spray secret-leak found + fixed).
+  data-leak defects; one confirmed spray secret-leak found + fixed). Spray preserves the discovered port.
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 - Owner-approved policy decisions: [`docs/OWNER_DECISIONS.md`](docs/OWNER_DECISIONS.md) (live
   HackTricks fetch/cache is approved; project credentials are durable in `<project>/creds.json`).
@@ -230,7 +230,7 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 | Finding-aware HackTricks (offline Phases 1–3) | ✅ **Done** | §2/§27 gate ✅ | 21 vendored pages + loader + offline render + finding-aware jump + `clean_markdown` + 12-module/30-entry verified section map |
 | Owner-approved live HackTricks fetch/cache | ✅ **Done** | §14a policy ✅ | `references/live_hacktricks.py` — allow-listed HTTPS, bounded, sanitized, XDG cache; off-by-default; never transmits target/cred data. Security-reviewed: 0 confirmed defects |
 | Cred store + password spraying | ✅ **Done** | §2a | opt-in/off-by-default; creds durable in `<project>/creds.json`, isolated, only explicit edit/delete removes; confirmed-spray recorded add-only |
-| Preserve discovered port through spray | ⏭ **Next** | spray dialog | spray uses each tool's default port; a non-standard service port isn't sprayed. Off-by-default + benign (ineffective spray, never cred loss) |
+| Preserve discovered port through spray | ✅ **Done** | spray dialog | `spray.discovered_port` maps by nmap service name → `build_spray_command` injects hydra `-s`/netexec `--port`; standard ports stay clean. Still policy-gated + secret-redacted |
 | Timed mock-exam dry run | ⛔ | exam preset (✅) + live targets | The "timed" part needs authorized targets |
 | Interactive + cross-machine AppImage acceptance | 🕒 | AppImage build (✅) | build + headless construction verified on Kali; on-screen/cross-machine open — see `packaging/ACCEPTANCE.md` |
 
@@ -412,18 +412,16 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 
 ## Immediate next chunk
 
-Cred-spraying, HackTricks (**Phases 1–3 + owner-approved live fetch/cache §14a**), parser
-multi-version resilience, durable project credentials, the **`doctor` guided safe installer**, and the
-**single-click AppImage + branded splash** (real acceptance build on Kali) are all done. Exactly one
-recommended next chunk:
+Cred-spraying (now **port-aware**), HackTricks (**Phases 1–3 + owner-approved live fetch/cache §14a**),
+parser multi-version resilience, durable project credentials, the **`doctor` guided safe installer**,
+and the **single-click AppImage + branded splash** (real acceptance build on Kali) are all done.
+Exactly one recommended next chunk:
 
-- **⏭ Preserve the discovered service PORT through the spray path.** The Spray dialog sprays by service
-  key using each tool's default port (`hydra ssh://TARGET` = 22), so a service on a non-standard port
-  (SSH on 2222) is sprayed on the wrong port. It's a correctness gap in an **opt-in, off-by-default**
-  feature with a **benign** failure mode (an ineffective spray — never credential loss, never a safety
-  issue), which is why it wasn't force-fixed at the end of the live-fetch/creds workstream. Wiring the
-  discovered port into `spray.build_spray_command` (hydra `-s <port>` / a per-service instance in the
-  dialog) is the fix.
+- **⏭ Harden the two accepted low-severity live-fetch residuals** (from the refute review): escape
+  markdown metacharacters in extracted live content so a page's literal `[x](file://…)` text can't
+  become a clickable link, and treat a missing `Content-Type` header explicitly instead of skipping
+  validation. Both are **non-exploitable** today (the host is TLS-pinned `book.hacktricks.wiki`, so a
+  response can't be forged), so this is polish/defense-in-depth, not a fix.
 
 **Blocked (need external resources):** the *timed* mock exam (authorized target); full interactive +
 cross-machine AppImage acceptance (a real desktop / a second VM — see `packaging/ACCEPTANCE.md`).

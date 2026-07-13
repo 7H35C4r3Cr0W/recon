@@ -39,6 +39,18 @@ def test_preview_builds_selected_service_commands(qtbot: QtBot, tmp_path: Path) 
     assert set(d.selected_services()) == {"smb", "ssh"}
 
 
+def test_preview_uses_discovered_nonstandard_port(qtbot: QtBot, tmp_path: Path) -> None:
+    from oscprecon.models import DiscoveredService, Proto
+
+    prof = Profile.create(config.workspace_root(), "b", Target(ip="10.0.0.1"))
+    prof.discovered_services = [DiscoveredService(2222, Proto.TCP, "ssh")]  # SSH relocated
+    d = SprayDialog(prof, spray_enabled=True)
+    qtbot.addWidget(d)
+    d._checks["ssh"].setChecked(True)
+    preview = d._preview.toPlainText()
+    assert "-s 2222" in preview and "ssh://10.0.0.1" in preview  # sprays the discovered port
+
+
 def test_spray_launches_gated_worker_when_enabled(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

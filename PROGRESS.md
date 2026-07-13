@@ -15,12 +15,13 @@ fetch/cache (§14a)**, **durable project credentials + opt-in spray**, the **doc
 the **single-click AppImage + splash**, and **parser multi-version resilience** are **DONE**. Phase 6
 is partial: only the *timed* mock exam remains (blocked on a live target).
 
-**⏭ One recommended next chunk: preserve the discovered service PORT through the spray path.**
-Today the Spray dialog sprays by service key using each tool's default port (e.g. `hydra ssh://TARGET`
-= 22), so a service on a non-standard port (SSH on 2222) is sprayed on the wrong port. Off-by-default
-+ opt-in + benign (an ineffective spray, never credential loss), so it is a correctness gap, not a
-safety one. See [[owner-decisions]]. **Blocked:** timed mock exam + full interactive/cross-machine
-AppImage acceptance (see `packaging/ACCEPTANCE.md`) need an authorized target / a real desktop.
+**Spray now preserves the discovered service port** (SSH on 2222 → `hydra -s 2222`, SMB elsewhere →
+`netexec --port`), so that correctness gap is closed. **⏭ One recommended next chunk: harden the two
+accepted low-severity live-fetch residuals** — escape markdown metacharacters in extracted live
+content (a page serving literal `[x](file://…)` becomes a clickable link) and treat a missing
+`Content-Type` header explicitly. Both are non-exploitable behind TLS host-pinning, so this is polish,
+not a fix. **Blocked:** timed mock exam + full interactive/cross-machine AppImage acceptance (see
+`packaging/ACCEPTANCE.md`) need an authorized target / a real desktop.
 
 ### Live HackTricks fetch/cache + durable creds + parser resilience + AppImage acceptance
 A sequenced workstream (owner-approved live HackTricks + the two permanent product rules). In order:

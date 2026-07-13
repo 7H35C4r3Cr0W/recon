@@ -113,3 +113,40 @@ def test_secure_output_file_is_0600(tmp_path: Path) -> None:
     out.chmod(0o644)
     spray.secure_output_file(out)
     assert stat.S_IMODE(out.stat().st_mode) == 0o600
+
+
+def test_build_spray_command_preserves_nonstandard_port(tmp_path: Path) -> None:
+    u, p = tmp_path / "u", tmp_path / "p"
+    # hydra service on a relocated port -> -s <port>; netexec service -> --port <port>
+    ssh = spray.build_spray_command("ssh", "10.0.0.1", u, p, 2222)
+    assert "-s 2222" in ssh and "ssh://10.0.0.1" in ssh
+    smb = spray.build_spray_command("smb", "10.0.0.1", u, p, 4445)
+    assert "--port 4445" in smb
+    # the standard port keeps the clean command (no override emitted)
+    assert "-s " not in spray.build_spray_command("ssh", "10.0.0.1", u, p, 22)
+    assert "--port" not in spray.build_spray_command("smb", "10.0.0.1", u, p, 445)
+    assert "--port" not in spray.build_spray_command("smb", "10.0.0.1", u, p, None)
+
+
+def test_ported_spray_command_stays_policy_gated(tmp_path: Path) -> None:
+    u, p = tmp_path / "u", tmp_path / "p"
+    for key, port in (("ssh", 2222), ("smb", 4445), ("ftp", 2121)):
+        argv = shlex.split(spray.build_spray_command(key, "10.0.0.1", u, p, port))
+        # a port'd spray is STILL blocked in the default mode and only runs in Spray mode
+        assert shell.policy_violation(argv) is not None
+        assert shell.policy_violation(argv, spray=True) is None
+
+
+def test_discovered_port_matches_by_nmap_service_name() -> None:
+    from oscprecon.models import DiscoveredService, Proto
+
+    services = [
+        DiscoveredService(2222, Proto.TCP, "ssh"),
+        DiscoveredService(445, Proto.TCP, "microsoft-ds"),
+        DiscoveredService(636, Proto.TCP, "ldapssl"),
+    ]
+    assert spray.discovered_port("ssh", services) == 2222  # relocated SSH found
+    assert spray.discovered_port("smb", services) == 445  # by microsoft-ds
+    assert spray.discovered_port("ldap", services) == 636
+    assert spray.discovered_port("ftp", services) is None  # not discovered -> default
+    assert spray.discovered_port("bogus", services) is None

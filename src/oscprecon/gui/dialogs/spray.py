@@ -95,8 +95,15 @@ class SprayDialog(QDialog):
     def _refresh_preview(self) -> None:
         users = self._profile.directory / "spray" / "users.txt"
         passwords = self._profile.directory / "spray" / "passwords.txt"
+        services = self._profile.discovered_services
         commands = [
-            spray.build_spray_command(key, self._profile.target.ip, users, passwords)
+            spray.build_spray_command(
+                key,
+                self._profile.target.ip,
+                users,
+                passwords,
+                spray.discovered_port(key, services),
+            )
             for key in self.selected_services()
         ]
         self._preview.setPlainText("\n".join(commands) or "(select one or more services)")

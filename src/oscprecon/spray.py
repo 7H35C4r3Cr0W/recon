@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from oscprecon.models import Credential
+from oscprecon.models import Credential, DiscoveredService
 
 # why: OSCP-legal credential spraying (§2a) — built ONLY for the active profile's single target,
 # from the user's editable cred vault. This module is PURE command construction + list writing; it
@@ -19,29 +19,64 @@ from oscprecon.models import Credential
 class SprayService:
     key: str
     label: str
-    template: str  # interpolates {target} {users} {passwords}
+    template: str  # interpolates {target} {port_opt} {users} {passwords}
+    default_port: int  # the tool default for this service (no override emitted when it matches)
+    nmap_names: frozenset[str]  # nmap service names that identify a discovered instance
+    port_style: str  # "hydra" (-s PORT after `hydra`) | "netexec" (--port PORT after the target)
 
 
 # netexec for Windows/AD services (native spray + --continue-on-success); hydra for the rest.
+# {port_opt} injects the discovered NON-STANDARD port (hydra `-s`, netexec `--port`) so a service on
+# a relocated port (SSH on 2222, SMB elsewhere) is sprayed on the RIGHT port, not the tool default.
 SPRAY_SERVICES: tuple[SprayService, ...] = (
     SprayService(
         "smb",
         "SMB (netexec)",
-        "netexec smb {target} -u {users} -p {passwords} --continue-on-success",
+        "netexec smb {target}{port_opt} -u {users} -p {passwords} --continue-on-success",
+        445,
+        frozenset({"microsoft-ds", "netbios-ssn"}),
+        "netexec",
     ),
     SprayService(
         "winrm",
         "WinRM (netexec)",
-        "netexec winrm {target} -u {users} -p {passwords} --continue-on-success",
+        "netexec winrm {target}{port_opt} -u {users} -p {passwords} --continue-on-success",
+        5985,
+        frozenset({"wsman", "wsmans"}),
+        "netexec",
     ),
     SprayService(
         "ldap",
         "LDAP (netexec)",
-        "netexec ldap {target} -u {users} -p {passwords} --continue-on-success",
+        "netexec ldap {target}{port_opt} -u {users} -p {passwords} --continue-on-success",
+        389,
+        frozenset({"ldap", "ldapssl"}),
+        "netexec",
     ),
-    SprayService("ssh", "SSH (hydra)", "hydra -L {users} -P {passwords} ssh://{target}"),
-    SprayService("ftp", "FTP (hydra)", "hydra -L {users} -P {passwords} ftp://{target}"),
-    SprayService("rdp", "RDP (hydra)", "hydra -L {users} -P {passwords} rdp://{target}"),
+    SprayService(
+        "ssh",
+        "SSH (hydra)",
+        "hydra{port_opt} -L {users} -P {passwords} ssh://{target}",
+        22,
+        frozenset({"ssh"}),
+        "hydra",
+    ),
+    SprayService(
+        "ftp",
+        "FTP (hydra)",
+        "hydra{port_opt} -L {users} -P {passwords} ftp://{target}",
+        21,
+        frozenset({"ftp", "ftp-data"}),
+        "hydra",
+    ),
+    SprayService(
+        "rdp",
+        "RDP (hydra)",
+        "hydra{port_opt} -L {users} -P {passwords} rdp://{target}",
+        3389,
+        frozenset({"ms-wbt-server", "ms-wbt"}),
+        "hydra",
+    ),
 )
 _BY_KEY = {service.key: service for service in SPRAY_SERVICES}
 
@@ -122,13 +157,40 @@ def secure_output_file(path: Path) -> None:
         os.close(fd)
 
 
-def build_spray_command(service_key: str, target: str, users: Path, passwords: Path) -> str:
-    """Build the single-target spray command for a service. Run it via shell.run(spray=True)."""
+def discovered_port(service_key: str, services: list[DiscoveredService]) -> int | None:
+    """The discovered port for a spray service (matched by nmap service name), or None for default.
+
+    So a spray follows the ACTUAL discovered port: nmap reporting `ssh` on 2222 -> ssh spray uses
+    2222. Matched by service name (nmap reports it regardless of port), first match wins.
+    """
+    service = _BY_KEY.get(service_key)
+    if service is None:
+        return None
+    for discovered in services:
+        if discovered.service.lower() in service.nmap_names:
+            return discovered.port
+    return None
+
+
+def build_spray_command(
+    service_key: str, target: str, users: Path, passwords: Path, port: int | None = None
+) -> str:
+    """Build the single-target spray command for a service. Run it via shell.run(spray=True).
+
+    `port` (from discovered_port) overrides the tool default ONLY when it differs — a standard port
+    keeps the clean command; a non-standard port is injected as hydra `-s`/netexec `--port`.
+    """
     service = _BY_KEY.get(service_key)
     if service is None:
         raise ValueError(f"unknown spray service: {service_key!r}")
+    port_opt = ""
+    if port is not None and port != service.default_port:
+        port_opt = f" -s {int(port)}" if service.port_style == "hydra" else f" --port {int(port)}"
     return service.template.format(
-        target=target, users=shlex.quote(str(users)), passwords=shlex.quote(str(passwords))
+        target=target,
+        port_opt=port_opt,
+        users=shlex.quote(str(users)),
+        passwords=shlex.quote(str(passwords)),
     )
 
 

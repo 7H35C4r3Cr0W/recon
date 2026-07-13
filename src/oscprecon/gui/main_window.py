@@ -895,7 +895,8 @@ class MainWindow(QMainWindow):
         for service in dialog.selected_services():
             if not self._tasks.can_start():
                 break
-            command = spray.build_spray_command(service, target, users_path, passwords_path)
+            port = spray.discovered_port(service, profile.discovered_services)
+            command = spray.build_spray_command(service, target, users_path, passwords_path, port)
             output_file = profile.directory / "spray" / f"{service}.txt"
             spray.secure_output_file(output_file)  # 0600 — it can hold plaintext secrets
             self._tool_panel.append_output(f"$ [spray] {command}")
