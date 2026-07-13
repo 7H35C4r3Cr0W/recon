@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from oscprecon.workspace.health import (
+    HealthIssue,
+    check_profile,
+    repair_creds_permissions,
+    repair_remove_stale_temp,
+)
 from oscprecon.workspace.index import scan_workspace, sort_summaries, summarize_profile
 from oscprecon.workspace.locks import (
     LockInfo,
@@ -25,14 +31,18 @@ from oscprecon.workspace.search import SearchQuery, SearchResult, search_workspa
 __all__ = [
     "DEFAULT_STATUS",
     "STATUSES",
+    "HealthIssue",
     "LockInfo",
     "Organization",
     "ProfileSummary",
     "SearchQuery",
     "SearchResult",
     "acquire",
+    "check_profile",
     "current_lock_info",
     "is_stale",
+    "repair_creds_permissions",
+    "repair_remove_stale_temp",
     "read_lock",
     "recover_stale",
     "release",
