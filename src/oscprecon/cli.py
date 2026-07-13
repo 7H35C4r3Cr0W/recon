@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import typer
 
-from oscprecon import config, shell, vault_export
+from oscprecon import config, doctor as doctor_mod, vault_export
 from oscprecon.models import Target
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
@@ -157,22 +156,45 @@ def import_project_cmd(
 
 
 @app.command()
-def doctor() -> None:
-    """Check that each wrapped recon tool is installed; print install hints for the missing ones."""
-    tools = sorted(shell.ALLOWED_TOOLS)
-    missing = [tool for tool in tools if shutil.which(tool) is None]
-    typer.echo(f"[doctor] {len(tools) - len(missing)}/{len(tools)} wrapped tools found on PATH")
+def doctor(
+    install: bool = typer.Option(
+        False, "--install", help="Offer to apt-install the missing allow-listed tools (asks first)."
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y", help="Skip the confirmation prompt (non-interactive install)."
+    ),
+) -> None:
+    """Check each wrapped tool; print install hints, and with --install offer to apt-install them."""
+    report = doctor_mod.scan()
+    total = len(report.tools)
+    missing = report.missing
+    typer.echo(f"[doctor] {total - len(missing)}/{total} wrapped tools found on PATH")
     if not missing:
         typer.echo("[doctor] all wrapped tools present — exam-ready.")
         return
     typer.echo(f"[doctor] {len(missing)} missing (install the ones you need):")
     for tool in missing:
-        typer.echo(f"  {tool:24}  {shell.install_hint(tool)}")
+        typer.echo(f"  {tool.name:24}  {tool.hint}")
     # why: alternatives cover the same capability — don't alarm the user about skipping them.
     typer.echo(
         "\nNote: alternatives are fine to skip — netexec covers nxc/crackmapexec, and "
         "GetX.py covers impacket-GetX.py (and vice-versa)."
     )
+    if not install:
+        typer.echo("\nRe-run `doctor --install` to apt-install them (asks before running anything).")
+        return
+    plan = doctor_mod.install_plan(report)
+    if plan.manual:
+        typer.echo("\n[doctor] install these manually (not apt):")
+        for name, hint in plan.manual:
+            typer.echo(f"  {name:24}  {hint}")
+    code = doctor_mod.install(
+        plan,
+        assume_yes=yes,
+        confirm=lambda command: typer.confirm(f"[doctor] run `{command}`?"),
+        echo=typer.echo,
+    )
+    raise typer.Exit(code)
 
 
 def main() -> None:
