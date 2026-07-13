@@ -51,6 +51,24 @@ def test_scan_profile_combo_populates_and_collects(qtbot: QtBot) -> None:
     assert d.selected_settings().scan_profile == "quick"  # collected back out
 
 
+def test_spray_toggle_populates_and_collects(qtbot: QtBot) -> None:
+    settings = config.Settings(
+        workspace_root="/tmp/ws",
+        wordlist_paths=[],
+        theme="light",
+        font_size=0,
+        max_concurrency=4,
+        nmap_udp_full=False,
+        spray_enabled=True,
+    )
+    d = _make(qtbot, settings)
+    assert d._spray_enabled.isChecked()  # reflects the setting
+    d._spray_enabled.setChecked(False)
+    assert d.selected_settings().spray_enabled is False  # collected back out
+    # default settings keep it OFF
+    assert not _make(qtbot, config.default_settings())._spray_enabled.isChecked()
+
+
 def test_eight_sections_present(qtbot: QtBot) -> None:
     d = _make(qtbot, config.default_settings())
     labels = [d._tabs.tabText(i) for i in range(d._tabs.count())]

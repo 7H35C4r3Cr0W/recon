@@ -158,6 +158,15 @@ class SettingsDialog(QDialog):
         )
         note.setWordWrap(True)
         layout.addWidget(note)
+        self._spray_enabled = QCheckBox("Enable Spray mode (credential brute / spraying)")
+        layout.addWidget(self._spray_enabled)
+        spray_note = QLabel(
+            "OFF by default. OSCP-legal against your OWN authorized targets (§ 2a). When on, it "
+            "unlocks hydra/medusa/netexec list-spray and password wordlists against the active "
+            "target. Never spray the exam VPN / control panel or any out-of-scope host."
+        )
+        spray_note.setWordWrap(True)
+        layout.addWidget(spray_note)
         layout.addStretch(1)
         return page
 
@@ -233,6 +242,7 @@ class SettingsDialog(QDialog):
         prof_idx = self._scan_profile.findData(settings.scan_profile)
         self._scan_profile.setCurrentIndex(prof_idx if prof_idx >= 0 else 0)
         self._udp_full.setChecked(settings.nmap_udp_full)
+        self._spray_enabled.setChecked(settings.spray_enabled)
         self._concurrency.setValue(settings.max_concurrency)
 
     def selected_settings(self) -> Settings:
@@ -246,6 +256,7 @@ class SettingsDialog(QDialog):
             max_concurrency=self._concurrency.value(),
             nmap_udp_full=self._udp_full.isChecked(),
             scan_profile=str(self._scan_profile.currentData()),
+            spray_enabled=self._spray_enabled.isChecked(),
         ).normalized()
 
     # ----- actions ----------------------------------------------------------
