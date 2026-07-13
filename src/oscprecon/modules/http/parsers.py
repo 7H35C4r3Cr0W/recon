@@ -6,6 +6,14 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
+_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _clean(text: str) -> str:
+    # why: tool output can carry ANSI/control bytes (progress redraws, a truncated write). Strip
+    # them from every string field so they never leak into findings.json, reports, or GUI text.
+    return _CONTROL_RE.sub("", text)
+
 
 @dataclass
 class HttpFinding:
@@ -16,6 +24,11 @@ class HttpFinding:
     redirect_to: str = ""
     note: str = ""
     module: str = "http"
+
+    def __post_init__(self) -> None:
+        self.path = _clean(self.path)
+        self.redirect_to = _clean(self.redirect_to)
+        self.note = _clean(self.note)
 
     def to_dict(self, discovered_at: str) -> dict[str, Any]:
         return {
@@ -208,11 +221,23 @@ def parse_nikto(text: str, port: int) -> list[HttpFinding]:
 
 
 def parse_whatweb(text: str, port: int) -> list[HttpFinding]:
+    # whatweb --log-json drifts between a single JSON array/object and NDJSON (one object per line)
+    # across versions. Try the whole doc first, then fall back to line-by-line, skipping bad rows —
+    # so a format change or one malformed line never drops the rest.
+    stripped = text.strip()
+    entries: list[Any] = []
     try:
-        data = json.loads(text)
+        data = json.loads(stripped)
+        entries = data if isinstance(data, list) else [data]
     except json.JSONDecodeError:
-        return []
-    entries = data if isinstance(data, list) else [data]
+        for line in stripped.splitlines():
+            candidate = line.strip()
+            if not candidate:
+                continue
+            try:
+                entries.append(json.loads(candidate))
+            except json.JSONDecodeError:
+                continue
     findings: list[HttpFinding] = []
     for entry in entries:
         if not isinstance(entry, dict):
