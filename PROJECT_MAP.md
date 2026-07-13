@@ -222,7 +222,8 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 | Pattern coverage for ssh/ike/tftp/vhost | ✅ **Done** | pattern engine | all 19 modules now have `patterns/*.yaml` (47 rules); commands policy-clean |
 | Report EDB-hit persistence | ✅ **Done** | references, profile store | `edb.py`→`edb.json` + report section; lookup-only (no PoC path) |
 | AD / Kerberos enum workflow | ✅ **Done** | smb/ldap modules | `modules/kerberos` (Tier-1 KDC confirm + enum-only Tier-2); parser stores no hashes |
-| Finding-aware HackTricks integration | ⏭ **Next** (gated) | §27 change first | Vendor HackTricks markdown offline → section-aware surfacing. **Needs a CLAUDE.md §2/§27 edit first** (see phases) |
+| Finding-aware HackTricks integration | ⏭ **Next** | §2/§27 gate ✅ (`bf42f1e`) | Vendor HackTricks markdown offline → section-aware surfacing. Gate cleared; Phase 1 = vendor + index |
+| Cred store + password spraying | 🕒 (gated) | CLAUDE.md §1/§2 amendment | OSCP-legal, but reverses recon-only identity; opt-in/off-by-default. See [[cred-spray-scope-change]] |
 | Timed mock-exam dry run | ⛔ | exam preset (✅) + live targets | The "timed" part needs authorized targets |
 | AD / Kerberos enum workflow polish | 🕒 | smb/ldap modules (✅) | Enumeration only, no cracking |
 
@@ -408,20 +409,26 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
 tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-**⏭ Finding-aware HackTricks integration — Phase 1 (vendor + index), gated on a CLAUDE.md §2/§27 edit.**
+**⏭ Finding-aware HackTricks integration — Phase 1 (vendor + index). GATE CLEARED.**
 
-- **Why this one:** the owner confirmed the offline-vendored-markdown approach is OSCP-legal and wants
-  it built "at the right time". It's deterministic and offline once permitted.
-- **Gate (do first):** propose a CLAUDE.md §2/§27 edit distinguishing *vendoring the CC-licensed
-  HackTricks markdown offline* (to allow) from *live scraping/caching of the site at runtime* (still
-  out). §27 currently forbids both; get explicit sign-off + attribution before coding.
+- **Why this one:** the owner confirmed the offline-vendored-markdown approach is OSCP-legal; the
+  CLAUDE.md §2/§27 gate is now **applied** (`bf42f1e` — offline vendoring allowed, live scraping still
+  forbidden). It's deterministic and offline once the markdown is vendored.
 - **Phase 1 scope:** vendor a bounded network-services-pentesting markdown snapshot under
   `references/hacktricks/`, a refresh script, and a `service/module → file+anchor` index; ship in the
-  wheel; offline-load test. (Section extraction + finding-aware UX are later phases — see the memory.)
+  wheel; offline-load test. Needs one-time network access to fetch the repo at vendor time. (Section
+  extraction + finding-aware UX are later phases — see the memory.)
 
-**Parallel future tracks (need an owner decision):** Phase 6 distribution (installer / tool-update-
-resilient parsers / single-click app / splash). **Blocked:** live validation + timed mock (authorized
-target required). Full detail in the build memory ([[hacktricks-integration]], [[distribution-goals]]).
+**Parallel future tracks (need an owner decision / gate):**
+- **Credential store + OSCP-legal password spraying** (owner request; hydra smb/ftp/ssh, editable cred
+  vault). **Verified OSCP-legal**, but it **reverses the tool's recon-only identity** (§1) and the §2
+  hydra/spray ban + `shell.policy_violation` enforcement — so it needs an explicit **CLAUDE.md §1/§2
+  amendment first** (draft on request) and should be **opt-in / off-by-default** to keep the exam-legal
+  default for the public release. See [[cred-spray-scope-change]].
+- **Phase 6 distribution** (installer / tool-update-resilient parsers / single-click app / splash).
+
+**Blocked:** live validation + timed mock (authorized target required). Full detail in the build memory
+([[hacktricks-integration]], [[cred-spray-scope-change]], [[distribution-goals]]).
 
 ---
 
