@@ -100,7 +100,7 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
   - ✅ **Status footer** (CLAUDE.md §19) — built into `main_window.py` (`_update_status_footer`): app+version, active profile, workspace root, exam-legal reminder.
   - ✅ **Full GUI audit log** (CLAUDE.md §6a) — `audit.py` + `<profile>/audit.jsonl`; feeds the dashboard Activity timeline.
   - ✅ **Concurrent-copy lock** (CLAUDE.md §6b) — advisory `<profile>/.lock` + read-only prompt + stale-lock reclaim (delivered in the Workspace upgrade).
-  - 🕒 **Project file operations** (CLAUDE.md §19) — File → Open by IP / Import Project (.tar.gz) / Export Project (.tar.gz, warns `creds.json` included). **Still unbuilt** — the only remaining item from this list. (`bulk.export_project` is an Obsidian *vault* export, not the tarball backup.)
+  - ✅ **Project file operations** (CLAUDE.md §19) — `workspace/portability.py`: File → Open by IP / Import Project / Export Project (.tar.gz, warns `creds.json` included) + CLI `export-project`/`import-project`. Import is path-traversal-safe (rejects `..`/absolute/backslash/symlink/special/multi-top/non-profile + decompression-bomb cap; stages then swaps). (`bulk.export_project` remains a distinct Obsidian *vault* export.)
 
 **Exit:** pleasant to use under exam pressure; reports drop into Obsidian cleanly.
 
@@ -156,9 +156,9 @@ subsystem-by-subsystem status map and forward plan.**
 
 Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` §27:
 
-- **Project file operations (CLAUDE.md §19)** — *recommended next chunk.* File → Open by IP /
-  Import Project (.tar.gz) / Export Project (.tar.gz, warns `creds.json` included). Deps (profile model +
-  workspace index) are done; deterministic, no live target.
+- **Pattern-library coverage for ssh/ike/tftp/vhost** — *recommended next chunk.* These 4 modules lack
+  `patterns/*.yaml` (15/19 covered), so "Recon next steps" is empty for them. Deterministic, no live
+  target; each new file needs ≥ 3 provenance-cited entries that pass the forbidden-content gate.
 - **Timed mock exam (Phase 6).** A timed dry run against a standalone + AD set. Blocked on an authorized
   live target. (The exam-mode *scan profile* it would exercise is now built.)
 

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDockWidget,
     QFileDialog,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMenu,
@@ -64,7 +65,7 @@ from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
 from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
-from oscprecon.workspace import locks
+from oscprecon.workspace import locks, portability
 
 # Workers moved to oscprecon.gui.workers; re-exported here so existing imports/tests keep working.
 __all__ = [
@@ -234,6 +235,10 @@ class MainWindow(QMainWindow):
         self._open_action.triggered.connect(self._on_open)
         file_menu.addAction(self._open_action)
 
+        self._open_by_ip_action = QAction("Open by IP...", self)
+        self._open_by_ip_action.triggered.connect(self._on_open_by_ip)
+        file_menu.addAction(self._open_by_ip_action)
+
         self._recent_menu = file_menu.addMenu("Recent Profiles")
         self._rebuild_recent_menu()
 
@@ -246,6 +251,15 @@ class MainWindow(QMainWindow):
         self._export_vault_action = QAction("Export to Obsidian Vault...", self)
         self._export_vault_action.triggered.connect(self._on_export_vault)
         file_menu.addAction(self._export_vault_action)
+
+        file_menu.addSeparator()
+        self._import_project_action = QAction("Import Project...", self)
+        self._import_project_action.triggered.connect(self._on_import_project)
+        file_menu.addAction(self._import_project_action)
+
+        self._export_project_action = QAction("Export Project...", self)
+        self._export_project_action.triggered.connect(self._on_export_project)
+        file_menu.addAction(self._export_project_action)
 
         file_menu.addSeparator()
         prefs_action = QAction("Preferences...", self)
@@ -622,6 +636,95 @@ class MainWindow(QMainWindow):
             "Credential secret values are redacted.",
         )
 
+    def _on_open_by_ip(self) -> None:
+        ip, ok = QInputDialog.getText(self, "Open by IP", "Target IP or hostname:")
+        if not ok or not ip.strip():
+            return
+        matches = portability.find_profiles_by_ip(config.workspace_root(), ip.strip())
+        if not matches:
+            QMessageBox.information(self, "No match", f"No profile targets {ip.strip()}.")
+            return
+        if len(matches) == 1:
+            self._open_path(matches[0])
+            return
+        names = [p.name for p in matches]
+        choice, chose = QInputDialog.getItem(
+            self,
+            "Multiple matches",
+            f"{len(matches)} profiles target {ip.strip()}:",
+            names,
+            0,
+            False,
+        )
+        if chose and choice:
+            self._open_path(matches[names.index(choice)])
+
+    def _on_import_project(self) -> None:
+        chosen, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Project",
+            str(config.workspace_root()),
+            "Project archives (*.tar.gz *.tgz *.tar);;All files (*)",
+        )
+        if not chosen:
+            return
+        root = config.workspace_root()
+        try:
+            dest = portability.import_project_archive(Path(chosen), root)
+        except portability.ProjectExistsError:
+            answer = QMessageBox.question(
+                self,
+                "Profile exists",
+                "A profile with that name already exists.\nReplace it with the imported copy?",
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            try:
+                dest = portability.import_project_archive(Path(chosen), root, overwrite=True)
+            except portability.ProjectArchiveError as exc:
+                QMessageBox.warning(self, "Import failed", str(exc))
+                return
+        except portability.ProjectArchiveError as exc:
+            QMessageBox.warning(self, "Import failed", str(exc))
+            return
+        self._audit_action("project-imported", source=str(chosen))
+        self._open_path(dest)
+
+    def _on_export_project(self) -> None:
+        if self._profile is None:
+            QMessageBox.warning(self, "No profile", "Open or create a profile first.")
+            return
+        confirm = QMessageBox.warning(
+            self,
+            "Export Project",
+            "The archive includes creds.json (plaintext credentials).\n"
+            "Store and transfer it as sensitive. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        default = str(config.workspace_root() / f"{self._profile.profile_name}.tar.gz")
+        chosen, _ = QFileDialog.getSaveFileName(
+            self, "Export Project", default, "Project archive (*.tar.gz)"
+        )
+        if not chosen:
+            return
+        if not self._profile.read_only:  # keep the on-disk copy current before packing
+            self._notes_pane.flush()
+            self._profile.save()
+        try:
+            out = portability.export_project_archive(self._profile.directory, Path(chosen))
+        except portability.ProjectArchiveError as exc:
+            QMessageBox.warning(self, "Export failed", str(exc))
+            return
+        self._audit_action("project-exported", dest=str(out))
+        self._tool_panel.append_output(f"[exported] {out}")
+        QMessageBox.information(
+            self,
+            "Project exported",
+            f"Archive written to:\n{out}\n\nIncludes creds.json — treat it as sensitive.",
+        )
+
     def _on_add_credential(self) -> None:
         if self._profile is None:
             QMessageBox.information(self, "No profile", "Open or create a profile first.")
@@ -668,6 +771,10 @@ class MainWindow(QMainWindow):
         read_only = self._profile is not None and self._profile.read_only
         self._new_action.setEnabled(not any_running)
         self._open_action.setEnabled(not any_running)
+        self._open_by_ip_action.setEnabled(not any_running)
+        self._import_project_action.setEnabled(not any_running)
+        # export packs the profile dir — gate it so a snapshot isn't taken mid-scan-write
+        self._export_project_action.setEnabled(not any_running and self._profile is not None)
         self._save_action.setEnabled(not any_running and not read_only)
         self._recent_menu.setEnabled(not any_running)
         self._run_button.setEnabled(

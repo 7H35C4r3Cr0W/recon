@@ -6,8 +6,8 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (104 files) · `ruff check` + `ruff format --check` clean ·
-  **671 tests** pass (incl. 182 offscreen GUI) · `test_packaging` green (wheel ships resources).
+- **Verified:** `mypy --strict` clean (105 files) · `ruff check` + `ruff format --check` clean ·
+  **699 tests** pass (incl. 189 offscreen GUI) · `test_packaging` green (wheel ships resources).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
 ## Status legend
@@ -114,11 +114,15 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 - **Does:** each `~/oscprecon/<name>/` folder is self-contained: `profile.json` (v1, `schema_version`,
   discovered services, command history, references-visited, `organization` block), per-service output
   folders, atomic saves, recent-profile restore.
-- **Complete:** schema versioned + backward-compatible; corrupt-profile-safe load.
-- **Remaining:** project portability (Open-by-IP / Import / Export `.tar.gz`) — see §13.
-- **Depends on:** core execution.
+- **Complete:** schema versioned + backward-compatible; corrupt-profile-safe load. **Project
+  portability** — Open-by-IP, Import/Export `.tar.gz` (`workspace/portability.py`); import is
+  path-traversal-safe (rejects `..`/absolute/backslash/symlink/special/multi-top/non-profile + a
+  decompression-bomb cap), stages then swaps so a bad archive leaves nothing behind.
+- **Remaining:** none.
+- **Depends on:** core execution, workspace index.
 - **Risks:** future schema migrations must stay backward-compatible.
-- **Tests:** `test_config`, `test_settings`, `test_organization`, `test_workspace_index`.
+- **Tests:** `test_config`, `test_settings`, `test_organization`, `test_workspace_index`,
+  `test_workspace_portability`, `test_cli_project`, `tests/gui/test_project_ops`.
 
 ## 7. Findings and credentials — ✅
 
@@ -157,9 +161,9 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
   archived to `report-archive/` before overwrite; rendered report tab; `File → Export to Obsidian
   Vault…` writes a linked note folder (also available as a bulk action).
 - **Complete:** single-file Obsidian mode (default) + on-demand vault export.
-- **Remaining:** Exploit-DB hits in the report are deferred (need a persistent per-profile EDB store);
-  `.tar.gz` project import/export (§13). **Note:** `bulk.export_project` is a *vault* export, not the
-  §19 tarball backup — the tarball feature is still unbuilt.
+- **Remaining:** Exploit-DB hits in the report are deferred (need a persistent per-profile EDB store).
+  **Note:** the §19 `.tar.gz` project import/export is now built in `workspace/portability.py` (see §6);
+  `bulk.export_project` remains a distinct *vault* export, not the tarball backup.
 - **Depends on:** profile model, findings/credentials, references.
 - **Risks:** report must stay self-contained (no external inlined content) for exam use.
 - **Tests:** `test_reporter_findings`, `test_vault_export`, `tests/gui/test_report_view`,
@@ -211,9 +215,9 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 | Feature | Marker | Depends on | Note |
 |---|---|---|---|
 | Scan profiles incl. **exam mode** | ✅ **Done** | orchestrator, modules, settings | quick/default/full/exam govern the nmap battery; exam is speed-tuned + exam-legal (no `--script vuln`). Preferences default + `Scan → Run recon with profile` + CLI `--scan-profile` |
-| Project file ops (`Open by IP`, `Import`/`Export .tar.gz`) | ⏭ **Next** | profile model, workspace index (✅) | §19 tarball backup/transfer; warn `creds.json` included |
+| Project file ops (`Open by IP`, `Import`/`Export .tar.gz`) | ✅ **Done** | profile model, workspace index | `workspace/portability.py` + File menu + CLI `export-project`/`import-project`; traversal-safe import, warns `creds.json` included |
+| Pattern coverage for ssh/ike/tftp/vhost | ⏭ **Next** | pattern engine (✅) | 4 modules lack `patterns/*.yaml` |
 | Timed mock-exam dry run | ⛔ | exam preset (✅) + live targets | The "timed" part needs authorized targets |
-| Pattern coverage for ssh/ike/tftp/vhost | 🕒 | pattern engine (✅) | 4 modules lack `patterns/*.yaml` |
 | Report EDB-hit persistence | 🕒 | references, profile store | Needs a per-profile EDB store to render from |
 | AD / Kerberos enum workflow polish | 🕒 | smb/ldap modules (✅) | Enumeration only, no cracking |
 
@@ -276,7 +280,7 @@ flowchart TD
 
     exam["Exam-mode scan profile ✅"]
     mock["Timed mock exam ⛔"]
-    proj["Project file ops tar.gz ⏭"]
+    proj["Project file ops tar.gz ✅"]
     live["Live validation ⛔"]
 
     shell --> workers --> guiexec
@@ -294,24 +298,23 @@ flowchart TD
 
     modules --> exam
     exam -.-> mock
-    profile -.-> proj
-    index -.-> proj
+    profile --> proj
+    index --> proj
     exam -.-> live
     modules -.-> live
     mock -.-> live
 
     classDef done fill:#173a2a,stroke:#2f9e6b,color:#e8fff4;
-    classDef next fill:#153a5b,stroke:#4aa3ff,color:#eaf4ff;
     classDef later fill:#3d3410,stroke:#c9a227,color:#fff7e0;
     classDef blocked fill:#3d1616,stroke:#d05050,color:#ffe8e8;
-    class shell,workers,modules,guiexec,profile,fcn,graph,reports,audit,index,dash,search,views,bulk,locks,ro,activity,exam done;
-    class proj next;
+    class shell,workers,modules,guiexec,profile,fcn,graph,reports,audit,index,dash,search,views,bulk,locks,ro,activity,exam,proj done;
     class mock,live blocked;
 ```
 
 **Do-not-start-yet rules from the graph:**
-- **Project file ops** is the next chunk — its deps (profile model + workspace index) are done.
-- **Timed mock exam** waits on the (now-complete) exam-mode profile **and** an authorized live target.
+- **Next chunk is pattern coverage** (ssh/ike/tftp/vhost YAMLs) — a leaf on the pattern engine (✅),
+  no blocking deps.
+- **Timed mock exam** waits on the (complete) exam-mode profile **and** an authorized live target.
 - **Live validation** waits on everything and an authorized target — never claim it without one.
 
 ---
@@ -331,6 +334,7 @@ flowchart TD
 | Graph | ✅ | Medium (`test_graph_data/_view`) | None material | None |
 | Reports | ✅ | High (`test_reporter_findings`) | EDB hits not persisted | Add per-profile EDB store (later) |
 | Obsidian export | ✅ | High (`test_vault_export`) | None | None |
+| Project portability | ✅ | High (`test_workspace_portability`, `test_cli_project`, GUI) | Malicious archive on import | Done — traversal-safe + bomb cap |
 | Packaging | ✅ | Medium (`test_packaging`) | Unshipped new resource | Keep `test_packaging` current |
 | CI | ✅ | n/a (Gitea workflow) | Remote unreachable off-LAN | Push on-network via `autosave.sh` |
 | Workspace dashboard | ✅ | High (`test_dashboard`, `test_workspace_index`) | Index staleness | None |
@@ -349,10 +353,10 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 
 - **Phase 1 — Exam-day readiness** ✅ (preset) — exam-mode scan profile shipped (tight/fast, exam-legal;
   quick/default/full/exam). Only the *timed* mock-exam dry run remains, which is ⛔ (needs a live target).
-- **Phase 2 — Project portability & recovery** ⏭ **Next** — `File → Open by IP`, `Import Project` (.tar.gz),
-  `Export Project` (.tar.gz, warns `creds.json` included). Deps: profile model + workspace index (done).
-- **Phase 3 — Recon depth** 🕒 — pattern YAMLs for ssh/ike/tftp/vhost; report EDB-hit persistence;
-  AD/Kerberos enum workflow polish (enumeration only). Deps: pattern engine + modules (done).
+- **Phase 2 — Project portability & recovery** ✅ — `File → Open by IP`, `Import Project` (.tar.gz),
+  `Export Project` (.tar.gz, warns `creds.json` included) + CLI equivalents. Traversal-safe import.
+- **Phase 3 — Recon depth** ⏭ **Next** — pattern YAMLs for ssh/ike/tftp/vhost; report EDB-hit
+  persistence; AD/Kerberos enum workflow polish (enumeration only). Deps: pattern engine + modules (done).
 - **Phase 4 — Extended services (only as needed)** 🕒/❌ — dedicated modules for §12 services *actually
   encountered on a box* (rsync, finger, memcached, elasticsearch, couchdb, …). Never speculative.
 - **Phase 5 — Live validation** ⛔ — 3 authorized lab targets, live parser validation, performance
@@ -380,20 +384,19 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 
 ## Immediate next chunk
 
-**⏭ Project portability & recovery (§19): `Open by IP`, `Import Project`, `Export Project`.**
+**⏭ Pattern-library coverage for ssh / ike / tftp / vhost.**
 
-- **Why this one:** the exam-mode scan profile (the prior recommendation) is now shipped, so the next
-  self-contained, deterministic chunk that needs **no live target** and whose deps (profile model +
-  workspace index) are complete is the project-file model. It completes the "each `~/oscprecon/<name>/`
-  is a portable project file" story and gives fast recovery/backup/transfer.
-- **Completion definition:** `File → Open by IP…` (match `profile.json.target.ip` across the workspace);
-  `Import Project…` (extract a `<name>.tar.gz` into the workspace and open it); `Export Project…` (pack
-  the active profile to `<name>.tar.gz`, **warn `creds.json` is included**). Path-traversal-safe extract;
-  tests for round-trip + malicious archive rejection; docs updated.
-- **Explicitly excludes:** the *timed* mock-exam run (⛔ needs authorized targets) and any live validation.
+- **Why this one:** these 4 modules ship engines, parsers, and manual commands but lack
+  `patterns/*.yaml`, so the "Recon next steps" panel is empty for them (15/19 covered). It is the
+  smallest self-contained, deterministic gap left, needs **no live target**, and depends only on the
+  complete pattern engine. Closes a Phase-2/3 coverage hole.
+- **Completion definition:** `patterns/{ssh,ike,tftp,vhost}.yaml` each with ≥ 3 provenance-cited
+  (`# source:`) entries that pass the engine's forbidden-content gate; suggestions render in the panel
+  and report; tests assert each loads and matches expected findings; docs updated.
+- **Explicitly excludes:** any exploit/CVE-specific suggestions (§15 forbidden pattern contents), the
+  *timed* mock-exam run (⛔), and live validation.
 
-**Later candidates (do not start):** pattern coverage for ssh/ike/tftp/vhost; report EDB-hit
-persistence; AD/Kerberos enum workflow polish.
+**Later candidates (do not start):** report EDB-hit persistence; AD/Kerberos enum workflow polish.
 
 ---
 
@@ -414,3 +417,5 @@ for safety/architecture):
   live-box verified. This map states that distinction explicitly (§16 / Live validation ⛔).
 - **Graph Phase 4:** §16 "presentation reinforcements" (drag-persist, add-note, minimap, PNG/SVG) were
   queued in prose but are in fact **built** — confirmed in `graph_view.py` + `graph_html/app.js`.
+- **Project file ops (§19):** now **built** in `workspace/portability.py` (Open-by-IP / Import / Export
+  `.tar.gz`, traversal-safe) — the last item that was still "queued" in ROADMAP is done.

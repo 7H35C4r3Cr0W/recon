@@ -81,6 +81,10 @@ and service/finding/**credential counts** (counts only — secret values never a
   open elsewhere offers **read-only** (title shows `[READ-ONLY]`, every write is blocked, export still
   works). Stale locks (dead PID, same host) are recovered automatically; live/foreign ones are never
   stolen.
+- **Portable projects** — each profile folder is self-contained. `File → Open by IP…` finds a profile
+  by its target IP; `Import Project…` / `Export Project…` move a profile between machines as a
+  path-traversal-safe `<name>.tar.gz` (export **warns that `creds.json` is included**). Headless
+  equivalents: `oscprecon-cli export-project` / `import-project`.
 
 ### Preferences
 

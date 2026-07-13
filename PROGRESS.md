@@ -11,17 +11,37 @@ Running record of what's been built, in order, so any session can pick up mid-st
 
 Phases 0–5, all 19 recon modules (14 core + Redis/MongoDB/MSSQL/MySQL/PostgreSQL), Phase 3 pattern
 engine, Phase 4 graph (incl. §16 drag-persist/add-note/minimap/PNG-SVG export), the full Workspace
-Dashboard & Organization upgrade (index, dashboard, search, health, locks, activity, saved views, bulk
-actions, Preferences/Settings), and the **exam-mode scan profile** are **DONE** — 671 tests green.
-Phase 6 is partial: `doctor` + status footer + audit log + concurrent-copy lock + exam profile done;
-only the *timed* mock exam remains (blocked on a live target).
+Dashboard & Organization upgrade, the **exam-mode scan profile**, and **project file operations §19**
+(Open-by-IP / Import / Export `.tar.gz`) are **DONE** — 699 tests green. Phase 6 is partial: `doctor` +
+status footer + audit log + concurrent-copy lock + exam profile done; only the *timed* mock exam
+remains (blocked on a live target).
 
-**Recommended next chunk (do one at a time):** **project file operations §19** — `File → Open by IP`,
-`Import Project` (.tar.gz), `Export Project` (.tar.gz, warns `creds.json` included). Deterministic, no
-live target, deps (profile model + workspace index) done. Later candidates: pattern YAMLs for
-ssh/ike/tftp/vhost, report EDB-hit persistence, AD/Kerberos workflow polish. **Blocked:** live
-acceptance testing + timed mock exam (need an authorized target — verification to date is fixtures +
-unit/GUI tests, not live boxes).
+**Recommended next chunk (do one at a time):** **pattern-library coverage for ssh/ike/tftp/vhost** —
+these 4 modules lack `patterns/*.yaml` (15/19 covered), so "Recon next steps" is empty for them.
+Deterministic, no live target; each file needs ≥ 3 provenance-cited entries passing the forbidden-
+content gate. Later candidates: report EDB-hit persistence, AD/Kerberos workflow polish. **Blocked:**
+live acceptance testing + timed mock exam (need an authorized target — verification to date is fixtures
++ unit/GUI tests, not live boxes).
+
+### Project file operations §19 — DONE (deterministic; no live target)
+Each `~/oscprecon/<name>/` is now a portable project file. New module
+`src/oscprecon/workspace/portability.py`:
+- **`find_profiles_by_ip`** — scan `<workspace>/*/profile.json`, return dirs whose `target.ip` matches
+  (corrupt/partial profiles skipped). Backs `File → Open by IP…`.
+- **`export_project_archive`** — pack `<profile>/` → `<name>.tar.gz`, dropping transient `.lock`/`*.tmp`.
+  Includes `creds.json` verbatim; the caller warns (GUI + CLI both do).
+- **`import_project_archive`** — **security-critical.** Validates EVERY member before extracting:
+  rejects absolute paths, `..` traversal, backslash names, symlinks/hardlinks, device/fifo specials,
+  members that escape the workspace, multiple top-level dirs, non-profile archives, and a
+  decompression-bomb size cap (2 GiB). Extracts to a staging dir, confirms `profile.json`, then swaps
+  into place — a hostile/non-profile archive leaves nothing behind. Refuses to clobber unless
+  `overwrite=True` (raises `ProjectExistsError`).
+- **GUI** (`main_window`): File menu Open by IP / Import Project / Export Project; import prompts to
+  overwrite on collision and warns on malicious archives; export warns `creds.json` is included; all
+  three gate off during a running scan. **CLI**: `export-project` / `import-project` (`--overwrite`).
+- **Tests (+28 → 699):** 17 portability (round-trip, find-by-ip, collision/overwrite, and the full
+  malicious-archive matrix incl. bomb), 4 CLI, 7 GUI. Adversarial review added the decompression-bomb
+  cap. Gates green incl. packaging (new module ships).
 
 ### Phase 6 · exam-mode scan profile — DONE (deterministic; no live target)
 Introduced scan profiles governing the nmap discovery battery, plumbed end-to-end:

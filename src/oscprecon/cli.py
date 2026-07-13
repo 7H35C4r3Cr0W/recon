@@ -9,6 +9,7 @@ from oscprecon import config, shell, vault_export
 from oscprecon.models import Target
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
+from oscprecon.workspace import portability
 
 app = typer.Typer(
     help="oscprecon headless CLI — recon-only, OSCP exam-legal.",
@@ -109,6 +110,50 @@ def export_vault_cmd(
         raise typer.Exit(2)
     out = vault_export.export_vault(Profile.load(directory), dest)
     typer.echo(f"[exported] {out} (snapshot — creds.json values redacted)")
+
+
+@app.command("export-project")
+def export_project_cmd(
+    dest: Path = typer.Argument(..., help="Destination folder, or an explicit <name>.tar.gz path."),
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Pack a profile folder into <name>.tar.gz for backup/transfer (includes creds.json)."""
+    root = workspace if workspace is not None else config.workspace_root()
+    directory = Path(root) / profile
+    if not (directory / "profile.json").exists():
+        typer.echo(f"[error] no profile at {directory}", err=True)
+        raise typer.Exit(2)
+    try:
+        out = portability.export_project_archive(directory, dest)
+    except portability.ProjectArchiveError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(2) from exc
+    typer.echo(f"[exported] {out}  (WARNING: includes creds.json — treat the archive as sensitive)")
+
+
+@app.command("import-project")
+def import_project_cmd(
+    archive: Path = typer.Argument(..., help="Project archive (.tar.gz) to import."),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+    overwrite: bool = typer.Option(
+        False, "--overwrite", help="Replace an existing profile of the same name."
+    ),
+) -> None:
+    """Extract a project archive into the workspace (path-traversal-safe) and register it."""
+    root = workspace if workspace is not None else config.workspace_root()
+    try:
+        dest = portability.import_project_archive(archive, Path(root), overwrite=overwrite)
+    except portability.ProjectExistsError as exc:
+        typer.echo(f"[error] {exc} — re-run with --overwrite to replace it.", err=True)
+        raise typer.Exit(2) from exc
+    except portability.ProjectArchiveError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(2) from exc
+    config.add_recent(dest)
+    typer.echo(f"[imported] {dest}")
 
 
 @app.command()
