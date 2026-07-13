@@ -22,6 +22,35 @@ remains is blocked on external resources:** the *timed* mock exam needs an autho
 interactive + cross-machine AppImage acceptance needs a real desktop / a second VM (see
 `packaging/ACCEPTANCE.md`). No deterministic next chunk — the next move is the owner's call.
 
+### Nabu rebrand + UI/UX pass (in progress — owner-requested)
+Renaming the product to **Nabu** and lifting it toward a polished desktop product. Landed so far
+(each its own commit, four gates green, out-of-checkout wheel install verified):
+- **Nabu user-facing rename + compat entry points** (`f581bea`) — display name/title/footer/splash/CLI
+  help/Doctor/README/About all say Nabu; new `nabu` / `nabu-cli` console scripts; `oscp-recon` /
+  `oscprecon` / `oscprecon-cli` kept as legacy aliases; internal package `oscprecon`, dist name
+  `oscp-recon`, and all data paths (`~/oscprecon`, `~/.config/oscprecon`, `~/.cache/oscprecon`)
+  **unchanged** — no data migration. Central `branding.py`.
+- **Original visual identity** (`bc33c91`) — hand-authored SVG set (logo, icon, icon-light,
+  icon-mono, splash, empty-workspace) in `gui/assets/`: cuneiform stylus wedge (Nabu, scribe god)
+  over a network/constellation graph on a tablet tile; ink-navy + gold/bronze + muted-teal palette.
+  Ships in the wheel; `nabu.png` regenerated from the SVG; app/window icon wired.
+- **Design system** (`711b088`) — `gui/theme/` package: typed `tokens` (Palette for dark+light,
+  spacing/radius/sizing/typography), `styles` (token-derived QSS builders), `icons` (themeable
+  glyphs + an `icon_button` factory that ENFORCES tooltip+accessible-name+focus).
+- **Conservative finding semantics** (`3d0938f`) — new `finding_severity.py` centralizes how a
+  finding is framed: an open port / product / version / EDB hit is **never** a vuln; SMB signing is
+  relay-risk only when disabled; anon=access, null/world-readable/writable=exposure. Graph uses it,
+  gains a **legend**, styles EDB refs apart from danger, and a regression guard proves credential
+  secrets can never be surfaced by graph search.
+
+**Remaining Nabu chunks (not yet done):** main application shell + primary navigation (Workspace /
+Recon / Graph / Findings / Credentials / Notes / Report / Activity + compact header); dashboard
+empty-state illustration + row hierarchy; three-pane recon visual polish; reference-pane presentation;
+dedicated Findings view; vault/spray UX polish; dialog/form uniformity; feedback/loading/error
+banners; full keyboard-shortcut + accessibility sweep; performance pass; `docs/screenshots/`
+(generated data only); the 22-angle adversarial refute-review; and the docs/packaging finalization.
+**Recommended single next chunk:** the main application shell + primary navigation.
+
 ### Pre-live-testing polish (owner-requested)
 A run of owner-requested improvements before live-box testing:
 - **Finding-aware jump now applies to LIVE HackTricks content** (not just vendored); **audit coverage**

@@ -32,6 +32,35 @@ file records *why* the relevant sections read as they do. Concise by design — 
 - Hydra/Medusa/NetExec temp input files are **derived artifacts, not the credential store**; they may
   be cleaned safely, but cleanup must **never** touch `creds.json` or durable credentials.
 
+## Product name — "Nabu"
+
+- The user-facing product is **Nabu** (tagline *Local Recon Workspace*). Display everywhere:
+  window title, splash, About, status footer, CLI help, Doctor, README, packaging.
+- The **internal Python package stays `oscprecon`** and the **distribution/wheel name stays
+  `oscp-recon`** — renaming either buys nothing and would break installs, imports, and
+  `importlib.metadata` lookups. `branding.py` is the single source of the display name.
+- **No data migration.** Workspace root (`~/oscprecon/`), XDG config (`~/.config/oscprecon/`) and
+  cache (`~/.cache/oscprecon/`) are unchanged; existing projects keep working untouched.
+- Entry points: `nabu` (GUI) and `nabu-cli` (headless) are preferred; `oscp-recon`, `oscprecon`,
+  and `oscprecon-cli` remain as **legacy aliases for ≥1 release** so existing scripts don't break.
+- **Visual identity is original and offline** — hand-authored SVGs in `src/oscprecon/gui/assets/`
+  (cuneiform stylus + network-graph motif). No copyrighted/commercial artwork, no runtime asset
+  fetch, no telemetry. Palette: deep ink/navy, gold/bronze accent, muted teal secondary.
+- **The CLI must not emit ASCII-art banners** into piped/subcommand/machine-readable output; the
+  splash wordmark is GUI-only.
+
+## Risk framing — conservative by construction
+
+- `finding_severity.classify()` is the **one** place that decides how a finding is visually framed.
+- **Nothing is ever labelled a vulnerability from an open port, a product/version banner, or an
+  Exploit-DB search hit alone.** Those are neutral facts / references.
+- Only explicit weak-posture finding *kinds* escalate: anonymous/guest auth → access; null session /
+  world-readable / writable / no_root_squash → exposure; SMB signing **disabled** (not merely
+  present) / open-relay / weak-algo → relay-risk. A username or share *name* stays informational.
+- Exploit-DB is a **reference badge**, never a confirmed vuln, and never the graph's danger ring.
+- **Credential secrets** are redacted in all graph/report data and are **excluded from graph search**
+  (proven by test); reveal/copy stays explicit.
+
 ## Process
 
 - Finish one major implementation chunk before starting another.
