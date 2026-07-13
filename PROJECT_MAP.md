@@ -6,8 +6,9 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (111 files) · `ruff check` + `ruff format --check` clean ·
-  **741 tests** pass (incl. 202 offscreen GUI) · `test_packaging` green (wheel ships resources).
+- **Verified:** `mypy --strict` clean (114 files) · `ruff check` + `ruff format --check` clean ·
+  **745 tests** pass (incl. 202 offscreen GUI) · `test_packaging` green (wheel ships resources,
+  incl. the vendored HackTricks snapshot).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
 ## Status legend
@@ -409,16 +410,16 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
 tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-**⏭ Finding-aware HackTricks integration — Phase 1 (vendor + index).** Credential spraying is now
-complete; HackTricks is the next feature in the owner's order.
+**⏭ Finding-aware HackTricks integration — Phase 2 (render + section extraction).** Phase 1 (vendor +
+index + loader) is done (`37f0d68`).
 
-- **Gate:** cleared (`bf42f1e` — offline vendoring allowed). Owner FYSA: live scraping may also be OK,
-  so offer to relax §27 further when building (keep offline vendoring as the exam-safe default).
-- **Phase 1 scope:** vendor a bounded network-services-pentesting markdown snapshot under
-  `references/hacktricks/` + a refresh script + a `service/finding → file+anchor` index; ship in the
-  wheel; offline-load test. Needs one-time network at vendor time. Enforce the owner's acceptance
-  criteria when it renders: accuracy, correct parsing, clean appearance, and **show the data + a
-  clickable link**. Section extraction + finding-aware UX are later phases.
+- **Scope:** in the reference pane, show the vendored offline page for the selected service (clean
+  markdown render) **beside** the live `book.hacktricks.wiki` link (never replace the link — owner
+  criterion). Then finding-aware section extraction — jump to the subsection matching the finding kind
+  (e.g. smb null-session, kerberos AS-REP). Enforce the owner's acceptance criteria: accuracy, correct
+  parsing (headings/code blocks survive), clean appearance, show data **+** link.
+- **Also offer:** relax §2/§27 to permit live fetch+parse too (owner FYSA), keeping offline vendoring
+  as the exam-safe default path.
 
 **Parallel future tracks (need an owner decision / gate):**
 - **Credential spraying (opt-in, off by default)** — ✅ **COMPLETE** end-to-end: CLAUDE.md §1/§2/§2a
@@ -427,8 +428,11 @@ complete; HackTricks is the next feature in the owner's order.
   gated runner** (`1531f59`, `Scan → Credential Spray…`). `spray=True` is passed in exactly one place,
   only when `config.spray_enabled`. UX polish (Burp-clean) is a later refinement. See
   [[cred-spray-scope-change]].
-- **Finding-aware HackTricks integration** — ⏭ **NEXT**. §2/§27 gate ✅; Phase 1 (vendor + index) needs
-  one-time network at vendor time. (Owner FYSA: live scraping may also be OK — §27 could relax further.)
+- **Finding-aware HackTricks integration** — **Phase 1 ✅** (`37f0d68`): 21 network-services pages
+  vendored offline (`references/hacktricks/`, CC BY-NC-SA, `refresh.py` maintainer script) + `hacktricks.py`
+  loader (`page_for_module` → markdown + live URL). ⏭ **NEXT: Phase 2** — render the offline page in the
+  reference pane beside the live link + finding-aware section extraction. (Owner FYSA: live scraping may
+  also be OK — offer to relax §27 further.)
 - **Phase 6 distribution** (installer / tool-update-resilient parsers / single-click app / splash).
 
 **Blocked:** live validation + timed mock (authorized target required). Full detail in the build memory

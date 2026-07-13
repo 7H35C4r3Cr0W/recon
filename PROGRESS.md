@@ -39,6 +39,19 @@ New `modules/kerberos/` — the 20th service module, wired into the shared Simpl
   (no `-usersfile`/`-request`/cracking tools), SimpleRecon worker parse, pattern firing. The
   parametrized `test_simple_panel_manual_followups_stay_legal` now covers kerberos too.
 
+### HackTricks integration Phase 1 — vendored offline snapshot + loader (`37f0d68`)
+§2/§27 gate cleared earlier (`bf42f1e`). Build-time vendoring, NO runtime scraping.
+- `references/hacktricks/refresh.py` (maintainer-run, the only network toucher): fetches source
+  markdown for our 21 service modules via an explicit `module → repo-path` map (repo filenames include
+  port prefixes and differ from book-URL slugs, so it's curated + verified against the repo listing),
+  strips mdBook `{{#include}}` banner directives, writes `pages/<module>.md` + `index.json` + `NOTICE.md`
+  (CC BY-NC-SA attribution). 21 pages, ~436 KB.
+- `oscprecon/hacktricks.py`: offline loader — `page_for_module(m)` → `HacktricksPage{title, markdown,
+  live url}`; pure file reads.
+- Tests (+4): offline index load, real content + book link, unknown→None, and an accuracy guard that
+  every vendored page actually matches its service + has includes stripped. `test_packaging` asserts the
+  snapshot ships in the wheel. NEXT: Phase 2 render + section extraction (show data beside the link).
+
 ### Credential spraying — opt-in, off by default (§2a) — COMPLETE end-to-end
 GUI (chunks 4–5): **Credential Vault dialog** (`bd4fd1e`) — Edit → Credential Vault…, list with
 redacted secrets + add/delete (Profile.add/delete_credential, read-only-guarded). **Spray dialog +
