@@ -18,6 +18,33 @@ Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
 
+### Phase 2 · MSSQL module (mssql) — DONE
+Third DB service module (after Redis/Mongo), but banner-only per CLAUDE.md §12 (MSSQL = "Banner
+only" — default-cred is user judgment, not auto). No data auto-enum; the whole Tier-1 is an unauth
+pre-login info leak. Shared `SimpleReconSpec` (no bespoke panel/worker), name `mssql` matching the
+existing services.yaml 1433 + 1434-browser stubs.
+- **engine** (`modules/mssql/`): `MssqlModule` triggers 1433 + `ms-sql-s`/`ms-sql`/`ms-sql-m`/`mssql`;
+  ONE Tier-1 recon step — `nmap -sV -p 1433 --script ms-sql-info,ms-sql-ntlm-info` — attempting NO
+  credential (test asserts the argv carries no `mssql.username`/`ms-sql-empty-password`/`sa:` + passes
+  `shell.policy_violation`). suggest() nudges the single sa-empty/sa:sa Tier-2 check + AD-domain pivot.
+- **parsers** (`parsers.py`): extracts version / instance / hostname / AD-domain / os-build from the
+  NSE tables. Three review-driven hardenings: (1) `_VERSION_LINE` uses `[ \t]+` not `\s+` — `\s+` spans
+  the newline, so a bare `ms-sql-s` -sV line with ms-sql-info blocked captured the following ntlm-info
+  header as a bogus version; (2) multi-instance via `finditer` over instance blocks (every instance +
+  version, not just the first); (3) domain prefers the DNS FQDN and drops the literal `WORKGROUP` so a
+  standalone box is no longer mislabeled AD-joined. `[missing]`/`[blocked]` sentinel skip as usual.
+- **Tier-2** `manual_commands.yaml` (6): single sa-empty (nmap NSE + netexec + impacket), sa:sa,
+  ms-sql-dac instance/DAC-port leak, and a creds-gated `SELECT name FROM sys.databases`. No xp_cmdshell,
+  no list-driven auth (test enforces argv0 ∈ {nmap,netexec,impacket-mssqlclient} + no `-x`/`xp_cmdshell`).
+- **pattern** `patterns/mssql.yaml` (2 rules, `# source:` CPTS MSSQL notes): version → Tier-2 sa check;
+  domain → LDAP/SMB/Kerberos pivot. **GUI**: one `SIMPLE_SPECS` entry (shared panel auto-wires).
+- 3 fixtures (AD single-instance / multi-instance / -sV-only) + parser/module/GUI tests, incl. the
+  bare-line regression, the WORKGROUP guard, and `suggest([]) == []`. **Adversarial 3-lens review**
+  (11 agents, refute-biased verify): 6 confirmed / 0 refuted → version-newline-bleed (medium),
+  multi-instance drop, WORKGROUP mislabel + coverage gaps all fixed; 2 findings dispositioned by-design
+  (instance/pattern divergence is moot post-fix; `ms-sql-m`/1434 trigger with `-p 1433` recon is the
+  §12-scoped probe). Exam-legality reviewer returned zero findings. Four gates green, 484 tests. `a0e3b10`.
+
 ### Phase 2 · MongoDB module (mongodb) — DONE
 Second DB service module after Redis (the template). Read-only unauth Tier-1 auto-enum via the shared
 SimpleReconSpec (no bespoke panel/worker), name `mongodb` matching the existing services.yaml stub.
@@ -62,7 +89,8 @@ User approved expanding the §2 allow-list for read-only enum tools and wiring e
 **Coverage now: 99 tool-hints / 94 service rules, 26 pattern rules / 48 suggestions, 60 allow-listed
 tools, 16 module packages.** The vault is essentially exhausted for recon syntax (2nd pass was mostly
 fixes + protocol-gap fills). **Remaining follow-ups** (not blockers): full Tier-1 modules for
-MSSQL/MySQL/Postgres (Redis + Mongo done; the rest have tool-hints); a Kerberos module home for the AS-REP/SPN
+MySQL/Postgres (Redis + Mongo full auto-enum, MSSQL banner-only per §12 — all done; MySQL/Postgres
+still tool-hints only); a Kerberos module home for the AS-REP/SPN
 manuals; `openssl s_client` STARTTLS variants for 110/143. Skipped as too-borderline for §2:
 ssl-heartbleed, rmi-vuln-classloader, IIS http-iis-short-name-brute (policy blocks *brute*), and the
 new-binaries tnscmd10g/ident-user-enum/svmap/braa (nmap covers them).

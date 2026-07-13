@@ -1,0 +1,32 @@
+# MSSQL manual follow-ups (Tier-2 — shown, never auto-run). Single default-cred checks + read-only
+# enum; {target}/{port} filled from the active profile. Iterating a user/password list is Tier-3 (out).
+- description: "Single sa empty-password check (nmap NSE)"
+  why: "ms-sql-empty-password tries sa with a blank password — one attempt, not a brute"
+  command: "nmap -p {port} --script ms-sql-empty-password {target}"
+# source: Obsidian: Courses/HTB/Certifications/OSCP/CPTS/Footprinting/MSSQL/MSSQL.md
+
+- description: "Single sa empty-password check (netexec)"
+  why: "one login attempt, sa + empty password; netexec reports success, does not spray"
+  command: "netexec mssql {target} -u sa -p '' --local-auth"
+# source: Obsidian: 0.00 Methdology/.../Other Services/3306/Mssql/Mssql.md
+
+- description: "Single sa:'' login, then read-only DB enum (impacket)"
+  why: "impacket-mssqlclient one attempt with sa + empty password — best run in a terminal"
+  command: "impacket-mssqlclient 'sa:@{target}'"
+# source: Obsidian: Courses/HTB/Certifications/OSCP/CPTS/Footprinting/MSSQL/MSSQL.md
+
+- description: "Single sa:sa default-cred check (impacket)"
+  why: "one attempt with the classic default credential — not a list"
+  command: "impacket-mssqlclient 'sa:sa@{target}'"
+# source: Obsidian: 0.00 Methdology/.../Other Services/3306/Mssql/Mssql.md
+
+- description: "DAC / dedicated-admin instance info (nmap NSE)"
+  why: "ms-sql-dac reveals the instance and DAC port — read-only, no login"
+  command: "nmap -p {port} --script ms-sql-dac {target}"
+# source: Obsidian: Courses/HTB/Certifications/OSCP/CPTS/Footprinting/MSSQL/MSSQL.md
+
+- description: "List databases (requires working creds)"
+  why: "read-only SQL query once a login works — confirms what we can read, not exploitation"
+  command: "netexec mssql {target} -u {user} -p {password} -q 'SELECT name FROM sys.databases'"
+  requires: ["creds"]
+# source: Obsidian: 0.00 Methdology/.../Other Services/3306/Mssql/Mssql.md

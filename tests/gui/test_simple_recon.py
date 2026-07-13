@@ -99,6 +99,18 @@ def test_mongodb_worker_parses_and_writes_findings(
     assert {"access", "version", "database", "collection"} <= kinds
 
 
+def test_mssql_worker_parses_and_writes_findings(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.129.201.248"))
+    monkeypatch.setattr(shell, "run", _fake_run({"ms-sql-info": "mssql/nmap-info.txt"}))
+    result = mw.SimpleReconWorker(prof, "mssql")._drive()
+    assert result.module == "mssql"
+    kinds = {f.get("kind") for f in findings_mod.load_findings(prof.directory)}
+    assert {"version", "instance", "hostname", "domain"} <= kinds
+    assert any(line.startswith("→") for line in result.summary)  # a Tier-2 suggestion surfaced
+
+
 def test_worker_empty_output_writes_nothing(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -1,0 +1,31 @@
+Starting Nmap 7.94 ( https://nmap.org ) at 2026-07-12 09:40 EST
+Nmap scan report for 10.129.201.248
+Host is up (0.15s latency).
+
+PORT     STATE SERVICE  VERSION
+1433/tcp open  ms-sql-s Microsoft SQL Server 2019 15.00.2000.00; RTM
+| ms-sql-info:
+|   Windows server name: SQL-01
+|   10.129.201.248\MSSQLSERVER:
+|     Instance name: MSSQLSERVER
+|     Version:
+|       name: Microsoft SQL Server 2019 RTM
+|       number: 15.00.2000.00
+|       Product: Microsoft SQL Server 2019
+|       Service pack level: RTM
+|       Post-SP patches applied: false
+|     TCP port: 1433
+|     Clustered: false
+|   10.129.201.248\SQLEXPRESS:
+|     Instance name: SQLEXPRESS
+|     Version:
+|       name: Microsoft SQL Server 2014 RTM
+|       number: 12.00.6024.00
+|       Product: Microsoft SQL Server 2014
+|       Service pack level: SP3
+|       Post-SP patches applied: true
+|     TCP port: 1444
+|_    Clustered: false
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 9.11 seconds

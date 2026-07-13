@@ -1,0 +1,19 @@
+# MSSQL recon next-steps (banner-only Tier-1; the default-cred checks below are single-attempt Tier-2,
+# shown/pre-filled, never a list). Sourced from the CPTS MSSQL footprinting notes.
+- match:
+    service: mssql
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "MSSQL reachable — single default-cred check as Tier-2 (sa empty password, then sa:sa)"
+      command: "netexec mssql {target} -u sa -p '' --local-auth"
+# source: Obsidian: Courses/HTB/Certifications/OSCP/CPTS/Footprinting/MSSQL/MSSQL.md
+
+- match:
+    service: mssql
+    field: kind
+    value: "^domain$"
+  suggest:
+    - text: "NTLM leaks the AD domain — pivot the domain into LDAP / SMB / Kerberos enumeration"
+      command: "nmap -p 389 --script ldap-rootdse {target}"
+# source: Obsidian: Courses/HTB/Certifications/OSCP/CPTS/Footprinting/MSSQL/MSSQL.md
