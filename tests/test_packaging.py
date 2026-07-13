@@ -18,6 +18,10 @@ def test_runtime_resources_resolve_package_relative() -> None:
     assert len(list((PKG / "patterns").glob("*.yaml"))) >= 10
     assert len(list((PKG / "templates").glob("*"))) >= 1
     assert len(list(PKG.glob("modules/*/manual_commands.yaml"))) >= 14
+    # workspace backend + dashboard GUI packages
+    for module in ("index", "search", "health", "locks", "activity", "views", "bulk", "models"):
+        assert (PKG / "workspace" / f"{module}.py").exists()
+    assert (PKG / "gui" / "workspace" / "dashboard.py").exists()
 
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="uv not on PATH")

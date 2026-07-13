@@ -18,6 +18,36 @@ Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
 
+### Workspace Dashboard & Project Organization upgrade — DONE (deterministic; no live target)
+Turned the app from individually-opened profiles into an organized local workspace. New non-GUI
+package `src/oscprecon/workspace/` (business logic; profiles stay authoritative, the index is never a
+second source of truth) + `src/oscprecon/gui/workspace/` (dashboard). Commits `e6ffb7e`..`6bfef69`.
+- **index + models** (`e6ffb7e`): scan_workspace/summarize_profile → lightweight ProfileSummary (counts
+  + booleans, NEVER secrets) built without reading raw output; tolerant of missing/corrupt/partial
+  profiles (warning rows), ignores unrelated folders, skips symlink escapes, survives permission
+  failures. profile.json gains a normalized `organization` block (status/tags/pinned/archived/
+  display_name) — backward-compatible, atomic; Profile setters + `mark_opened()`.
+- **search** (`e19897e`): cross-profile search (names/targets/tags/services/ports/findings/notes/report/
+  commands/cred USERNAMES+DOMAINS). Secret values never indexed/shown; previews single-line, control-
+  stripped, capped, PLAIN-text. Filters: port/service/tags/status/finding-kind/profile/archived/limit.
+- **locks + read-only** (`6336f90`): advisory `<profile>/.lock` (pid/host/version/ts, no personal data);
+  live-lock never stolen, stale (same-host dead PID) recoverable, foreign-host conservative, PID-reuse
+  safe. Profile `read_only` flag raises ReadOnlyError on every disk write; reads + export still work.
+- **health** (`268471d`): read-only check_profile (corrupt/truncated JSON, malformed audit lines,
+  stale temp, orphan output, orphan findings, world-readable creds, path escape) + safe repairs
+  (creds→0600; stale temp MOVED to health-backup/, never deleted).
+- **activity** (`0a47b4d`): human-readable timeline from audit.jsonl (malformed lines skipped+counted,
+  secrets redacted). **saved views** (`ccd9457`): filter-only config, built-ins + user CRUD, corrupt-
+  safe. **bulk** (`67a24f8`): tag/status/archive/restore/report/export/health across a selection —
+  never stops on first failure, skips locked/corrupt, cancellable, audited (no scan/cred/delete).
+- **dashboard + wiring** (`6bfef69`): WorkspaceDashboard (off-thread cancellable scan, table, filter,
+  saved-view combo, show-archived, actions, empty-state, a11y) is the home view (`Ctrl+0` / startup);
+  MainWindow acquires the lock on open, prompts read-only for a live foreign lock, and disables all
+  writes (run/save/add-cred/notes/audit/reference-visits) + shows `[READ-ONLY]` when read-only.
+- Verify: four gates + offscreen GUI green, 627 tests; wheel ships `workspace/` + `gui/workspace/` and
+  they import + function from a clean venv outside the checkout. Import note: `workspace/bulk.py`
+  imports profile/reporter/vault_export so it is NOT re-exported from `workspace/__init__` (cycle).
+
 ### GUI architecture cleanup — behavior-preserving extraction of main_window.py — DONE (3 chunks)
 main_window.py 1633 → 945 lines with no behavior change (all signals, menu actions, auditing,
 cancellation, reports, module workflows preserved); one latent stale-profile bug fixed along the way.

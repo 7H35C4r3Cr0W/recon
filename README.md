@@ -56,6 +56,28 @@ reference), plus a Bloodhound-style graph view (`Ctrl+G`).
 - **Resume** — `--resume` skips commands whose output already exists (`--force` re-runs).
 - **Doctor** — `oscprecon-cli doctor` checks every wrapped tool on `PATH` and prints install hints.
 
+### Workspace dashboard
+
+The home view (`Ctrl+0`, or shown on startup with no profile) is a searchable, filterable table of
+every profile under the workspace root — built off the GUI thread, tolerant of corrupt/partial
+profiles (they surface as ⚠ warning rows, never hidden). It shows target, status, tags, last activity,
+and service/finding/**credential counts** (counts only — secret values never appear anywhere).
+
+- **Organize** — per-profile status (new/active/needs-review/blocked/completed), tags, pin, and
+  archive (archive hides by default and never deletes). Right-click for actions; bulk tag/status/
+  archive/report/export/health across a selection.
+- **Global search** — across names, targets, tags, services, ports, findings, notes, report headings,
+  commands, and credential **usernames/domains**. Passwords/tokens/keys are never indexed or shown.
+- **Saved views** — reusable filters (Pinned, Confirmed credentials, Missing a report, Failed scans,
+  Windows, PostgreSQL, …) plus your own.
+- **Health** — a read-only per-profile scan (corrupt/truncated JSON, stale temp files, orphaned
+  output, world-readable creds, path escapes) with opt-in safe repairs that back up before changing.
+- **Activity** — a human-readable timeline derived from the audit log (secrets redacted).
+- **Locking & read-only** — opening a profile takes an advisory `<profile>/.lock`; a profile already
+  open elsewhere offers **read-only** (title shows `[READ-ONLY]`, every write is blocked, export still
+  works). Stale locks (dead PID, same host) are recovered automatically; live/foreign ones are never
+  stolen.
+
 ### Profile layout
 
 Each box is a self-contained folder under the workspace root (default `~/oscprecon/`):
