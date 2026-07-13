@@ -156,11 +156,15 @@ subsystem-by-subsystem status map and forward plan.**
 
 Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` §27:
 
-- **Pattern-library coverage for ssh/ike/tftp/vhost** — *recommended next chunk.* These 4 modules lack
-  `patterns/*.yaml` (15/19 covered), so "Recon next steps" is empty for them. Deterministic, no live
-  target; each new file needs ≥ 3 provenance-cited entries that pass the forbidden-content gate.
+- ✅ **Pattern-library coverage** — DONE: `patterns/{ssh,ike,tftp,vhost}.yaml` added; **all 19 modules**
+  now have provenance-cited, forbidden-gate-clean, policy-clean pattern entries (47 rules).
+- **Report Exploit-DB-hit persistence** — *recommended next chunk.* searchsploit runs live in the
+  reference pane but hits aren't persisted, so `report.md` can't list them. Add a per-profile EDB store
+  + a reporter section. Lookup-only (§14) — no PoC download/execute. Deterministic, no live target.
 - **Timed mock exam (Phase 6).** A timed dry run against a standalone + AD set. Blocked on an authorized
   live target. (The exam-mode *scan profile* it would exercise is now built.)
+- **Distribution & resilience (future, not greenlit).** Public GitHub release: tool-update-resilient
+  parsers, `doctor`→safe installer, single-click contained app, splash screen. See the build memory.
 
 *(The concurrent-copy profile lock, CLAUDE.md §6b, the status footer §19, and the audit log §6a are now
 built — see the Workspace Dashboard section.)*

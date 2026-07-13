@@ -7,7 +7,7 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
 - **Verified:** `mypy --strict` clean (105 files) · `ruff check` + `ruff format --check` clean ·
-  **699 tests** pass (incl. 189 offscreen GUI) · `test_packaging` green (wheel ships resources).
+  **700 tests** pass (incl. 189 offscreen GUI) · `test_packaging` green (wheel ships resources).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
 ## Status legend
@@ -64,9 +64,10 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
   and handles non-standard ports; SMB is tiered (null/guest, never list-driven).
 - **Complete:** all 19 modules ship engine + parser tests + fixtures + `manual_commands.yaml` +
   `services.yaml` hints. PostgreSQL is the newest, hardened via the DB-primitive backstop.
-- **Remaining:** pattern YAMLs missing for **ssh, ike, tftp, vhost** (15 of 19 have them); extended
-  §12 services (rsync, finger, memcached, elasticsearch, couchdb, docker, etcd, zookeeper, vnc, webdav,
-  ipmi, ipp, mdns, upnp) are **not** dedicated modules (❌ until a real box needs one).
+- **Complete:** **all 19 modules now have `patterns/*.yaml`** (47 rules; ssh/ike/tftp/vhost added).
+- **Remaining:** extended §12 services (rsync, finger, memcached, elasticsearch, couchdb, docker, etcd,
+  zookeeper, vnc, webdav, ipmi, ipp, mdns, upnp) are **not** dedicated modules (❌ until a real box
+  needs one).
 - **Depends on:** core execution + references + patterns.
 - **Risks:** a Tier-2 command drifting into list-driven brute (guard: policy + review).
 - **Tests:** `test_<svc>_module` + `test_<svc>_parsers` for every module; fixtures under
@@ -216,9 +217,9 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 |---|---|---|---|
 | Scan profiles incl. **exam mode** | ✅ **Done** | orchestrator, modules, settings | quick/default/full/exam govern the nmap battery; exam is speed-tuned + exam-legal (no `--script vuln`). Preferences default + `Scan → Run recon with profile` + CLI `--scan-profile` |
 | Project file ops (`Open by IP`, `Import`/`Export .tar.gz`) | ✅ **Done** | profile model, workspace index | `workspace/portability.py` + File menu + CLI `export-project`/`import-project`; traversal-safe import, warns `creds.json` included |
-| Pattern coverage for ssh/ike/tftp/vhost | ⏭ **Next** | pattern engine (✅) | 4 modules lack `patterns/*.yaml` |
+| Pattern coverage for ssh/ike/tftp/vhost | ✅ **Done** | pattern engine | all 19 modules now have `patterns/*.yaml` (47 rules); commands policy-clean |
+| Report EDB-hit persistence | ⏭ **Next** | references, profile store | Needs a per-profile EDB store to render searchsploit hits into `report.md` |
 | Timed mock-exam dry run | ⛔ | exam preset (✅) + live targets | The "timed" part needs authorized targets |
-| Report EDB-hit persistence | 🕒 | references, profile store | Needs a per-profile EDB store to render from |
 | AD / Kerberos enum workflow polish | 🕒 | smb/ldap modules (✅) | Enumeration only, no cracking |
 
 ## 14. Completed features (roll-up) — ✅
@@ -232,8 +233,8 @@ audit log §6a, concurrent-copy lock §6b) and the full Workspace Dashboard & Or
 
 - **Phase 6 (exam-day polish):** `doctor` ✅, self-contained report ✅, **exam-mode scan profile ✅**;
   only the **timed** mock-exam dry run remains (⛔ needs an authorized target).
-- **Pattern library breadth:** 15/19 modules have pattern YAMLs (ssh/ike/tftp/vhost missing).
-- **Reports:** Exploit-DB hits not yet persisted into `report.md`.
+- **Reports:** Exploit-DB hits not yet persisted into `report.md` (the last known coverage gap now that
+  pattern breadth is complete — 19/19 modules).
 
 ## 16. Blocked work — ⛔
 
@@ -325,7 +326,7 @@ flowchart TD
 |---|---|---|---|---|
 | Shell & command policy | ✅ | High (`test_shell_policy`, `test_shell_cancel`) | Any new module bypassing the chokepoint | Keep it the only exec path |
 | Task lifecycle | ✅ | High (`test_task_lifecycle/manager`, `test_workers`) | Cancellation under profile switch | None — stable |
-| Service modules | ✅ (19) | High (per-module + parser tests) | Tier-2 drift toward brute | Add ssh/ike/tftp/vhost patterns |
+| Service modules | ✅ (19) | High (per-module + parser tests + 47 patterns) | Tier-2 drift toward brute | None — all 19 have patterns |
 | PostgreSQL | ✅ | High (`test_postgresql_*`) | DB-primitive backstop coverage | None — hardened |
 | GUI architecture | ✅ | High (`tests/gui/*`) | Worker lifecycle regressions | None — refactor landed |
 | Profiles | ✅ | High (`test_config/organization`) | Future schema migrations | Keep schema backward-compatible |
@@ -361,6 +362,16 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
   encountered on a box* (rsync, finger, memcached, elasticsearch, couchdb, …). Never speculative.
 - **Phase 5 — Live validation** ⛔ — 3 authorized lab targets, live parser validation, performance
   testing, timed mock exam, workflow corrections. Deps: everything + an authorized target.
+- **Phase 6 — Distribution & resilience** 🕒 (future; **not greenlit** — user's stated end-goal for a
+  public GitHub release). Owner-recorded ideas, to scope one chunk at a time when greenlit:
+  1. **Tool-update-resilient parsers** — a wrapped tool changing output must never crash the app;
+     parsers degrade gracefully and surface "couldn't parse X"; consider multi-version fixtures.
+  2. **`doctor` → guided safe installer** — extend `oscprecon-cli doctor` to detect the Kali host and
+     offer to install missing §2-allowed tools (explicit confirm, never silent, never forbidden tools).
+  3. **Host-readiness check** on first run.
+  4. **Single-click contained app** — evaluate PyInstaller/Briefcase/AppImage; launches the GUI on click.
+  5. **Splash screen** with ASCII-art branding on load (`QSplashScreen`), Burp-style.
+  6. **Public-release hygiene** — license, outside-user README, screenshots, clean fresh-Kali install.
 
 ---
 
@@ -384,19 +395,21 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 
 ## Immediate next chunk
 
-**⏭ Pattern-library coverage for ssh / ike / tftp / vhost.**
+**⏭ Report Exploit-DB-hit persistence.**
 
-- **Why this one:** these 4 modules ship engines, parsers, and manual commands but lack
-  `patterns/*.yaml`, so the "Recon next steps" panel is empty for them (15/19 covered). It is the
-  smallest self-contained, deterministic gap left, needs **no live target**, and depends only on the
-  complete pattern engine. Closes a Phase-2/3 coverage hole.
-- **Completion definition:** `patterns/{ssh,ike,tftp,vhost}.yaml` each with ≥ 3 provenance-cited
-  (`# source:`) entries that pass the engine's forbidden-content gate; suggestions render in the panel
-  and report; tests assert each loads and matches expected findings; docs updated.
-- **Explicitly excludes:** any exploit/CVE-specific suggestions (§15 forbidden pattern contents), the
-  *timed* mock-exam run (⛔), and live validation.
+- **Why this one:** the reference pane already runs `searchsploit --json` live per service, but those
+  Exploit-DB hits are **not** persisted, so `report.md` can't list them — the last known coverage gap
+  now that pattern breadth is complete (19/19). Deterministic, needs **no live target**, and depends
+  only on the existing references + profile store.
+- **Completion definition:** a per-profile EDB store (e.g. `references/visited.json` extended, or a new
+  `edb.json`) that records searchsploit hits per service (EDB-ID, title, product/version — lookup-only,
+  never the PoC); the reporter renders a "Exploit-DB references" section citing them; tests for the
+  store + report rendering; **stays lookup-only (§14) — no PoC download/execute/transform**.
+- **Explicitly excludes:** the *timed* mock-exam run (⛔), live validation, and anything that fetches or
+  runs a PoC.
 
-**Later candidates (do not start):** report EDB-hit persistence; AD/Kerberos enum workflow polish.
+**Later candidates (do not start):** AD/Kerberos enum workflow polish; the queued distribution phase
+(installer / tool-update-resilient parsers / single-click app / splash — see *Future / distribution*).
 
 ---
 

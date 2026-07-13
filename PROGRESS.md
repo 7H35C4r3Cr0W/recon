@@ -9,19 +9,33 @@ Running record of what's been built, in order, so any session can pick up mid-st
 **See [`PROJECT_MAP.md`](PROJECT_MAP.md) for the authoritative status map** (subsystem-by-subsystem
 ✅/🚧/⏭/🕒/⛔/❌, dependency graph, forward phases). This "Next up" is the one-line pointer.
 
-Phases 0–5, all 19 recon modules (14 core + Redis/MongoDB/MSSQL/MySQL/PostgreSQL), Phase 3 pattern
-engine, Phase 4 graph (incl. §16 drag-persist/add-note/minimap/PNG-SVG export), the full Workspace
-Dashboard & Organization upgrade, the **exam-mode scan profile**, and **project file operations §19**
-(Open-by-IP / Import / Export `.tar.gz`) are **DONE** — 699 tests green. Phase 6 is partial: `doctor` +
-status footer + audit log + concurrent-copy lock + exam profile done; only the *timed* mock exam
-remains (blocked on a live target).
+Phases 0–5, all 19 recon modules (14 core + Redis/MongoDB/MSSQL/MySQL/PostgreSQL) **each with pattern
+next-steps (19/19, 47 rules)**, Phase 4 graph (incl. §16 reinforcements), the full Workspace Dashboard
+& Organization upgrade, the **exam-mode scan profile**, and **project file operations §19** are
+**DONE** — 700 tests green. Phase 6 is partial: `doctor` + status footer + audit log + concurrent-copy
+lock + exam profile done; only the *timed* mock exam remains (blocked on a live target).
 
-**Recommended next chunk (do one at a time):** **pattern-library coverage for ssh/ike/tftp/vhost** —
-these 4 modules lack `patterns/*.yaml` (15/19 covered), so "Recon next steps" is empty for them.
-Deterministic, no live target; each file needs ≥ 3 provenance-cited entries passing the forbidden-
-content gate. Later candidates: report EDB-hit persistence, AD/Kerberos workflow polish. **Blocked:**
-live acceptance testing + timed mock exam (need an authorized target — verification to date is fixtures
-+ unit/GUI tests, not live boxes).
+**Recommended next chunk (do one at a time):** **report Exploit-DB-hit persistence** — searchsploit
+runs live in the reference pane but hits aren't persisted, so `report.md` can't list them. Add a
+per-profile EDB store + a reporter section; lookup-only (§14), no PoC fetch/run. Deterministic, no live
+target. Later candidates: AD/Kerberos workflow polish; the **distribution phase** (installer / tool-
+update-resilient parsers / single-click app / splash — future, not greenlit; see build memory).
+**Blocked:** live acceptance testing + timed mock exam (need an authorized target).
+
+### Pattern coverage ssh/ike/tftp/vhost — DONE (Phase 3 breadth complete: 19/19 modules)
+Added `patterns/{ssh,ike,tftp,vhost}.yaml`, closing the last pattern gap (was 15/19). Each entry
+matches the module's REAL finding shape and interpolates context:
+- **ssh** (kind banner/hostkey/algo-weak/auth): version→searchsploit lookup; publickey→hunt for
+  id_rsa; password-auth note (single manual login only, never a list); weak-algo note.
+- **ike** (kind service/transform/aggressive/note): enumerate transforms + aggressive-mode test
+  (`ike-scan -M -A {target}`); aggressive-mode misconfig note; weak-transform note.
+- **tftp** (kind file): `curl -s "tftp://{target}/{value}"` retrieval; well-known config filenames;
+  grep-downloaded-files-for-secrets note.
+- **vhost** (vhost/status/size/ip): `whatweb http://{vhost}/`; status-200→`feroxbuster` content
+  discovery; response-size vs wildcard-baseline note.
+All recon-only (pass the §15 forbidden-content gate), all commands allow-listed + policy-clean, all
+provenance-cited (`# source: Obsidian: 0.01 Cheatsheets/All_In_One`). +1 engine test asserting they
+fire on real shapes and every command clears `shell.policy_violation`. 47 rules total; 700 tests green.
 
 ### Project file operations §19 — DONE (deterministic; no live target)
 Each `~/oscprecon/<name>/` is now a portable project file. New module

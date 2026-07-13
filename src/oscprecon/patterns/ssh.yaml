@@ -1,0 +1,34 @@
+# SSH (22) recon next-steps — recon only, NO credential brute (§2/§15).
+# Findings the module emits: kind ∈ banner | hostkey | algo-weak | auth.
+
+- match:
+    service: ssh
+    field: kind
+    value: "banner"
+  suggest:
+    - text: "SSH banner: {value}. Record the exact build and check searchsploit for version-specific enumeration advisories (lookup only)."
+      command: "searchsploit openssh"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: ssh
+    detail_contains: "password authentication enabled"
+  suggest:
+    - text: "Password authentication is enabled. If you have ALREADY recovered credentials elsewhere, try them as a single manual login — never iterate a list (banned)."
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: ssh
+    field: kind
+    value: "auth"
+  suggest:
+    - text: "Enumerated SSH auth methods. If only publickey is accepted, hunt for a private key (id_rsa, .ssh/) in readable shares, web roots, and FTP before attempting access."
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: ssh
+    field: kind
+    value: "algo-weak"
+  suggest:
+    - text: "Weak SSH algorithm offered ({value}) — indicates a dated daemon; record it and prioritise a version lookup."
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)

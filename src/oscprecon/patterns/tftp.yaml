@@ -1,0 +1,25 @@
+# TFTP (69/udp) recon next-steps — recon only, read-only GET (curl speaks tftp://).
+# Findings the module emits: kind ∈ file | note.
+
+- match:
+    service: tftp
+    field: kind
+    value: "file"
+  suggest:
+    - text: "TFTP serves '{value}' with no authentication — retrieve it; router/device configs here often carry plaintext credentials and SNMP communities."
+      command: "curl -s \"tftp://{target}/{value}\" -o \"{value}\""
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: tftp
+  suggest:
+    - text: "TFTP has no directory listing — also request well-known names the enum won't reveal: running-config, startup-config, backup, sysinfo, and <hostname>.cfg."
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: tftp
+    field: kind
+    value: "file"
+  suggest:
+    - text: "After downloading, grep retrieved files for credentials, hostnames, and 'community' strings before pivoting."
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)

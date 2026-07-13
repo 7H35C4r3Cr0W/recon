@@ -1,0 +1,24 @@
+# vhost / subdomain (HTTP Host-header + DNS brute) recon next-steps — recon only.
+# Findings the module emits: vhost, status, size, ip, note (no kind field).
+
+- match:
+    service: vhost
+  suggest:
+    - text: "Discovered vhost {vhost} (HTTP {status}). Map it to the target IP in /etc/hosts, then fingerprint it."
+      command: "whatweb http://{vhost}/"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: vhost
+    field: status
+    value: "^200$"
+  suggest:
+    - text: "{vhost} returns 200 — treat it as a distinct web root and content-discover it separately."
+      command: "feroxbuster -u http://{vhost}/ -w /usr/share/seclists/Discovery/Web-Content/common.txt"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: vhost
+  suggest:
+    - text: "Compare {vhost}'s response size ({size}) against the wildcard baseline before trusting it — vhost fuzzers false-positive on catch-all responses."
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)

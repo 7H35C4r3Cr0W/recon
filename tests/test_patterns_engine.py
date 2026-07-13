@@ -1,6 +1,8 @@
+import shlex
 from pathlib import Path
 from typing import Any
 
+from oscprecon import shell
 from oscprecon.patterns import engine
 
 FIX = Path(__file__).parent / "fixtures"
@@ -132,6 +134,56 @@ def test_shipped_patterns_fire_on_findings() -> None:
     # PostgreSQL default-cred check interpolates BOTH the target and the non-standard port
     assert "postgresql://postgres:postgres@10.10.10.5:5433/postgres" in commands
     assert suggestions and all(s.source_box for s in suggestions)
+
+
+def test_ssh_ike_tftp_vhost_patterns_fire_and_commands_are_policy_clean() -> None:
+    # the new-coverage modules must fire on their REAL finding shapes, interpolate {target}/{value}/
+    # {vhost}, and every pre-fill command must clear the §2 exec policy (so the user can Run it).
+    findings: list[dict[str, Any]] = [
+        {"module": "ssh", "kind": "banner", "value": "OpenSSH 7.6p1 Ubuntu", "detail": ""},
+        {
+            "module": "ssh",
+            "kind": "auth",
+            "value": "password",
+            "detail": "password authentication enabled",
+        },
+        {
+            "module": "ssh",
+            "kind": "algo-weak",
+            "value": "diffie-hellman-group1-sha1",
+            "detail": "weak",
+        },
+        {"module": "ike", "kind": "service", "value": "IKE/ISAKMP VPN (main mode)", "detail": "up"},
+        {"module": "ike", "kind": "aggressive", "value": "enabled", "detail": "leaks PSK material"},
+        {"module": "ike", "kind": "transform", "value": "Enc=3DES Hash=SHA1", "detail": ""},
+        {
+            "module": "tftp",
+            "kind": "file",
+            "value": "running-config",
+            "detail": "readable via TFTP",
+        },
+        {
+            "module": "vhost",
+            "vhost": "admin.htb.local",
+            "status": 200,
+            "size": 1234,
+            "ip": "",
+            "note": "",
+        },
+    ]
+    suggestions = engine.suggest_for(findings, target="10.10.10.5")  # loads shipped patterns/
+    commands = [s.command_template for s in suggestions if s.command_template]
+    joined = " ".join(commands)
+    assert "ike-scan -M -A 10.10.10.5" in joined  # {target} interpolated for ike
+    assert 'curl -s "tftp://10.10.10.5/running-config"' in joined  # {target}+{value} for tftp
+    assert "whatweb http://admin.htb.local/" in joined  # {vhost} interpolated
+    assert "feroxbuster -u http://admin.htb.local/" in joined  # status 200 vhost content-discovery
+    assert any("searchsploit openssh" in c for c in commands)  # ssh banner lookup
+    # a text-only ssh suggestion (password auth) also fired
+    assert any("Password authentication is enabled" in s.text for s in suggestions)
+    for cmd in commands:  # every pre-fill command is runnable under the recon-only policy
+        assert shell.policy_violation(shlex.split(cmd)) is None, cmd
+    assert all(s.source_box for s in suggestions)  # provenance carried through
 
 
 def test_postgresql_pattern_does_not_fire_on_unrelated_findings() -> None:

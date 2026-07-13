@@ -1,0 +1,27 @@
+# IKE / ISAKMP (500/udp) recon next-steps — recon only.
+# Findings the module emits: kind ∈ service | transform | aggressive | note.
+
+- match:
+    service: ike
+    field: kind
+    value: "service"
+  suggest:
+    - text: "IKE/ISAKMP responder is up ({value}). Enumerate accepted transforms and test for aggressive mode."
+      command: "ike-scan -M -A {target}"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: ike
+    field: kind
+    value: "aggressive"
+  suggest:
+    - text: "Aggressive mode returned a handshake — a notable misconfiguration that exposes PSK-related material. Record it and confirm the negotiated identity/transform (no offline recovery here)."
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
+
+- match:
+    service: ike
+    field: kind
+    value: "transform"
+  suggest:
+    - text: "Negotiated IKE transform: {value}. Note weak parameters (DES/3DES, MD5/SHA1, DH group 1/2) — they mark a dated VPN endpoint worth documenting."
+# source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
