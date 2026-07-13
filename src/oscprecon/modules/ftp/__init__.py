@@ -14,11 +14,14 @@ from oscprecon.modules.ftp.parsers import (
     nmap_anon_ok,
     parse_ftp_listing,
     parse_ftp_tool,
+    peek_snippet,
     subdirs,
 )
 
 __all__ = [
     "FTP_SERVICE_NAMES",
+    "PEEK_MAX_BYTES",
+    "PEEK_MAX_FILES",
     "FtpEntry",
     "FtpFinding",
     "FtpModule",
@@ -26,14 +29,75 @@ __all__ = [
     "anon_credential",
     "ftp_base_url",
     "ftp_dir_url",
+    "ftp_file_url",
+    "is_peekable",
     "nmap_anon_ok",
     "parse_ftp_listing",
     "parse_ftp_tool",
+    "peek_snippet",
     "subdirs",
 ]
 
 FTP_SERVICE_NAMES = frozenset({"ftp", "ftp-data", "ftps", "ftps-data"})
 _FTP_PORTS = frozenset({21})
+
+# Bounded content peek (§12: reads are triage, not bulk exfil). Only small text-like files, capped.
+PEEK_MAX_BYTES = 8192  # only peek files the listing already shows as this small
+PEEK_MAX_FILES = 8  # at most this many peeks per walk, so it's never a download storm
+_PEEK_TEXT_EXT = frozenset(
+    {
+        "txt",
+        "log",
+        "conf",
+        "config",
+        "cfg",
+        "ini",
+        "xml",
+        "json",
+        "yaml",
+        "yml",
+        "md",
+        "csv",
+        "sh",
+        "bash",
+        "php",
+        "html",
+        "htm",
+        "js",
+        "py",
+        "sql",
+        "env",
+        "properties",
+        "inc",
+        "bak",
+        "old",
+        "asp",
+        "aspx",
+        "jsp",
+        "pl",
+        "rb",
+        "pem",
+        "pub",
+        "key",
+        "htpasswd",
+        "htaccess",
+        "cnf",
+    }
+)
+
+
+def is_peekable(entry: FtpEntry) -> bool:
+    # small, non-dir, text-like (a known text ext, or no ext — often a config/script). Size 0
+    # is skipped so we never fetch something we can't bound.
+    if entry.is_dir or entry.size <= 0 or entry.size > PEEK_MAX_BYTES:
+        return False
+    return entry.extension == "" or entry.extension in _PEEK_TEXT_EXT
+
+
+def ftp_file_url(target: str, port: int, path: str) -> str:
+    # a FILE url (no trailing '/') so curl DOWNLOADS it; the small file is fetched whole to preview
+    raw = path if path.startswith("/") else "/" + path
+    return ftp_base_url(target, port) + quote(raw, safe="/")
 
 
 @dataclass
@@ -126,6 +190,22 @@ class FtpModule(Module):
                 f"ftp/dirs/{_dir_slug(path)}-{digest}.txt",
             ),
             "curl-list",
+        )
+
+    def peek_step(self, target: Target, path: str, port: int = 21) -> FtpStep:
+        # fetch a small, already-listed text file whole (§12: bounded read). --max-time bounds
+        # a slow/large transfer even if the listed size was wrong; the snippet shows only the head.
+        url = ftp_file_url(target.ip, port, path)
+        digest = hashlib.sha1(path.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
+        return FtpStep(
+            Command(
+                "ftp",
+                f"curl -s --max-time 15 {shlex.quote(url)}",
+                f"Peek: preview the head of {path} (small text file).",
+                "< 15s",
+                f"ftp/peek/{_dir_slug(path)}-{digest}.txt",
+            ),
+            "peek",
         )
 
     def commands(self, target: Target, ports: list[Port]) -> list[Command]:

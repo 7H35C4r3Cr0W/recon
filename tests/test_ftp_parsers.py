@@ -93,3 +93,51 @@ def test_dispatch_and_garbage() -> None:
     assert parse_ftp_tool("unknown", "x") == []
     assert parse_ftp_tool("curl-list", _read("curl-list-unix.txt"))
     assert parse_ftp_listing("total 8\nnot a listing line") == []
+
+
+def test_ftp_entry_extension() -> None:
+    from oscprecon.modules.ftp.parsers import FtpEntry
+
+    assert FtpEntry("db.conf", False, 10).extension == "conf"
+    assert FtpEntry("README", False, 10).extension == ""  # no extension
+    assert FtpEntry(".bashrc", False, 10).extension == ""  # dotfile, not an extension
+    assert FtpEntry("ARCHIVE.TAR.GZ", False, 10).extension == "gz"
+
+
+def test_peek_snippet_is_safe_and_bounded() -> None:
+    from oscprecon.modules.ftp.parsers import peek_snippet
+
+    assert peek_snippet("root:x:0:0:root:/root") == "root:x:0:0:root:/root"
+    assert peek_snippet("line1\nline2\ttab") == "line1 line2 tab"  # whitespace collapsed
+    assert peek_snippet("\x00\x01\x02\xff\xfe binary \x00\x00") == "(binary or non-text content)"
+    assert peek_snippet("") == "(empty)" and peek_snippet("   ") == "(empty)"
+    long = "A" * 200
+    out = peek_snippet(long, limit=60)
+    assert len(out) == 61 and out.endswith("…")  # capped + ellipsis
+    assert "\x1b" not in peek_snippet("\x1b[31mred\x1b[0m text")  # control/ANSI stripped
+
+
+def test_is_peekable_only_small_text_files() -> None:
+    from oscprecon.modules.ftp import PEEK_MAX_BYTES, is_peekable
+    from oscprecon.modules.ftp.parsers import FtpEntry
+
+    assert is_peekable(FtpEntry("db.conf", False, 200)) is True
+    assert is_peekable(FtpEntry("id_rsa", False, 1600)) is True  # no-ext small file
+    assert is_peekable(FtpEntry("etc", True, 0)) is False  # directory
+    assert is_peekable(FtpEntry("huge.log", False, PEEK_MAX_BYTES + 1)) is False  # too big
+    assert is_peekable(FtpEntry("photo.jpg", False, 500)) is False  # binary extension
+    assert is_peekable(FtpEntry("weird", False, 0)) is False  # unknown/zero size
+
+
+def test_ftp_file_url_and_peek_step() -> None:
+    from oscprecon.models import Target
+    from oscprecon.modules.ftp import FtpModule, ftp_file_url
+
+    assert ftp_file_url("10.0.0.1", 21, "/pub/db.conf") == "ftp://10.0.0.1/pub/db.conf"
+    step = FtpModule().peek_step(Target(ip="10.0.0.1"), "/pub/db.conf")
+    assert step.tool == "peek"
+    assert (
+        "curl -s" in step.command.shell_line
+        and "ftp://10.0.0.1/pub/db.conf" in step.command.shell_line
+    )
+    assert "--max-time" in step.command.shell_line  # bounded even if the listed size was wrong

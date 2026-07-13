@@ -11,11 +11,14 @@ from oscprecon.gui.workers.base import CancellableThread
 from oscprecon.models import Credential, Target
 from oscprecon.modules.dns import DnsFinding, DnsModule, parse_dns_tool
 from oscprecon.modules.ftp import (
+    PEEK_MAX_FILES,
     FtpFinding,
     FtpModule,
+    is_peekable,
     nmap_anon_ok,
     parse_ftp_listing,
     parse_ftp_tool,
+    peek_snippet,
 )
 from oscprecon.modules.ftp import (
     anon_credential as ftp_anon_credential,
@@ -236,6 +239,7 @@ class FtpReconWorker(CancellableThread):
         findings: list[FtpFinding] = []
         seen: set[str] = set()
         queue: list[tuple[str, int]] = [("/", 0)]
+        peekable: list[str] = []
         listed = 0
         while queue and listed < _FTP_MAX_DIRS:
             if self._cancel.is_set():
@@ -252,15 +256,35 @@ class FtpReconWorker(CancellableThread):
             ):
                 child = path.rstrip("/") + "/" + entry.name
                 kind = "dir" if entry.is_dir else "file"
-                detail = "" if entry.is_dir else f"{entry.size} bytes"
+                ext = entry.extension or "no ext"
+                detail = "" if entry.is_dir else f"{entry.size} bytes ({ext})"
                 findings.append(FtpFinding(kind, child, detail))
+                if is_peekable(entry):
+                    peekable.append(child)
                 if recurse and entry.is_dir and depth + 1 < _FTP_MAX_DEPTH:
                     queue.append((child + "/", depth + 1))
+        findings.extend(self._peek_files(target, peekable))
         if queue:  # exited on the dir cap — say so, don't pretend the walk was exhaustive
             self.line.emit(
                 f"[ftp] walk bounded at {_FTP_MAX_DIRS} dirs — list deeper paths via Tier-2"
             )
         return findings
+
+    def _peek_files(self, target: Target, paths: list[str]) -> list[FtpFinding]:
+        # bounded content triage: fetch the head of up to PEEK_MAX_FILES small text files so you
+        # can eyeball what's inside without an explicit download of each.
+        out: list[FtpFinding] = []
+        for path in paths[:PEEK_MAX_FILES]:
+            if self._cancel.is_set():
+                break
+            step = self._module.peek_step(target, path, self._port)
+            text = self._run_step(step.command.shell_line, step.command.output_file)
+            out.append(FtpFinding("peek", path, peek_snippet(text)))
+        if len(paths) > PEEK_MAX_FILES:
+            self.line.emit(
+                f"[ftp] peeked {PEEK_MAX_FILES}/{len(paths)} small files — rest via Tier-2"
+            )
+        return out
 
     def _write_findings(self, collected: list[FtpFinding]) -> None:
         if not collected:
@@ -281,6 +305,10 @@ class FtpReconWorker(CancellableThread):
         if files:
             summary.append(f"Files ({len(files)}):")
             summary.extend(f"  {f}" for f in files)
+        peeks = [(f.value, f.detail) for f in collected if f.kind == "peek"]
+        if peeks:
+            summary.append(f"Peeked contents ({len(peeks)}):")
+            summary.extend(f"  {path} → {snippet}" for path, snippet in peeks)
         if any(f.kind == "note" and "bounce" in f.value for f in collected):
             summary.append("Note: FTP bounce accepted (recon)")
         summary.append("Anonymous access: allowed" if anon else "Anonymous access: denied")
