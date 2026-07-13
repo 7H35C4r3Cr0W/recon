@@ -13,6 +13,22 @@ from oscprecon.references import match as ref_match
 
 _VALID_STATUS = frozenset({"new", "investigating", "done", "dead-end"})
 
+# Finding kinds that are inherently notable (a weak/open posture), plus text signals. Notable
+# findings are highlighted in the graph so the interesting stuff pops (anon access, writable…).
+_NOTABLE_KINDS = frozenset({"open-relay", "algo-weak", "world-readable"})
+_NOTABLE_TEXT = ("anonymous", "null session", "writable", "world-readable", "no_root_squash")
+
+
+def _is_notable(kind: str, value: str, detail: str) -> bool:
+    text = f"{value} {detail}".lower()
+    if kind == "signing":
+        return "disabled" in text  # signing is only notable when it's OFF
+    if kind in _NOTABLE_KINDS:
+        return True
+    if kind in ("auth", "bind", "access") and ("anon" in value.lower() or "null" in value.lower()):
+        return True
+    return any(signal in text for signal in _NOTABLE_TEXT)
+
 
 def _service_id(port: int, proto: str) -> str:
     return f"service-{port}-{proto}"
@@ -71,10 +87,12 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
         kind = str(finding.get("kind", ""))
         value = str(finding.get("value", ""))
         module = str(finding.get("module", ""))
+        detail = str(finding.get("detail", ""))
         label = f"{kind}: {value}" if kind else (value or "finding")
-        add_node(
-            fid, "finding", label, {"module": module, "detail": str(finding.get("detail", ""))}
-        )
+        extra: dict[str, Any] = {"module": module, "detail": detail}
+        if _is_notable(kind, value, detail):
+            extra["notable"] = True  # anon access / writable / weak signing / etc. -> highlighted
+        add_node(fid, "finding", label, extra)
         parent = module_service.get(module, "target")
         edges.append(_edge(parent, fid, "exposes-finding", f"e-find-{index}"))
 

@@ -11,7 +11,7 @@
   var linkSource = null;
   var svgReady = false;
 
-  var DEFAULT_HINT = "drag nodes to reposition (saved) · click a node for detail";
+  var DEFAULT_HINT = "search to highlight · red ring = notable finding · drag nodes (saved) · click for detail";
 
   var STYLE = [
     {
@@ -48,8 +48,19 @@
     { selector: 'node[status="done"]', style: { "border-color": "#a6e3a1" } },
     { selector: 'node[status="dead-end"]', style: { opacity: 0.45 } },
     { selector: "node[note]", style: { "border-style": "dashed", "border-color": "#cba6f7" } },
+    // notable/vulnerable findings (anon access, writable, weak signing…) stand out with a red ring
+    {
+      selector: "node[notable]",
+      style: { "border-width": 5, "border-color": "#f38ba8", "border-style": "double" },
+    },
     { selector: "node:selected", style: { "border-width": 4, "border-color": "#cba6f7" } },
     { selector: ".hidden", style: { display: "none" } },
+    // search: bright ring on matches, dim everything else
+    {
+      selector: ".search-hit",
+      style: { "border-width": 6, "border-color": "#f9e2af", "background-blacken": -0.15 },
+    },
+    { selector: ".search-dim", style: { opacity: 0.12 } },
     {
       selector: "edge",
       style: {
@@ -147,6 +158,32 @@
         e.toggleClass("hidden", e.source().hasClass("hidden") || e.target().hasClass("hidden"));
       });
     });
+  }
+
+  // BloodHound-style search: type "ssh" / "445" / "admin" -> highlight matches, dim the rest, fit.
+  function applySearch(query) {
+    var q = (query || "").trim().toLowerCase();
+    [cy, mini].forEach(function (graph) {
+      if (!graph) return;
+      graph.nodes().removeClass("search-hit search-dim");
+      if (!q) return;
+      graph.nodes().forEach(function (n) {
+        var hay = [
+          n.data("label"),
+          n.data("type"),
+          n.data("port"),
+          n.data("module"),
+          n.data("source"),
+        ]
+          .join(" ")
+          .toLowerCase();
+        n.addClass(hay.indexOf(q) >= 0 ? "search-hit" : "search-dim");
+      });
+    });
+    if (q && cy) {
+      var hits = cy.nodes(".search-hit");
+      if (hits.length) cy.fit(hits, 60);
+    }
   }
 
   function updateViewportRect() {
@@ -272,6 +309,11 @@
     };
     var boxes = document.querySelectorAll("input.filter");
     for (var i = 0; i < boxes.length; i++) boxes[i].onchange = applyFilter;
+    var search = document.getElementById("search");
+    if (search)
+      search.oninput = function () {
+        applySearch(this.value);
+      };
 
     buildMinimap(elements);
   }

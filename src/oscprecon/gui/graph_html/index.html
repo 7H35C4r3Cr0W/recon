@@ -9,6 +9,7 @@
   </head>
   <body>
     <div id="toolbar">
+      <input id="search" type="search" placeholder="search: ssh, 445, admin…" />
       <button id="layout-hier">Hierarchical</button>
       <button id="layout-force">Force-directed</button>
       <button id="fit">Fit</button>
@@ -20,7 +21,7 @@
         <label class="filter-label"><input type="checkbox" class="filter" data-type="finding" checked /> findings</label>
         <label class="filter-label"><input type="checkbox" class="filter" data-type="credential" checked /> creds</label>
       </span>
-      <span id="hint">drag nodes to reposition (saved) · click a node for detail</span>
+      <span id="hint">search to highlight · red ring = notable finding · drag nodes (saved) · click for detail</span>
     </div>
     <div id="cy"></div>
     <div id="minimap"><div id="minimap-viewport"></div></div>

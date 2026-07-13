@@ -134,3 +134,32 @@ def test_profile_graph_persistence_roundtrip(tmp_path: Path) -> None:
     reloaded = prof.load_graph()
     assert reloaded["user_edges"] == [{"from": "a", "to": "b"}]
     assert reloaded["node_overrides"]["a"]["status"] == "done"
+
+
+def test_notable_findings_are_flagged(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.1"))
+    prof.set_services([DiscoveredService(445, Proto.TCP, "microsoft-ds")])
+    findings_mod.add_findings(
+        prof.directory,
+        [
+            {"module": "smb", "kind": "signing", "value": "disabled", "discovered_at": "t"},
+            {"module": "ftp", "kind": "auth", "value": "anonymous", "discovered_at": "t"},
+            {
+                "module": "smb",
+                "kind": "share",
+                "value": "IT",
+                "detail": "READ",
+                "discovered_at": "t",
+            },
+            {"module": "smb", "kind": "user", "value": "administrator", "discovered_at": "t"},
+        ],
+    )
+    finds = {
+        n["data"]["label"]: n["data"]
+        for n in build_elements(prof)["nodes"]
+        if n["data"]["type"] == "finding"
+    }
+    assert finds["signing: disabled"].get("notable") is True  # weak signing highlighted
+    assert finds["auth: anonymous"].get("notable") is True  # anon access highlighted
+    assert "notable" not in finds["share: IT"]  # a readable share is not itself "notable"
+    assert "notable" not in finds["user: administrator"]  # a username is not notable
