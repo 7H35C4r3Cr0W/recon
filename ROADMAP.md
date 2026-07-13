@@ -44,7 +44,10 @@ run it on ≥3 real boxes.
 
 ---
 
-## Phase 2 — Core service modules — ⬜
+## Phase 2 — Core service modules — ✅ built & verified
+<!-- All 14 core modules + Redis/MongoDB/MSSQL/MySQL DB modules ship engine + parser tests +
+     manual_commands.yaml + services.yaml tool-hints + GUI panels. See PROGRESS.md per-module logs. -->
+
 
 Order: `http` (granular controls + non-standard ports) → `vhost` → `smb` (tiered) → `ftp` → `ssh` → `dns` → `ldap` → `smtp` → `nfs` → `snmp` → `tftp` → `netbios` → `ike` → `ntp`.
 
@@ -54,7 +57,10 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 
 ---
 
-## Phase 3 — Pattern library + suggestion engine — ⬜
+## Phase 3 — Pattern library + suggestion engine — ✅ built & verified
+<!-- patterns/engine.py + per-service patterns/*.yaml (provenance + forbidden-content gates),
+     "Recon next steps" GUI panel (pre-fill, no auto-run), report citations. -->
+
 
 - `patterns/engine.py`; per-service YAML with `# source:` provenance requirement (build gate).
 - "Recon next steps" sub-section in the Tool Panel (pre-fill on click, never auto-execute).
@@ -64,7 +70,10 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 
 ---
 
-## Phase 4 — Graph view (Bloodhound-style) — ⬜
+## Phase 4 — Graph view (Bloodhound-style) — ✅ built & verified
+<!-- graph_view.py (QWebEngineView + vendored Cytoscape.js in gui/graph_html/), graph_data.py,
+     QWebChannel GraphBridge, graph.json persistence, Ctrl+G toggle. -->
+
 
 - `graph_view.py` — `QWebEngineView` + vendored Cytoscape.js; `QWebChannel` bridge.
 - Node/edge types, layouts, interactions per §16; `graph.json` persistence; `View → Graph` (Ctrl+G).
@@ -76,7 +85,12 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 
 ---
 
-## Phase 5 — Quality of life + Obsidian output — ⬜
+## Phase 5 — Quality of life + Obsidian output — ✅ built & verified
+<!-- --resume/--force (skip existing output), bounded parallel execution + task status bar with
+     working cancel, real scan cancellation (cancel Event -> shell.run kills the child group),
+     report viewer tab, single-file Obsidian frontmatter + File -> Export to Obsidian Vault,
+     dark/light theme. -->
+
 
 - `--resume` (skip commands with existing output unless `--force`).
 - **Bounded parallel execution + status bar with cancel buttons** (real interrupt/cancel for in-flight scans — see Deferred below).
@@ -92,7 +106,10 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 
 ---
 
-## Phase 6 — Exam-day polish — ⬜
+## Phase 6 — Exam-day polish — 🚧 partial
+<!-- DONE: `oscprecon-cli doctor` (which-check for every wrapped tool + install hints). Self-contained
+     report. TODO: exam-profile preset (tight fast command set), timed mock-exam dry run. -->
+
 
 - `oscprecon-cli doctor` + Help → Doctor (checks each wrapped tool via `which`, prints install commands).
 - Exam profile preset (tight/fast; no `--script vuln`, no deep recursion).
@@ -106,6 +123,13 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 
 Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` §27:
 
-- **Real scan cancellation (Phase 5).** Phase 0's `closeEvent` currently *blocks* until the running nmap finishes (safe, but can freeze the UI on a long `-p-` sweep). Phase 5's "cancel buttons" deliverable should add cooperative interruption that kills the in-flight subprocess via the `shell.run` timeout/kill path and unwinds the worker cleanly.
-- **Findings persistence (`findings.json`).** `Module.parse()` returns `Finding`s; Phase 0 only surfaces them via the report. A dedicated `findings.json` writer is due when the first non-nmap module lands (Phase 2).
-- **DB-client primitive backstop on the custom-command path (Phase 6).** Surfaced by the MySQL module review. Every command the modules *surface* is read-only, but now that `mysql`/`psql`/`mongosh`/`redis-cli` are allow-listed, a user hand-typing into the command builder can slip an exploitation primitive past `shell.policy_violation` — e.g. `mysql -e "SELECT … INTO OUTFILE '/var/www/x.php'"`, `LOAD_FILE(…)`, `sys_exec`, or a `\!` client shell-escape. Mirrors the existing `ntpdate -q` / `ike-scan -P` backstops: add a per-client refusal in `policy_violation` for `into outfile`/`into dumpfile`/`load_file`/`sys_exec`/`sys_eval`/`\!`. Cross-cutting (the same path already allows `curl -T`/`smbclient put`), so treat as recon-only hardening, not a per-module fix.
+- **Concurrent-copy profile lock (`<profile>/.lock`, CLAUDE.md §6b).** Still queued: opening a profile
+  for edit should flock a `.lock` (owning PID) so a second GUI instance prompts "open read-only?".
+- **Exam-profile preset + timed mock exam (Phase 6).** A tight/fast command-set preset (no `--script
+  vuln`, no deep recursion) and a timed dry run against a standalone + AD set.
+
+<!-- Resolved and removed from this list (proven by code + tests):
+     real scan cancellation (cancel Event + closeEvent cancel-then-wait);
+     findings persistence (src/oscprecon/findings.py + findings.json);
+     DB-client primitive backstop in shell.policy_violation. -->
+
