@@ -45,7 +45,7 @@ The OSCP exam has strict tooling rules. This tool must be exam-legal by default 
 - **AI / LLM calls at runtime** — banned during exam. The tool runs offline/local.
 - **Automated exploit chains** — no scan → vuln-match → run-exploit → shell pipelines.
 - **PoC download / execute / transform** from Exploit-DB — lookup and linkout only.
-- **Anything that needs internet at runtime** — except direct probing of the target and live rendering of HackTricks / Exploit-DB pages in the reference pane.
+- **Anything that needs internet at runtime** — except direct probing of the target and live rendering of HackTricks / Exploit-DB pages in the reference pane. **Allowed exception:** a **build-time-vendored, offline snapshot** of the open-source HackTricks **markdown** (bundled in the wheel, read from disk, **attributed** per its licence — see § 27), used for finding-aware offline section rendering; it needs no runtime internet. **Still forbidden:** live scraping or runtime caching of the HackTricks / Exploit-DB **websites**.
 
 ### Tier framing for credential-adjacent recon
 
@@ -1261,6 +1261,7 @@ uv run ruff format --check
 - Better parsers extracting more findings
 - Pattern library entries (with `# source:`)
 - New entries in `references/services.yaml`
+- A **build-time-vendored, offline HackTricks markdown snapshot** — from the open-source repo, **attributed** per its licence (CC BY-NC-SA; confirm at vendor time), **size-bounded** to the network-services-pentesting pages, refreshed by a maintainer-run script (never fetched at runtime) — for finding-aware offline section surfacing (see § 2, § 14)
 - Report template improvements
 - GUI widgets exposing existing engine functionality
 - Bounded parallel execution
@@ -1274,7 +1275,7 @@ uv run ruff format --check
 - LLM/AI calls at runtime — even "optional"
 - Auto-exploitation gated behind flags
 - Downloading, executing, transforming Exploit-DB PoCs
-- Scraping / caching HackTricks
+- **Live scraping or runtime caching of the HackTricks / Exploit-DB _websites_** — fetching or persisting rendered pages at runtime (a build-time-vendored offline markdown snapshot is allowed — see "Yes to propose" and § 2)
 - Rewrites of the tech stack — decided in § 3
 - Speculative abstractions for features not in the roadmap
 - Splash screens, telemetry, update checks, login flows, cloud sync
