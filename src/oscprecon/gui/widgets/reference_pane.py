@@ -8,10 +8,13 @@ from PySide6.QtWidgets import (
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QTabWidget,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
 
+from oscprecon import hacktricks
 from oscprecon.models import DiscoveredService
 from oscprecon.references import ExploitHit, ServiceRef
 
@@ -58,11 +61,19 @@ class ReferencePane(QWidget):
             web_widget = QLabel("Web view unavailable — open the link above in a browser.")
             web_widget.setStyleSheet("color: gray;")
 
+        # Offline vendored HackTricks (§2a): rendered natively (no WebEngine, works with no net).
+        self._offline = QTextBrowser()
+        self._offline.setOpenExternalLinks(True)
+
+        self._tabs = QTabWidget()
+        self._offline_index = self._tabs.addTab(self._offline, "Offline")
+        self._live_index = self._tabs.addTab(web_widget, "Live page")
+
         hacktricks_box = QGroupBox("HackTricks")
         hacktricks_layout = QVBoxLayout(hacktricks_box)
         hacktricks_layout.addWidget(self._label)
         hacktricks_layout.addWidget(self._link)
-        hacktricks_layout.addWidget(web_widget, stretch=1)
+        hacktricks_layout.addWidget(self._tabs, stretch=1)
 
         self._exploits = QListWidget()
         self._exploits.itemClicked.connect(self._on_exploit_activated)
@@ -80,10 +91,12 @@ class ReferencePane(QWidget):
         if service is None or ref is None:
             self._label.setText("No reference mapping for this service.")
             self._link.setText("")
+            self._offline.setMarkdown("")
             self._load(QUrl("about:blank"))
             return
         self._label.setText(f"{ref.label} — {service.port}/{service.proto.value}")
         self._link.setText(f'<a href="{ref.hacktricks}">{ref.hacktricks}</a>')
+        self._show_offline(ref)
         self._load(QUrl(ref.hacktricks))
         self.page_visited.emit(ref.label, ref.hacktricks)
         if service.product:
@@ -101,6 +114,26 @@ class ReferencePane(QWidget):
             item.setData(_URL_ROLE, hit.url)
             item.setData(_LABEL_ROLE, f"EDB-{hit.edb_id}")
             self._exploits.addItem(item)
+
+    def _show_offline(self, ref: ServiceRef) -> None:
+        # render the vendored offline page (if any) and default to it; the live link stays visible
+        # above and the Live tab is a click away. Offline-first is the exam-friendly default.
+        page = hacktricks.page_for_module(ref.module)
+        if page is not None:
+            self._offline.setMarkdown(page.markdown)
+            self._tabs.setTabText(self._offline_index, f"Offline · {page.title}")
+            self._tabs.setCurrentIndex(self._offline_index)
+        else:
+            self._offline.setMarkdown(
+                "_No offline HackTricks page for this service — use the **Live page** tab or the "
+                "link above._"
+            )
+            self._tabs.setTabText(self._offline_index, "Offline")
+            self._tabs.setCurrentIndex(self._live_index)
+
+    def offline_text(self) -> str:
+        """The rendered offline page as plain text (for tests / search)."""
+        return self._offline.toPlainText()
 
     def _placeholder(self, text: str) -> None:
         item = QListWidgetItem(text)
