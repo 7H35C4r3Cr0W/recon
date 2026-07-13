@@ -29,7 +29,12 @@ from PySide6.QtWidgets import (
 from oscprecon import config, edb, findings, references, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.gui import theme
-from oscprecon.gui.dialogs import AddCredentialDialog, NewProfileDialog, SettingsDialog
+from oscprecon.gui.dialogs import (
+    AddCredentialDialog,
+    CredentialVaultDialog,
+    NewProfileDialog,
+    SettingsDialog,
+)
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
 from oscprecon.gui.widgets.graph_view import GraphView
@@ -307,6 +312,9 @@ class MainWindow(QMainWindow):
         add_cred_action = QAction("Add Credential...", self)
         add_cred_action.triggered.connect(self._on_add_credential)
         edit_menu.addAction(add_cred_action)
+        vault_action = QAction("Credential Vault...", self)
+        vault_action.triggered.connect(self._on_credential_vault)
+        edit_menu.addAction(vault_action)
 
         view_menu = self.menuBar().addMenu("&View")
         workspace_action = QAction("Workspace Dashboard", self)
@@ -770,6 +778,14 @@ class MainWindow(QMainWindow):
             source=cred.source,
         )
         self._tool_panel.append_output(f"[cred] added {cred.username} (source: {cred.source})")
+
+    def _on_credential_vault(self) -> None:
+        if self._profile is None:
+            QMessageBox.information(self, "No profile", "Open or create a profile first.")
+            return
+        CredentialVaultDialog(self._profile, self).exec()
+        self._audit_action("credential-vault-opened")
+        self._refresh_suggestions()  # has_credential may have changed
 
     def _on_browse_wordlists(self) -> None:
         dialog = QDialog(self)

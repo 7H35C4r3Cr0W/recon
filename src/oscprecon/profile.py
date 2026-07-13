@@ -270,6 +270,10 @@ class Profile:
         self._ensure_writable()
         creds.add_credential(self.creds_path, cred)
 
+    def delete_credential(self, cred: Credential) -> None:
+        self._ensure_writable()
+        creds.delete_credential(self.creds_path, cred)
+
     @property
     def graph_path(self) -> Path:
         return self.directory / "graph.json"

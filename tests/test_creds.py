@@ -83,3 +83,20 @@ def test_delete_credential_removes_the_matching_entry(tmp_path: Path) -> None:
     remaining = creds.delete_credential(path, drop)
     assert [c.username for c in remaining] == ["keep"]
     assert [c.username for c in creds.load_creds(path)] == ["keep"]  # persisted
+
+
+def test_profile_delete_credential_and_read_only_guard(tmp_path: Path) -> None:
+    from oscprecon.profile import ReadOnlyError
+
+    prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.1"))
+    cred = Credential(username="a", secret="1")
+    prof.add_credential(cred)
+    prof.delete_credential(cred)
+    assert prof.credentials() == []
+    prof.add_credential(cred)
+    prof.read_only = True
+    try:
+        prof.delete_credential(cred)
+        raise AssertionError("expected ReadOnlyError")
+    except ReadOnlyError:
+        pass
