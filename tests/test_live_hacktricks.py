@@ -109,6 +109,20 @@ def test_request_carries_no_project_data():
 # ---- extraction / sanitization -----------------------------------------------------------------
 
 
+def test_html_to_markdown_escapes_link_metacharacters():
+    # a page serving literal "[x](scheme:...)" text must NOT become a clickable link when rendered
+    html = "<main><p>text [click](file:///etc/passwd) here</p><pre>arr[0] = 1</pre></main>"
+    md, _ = lh.html_to_markdown(html)
+    assert "\\[click\\]" in md  # link text escaped -> renders as literal brackets, not a link
+    assert "arr[0] = 1" in md  # code block is verbatim, NOT escaped
+
+
+def test_fetch_rejects_missing_content_type():
+    opener = _Opener(_Resp(body=_html(), headers={}))  # response with NO Content-Type header
+    result = lh.get_page(_MAPPED, force=True, opener=opener)
+    assert result.state == "error" and "content-type" in result.error.lower()
+
+
 def test_html_to_markdown_strips_scripts_and_keeps_content():
     html = (
         b"<html><head><script>alert('x')</script></head>"

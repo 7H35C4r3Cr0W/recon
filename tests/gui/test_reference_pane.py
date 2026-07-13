@@ -150,3 +150,19 @@ def test_refresh_button_emits_signal(qtbot: QtBot) -> None:
     pane.set_live_enabled(True)
     with qtbot.waitSignal(pane.refresh_requested, timeout=1000):
         pane._refresh_btn.click()
+
+
+def test_live_content_renders_no_dangerous_links(qtbot: QtBot) -> None:
+    from oscprecon.references import live_hacktricks
+
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL))
+    # a hostile page's literal link text, extracted and rendered exactly as the live path does
+    md, _ = live_hacktricks.html_to_markdown(
+        "<main><p>see [x](file:///etc/passwd) and [y](javascript:alert(1))</p></main>"
+    )
+    pane.apply_live_result(LiveResult("live-refreshed", md, [], 1.0e9, _SMB_URL))
+    html = pane._offline.toHtml().lower()
+    assert 'href="file:' not in html and 'href="javascript:' not in html  # no clickable link
+    assert "file:///etc/passwd" in pane.offline_text()  # still shown as readable text

@@ -15,13 +15,12 @@ fetch/cache (§14a)**, **durable project credentials + opt-in spray**, the **doc
 the **single-click AppImage + splash**, and **parser multi-version resilience** are **DONE**. Phase 6
 is partial: only the *timed* mock exam remains (blocked on a live target).
 
-**Spray now preserves the discovered service port** (SSH on 2222 → `hydra -s 2222`, SMB elsewhere →
-`netexec --port`), so that correctness gap is closed. **⏭ One recommended next chunk: harden the two
-accepted low-severity live-fetch residuals** — escape markdown metacharacters in extracted live
-content (a page serving literal `[x](file://…)` becomes a clickable link) and treat a missing
-`Content-Type` header explicitly. Both are non-exploitable behind TLS host-pinning, so this is polish,
-not a fix. **Blocked:** timed mock exam + full interactive/cross-machine AppImage acceptance (see
-`packaging/ACCEPTANCE.md`) need an authorized target / a real desktop.
+**The in-scope, deterministic backlog is now fully exhausted** — spray preserves the discovered port,
+and both low-severity live-fetch residuals are hardened (markdown link-syntax escaped in extracted
+live content, proven at render level; missing `Content-Type` explicitly rejected). **Everything that
+remains is blocked on external resources:** the *timed* mock exam needs an authorized target, and full
+interactive + cross-machine AppImage acceptance needs a real desktop / a second VM (see
+`packaging/ACCEPTANCE.md`). No deterministic next chunk — the next move is the owner's call.
 
 ### Live HackTricks fetch/cache + durable creds + parser resilience + AppImage acceptance
 A sequenced workstream (owner-approved live HackTricks + the two permanent product rules). In order:

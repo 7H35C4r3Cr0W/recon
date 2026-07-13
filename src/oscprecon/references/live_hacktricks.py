@@ -79,6 +79,14 @@ _BLOCK_TAGS = {"p", "div", "section", "article", "tr", "table", "ul", "ol", "blo
 _CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
+def _escape_links(text: str) -> str:
+    # Neutralize markdown link/image syntax in page TEXT so a literal "[x](file://...)" in the page
+    # can't render as a clickable link with an arbitrary scheme. Defense-in-depth: the host is
+    # TLS-pinned, and real <a> hrefs are already dropped (we emit link text only). `\[`/`\]` render
+    # as literal brackets, so the content stays readable.
+    return text.replace("[", "\\[").replace("]", "\\]")
+
+
 def _article_html(html: str) -> str:
     # mdBook wraps the page body in <main>; isolate it so the sidebar/nav/chrome never leak.
     low = html.lower()
@@ -104,7 +112,7 @@ class _MarkdownExtractor(HTMLParser):
         text = re.sub(r"\s+", " ", "".join(self._buf)).strip()
         self._buf = []
         if text:
-            self._out.append(text)
+            self._out.append(_escape_links(text))
             self._out.append("")
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -138,9 +146,9 @@ class _MarkdownExtractor(HTMLParser):
         if tag in _HEADING_LEVEL and self._heading:
             title = re.sub(r"\s+", " ", "".join(self._hbuf)).strip()
             if title:
-                self._out.append(f"{'#' * self._heading} {title}")
+                self._out.append(f"{'#' * self._heading} {_escape_links(title)}")
                 self._out.append("")
-                self.headings.append(title)
+                self.headings.append(title)  # raw title for the (plain-text) navigation index
             self._heading = 0
             self._hbuf = []
         elif tag == "pre" and self._pre:
@@ -313,7 +321,11 @@ def _http_get(
     if final_host not in _ALLOWED_HOSTS:
         raise LiveFetchError("redirected off the allow-listed host")
     content_type = str(response.headers.get("Content-Type", "")).split(";")[0].strip().lower()
-    if content_type and not any(content_type.startswith(t) for t in _ALLOWED_CONTENT_TYPES):
+    if not content_type:
+        raise LiveFetchError(
+            "response had no Content-Type header"
+        )  # explicit: don't parse unlabeled
+    if not any(content_type.startswith(t) for t in _ALLOWED_CONTENT_TYPES):
         raise LiveFetchError(f"unexpected content type: {content_type}")
     body = response.read(_MAX_BYTES + 1)
     if len(body) > _MAX_BYTES:

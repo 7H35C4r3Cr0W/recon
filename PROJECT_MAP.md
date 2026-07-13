@@ -7,10 +7,11 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
 - **Verified:** `mypy --strict` clean (118 files) · `ruff check` + `ruff format --check` clean ·
-  **899 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
+  **902 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
   vendored HackTricks snapshot; `packaging/` build infra excluded from the wheel). Live-fetch +
   credential-durability paths independently refute-reviewed (0 credential-loss / allowlist-bypass /
-  data-leak defects; one confirmed spray secret-leak found + fixed). Spray preserves the discovered port.
+  data-leak defects; one confirmed spray secret-leak found + fixed, both low-sev residuals hardened).
+  Spray preserves the discovered port.
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 - Owner-approved policy decisions: [`docs/OWNER_DECISIONS.md`](docs/OWNER_DECISIONS.md) (live
   HackTricks fetch/cache is approved; project credentials are durable in `<project>/creds.json`).
@@ -412,19 +413,20 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 
 ## Immediate next chunk
 
-Cred-spraying (now **port-aware**), HackTricks (**Phases 1–3 + owner-approved live fetch/cache §14a**),
-parser multi-version resilience, durable project credentials, the **`doctor` guided safe installer**,
-and the **single-click AppImage + branded splash** (real acceptance build on Kali) are all done.
-Exactly one recommended next chunk:
+Cred-spraying (now **port-aware**), HackTricks (**Phases 1–3 + owner-approved live fetch/cache §14a**,
+both refute-review residuals hardened), parser multi-version resilience, durable project credentials,
+the **`doctor` guided safe installer**, and the **single-click AppImage + branded splash** (real
+acceptance build on Kali) are all done.
 
-- **⏭ Harden the two accepted low-severity live-fetch residuals** (from the refute review): escape
-  markdown metacharacters in extracted live content so a page's literal `[x](file://…)` text can't
-  become a clickable link, and treat a missing `Content-Type` header explicitly instead of skipping
-  validation. Both are **non-exploitable** today (the host is TLS-pinned `book.hacktricks.wiki`, so a
-  response can't be forged), so this is polish/defense-in-depth, not a fix.
+**The in-scope, deterministic backlog is exhausted — no deterministic next chunk remains.** What's
+left needs external resources, so the next move is the owner's call:
 
-**Blocked (need external resources):** the *timed* mock exam (authorized target); full interactive +
-cross-machine AppImage acceptance (a real desktop / a second VM — see `packaging/ACCEPTANCE.md`).
+- **⛔ Timed mock exam** — needs an authorized target.
+- **🕒 Full interactive + cross-machine AppImage acceptance** — a real desktop / a second VM (build +
+  headless construction are already verified; see `packaging/ACCEPTANCE.md`).
+
+Anything beyond those is new feature scope (not on the current roadmap) and should be owner-greenlit
+first.
 
 **Parallel future tracks (need an owner decision / gate):**
 - **Credential spraying (opt-in, off by default)** — ✅ **COMPLETE** end-to-end: CLAUDE.md §1/§2/§2a
