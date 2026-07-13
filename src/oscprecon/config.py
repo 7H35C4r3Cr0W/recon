@@ -2,12 +2,28 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 APP_NAME = "oscprecon"
 DEFAULT_WORKSPACE = Path.home() / "oscprecon"
 RECENT_LIMIT = 10
+
+# why: canonical default wordlist search roots — kept here (not in wordlists.py) so config stays the
+# single source of settings truth without importing the GUI-adjacent wordlist indexer.
+DEFAULT_WORDLIST_PATHS: tuple[Path, ...] = (
+    Path("/usr/share/seclists"),
+    Path("/usr/share/wordlists"),
+    Path.home() / "wordlists",
+)
+
+# Settings validation bounds + enums (config stays GUI-free; theme.py owns the palette application).
+THEMES = ("light", "dark")
+DEFAULT_THEME = "light"
+DEFAULT_MAX_CONCURRENCY = 4
+CONCURRENCY_RANGE = (1, 16)
+FONT_SIZE_RANGE = (8, 24)  # 0 = "use the Qt default, don't override"
 
 
 def config_dir() -> Path:
@@ -53,8 +69,101 @@ def save_prefs(prefs: dict[str, str]) -> None:
     _write_json_atomic(_prefs_path(), prefs)
 
 
+def _clamp(value: int, lo: int, hi: int) -> int:
+    return max(lo, min(hi, value))
+
+
+def _parse_int(raw: object, default: int, lo: int, hi: int) -> int:
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return _clamp(value, lo, hi)
+
+
+def _parse_bool(raw: object, default: bool) -> bool:
+    text = str(raw).strip().lower()
+    if text in ("1", "true", "yes", "on"):
+        return True
+    if text in ("0", "false", "no", "off", ""):
+        return False
+    return default
+
+
+@dataclass
+class Settings:
+    workspace_root: str
+    wordlist_paths: list[str]
+    theme: str
+    font_size: int  # 0 = don't override the Qt default
+    max_concurrency: int
+    nmap_udp_full: bool
+
+    def normalized(self) -> Settings:
+        font = self.font_size
+        if font != 0:
+            font = _clamp(font, *FONT_SIZE_RANGE)
+        return Settings(
+            workspace_root=self.workspace_root.strip() or str(DEFAULT_WORKSPACE),
+            wordlist_paths=[p for p in (s.strip() for s in self.wordlist_paths) if p],
+            theme=self.theme if self.theme in THEMES else DEFAULT_THEME,
+            font_size=font,
+            max_concurrency=_clamp(self.max_concurrency, *CONCURRENCY_RANGE),
+            nmap_udp_full=bool(self.nmap_udp_full),
+        )
+
+    def to_prefs(self) -> dict[str, str]:
+        # NOTE: settings never hold secrets — only paths, a theme name, and numeric knobs.
+        return {
+            "workspace_root": self.workspace_root,
+            "wordlist_paths": os.pathsep.join(self.wordlist_paths),
+            "theme": self.theme,
+            "font_size": str(self.font_size),
+            "max_concurrency": str(self.max_concurrency),
+            "nmap_udp_full": "true" if self.nmap_udp_full else "false",
+        }
+
+
+def default_settings() -> Settings:
+    return Settings(
+        workspace_root=str(DEFAULT_WORKSPACE),
+        wordlist_paths=[str(p) for p in DEFAULT_WORDLIST_PATHS],
+        theme=DEFAULT_THEME,
+        font_size=0,
+        max_concurrency=DEFAULT_MAX_CONCURRENCY,
+        nmap_udp_full=False,
+    )
+
+
+def load_settings() -> Settings:
+    prefs = load_prefs()
+    base = default_settings()
+    raw_paths = prefs.get("wordlist_paths")
+    paths = [p for p in raw_paths.split(os.pathsep) if p] if raw_paths else base.wordlist_paths
+    return Settings(
+        workspace_root=prefs.get("workspace_root") or base.workspace_root,
+        wordlist_paths=paths,
+        theme=prefs.get("theme", base.theme),
+        font_size=_parse_int(prefs.get("font_size"), base.font_size, 0, FONT_SIZE_RANGE[1]),
+        max_concurrency=_parse_int(
+            prefs.get("max_concurrency"), base.max_concurrency, *CONCURRENCY_RANGE
+        ),
+        nmap_udp_full=_parse_bool(prefs.get("nmap_udp_full"), base.nmap_udp_full),
+    ).normalized()
+
+
+def save_settings(settings: Settings) -> None:
+    prefs = load_prefs()  # preserve unrelated keys (recent handling lives elsewhere)
+    prefs.update(settings.normalized().to_prefs())
+    save_prefs(prefs)
+
+
+def reset_settings() -> None:
+    save_settings(default_settings())
+
+
 def workspace_root() -> Path:
-    return Path(load_prefs().get("workspace_root", str(DEFAULT_WORKSPACE)))
+    return Path(load_settings().workspace_root)
 
 
 def recent_profiles() -> list[str]:

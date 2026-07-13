@@ -119,14 +119,43 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 
 ---
 
+## Workspace Dashboard & Project Organization — ✅ built & verified (cross-cutting)
+
+Deterministic upgrade turning individually-opened profiles into an organized local workspace. Business
+logic in `src/oscprecon/workspace/` (profiles stay authoritative; the index is never a second source of
+truth); GUI in `src/oscprecon/gui/workspace/`. Delivered in chunks (`e6ffb7e`…`eebc8cc`) + a settings
+dialog:
+
+- **Index + organization metadata** — `scan_workspace` → typed `ProfileSummary` (counts + booleans,
+  never secrets); backward-compatible `profile.json` `organization` block (status/tags/pinned/archived/
+  display_name), normalized + atomic.
+- **Dashboard** — searchable/filterable home view (`Ctrl+0`), off-thread cancellable scan, corrupt
+  profiles surface as ⚠ rows; pin/tag/status/archive + bulk actions (no scan/cred/delete).
+- **Global search** — never indexes/shows passwords/tokens/keys; credential hits carry username/domain
+  only, previews plain-text + capped.
+- **Health + repairs** — read-only checks; opt-in repairs back up before changing, never delete.
+- **Locks + read-only** — advisory `<profile>/.lock` (§6b — resolves the deferred item below); live-lock
+  never stolen, stale recovered, foreign-host conservative; read-only blocks every write, export still
+  works.
+- **Activity timeline, saved views, safe bulk actions** — all filter-/read-only, secret-redacted.
+- **Preferences dialog** (§19) — `File → Preferences…` (`Ctrl+,`), 8 tabbed sections (Workspace /
+  Appearance / Tool paths / Scan / Reports / Privacy / Performance / Advanced) over a typed
+  `config.Settings` layer (validate + clamp + atomic, no secrets). Mandatory secret protections are
+  shown **locked-on** and cannot be disabled.
+
+Verified: four gates + offscreen GUI green (656 tests); wheel ships and imports `workspace/` +
+`gui/workspace/` from a clean venv.
+
+---
+
 ## Deferred / TODO (cross-cutting)
 
 Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` §27:
 
-- **Concurrent-copy profile lock (`<profile>/.lock`, CLAUDE.md §6b).** Still queued: opening a profile
-  for edit should flock a `.lock` (owning PID) so a second GUI instance prompts "open read-only?".
 - **Exam-profile preset + timed mock exam (Phase 6).** A tight/fast command-set preset (no `--script
   vuln`, no deep recursion) and a timed dry run against a standalone + AD set.
+
+*(The concurrent-copy profile lock, CLAUDE.md §6b, is now built — see the Workspace Dashboard section.)*
 
 <!-- Resolved and removed from this list (proven by code + tests):
      real scan cancellation (cancel Event + closeEvent cancel-then-wait);

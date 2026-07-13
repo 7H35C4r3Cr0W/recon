@@ -44,7 +44,24 @@ second source of truth) + `src/oscprecon/gui/workspace/` (dashboard). Commits `e
   saved-view combo, show-archived, actions, empty-state, a11y) is the home view (`Ctrl+0` / startup);
   MainWindow acquires the lock on open, prompts read-only for a live foreign lock, and disables all
   writes (run/save/add-cred/notes/audit/reference-visits) + shows `[READ-ONLY]` when read-only.
-- Verify: four gates + offscreen GUI green, 627 tests; wheel ships `workspace/` + `gui/workspace/` and
+- **packaging verification + docs** (`1e6d11e`): confirmed the wheel ships `workspace/` + `gui/workspace/`
+  and both import + function from a clean venv outside the checkout.
+- **adversarial-review fixes** (`eebc8cc`): refute-biased review across the upgrade surfaced 8 real
+  defects, each reproduced + regression-tested + fixed with the smallest change — tag single-source-of-
+  truth (organization.tags mirrored to profile.tags for the report/Obsidian frontmatter), profile.json
+  symlink-escape guard, cancellable `scan_workspace`, atomic-rename `recover_stale`, dashboard skips
+  live-locked profiles + emits `profile_mutated`, PlainText details/lock dialogs, main-window reloads an
+  open profile's org block so a later save can't clobber a dashboard edit.
+- **settings dialog** (Chunk 11): `config.Settings` typed layer (load/save/reset, validation +
+  clamping, atomic, no secrets) on top of `prefs.json`; `DEFAULT_WORDLIST_PATHS` + validation bounds
+  centralized in `config`. `SettingsDialog` (`File → Preferences…`, `Ctrl+,`) with 8 tabbed sections —
+  Workspace (root, create-on-save), Appearance (theme + live font override), Tool paths (wordlist
+  search paths, password lists always filtered), Scan (opt-in full-UDP sweep), Reports (fixed
+  redaction/archiving guarantees, informational), Privacy (mandatory protections shown locked-on —
+  cannot be disabled), Performance (max concurrent workers), Advanced (config path + reset). Wired live:
+  theme/font/concurrency re-applied on save, `nmap_udp_full` drives `NmapWorker`, dashboard re-scans on
+  workspace-root change, theme menu stays in sync.
+- Verify: four gates + offscreen GUI green, 656 tests; wheel ships `workspace/` + `gui/workspace/` and
   they import + function from a clean venv outside the checkout. Import note: `workspace/bulk.py`
   imports profile/reporter/vault_export so it is NOT re-exported from `workspace/__init__` (cycle).
 

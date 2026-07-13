@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import socket
@@ -157,8 +158,6 @@ def recover_stale(directory: Path) -> LockInfo | None:
     except OSError:
         return None
     else:
-        try:
+        with contextlib.suppress(OSError):
             claimed.unlink(missing_ok=True)
-        except OSError:
-            pass
     return acquire(directory)  # O_EXCL — only one instance can win this

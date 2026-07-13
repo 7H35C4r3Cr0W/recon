@@ -66,8 +66,8 @@ def test_foreign_host_lock_is_conservative(tmp_path: Path) -> None:
 def test_recover_stale_never_destroys_a_fresh_valid_lock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # regression: recover_stale must claim the exact stale file atomically, not blindly unlink — else
-    # a racer that installed a fresh VALID lock in between would have it deleted (two writable owners).
+    # regression: recover_stale must claim the exact stale file atomically, not blindly unlink —
+    # else a racer that installed a fresh VALID lock in between would lose it (two writable owners).
     import subprocess
 
     p = subprocess.Popen(["true"])
@@ -91,8 +91,8 @@ def test_recover_stale_never_destroys_a_fresh_valid_lock(
     monkeypatch.setattr(locks, "is_stale", racing_is_stale)
     result = locks.recover_stale(tmp_path)
     # the atomic rename saw the file was no longer the stale one (it was replaced) — either way the
-    # racer's live lock is preserved OR we cleanly re-acquire; we must NEVER end up destroying it and
-    # both being writable. The on-disk owner is a single valid lock.
+    # racer's live lock is preserved OR we cleanly re-acquire; we must NEVER destroy it and both end
+    # up writable. The on-disk owner is a single valid lock.
     on_disk, malformed = locks.read_lock(tmp_path)
     assert not malformed and on_disk is not None
     # if we didn't get it, the live lock survived; if we did, exactly one owner exists

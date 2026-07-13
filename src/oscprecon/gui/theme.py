@@ -51,3 +51,20 @@ def apply_theme(name: str) -> None:
         app.setPalette(_dark_palette())
     else:
         app.setPalette(app.style().standardPalette())
+
+
+_default_point_size: int | None = None
+
+
+def apply_font(point_size: int) -> None:
+    # point_size <= 0 means "restore the Qt default" — captured once on first call so the override
+    # is fully reversible without an app restart.
+    global _default_point_size
+    app = QApplication.instance()
+    if not isinstance(app, QApplication):
+        return
+    font = app.font()
+    if _default_point_size is None:
+        _default_point_size = font.pointSize()
+    font.setPointSize(point_size if point_size > 0 else _default_point_size)
+    app.setFont(font)

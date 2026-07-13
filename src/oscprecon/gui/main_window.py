@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 from oscprecon import config, findings, references, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.gui import theme
-from oscprecon.gui.dialogs import AddCredentialDialog, NewProfileDialog
+from oscprecon.gui.dialogs import AddCredentialDialog, NewProfileDialog, SettingsDialog
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
 from oscprecon.gui.widgets.graph_view import GraphView
@@ -120,13 +120,15 @@ def _contained_path(base: Path, rel: str) -> Path | None:
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        theme.apply_theme(config.load_prefs().get("theme", theme.DEFAULT_THEME))
+        settings = config.load_settings()
+        theme.apply_theme(settings.theme)
+        theme.apply_font(settings.font_size)
         self.setWindowTitle("oscp-recon")
         self.resize(1200, 720)
         self._profile: Profile | None = None
         self._auditor: Auditor | None = None
         self._locked_dir: Path | None = None  # the profile dir we currently hold an edit-lock on
-        self._tasks = TaskManager()
+        self._tasks = TaskManager(settings.max_concurrency)
         self._task_bar = TaskStatusBar(self._tasks)
         self._recent_menu: QMenu
         self._new_action: QAction
@@ -246,6 +248,12 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self._export_vault_action)
 
         file_menu.addSeparator()
+        prefs_action = QAction("Preferences...", self)
+        prefs_action.setShortcut("Ctrl+,")
+        prefs_action.triggered.connect(self._on_preferences)
+        file_menu.addAction(prefs_action)
+
+        file_menu.addSeparator()
         exit_action = QAction("Exit", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
@@ -289,7 +297,7 @@ class MainWindow(QMainWindow):
 
         theme_menu = view_menu.addMenu("Theme")
         self._theme_group = QActionGroup(self)
-        current_theme = theme.normalize(config.load_prefs().get("theme", theme.DEFAULT_THEME))
+        current_theme = theme.normalize(config.load_settings().theme)
         for name in theme.THEMES:
             action = QAction(name.capitalize(), self, checkable=True)
             action.setChecked(name == current_theme)
@@ -436,9 +444,29 @@ class MainWindow(QMainWindow):
 
     def _set_theme(self, name: str) -> None:
         theme.apply_theme(name)
-        prefs = config.load_prefs()
-        prefs["theme"] = theme.normalize(name)
-        config.save_prefs(prefs)
+        settings = config.load_settings()
+        settings.theme = theme.normalize(name)
+        config.save_settings(settings)
+
+    def _on_preferences(self) -> None:
+        dialog = SettingsDialog(config.load_settings(), self)
+        dialog.applied.connect(self._apply_settings)
+        dialog.exec()
+
+    def _apply_settings(self, settings: object) -> None:
+        if not isinstance(settings, config.Settings):
+            return
+        theme.apply_theme(settings.theme)
+        theme.apply_font(settings.font_size)
+        self._sync_theme_menu(settings.theme)
+        self._tasks.max_concurrency = settings.max_concurrency
+        self._update_status_footer()
+        self._dashboard.refresh()  # workspace root may have changed
+        self._audit_action("settings-changed", theme=settings.theme)
+
+    def _sync_theme_menu(self, name: str) -> None:
+        for action in self._theme_group.actions():
+            action.setChecked(action.text().lower() == name)
 
     def _on_graph_service_open(self, port: int, proto: str) -> None:
         # the graph's "Open service tooling" button jumps to the three-pane view + selects the svc
@@ -738,7 +766,7 @@ class MainWindow(QMainWindow):
         if self._profile is None or not self._tasks.can_start(exclusive=True):
             return
         self._tool_panel.append_output("[nmap] starting…")
-        worker = NmapWorker(self._profile)
+        worker = NmapWorker(self._profile, udp_full=config.load_settings().nmap_udp_full)
         self._start(worker, "nmap", self._on_scan_done, exclusive=True)
 
     def _on_run_command(self, command: str) -> None:

@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 from oscprecon import config
+from oscprecon.config import DEFAULT_WORDLIST_PATHS  # re-export: canonical roots live in config now
 
-DEFAULT_WORDLIST_PATHS: tuple[Path, ...] = (
-    Path("/usr/share/seclists"),
-    Path("/usr/share/wordlists"),
-    Path.home() / "wordlists",
-)
+__all__ = ["DEFAULT_WORDLIST_PATHS"]  # (extended implicitly by the module's public functions)
 
 # why: password brute force is out of scope (§2/§13) — password lists MUST NEVER be surfaced.
 # Two layers: (1) an affirmative allowlist — only files whose path maps to a known recon
@@ -75,10 +71,7 @@ class Wordlist:
 
 
 def wordlist_paths() -> list[Path]:
-    raw = config.load_prefs().get("wordlist_paths")
-    if raw:
-        return [Path(part) for part in raw.split(os.pathsep) if part]
-    return list(DEFAULT_WORDLIST_PATHS)
+    return [Path(part) for part in config.load_settings().wordlist_paths]
 
 
 def is_excluded(path: Path) -> bool:

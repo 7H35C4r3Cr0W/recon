@@ -78,6 +78,22 @@ and service/finding/**credential counts** (counts only — secret values never a
   works). Stale locks (dead PID, same host) are recovered automatically; live/foreign ones are never
   stolen.
 
+### Preferences
+
+`File → Preferences…` (`Ctrl+,`) opens a tabbed settings dialog, persisted atomically to
+`~/.config/oscprecon/prefs.json`:
+
+- **Workspace** — workspace root (created on save if missing).
+- **Appearance** — light/dark theme and an optional application font-size override (applied live).
+- **Tool paths** — wordlist search paths (password lists are always filtered out and never shown).
+- **Scan** — opt-in full UDP port sweep for *Run Full Recon* (default stays UDP top-100).
+- **Reports** — the fixed redaction/archiving guarantees, shown for reference.
+- **Privacy** — the mandatory secret protections (§2), displayed locked-on; they cannot be disabled.
+- **Performance** — cap on concurrent recon workers.
+- **Advanced** — config-file location and *Reset all settings to defaults*.
+
+Invalid values fall back to safe defaults; out-of-range numbers are clamped.
+
 ### Profile layout
 
 Each box is a self-contained folder under the workspace root (default `~/oscprecon/`):
