@@ -1,9 +1,11 @@
 from pathlib import Path
 
 from oscprecon import audit
+from oscprecon import edb as edb_mod
 from oscprecon import findings as findings_mod
 from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
+from oscprecon.references import ExploitHit
 from oscprecon.reporter import Reporter, _finding_line
 
 
@@ -24,6 +26,37 @@ def test_finding_line_http_shape() -> None:
 
 def test_finding_line_note_only_shape() -> None:
     assert _finding_line({"module": "vhost", "note": "dev.corp.local"}) == "dev.corp.local"
+
+
+def test_report_renders_edb_references(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    edb_mod.add_edb(
+        prof.directory,
+        service="22/tcp ssh",
+        product="OpenSSH",
+        version="7.2",
+        hits=[
+            ExploitHit(
+                edb_id="40136",
+                title="OpenSSH 7.2 - Username Enumeration",
+                url="https://www.exploit-db.com/exploits/40136",
+                path="linux/remote/40136.py",
+            )
+        ],
+    )
+    report = Reporter(prof).render()
+    assert "## Exploit-DB references" in report
+    assert "### 22/tcp ssh" in report
+    assert "[EDB-40136](https://www.exploit-db.com/exploits/40136)" in report
+    assert "Lookup only" in report  # the §14 callout is present
+    assert "40136.py" not in report  # the local PoC path is never surfaced
+
+
+def test_report_edb_empty_placeholder(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    report = Reporter(prof).render()
+    assert "## Exploit-DB references" in report
+    assert "No Exploit-DB matches recorded" in report
 
 
 def test_report_renders_per_service_findings(tmp_path: Path) -> None:

@@ -9,18 +9,32 @@ Running record of what's been built, in order, so any session can pick up mid-st
 **See [`PROJECT_MAP.md`](PROJECT_MAP.md) for the authoritative status map** (subsystem-by-subsystem
 ✅/🚧/⏭/🕒/⛔/❌, dependency graph, forward phases). This "Next up" is the one-line pointer.
 
-Phases 0–5, all 19 recon modules (14 core + Redis/MongoDB/MSSQL/MySQL/PostgreSQL) **each with pattern
-next-steps (19/19, 47 rules)**, Phase 4 graph (incl. §16 reinforcements), the full Workspace Dashboard
-& Organization upgrade, the **exam-mode scan profile**, and **project file operations §19** are
-**DONE** — 700 tests green. Phase 6 is partial: `doctor` + status footer + audit log + concurrent-copy
-lock + exam profile done; only the *timed* mock exam remains (blocked on a live target).
+Phases 0–5, all 19 recon modules (each with pattern next-steps, 47 rules), Phase 4 graph (incl. §16
+reinforcements), the full Workspace Dashboard & Organization upgrade, the **exam-mode scan profile**,
+**project file operations §19**, and **report Exploit-DB-hit persistence** are **DONE** — 709 tests
+green. Phase 6 is partial: `doctor` + status footer + audit log + concurrent-copy lock + exam profile
+done; only the *timed* mock exam remains (blocked on a live target). **The recon/report core now has no
+known coverage gaps.**
 
-**Recommended next chunk (do one at a time):** **report Exploit-DB-hit persistence** — searchsploit
-runs live in the reference pane but hits aren't persisted, so `report.md` can't list them. Add a
-per-profile EDB store + a reporter section; lookup-only (§14), no PoC fetch/run. Deterministic, no live
-target. Later candidates: AD/Kerberos workflow polish; the **distribution phase** (installer / tool-
-update-resilient parsers / single-click app / splash — future, not greenlit; see build memory).
-**Blocked:** live acceptance testing + timed mock exam (need an authorized target).
+**Recommended next chunk (do one at a time):** **AD/Kerberos enumeration workflow polish** — surface
+GetNPUsers/GetUserSPNs listing as Tier-2/module, enumeration only (no cracking, §2). It's the last
+well-defined in-scope deterministic chunk. **After it, the in-scope backlog is essentially exhausted:**
+remaining tracks are FUTURE / not greenlit (distribution phase; finding-aware HackTricks — needs a
+CLAUDE.md §27 change) and BLOCKED (live acceptance testing + timed mock, need an authorized target).
+
+### Report Exploit-DB-hit persistence — DONE (lookup-only §14)
+searchsploit runs live in the reference pane; now its hits persist and land in the report.
+- **`src/oscprecon/edb.py`** — per-profile `edb.json` store: `add_edb(service, product, version, hits)`
+  writes `{service, product, version, edb_id, title, url, discovered_at}`, deduped on
+  (edb_id, product, version). **Lookup-only: the local PoC `path` is NEVER stored** — no run/copy path.
+- **GUI**: `MainWindow._on_service_selected` captures the service context; `_on_edb_done` →
+  `_persist_edb` writes the store for the current lookup (stale results dropped), **skipped in
+  read-only mode**. searchsploit results come from the local exploitdb DB (curated titles), not target
+  output, so no report-injection surface.
+- **Reporter**: `_group_edb` + an "Exploit-DB references" `report.md` section (Obsidian callout stating
+  lookup-only §14; grouped by service; clickable `[EDB-<id>](url)` links; no PoC path).
+- **Tests (+9 → 709):** store round-trip/dedup/distinct-version/empty/corrupt; report renders the
+  section + placeholder + omits the PoC path; GUI persists + read-only skips.
 
 ### Pattern coverage ssh/ike/tftp/vhost — DONE (Phase 3 breadth complete: 19/19 modules)
 Added `patterns/{ssh,ike,tftp,vhost}.yaml`, closing the last pattern gap (was 15/19). Each entry

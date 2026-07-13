@@ -43,6 +43,20 @@ _No open ports discovered yet._
 _Run nmap to populate this section._
 {% endfor %}
 
+## Exploit-DB references
+
+> [!note] Lookup only — EDB-IDs surfaced by `searchsploit`. No PoC is downloaded, run, or transformed (§14).
+{% for g in edb_groups %}
+
+### {{ g.service }}
+{% for h in g.hits %}
+- [EDB-{{ h.edb_id }}]({{ h.url }}) — {{ h.title }}
+{% endfor %}
+{% else %}
+
+_No Exploit-DB matches recorded — select a versioned service to run searchsploit._
+{% endfor %}
+
 ## Per-service findings
 {% for g in finding_groups %}
 

@@ -56,7 +56,9 @@ reference), plus a Bloodhound-style graph view (`Ctrl+G`).
 - **Findings & credentials** persist to `findings.json` / `creds.json` (mode 600); anonymous/null
   enum auto-records a credential entry consumed by later modules.
 - **Reports** — `report.md` (Obsidian-friendly frontmatter + callouts, prior versions archived) with a
-  rendered report tab. `File → Export to Obsidian Vault…` writes a linked note folder.
+  rendered report tab, including an **Exploit-DB references** section (searchsploit EDB-IDs surfaced per
+  service — lookup-only, no PoC fetched or run). `File → Export to Obsidian Vault…` writes a linked note
+  folder.
 - **Resume** — `--resume` skips commands whose output already exists (`--force` re-runs).
 - **Doctor** — `oscprecon-cli doctor` checks every wrapped tool on `PATH` and prints install hints.
 

@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import config, findings, references, vault_export
+from oscprecon import config, edb, findings, references, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.gui import theme
 from oscprecon.gui.dialogs import AddCredentialDialog, NewProfileDialog, SettingsDialog
@@ -166,6 +166,7 @@ class MainWindow(QMainWindow):
         self._reference_pane.page_visited.connect(self._on_page_visited)
         self._edb_request_id = 0
         self._edb_workers: set[QThread] = set()
+        self._edb_context: tuple[str, str, str] | None = None  # (service label, product, version)
         self._pending_visits: list[tuple[str, str]] = []
 
         left = QWidget()
@@ -540,6 +541,11 @@ class MainWindow(QMainWindow):
             / "references"
             / f"edb-{selected.port}-{selected.proto.value}.json"
         )
+        self._edb_context = (
+            f"{selected.port}/{selected.proto.value} {selected.service}".strip(),
+            selected.product,
+            selected.version,
+        )
         worker = SearchsploitWorker(
             selected.product, selected.version, output_file, self._edb_request_id
         )
@@ -553,6 +559,21 @@ class MainWindow(QMainWindow):
             return  # a newer selection superseded this lookup
         if isinstance(hits, list):
             self._reference_pane.show_exploits(hits)
+            self._persist_edb(hits)
+
+    def _persist_edb(self, hits: list[Any]) -> None:
+        # record the EDB references (lookup-only) into report.md; skipped in read-only mode.
+        if (
+            self._profile is None
+            or self._profile.read_only
+            or not hits
+            or self._edb_context is None
+        ):
+            return
+        service, product, version = self._edb_context
+        edb.add_edb(
+            self._profile.directory, service=service, product=product, version=version, hits=hits
+        )
 
     def _on_page_visited(self, label: str, url: str) -> None:
         if self._profile is None or self._profile.read_only:

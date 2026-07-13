@@ -158,13 +158,18 @@ Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` �
 
 - ✅ **Pattern-library coverage** — DONE: `patterns/{ssh,ike,tftp,vhost}.yaml` added; **all 19 modules**
   now have provenance-cited, forbidden-gate-clean, policy-clean pattern entries (47 rules).
-- **Report Exploit-DB-hit persistence** — *recommended next chunk.* searchsploit runs live in the
-  reference pane but hits aren't persisted, so `report.md` can't list them. Add a per-profile EDB store
-  + a reporter section. Lookup-only (§14) — no PoC download/execute. Deterministic, no live target.
+- ✅ **Report Exploit-DB-hit persistence** — DONE: `edb.py` → per-profile `edb.json` + an "Exploit-DB
+  references" report section. Lookup-only (§14): EDB-ID/title/URL only, never the local PoC path.
+- **AD/Kerberos enum workflow polish** — *recommended next chunk.* Surface GetNPUsers/GetUserSPNs
+  listing as Tier-2/module (enumeration only, no cracking). Last well-defined in-scope deterministic
+  chunk; the recon/report core now has no known coverage gaps.
 - **Timed mock exam (Phase 6).** A timed dry run against a standalone + AD set. Blocked on an authorized
   live target. (The exam-mode *scan profile* it would exercise is now built.)
 - **Distribution & resilience (future, not greenlit).** Public GitHub release: tool-update-resilient
   parsers, `doctor`→safe installer, single-click contained app, splash screen. See the build memory.
+- **Finding-aware HackTricks integration (future, not greenlit).** Surface the relevant HackTricks
+  section per finding (offline vendored repo). **Needs a CLAUDE.md §27 change first** (§27 currently
+  forbids scraping/caching HackTricks). Reconcile with owner + attribute (CC BY-NC-SA) before any work.
 
 *(The concurrent-copy profile lock, CLAUDE.md §6b, the status footer §19, and the audit log §6a are now
 built — see the Workspace Dashboard section.)*

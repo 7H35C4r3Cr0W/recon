@@ -7,6 +7,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 from oscprecon import audit, references
+from oscprecon import edb as edb_mod
 from oscprecon import findings as findings_mod
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
@@ -77,6 +78,26 @@ def _group_findings(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{"module": module, "lines": groups[module]} for module in sorted(groups)]
 
 
+def _group_edb(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # group EDB references by service (first-seen order), dedup EDB-IDs within each service.
+    groups: dict[str, list[dict[str, str]]] = {}
+    seen: dict[str, set[str]] = {}
+    for entry in raw:
+        service = str(entry.get("service", "")).strip() or "unknown"
+        edb_id = str(entry.get("edb_id", "")).strip()
+        if not edb_id or edb_id in seen.setdefault(service, set()):
+            continue
+        seen[service].add(edb_id)
+        groups.setdefault(service, []).append(
+            {
+                "edb_id": edb_id,
+                "title": str(entry.get("title", "")),
+                "url": str(entry.get("url", "")),
+            }
+        )
+    return [{"service": service, "hits": groups[service]} for service in groups]
+
+
 class Reporter:
     def __init__(self, profile: Profile) -> None:
         self.profile = profile
@@ -108,6 +129,7 @@ class Reporter:
         if profile.notes_path.exists():
             notes = profile.notes_path.read_text(encoding="utf-8").strip()
         raw_findings = findings_mod.load_findings(profile.directory)
+        edb_groups = _group_edb(edb_mod.load_edb(profile.directory))
         all_audit = audit.load_entries(profile.directory)
         shown_audit = all_audit[-_AUDIT_CAP:]
         audit_rows = [
@@ -138,6 +160,7 @@ class Reporter:
             "status": profile.status,
             "services": services,
             "finding_groups": _group_findings(raw_findings),
+            "edb_groups": edb_groups,
             "audit_rows": audit_rows,
             "audit_total": len(all_audit),
             "command_history": profile.command_history,

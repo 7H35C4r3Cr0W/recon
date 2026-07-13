@@ -6,8 +6,8 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (105 files) · `ruff check` + `ruff format --check` clean ·
-  **700 tests** pass (incl. 189 offscreen GUI) · `test_packaging` green (wheel ships resources).
+- **Verified:** `mypy --strict` clean (106 files) · `ruff check` + `ruff format --check` clean ·
+  **709 tests** pass (incl. 191 offscreen GUI) · `test_packaging` green (wheel ships resources).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
 ## Status legend
@@ -161,10 +161,11 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 - **Does:** `report.md` with Obsidian YAML frontmatter + callouts + full command log; prior report
   archived to `report-archive/` before overwrite; rendered report tab; `File → Export to Obsidian
   Vault…` writes a linked note folder (also available as a bulk action).
-- **Complete:** single-file Obsidian mode (default) + on-demand vault export.
-- **Remaining:** Exploit-DB hits in the report are deferred (need a persistent per-profile EDB store).
-  **Note:** the §19 `.tar.gz` project import/export is now built in `workspace/portability.py` (see §6);
-  `bulk.export_project` remains a distinct *vault* export, not the tarball backup.
+- **Complete:** single-file Obsidian mode (default) + on-demand vault export. **Exploit-DB references**
+  now persist per profile (`edb.py` → `edb.json`) and render as an "Exploit-DB references" report
+  section — **lookup-only (§14): EDB-ID/title/URL only, never the local PoC path or content.**
+- **Remaining:** none of the known report gaps. **Note:** the §19 `.tar.gz` project import/export lives
+  in `workspace/portability.py` (§6); `bulk.export_project` remains a distinct *vault* export.
 - **Depends on:** profile model, findings/credentials, references.
 - **Risks:** report must stay self-contained (no external inlined content) for exam use.
 - **Tests:** `test_reporter_findings`, `test_vault_export`, `tests/gui/test_report_view`,
@@ -218,7 +219,8 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 | Scan profiles incl. **exam mode** | ✅ **Done** | orchestrator, modules, settings | quick/default/full/exam govern the nmap battery; exam is speed-tuned + exam-legal (no `--script vuln`). Preferences default + `Scan → Run recon with profile` + CLI `--scan-profile` |
 | Project file ops (`Open by IP`, `Import`/`Export .tar.gz`) | ✅ **Done** | profile model, workspace index | `workspace/portability.py` + File menu + CLI `export-project`/`import-project`; traversal-safe import, warns `creds.json` included |
 | Pattern coverage for ssh/ike/tftp/vhost | ✅ **Done** | pattern engine | all 19 modules now have `patterns/*.yaml` (47 rules); commands policy-clean |
-| Report EDB-hit persistence | ⏭ **Next** | references, profile store | Needs a per-profile EDB store to render searchsploit hits into `report.md` |
+| Report EDB-hit persistence | ✅ **Done** | references, profile store | `edb.py`→`edb.json` + report section; lookup-only (no PoC path) |
+| AD / Kerberos enum workflow polish | ⏭ **Next** | smb/ldap modules (✅) | Enumeration only (GetNPUsers/GetUserSPNs listing), no cracking |
 | Timed mock-exam dry run | ⛔ | exam preset (✅) + live targets | The "timed" part needs authorized targets |
 | AD / Kerberos enum workflow polish | 🕒 | smb/ldap modules (✅) | Enumeration only, no cracking |
 
@@ -233,8 +235,8 @@ audit log §6a, concurrent-copy lock §6b) and the full Workspace Dashboard & Or
 
 - **Phase 6 (exam-day polish):** `doctor` ✅, self-contained report ✅, **exam-mode scan profile ✅**;
   only the **timed** mock-exam dry run remains (⛔ needs an authorized target).
-- **Reports:** Exploit-DB hits not yet persisted into `report.md` (the last known coverage gap now that
-  pattern breadth is complete — 19/19 modules).
+- _(No known coverage gaps remain in the recon/report core: pattern breadth is 19/19 and Exploit-DB
+  references now persist into the report. Remaining work is forward-looking — see §13 and the phases.)_
 
 ## 16. Blocked work — ⛔
 
@@ -333,7 +335,7 @@ flowchart TD
 | Findings | ✅ | High (`test_findings*`) | New unredacted render surface | Route all through `redact()` |
 | Credentials | ✅ | High (`test_creds`, `test_audit`) | Secret leakage | None — 0600 + redaction |
 | Graph | ✅ | Medium (`test_graph_data/_view`) | None material | None |
-| Reports | ✅ | High (`test_reporter_findings`) | EDB hits not persisted | Add per-profile EDB store (later) |
+| Reports | ✅ | High (`test_reporter_findings`, `test_edb`) | Report injection via tool output | None — EDB refs persist (lookup-only) |
 | Obsidian export | ✅ | High (`test_vault_export`) | None | None |
 | Project portability | ✅ | High (`test_workspace_portability`, `test_cli_project`, GUI) | Malicious archive on import | Done — traversal-safe + bomb cap |
 | Packaging | ✅ | Medium (`test_packaging`) | Unshipped new resource | Keep `test_packaging` current |
@@ -372,6 +374,11 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
   4. **Single-click contained app** — evaluate PyInstaller/Briefcase/AppImage; launches the GUI on click.
   5. **Splash screen** with ASCII-art branding on load (`QSplashScreen`), Burp-style.
   6. **Public-release hygiene** — license, outside-user README, screenshots, clean fresh-Kali install.
+- **Finding-aware HackTricks integration** 🕒 (future; **not greenlit**, and needs a **CLAUDE.md §27
+  change first** — §27 currently forbids scraping/caching HackTricks). Idea: on a finding, surface the
+  exact relevant HackTricks section (not just the page) inline / into notes, likely by vendoring the
+  open-source HackTricks markdown repo offline (exam-legal, must attribute — CC BY-NC-SA). Reconcile
+  §2/§27 with the owner before any work.
 
 ---
 
@@ -395,21 +402,22 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 
 ## Immediate next chunk
 
-**⏭ Report Exploit-DB-hit persistence.**
+**⏭ AD / Kerberos enumeration workflow polish.**
 
-- **Why this one:** the reference pane already runs `searchsploit --json` live per service, but those
-  Exploit-DB hits are **not** persisted, so `report.md` can't list them — the last known coverage gap
-  now that pattern breadth is complete (19/19). Deterministic, needs **no live target**, and depends
-  only on the existing references + profile store.
-- **Completion definition:** a per-profile EDB store (e.g. `references/visited.json` extended, or a new
-  `edb.json`) that records searchsploit hits per service (EDB-ID, title, product/version — lookup-only,
-  never the PoC); the reporter renders a "Exploit-DB references" section citing them; tests for the
-  store + report rendering; **stays lookup-only (§14) — no PoC download/execute/transform**.
-- **Explicitly excludes:** the *timed* mock-exam run (⛔), live validation, and anything that fetches or
-  runs a PoC.
+- **Why this one:** it is the last well-defined **in-scope, deterministic** chunk — the recon/report
+  core now has no known coverage gaps (patterns 19/19, EDB references persisted). The impacket enum
+  scripts are already allow-listed; this makes AD enumeration a first-class flow.
+- **Completion definition:** a focused Kerberos/AD **enumeration** surface — e.g. surface
+  `GetNPUsers.py` (AS-REP user listing) and `GetUserSPNs.py` (SPN listing) as Tier-2 manual commands /
+  a small module, driven by discovered users + a domain, **enumeration only (no cracking on-host, §2)**;
+  parser + fixtures; pattern entries; tests. Consumes propagated creds when present.
+- **Explicitly excludes:** any hash cracking / roasting-to-crack, the *timed* mock-exam (⛔), and live
+  validation.
 
-**Later candidates (do not start):** AD/Kerberos enum workflow polish; the queued distribution phase
-(installer / tool-update-resilient parsers / single-click app / splash — see *Future / distribution*).
+**After this, the in-scope backlog is essentially exhausted** — the remaining tracks are **future /
+not greenlit** (Phase 6 distribution: installer / resilient parsers / single-click app / splash; and
+the HackTricks deep-integration idea — both need an owner decision, the latter also a §27 change) and
+**blocked** (live validation + timed mock, need an authorized target). Good moment to pick a direction.
 
 ---
 
