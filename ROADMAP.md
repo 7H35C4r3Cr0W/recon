@@ -163,11 +163,10 @@ Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` �
 - ✅ **AD/Kerberos enum workflow** — DONE: `modules/kerberos` (Tier-1 credential-free `nmap -sV -p88`
   KDC confirm; Tier-2 enum-only single-user AS-REP + GetADUsers/GetUserSPNs). Parser records
   principals/SPNs but **never the AS-REP/TGS hash**; no `-usersfile`, no `-request`, no cracking.
-- **Finding-aware HackTricks integration** — **Phase 1 DONE** (`37f0d68`): 21 network-services pages
-  vendored offline (`references/hacktricks/` + `refresh.py`, CC BY-NC-SA) + `hacktricks.py` loader,
-  shipped in the wheel. *Next: Phase 2* — render the offline page in the reference pane beside the live
-  link + finding-aware section extraction. (Owner FYSA: live scraping may also be OK — offer to relax
-  §2/§27 further.)
+- **Finding-aware HackTricks integration** — **Phases 1–2 DONE** (`37f0d68`, `7e5005e`, `f2fdef3`): 21
+  offline pages vendored + loader; reference pane renders the offline page (no WebEngine, offline-first)
+  beside the live link, jumps to the section matching a finding kind, + a find-in-page box. *Later:*
+  Phase 3 polish (more maps, cleaner render) + the owner FYSA §27 live-fetch relax.
 - ✅ **Credential spraying (opt-in, off by default)** — DONE end-to-end: CLAUDE.md §1/§2/§2a amendment,
   gated `shell.policy_violation(spray=)`, `spray.py` builder, editable Credential Vault dialog, and the
   Spray dialog + gated runner (`Scan → Credential Spray…`). `spray=True` is passed in one place, only

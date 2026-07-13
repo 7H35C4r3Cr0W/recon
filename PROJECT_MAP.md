@@ -7,7 +7,7 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
 - **Verified:** `mypy --strict` clean (114 files) · `ruff check` + `ruff format --check` clean ·
-  **745 tests** pass (incl. 202 offscreen GUI) · `test_packaging` green (wheel ships resources,
+  **752 tests** pass (incl. 209 offscreen GUI) · `test_packaging` green (wheel ships resources,
   incl. the vendored HackTricks snapshot).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
@@ -410,16 +410,19 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
 tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-**⏭ Finding-aware HackTricks integration — Phase 2 (render + section extraction).** Phase 1 (vendor +
-index + loader) is done (`37f0d68`).
+Cred-spraying and HackTricks (Phases 1–2) are done. The strongest next chunk for the public-release
+goal is the owner's stated **top worry — tool-update resilience**:
 
-- **Scope:** in the reference pane, show the vendored offline page for the selected service (clean
-  markdown render) **beside** the live `book.hacktricks.wiki` link (never replace the link — owner
-  criterion). Then finding-aware section extraction — jump to the subsection matching the finding kind
-  (e.g. smb null-session, kerberos AS-REP). Enforce the owner's acceptance criteria: accuracy, correct
-  parsing (headings/code blocks survive), clean appearance, show data **+** link.
-- **Also offer:** relax §2/§27 to permit live fetch+parse too (owner FYSA), keeping offline vendoring
-  as the exam-safe default path.
+**⏭ Parser tool-update resilience (Phase 6 / distribution item 1).** A wrapped tool changing its output
+must never crash the app.
+
+- **Scope:** audit the service parsers to degrade gracefully on unexpected/'new-version' output
+  (return what they can, never raise to the UI; surface "couldn't parse X"); add multi-version /
+  malformed fixtures per parser; a shared guard so a parser exception is contained. Deterministic, no
+  live target.
+- **Alternatives:** `doctor` → guided safe installer (distribution item 2 — tells a user exactly what to
+  `apt`/`pipx` install); HackTricks Phase 3 polish (more kind→section maps, cleaner rendering, offer the
+  §27 live-fetch relax). All in the build memory ([[distribution-goals]], [[hacktricks-integration]]).
 
 **Parallel future tracks (need an owner decision / gate):**
 - **Credential spraying (opt-in, off by default)** — ✅ **COMPLETE** end-to-end: CLAUDE.md §1/§2/§2a
@@ -428,11 +431,11 @@ index + loader) is done (`37f0d68`).
   gated runner** (`1531f59`, `Scan → Credential Spray…`). `spray=True` is passed in exactly one place,
   only when `config.spray_enabled`. UX polish (Burp-clean) is a later refinement. See
   [[cred-spray-scope-change]].
-- **Finding-aware HackTricks integration** — **Phase 1 ✅** (`37f0d68`): 21 network-services pages
-  vendored offline (`references/hacktricks/`, CC BY-NC-SA, `refresh.py` maintainer script) + `hacktricks.py`
-  loader (`page_for_module` → markdown + live URL). ⏭ **NEXT: Phase 2** — render the offline page in the
-  reference pane beside the live link + finding-aware section extraction. (Owner FYSA: live scraping may
-  also be OK — offer to relax §27 further.)
+- **Finding-aware HackTricks integration** — **Phases 1–2 ✅**. Phase 1 (`37f0d68`): 21 pages vendored
+  offline + `hacktricks.py` loader. Phase 2 (`7e5005e`/`f2fdef3`): reference pane renders the offline
+  page (`QTextBrowser`, no WebEngine) beside the live link, **defaults offline-first**, jumps to the
+  section matching a finding kind, and has a find-in-page box. 🕒 **Later:** Phase 3 polish (more
+  kind→section mappings, cleaner mdBook rendering) + the owner FYSA §27 relax to also allow live fetch.
 - **Phase 6 distribution** (installer / tool-update-resilient parsers / single-click app / splash).
 
 **Blocked:** live validation + timed mock (authorized target required). Full detail in the build memory

@@ -42,7 +42,10 @@ oscprecon-cli scan 10.10.10.10 --profile htb-box   # headless nmap
 ## What it does
 
 Three-pane desktop GUI (service tree · command builder + output + follow-ups · HackTricks/Exploit-DB
-reference), plus a Bloodhound-style graph view (`Ctrl+G`).
+reference), plus a Bloodhound-style graph view (`Ctrl+G`). The reference pane renders a **vendored,
+offline HackTricks** page for the selected service (works with no internet), jumps to the section
+matching your findings, and keeps a link to the live page — see the CC BY-NC-SA attribution in
+`references/hacktricks/NOTICE.md`.
 
 - **Discovery** — two-stage nmap (TCP top-1000 → full → versioned on found ports; UDP top-100),
   parsed into a service tree. Non-standard HTTP/DB ports get their own per-port nodes and output.

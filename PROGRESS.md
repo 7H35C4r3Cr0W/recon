@@ -39,6 +39,20 @@ New `modules/kerberos/` — the 20th service module, wired into the shared Simpl
   (no `-usersfile`/`-request`/cracking tools), SimpleRecon worker parse, pattern firing. The
   parametrized `test_simple_panel_manual_followups_stay_legal` now covers kerberos too.
 
+### HackTricks integration Phase 2 — offline render + finding-aware jump (`7e5005e`, `f2fdef3`)
+Reference pane now surfaces the vendored HackTricks page:
+- **2a (`7e5005e`):** an "Offline" tab renders the vendored markdown via `QTextBrowser.setMarkdown`
+  (no WebEngine, works with no internet), default-selected when a page exists; a "Live page" tab holds
+  the existing web view; the clickable `book.hacktricks.wiki` link stays above both (view-it-yourself).
+- **2b (`f2fdef3`):** finding-aware jump — `main_window._on_service_selected` passes the service's
+  findings; the pane scrolls the offline page to the section matching a finding kind (verified keyword
+  map: smb auth→Server Enumeration / share→Shared Folders, ftp auth→Anonymous login, ssh
+  algo-weak→Weak Cipher Algorithms, ldap auth→Anonymous Access, snmp→community/enumeration), showing a
+  grey hint; a miss is a no-op. Plus a wrap-around "Find in HackTricks page…" box.
+Tests (+7): offline render (smb→445/SMB, no `{{#include}}`), offline-first default + live link, live
+fallback for unmapped services, finding-aware jump + hint, kind→section map, find box. NEXT: Phase 3
+polish (more maps, cleaner mdBook render) — or pivot to distribution (parser tool-update resilience).
+
 ### HackTricks integration Phase 1 — vendored offline snapshot + loader (`37f0d68`)
 §2/§27 gate cleared earlier (`bf42f1e`). Build-time vendoring, NO runtime scraping.
 - `references/hacktricks/refresh.py` (maintainer-run, the only network toucher): fetches source
