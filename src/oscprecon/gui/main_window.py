@@ -546,7 +546,15 @@ class MainWindow(QMainWindow):
         selected = service if isinstance(service, DiscoveredService) else None
         ref = references.match(selected) if selected is not None else None
         self._tool_panel.show_service(selected, ref)
-        self._reference_pane.show_service(selected, ref)
+        # findings for this service feed the reference pane's finding-aware HackTricks jump
+        service_findings = None
+        if selected is not None and ref is not None and self._profile is not None:
+            service_findings = [
+                f
+                for f in findings.load_findings(self._profile.directory)
+                if f.get("module") == ref.module
+            ]
+        self._reference_pane.show_service(selected, ref, service_findings)
         self._edb_request_id += 1
         if selected is None or not selected.product or self._profile is None:
             return

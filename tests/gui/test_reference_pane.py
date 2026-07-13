@@ -37,3 +37,37 @@ def test_clear_on_no_service(qtbot: QtBot) -> None:
     pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL))
     pane.show_service(None, None)  # deselect
     assert pane.offline_text() == ""
+
+
+def test_finding_aware_jump_sets_hint(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    findings = [{"module": "smb", "kind": "auth", "value": "null session"}]
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL), findings)
+    assert "Server Enumeration" in pane._jump_hint.text()  # jumped to the matching section
+    assert pane._offline.textCursor().hasSelection()  # the section is selected/scrolled to
+
+
+def test_no_findings_no_jump_hint(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL), [])
+    assert pane._jump_hint.text() == ""
+
+
+def test_section_for_findings_maps_kind() -> None:
+    assert (
+        ReferencePane._section_for_findings("smb", [{"kind": "share"}])
+        == "Shared Folders Enumeration"
+    )
+    assert ReferencePane._section_for_findings("ftp", [{"kind": "auth"}]) == "Anonymous login"
+    assert ReferencePane._section_for_findings("smb", [{"kind": "unknown"}]) == ""
+
+
+def test_find_box_jumps_to_text(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL))
+    pane._find.setText("Shared Folders")
+    pane._find_next()
+    assert pane._offline.textCursor().hasSelection()

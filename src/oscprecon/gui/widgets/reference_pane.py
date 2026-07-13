@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QGroupBox,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QTabWidget,
@@ -27,6 +30,16 @@ except ImportError:  # pragma: no cover - QtWebEngine ships with PySide6-Addons
 
 _URL_ROLE = Qt.ItemDataRole.UserRole
 _LABEL_ROLE = Qt.ItemDataRole.UserRole + 1
+
+# finding-aware jump: module -> finding-kind -> a heading/keyword that exists in the vendored page.
+# Keywords are verified against the vendored markdown; a miss is a no-op (never an error).
+_FINDING_SECTIONS: dict[str, dict[str, str]] = {
+    "smb": {"auth": "Server Enumeration", "share": "Shared Folders Enumeration"},
+    "ftp": {"auth": "Anonymous login"},
+    "ssh": {"algo-weak": "Weak Cipher Algorithms"},
+    "ldap": {"auth": "Anonymous Access"},
+    "snmp": {"community": "Community Strings", "system": "Enumerating SNMP"},
+}
 
 
 def _webview_enabled() -> bool:
@@ -65,6 +78,13 @@ class ReferencePane(QWidget):
         self._offline = QTextBrowser()
         self._offline.setOpenExternalLinks(True)
 
+        self._find = QLineEdit()
+        self._find.setPlaceholderText("Find in HackTricks page…")
+        self._find.returnPressed.connect(self._find_next)
+        self._jump_hint = QLabel("")
+        self._jump_hint.setWordWrap(True)
+        self._jump_hint.setStyleSheet("color: gray; font-style: italic;")
+
         self._tabs = QTabWidget()
         self._offline_index = self._tabs.addTab(self._offline, "Offline")
         self._live_index = self._tabs.addTab(web_widget, "Live page")
@@ -73,6 +93,8 @@ class ReferencePane(QWidget):
         hacktricks_layout = QVBoxLayout(hacktricks_box)
         hacktricks_layout.addWidget(self._label)
         hacktricks_layout.addWidget(self._link)
+        hacktricks_layout.addWidget(self._find)
+        hacktricks_layout.addWidget(self._jump_hint)
         hacktricks_layout.addWidget(self._tabs, stretch=1)
 
         self._exploits = QListWidget()
@@ -86,8 +108,14 @@ class ReferencePane(QWidget):
         layout.addWidget(hacktricks_box, stretch=3)
         layout.addWidget(exploits_box, stretch=1)
 
-    def show_service(self, service: DiscoveredService | None, ref: ServiceRef | None) -> None:
+    def show_service(
+        self,
+        service: DiscoveredService | None,
+        ref: ServiceRef | None,
+        findings: list[dict[str, Any]] | None = None,
+    ) -> None:
         self._exploits.clear()
+        self._jump_hint.setText("")
         if service is None or ref is None:
             self._label.setText("No reference mapping for this service.")
             self._link.setText("")
@@ -96,7 +124,7 @@ class ReferencePane(QWidget):
             return
         self._label.setText(f"{ref.label} — {service.port}/{service.proto.value}")
         self._link.setText(f'<a href="{ref.hacktricks}">{ref.hacktricks}</a>')
-        self._show_offline(ref)
+        self._show_offline(ref, findings or [])
         self._load(QUrl(ref.hacktricks))
         self.page_visited.emit(ref.label, ref.hacktricks)
         if service.product:
@@ -115,21 +143,48 @@ class ReferencePane(QWidget):
             item.setData(_LABEL_ROLE, f"EDB-{hit.edb_id}")
             self._exploits.addItem(item)
 
-    def _show_offline(self, ref: ServiceRef) -> None:
+    def _show_offline(self, ref: ServiceRef, findings: list[dict[str, Any]]) -> None:
         # render the vendored offline page (if any) and default to it; the live link stays visible
         # above and the Live tab is a click away. Offline-first is the exam-friendly default.
         page = hacktricks.page_for_module(ref.module)
-        if page is not None:
-            self._offline.setMarkdown(page.markdown)
-            self._tabs.setTabText(self._offline_index, f"Offline · {page.title}")
-            self._tabs.setCurrentIndex(self._offline_index)
-        else:
+        if page is None:
             self._offline.setMarkdown(
                 "_No offline HackTricks page for this service — use the **Live page** tab or the "
                 "link above._"
             )
             self._tabs.setTabText(self._offline_index, "Offline")
             self._tabs.setCurrentIndex(self._live_index)
+            return
+        self._offline.setMarkdown(page.markdown)
+        self._tabs.setTabText(self._offline_index, f"Offline · {page.title}")
+        self._tabs.setCurrentIndex(self._offline_index)
+        # finding-aware: jump to the section matching a finding kind for this service (if any).
+        section = self._section_for_findings(ref.module, findings)
+        if section and self._jump_to(section):
+            self._jump_hint.setText(f"↳ jumped to “{section}” — from your findings")
+        else:
+            self._offline.moveCursor(QTextCursor.MoveOperation.Start)
+
+    @staticmethod
+    def _section_for_findings(module: str, findings: list[dict[str, Any]]) -> str:
+        mapping = _FINDING_SECTIONS.get(module, {})
+        for finding in findings:
+            section = mapping.get(str(finding.get("kind", "")))
+            if section:
+                return section
+        return ""
+
+    def _jump_to(self, keyword: str) -> bool:
+        self._offline.moveCursor(QTextCursor.MoveOperation.Start)
+        return self._offline.find(keyword)
+
+    def _find_next(self) -> None:
+        text = self._find.text().strip()
+        if not text:
+            return
+        if not self._offline.find(text):  # not found ahead → wrap to the top and retry
+            self._offline.moveCursor(QTextCursor.MoveOperation.Start)
+            self._offline.find(text)
 
     def offline_text(self) -> str:
         """The rendered offline page as plain text (for tests / search)."""
