@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from oscprecon.workspace.activity import (
+    ActivityEvent,
+    load_activity,
+    load_workspace_activity,
+)
 from oscprecon.workspace.health import (
     HealthIssue,
     check_profile,
@@ -31,6 +36,7 @@ from oscprecon.workspace.search import SearchQuery, SearchResult, search_workspa
 __all__ = [
     "DEFAULT_STATUS",
     "STATUSES",
+    "ActivityEvent",
     "HealthIssue",
     "LockInfo",
     "Organization",
@@ -41,6 +47,8 @@ __all__ = [
     "check_profile",
     "current_lock_info",
     "is_stale",
+    "load_activity",
+    "load_workspace_activity",
     "repair_creds_permissions",
     "repair_remove_stale_temp",
     "read_lock",
