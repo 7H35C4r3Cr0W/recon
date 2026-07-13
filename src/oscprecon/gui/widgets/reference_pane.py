@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QPushButton,
     QTabWidget,
     QTextBrowser,
     QVBoxLayout,
@@ -20,6 +23,7 @@ from PySide6.QtWidgets import (
 from oscprecon import hacktricks
 from oscprecon.models import DiscoveredService
 from oscprecon.references import ExploitHit, ServiceRef
+from oscprecon.references.live_hacktricks import LiveResult
 
 try:
     from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -92,15 +96,32 @@ def _webview_enabled() -> bool:
 
 class ReferencePane(QWidget):
     page_visited = Signal(str, str)
+    refresh_requested = Signal()  # user asked for a live refresh of the current page
 
     def __init__(self) -> None:
         super().__init__()
+
+        # live-reference state
+        self._current_ref: ServiceRef | None = None
+        self._offline_markdown = ""  # the vendored copy, kept so "Use offline copy" can revert
+        self._live_enabled = False
 
         self._label = QLabel("Select a service to see references.")
         self._label.setWordWrap(True)
         self._link = QLabel("")
         self._link.setWordWrap(True)
         self._link.setOpenExternalLinks(True)
+
+        self._source_state = QLabel("")
+        self._source_state.setWordWrap(True)
+        self._source_state.setStyleSheet("color: gray;")
+        self._refresh_btn = QPushButton("Refresh")
+        self._refresh_btn.setEnabled(False)
+        self._refresh_btn.setToolTip("Enable live HackTricks in Preferences → References")
+        self._refresh_btn.clicked.connect(lambda: self.refresh_requested.emit())
+        self._use_offline_btn = QPushButton("Use offline copy")
+        self._use_offline_btn.setVisible(False)
+        self._use_offline_btn.clicked.connect(self._restore_offline)
 
         self._web: QWebEngineView | None = None
         if _webview_enabled():
@@ -132,10 +153,16 @@ class ReferencePane(QWidget):
         self._offline_index = self._tabs.addTab(self._offline, "Offline")
         self._live_index = self._tabs.addTab(web_widget, "Live page")
 
+        state_row = QHBoxLayout()
+        state_row.addWidget(self._source_state, stretch=1)
+        state_row.addWidget(self._use_offline_btn)
+        state_row.addWidget(self._refresh_btn)
+
         hacktricks_box = QGroupBox("HackTricks")
         hacktricks_layout = QVBoxLayout(hacktricks_box)
         hacktricks_layout.addWidget(self._label)
         hacktricks_layout.addWidget(self._link)
+        hacktricks_layout.addLayout(state_row)
         hacktricks_layout.addWidget(self._find)
         hacktricks_layout.addWidget(self._jump_hint)
         hacktricks_layout.addWidget(self._tabs, stretch=1)
@@ -159,12 +186,18 @@ class ReferencePane(QWidget):
     ) -> None:
         self._exploits.clear()
         self._jump_hint.setText("")
+        self._use_offline_btn.setVisible(False)
         if service is None or ref is None:
+            self._current_ref = None
+            self._offline_markdown = ""
             self._label.setText("No reference mapping for this service.")
             self._link.setText("")
+            self._source_state.setText("")
+            self._refresh_btn.setEnabled(False)
             self._offline.setMarkdown("")
             self._load(QUrl("about:blank"))
             return
+        self._current_ref = ref
         self._label.setText(f"{ref.label} — {service.port}/{service.proto.value}")
         self._link.setText(f'<a href="{ref.hacktricks}">{ref.hacktricks}</a>')
         self._show_offline(ref, findings or [])
@@ -191,22 +224,64 @@ class ReferencePane(QWidget):
         # above and the Live tab is a click away. Offline-first is the exam-friendly default.
         page = hacktricks.page_for_module(ref.module)
         if page is None:
+            self._offline_markdown = ""
             self._offline.setMarkdown(
                 "_No offline HackTricks page for this service — use the **Live page** tab or the "
                 "link above._"
             )
             self._tabs.setTabText(self._offline_index, "Offline")
             self._tabs.setCurrentIndex(self._live_index)
+            self._source_state.setText("Source: no offline page — use the Live page tab")
+            self._refresh_btn.setEnabled(self._live_enabled)
             return
-        self._offline.setMarkdown(hacktricks.clean_markdown(page.markdown))
+        self._offline_markdown = hacktricks.clean_markdown(page.markdown)
+        self._offline.setMarkdown(self._offline_markdown)
         self._tabs.setTabText(self._offline_index, f"Offline · {page.title}")
         self._tabs.setCurrentIndex(self._offline_index)
+        self._source_state.setText("Source: offline vendored snapshot")
+        self._refresh_btn.setEnabled(self._live_enabled)
+        self._apply_finding_jump(ref.module, findings)
+
+    def _apply_finding_jump(self, module: str, findings: list[dict[str, Any]]) -> None:
         # finding-aware: jump to the section matching a finding kind for this service (if any).
-        section = self._section_for_findings(ref.module, findings)
+        section = self._section_for_findings(module, findings)
         if section and self._jump_to(section):
             self._jump_hint.setText(f"↳ jumped to “{section}” — from your findings")
         else:
             self._offline.moveCursor(QTextCursor.MoveOperation.Start)
+
+    # ----- live HackTricks -------------------------------------------------
+
+    def set_live_enabled(self, enabled: bool) -> None:
+        self._live_enabled = enabled
+        self._refresh_btn.setEnabled(enabled and self._current_ref is not None)
+
+    def current_ref_url(self) -> str:
+        return self._current_ref.hacktricks if self._current_ref is not None else ""
+
+    def apply_live_result(self, result: LiveResult) -> None:
+        # A late result for a page we're no longer showing must not clobber the current one.
+        if self._current_ref is None or result.url != self._current_ref.hacktricks:
+            return
+        if result.state in ("live-refreshed", "live-cached") and result.markdown:
+            self._offline.setMarkdown(result.markdown)
+            self._offline.moveCursor(QTextCursor.MoveOperation.Start)
+            when = time.strftime("%Y-%m-%d %H:%M", time.localtime(result.fetched_at))
+            kind = "live refreshed" if result.state == "live-refreshed" else "live cached"
+            note = f" (offline copy shown — {result.error})" if result.error else ""
+            self._source_state.setText(f"Source: {kind} · {when}{note}")
+            self._use_offline_btn.setVisible(True)
+        elif "failed" in result.error.lower():
+            # a real fetch failure: keep the offline content, surface a clear, non-destructive note.
+            self._source_state.setText(f"Live fetch failed ({result.error}) — showing offline copy")
+        # a "disabled" / "no cache" result is expected and left silent (offline stays shown).
+
+    def _restore_offline(self) -> None:
+        if self._offline_markdown:
+            self._offline.setMarkdown(self._offline_markdown)
+            self._offline.moveCursor(QTextCursor.MoveOperation.Start)
+        self._source_state.setText("Source: offline vendored snapshot")
+        self._use_offline_btn.setVisible(False)
 
     @staticmethod
     def _section_for_findings(module: str, findings: list[dict[str, Any]]) -> str:

@@ -24,7 +24,15 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import config
-from oscprecon.config import CONCURRENCY_RANGE, FONT_SIZE_RANGE, SCAN_PROFILES, THEMES, Settings
+from oscprecon.config import (
+    CONCURRENCY_RANGE,
+    FONT_SIZE_RANGE,
+    HACKTRICKS_CACHE_DAYS_RANGE,
+    SCAN_PROFILES,
+    THEMES,
+    Settings,
+)
+from oscprecon.references import live_hacktricks
 
 # Mandatory, non-negotiable protections (CLAUDE.md §2) surfaced in the Privacy tab as locked-on
 # controls — the settings UI must never offer a way to switch these off.
@@ -54,6 +62,7 @@ class SettingsDialog(QDialog):
         self._tabs.addTab(self._build_appearance_tab(), "Appearance")
         self._tabs.addTab(self._build_tool_paths_tab(), "Tool paths")
         self._tabs.addTab(self._build_scan_tab(), "Scan")
+        self._tabs.addTab(self._build_references_tab(), "References")
         self._tabs.addTab(self._build_reports_tab(), "Reports")
         self._tabs.addTab(self._build_privacy_tab(), "Privacy")
         self._tabs.addTab(self._build_performance_tab(), "Performance")
@@ -170,6 +179,55 @@ class SettingsDialog(QDialog):
         layout.addStretch(1)
         return page
 
+    def _build_references_tab(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        self._ht_live = QCheckBox("Enable live HackTricks fetching")
+        layout.addWidget(self._ht_live)
+        intro = QLabel(
+            "OFF by default. When on, the reference pane can fetch the single canonical HackTricks "
+            "page mapped to a service (HTTPS, allow-listed host only) and cache it for offline "
+            "viewing. Your target IP, banners, findings, and credentials are NEVER sent — only the "
+            "mapped page URL is requested; local context just picks which local sections to show."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        self._ht_auto = QCheckBox("Automatically refresh stale pages when a service is selected")
+        layout.addWidget(self._ht_auto)
+        self._ht_prefer = QCheckBox("Prefer a live-cached page over the vendored offline snapshot")
+        layout.addWidget(self._ht_prefer)
+        days_row = QHBoxLayout()
+        days_row.addWidget(QLabel("Consider a cached page fresh for (days):"))
+        self._ht_days = QSpinBox()
+        self._ht_days.setRange(*HACKTRICKS_CACHE_DAYS_RANGE)
+        days_row.addWidget(self._ht_days)
+        days_row.addStretch(1)
+        layout.addLayout(days_row)
+        cache_row = QHBoxLayout()
+        clear = QPushButton("Clear live HackTricks cache")
+        clear.clicked.connect(self._clear_hacktricks_cache)
+        cache_row.addWidget(clear)
+        cache_row.addStretch(1)
+        layout.addLayout(cache_row)
+        self._ht_cache_loc = QLabel(f"Cache location: {live_hacktricks.cache_root()}")
+        self._ht_cache_loc.setWordWrap(True)
+        self._ht_cache_loc.setStyleSheet("color: gray;")
+        layout.addWidget(self._ht_cache_loc)
+        footer = QLabel(
+            "The vendored offline snapshot always remains available as the reliable fallback. "
+            "Clearing the cache only removes downloaded pages — it never touches project data."
+        )
+        footer.setWordWrap(True)
+        layout.addWidget(footer)
+        layout.addStretch(1)
+        return page
+
+    def _clear_hacktricks_cache(self) -> None:
+        removed = live_hacktricks.clear_cache()
+        QMessageBox.information(
+            self, "HackTricks cache", f"Cleared {removed} cached page(s). Project data untouched."
+        )
+
     def _build_reports_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -243,6 +301,10 @@ class SettingsDialog(QDialog):
         self._scan_profile.setCurrentIndex(prof_idx if prof_idx >= 0 else 0)
         self._udp_full.setChecked(settings.nmap_udp_full)
         self._spray_enabled.setChecked(settings.spray_enabled)
+        self._ht_live.setChecked(settings.hacktricks_live_enabled)
+        self._ht_auto.setChecked(settings.hacktricks_auto_refresh)
+        self._ht_prefer.setChecked(settings.hacktricks_prefer_live)
+        self._ht_days.setValue(settings.hacktricks_cache_days)
         self._concurrency.setValue(settings.max_concurrency)
 
     def selected_settings(self) -> Settings:
@@ -257,6 +319,10 @@ class SettingsDialog(QDialog):
             nmap_udp_full=self._udp_full.isChecked(),
             scan_profile=str(self._scan_profile.currentData()),
             spray_enabled=self._spray_enabled.isChecked(),
+            hacktricks_live_enabled=self._ht_live.isChecked(),
+            hacktricks_auto_refresh=self._ht_auto.isChecked(),
+            hacktricks_prefer_live=self._ht_prefer.isChecked(),
+            hacktricks_cache_days=self._ht_days.value(),
         ).normalized()
 
     # ----- actions ----------------------------------------------------------

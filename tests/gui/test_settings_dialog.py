@@ -51,6 +51,30 @@ def test_scan_profile_combo_populates_and_collects(qtbot: QtBot) -> None:
     assert d.selected_settings().scan_profile == "quick"  # collected back out
 
 
+def test_references_tab_populates_and_collects(qtbot: QtBot) -> None:
+    settings = config.Settings(
+        workspace_root="/tmp/ws",
+        wordlist_paths=[],
+        theme="light",
+        font_size=0,
+        max_concurrency=4,
+        nmap_udp_full=False,
+        hacktricks_live_enabled=True,
+        hacktricks_auto_refresh=True,
+        hacktricks_prefer_live=True,
+        hacktricks_cache_days=30,
+    )
+    d = _make(qtbot, settings)
+    assert d._ht_live.isChecked() and d._ht_auto.isChecked() and d._ht_prefer.isChecked()
+    assert d._ht_days.value() == 30
+    d._ht_live.setChecked(False)
+    collected = d.selected_settings()
+    assert collected.hacktricks_live_enabled is False
+    assert collected.hacktricks_auto_refresh is True and collected.hacktricks_cache_days == 30
+    # default settings keep live fetching OFF
+    assert not _make(qtbot, config.default_settings())._ht_live.isChecked()
+
+
 def test_spray_toggle_populates_and_collects(qtbot: QtBot) -> None:
     settings = config.Settings(
         workspace_root="/tmp/ws",
@@ -69,7 +93,15 @@ def test_spray_toggle_populates_and_collects(qtbot: QtBot) -> None:
     assert not _make(qtbot, config.default_settings())._spray_enabled.isChecked()
 
 
-def test_eight_sections_present(qtbot: QtBot) -> None:
+def _tab(dialog: object, title: str) -> object:
+    tabs = dialog._tabs
+    for i in range(tabs.count()):
+        if tabs.tabText(i) == title:
+            return tabs.widget(i)
+    raise AssertionError(f"no {title!r} tab")
+
+
+def test_sections_present(qtbot: QtBot) -> None:
     d = _make(qtbot, config.default_settings())
     labels = [d._tabs.tabText(i) for i in range(d._tabs.count())]
     assert labels == [
@@ -77,6 +109,7 @@ def test_eight_sections_present(qtbot: QtBot) -> None:
         "Appearance",
         "Tool paths",
         "Scan",
+        "References",
         "Reports",
         "Privacy",
         "Performance",
@@ -86,7 +119,7 @@ def test_eight_sections_present(qtbot: QtBot) -> None:
 
 def test_privacy_protections_are_locked_on(qtbot: QtBot) -> None:
     d = _make(qtbot, config.default_settings())
-    privacy = d._tabs.widget(5)
+    privacy = _tab(d, "Privacy")
     boxes = privacy.findChildren(QCheckBox)
     assert boxes  # protections are present
     for box in boxes:
@@ -95,7 +128,7 @@ def test_privacy_protections_are_locked_on(qtbot: QtBot) -> None:
 
 def test_reports_tab_has_no_editable_controls(qtbot: QtBot) -> None:
     d = _make(qtbot, config.default_settings())
-    reports = d._tabs.widget(4)
+    reports = _tab(d, "Reports")
     # informational only: no toggles/inputs that could disable redaction or archiving
     assert not reports.findChildren(QCheckBox)
     assert not reports.findChildren(QLineEdit)

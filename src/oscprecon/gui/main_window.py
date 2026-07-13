@@ -56,6 +56,7 @@ from oscprecon.gui.workers import (
     FtpReconWorker,
     LdapReconResult,
     LdapReconWorker,
+    LiveHacktricksWorker,
     NmapWorker,
     SearchsploitWorker,
     SimpleReconResult,
@@ -73,6 +74,7 @@ from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.parsing import run_parser
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
+from oscprecon.references.live_hacktricks import LiveResult
 from oscprecon.workspace import locks, portability
 
 # Workers moved to oscprecon.gui.workers; re-exported here so existing imports/tests keep working.
@@ -172,9 +174,13 @@ class MainWindow(QMainWindow):
         )
         self._reference_pane = ReferencePane()
         self._reference_pane.page_visited.connect(self._on_page_visited)
+        self._reference_pane.refresh_requested.connect(self._on_live_refresh)
+        self._reference_pane.set_live_enabled(settings.hacktricks_live_enabled)
         self._edb_request_id = 0
         self._edb_workers: set[QThread] = set()
         self._edb_context: tuple[str, str, str] | None = None  # (service label, product, version)
+        self._live_request_id = 0
+        self._live_workers: set[QThread] = set()
         self._pending_visits: list[tuple[str, str]] = []
 
         left = QWidget()
@@ -514,6 +520,7 @@ class MainWindow(QMainWindow):
         theme.apply_font(settings.font_size)
         self._sync_theme_menu(settings.theme)
         self._tasks.max_concurrency = settings.max_concurrency
+        self._reference_pane.set_live_enabled(settings.hacktricks_live_enabled)
         self._update_status_footer()
         self._dashboard.refresh()  # workspace root may have changed
         self._audit_action("settings-changed", theme=settings.theme)
@@ -565,6 +572,9 @@ class MainWindow(QMainWindow):
                 if f.get("module") == ref.module
             ]
         self._reference_pane.show_service(selected, ref, service_findings)
+        self._live_request_id += 1  # supersede any in-flight live fetch for a prior service
+        if ref is not None:
+            self._maybe_fetch_live(ref)
         self._edb_request_id += 1
         if selected is None or not selected.product or self._profile is None:
             return
@@ -592,6 +602,49 @@ class MainWindow(QMainWindow):
         if isinstance(hits, list):
             self._reference_pane.show_exploits(hits)
             self._persist_edb(hits)
+
+    # ----- live HackTricks (§14a) ------------------------------------------
+
+    def _maybe_fetch_live(self, ref: object) -> None:
+        # auto behaviour on service selection (manual Refresh is _on_live_refresh):
+        #   live enabled + auto-refresh -> fetch (serves fresh cache, refetches when stale)
+        #   live enabled + prefer-live  -> serve an existing cache only, no network
+        settings = config.load_settings()
+        if not settings.hacktricks_live_enabled:
+            return
+        url = getattr(ref, "hacktricks", "")
+        if not url:
+            return
+        if settings.hacktricks_auto_refresh:
+            self._dispatch_live(url, enabled=True, force=False)
+        elif settings.hacktricks_prefer_live:
+            self._dispatch_live(url, enabled=False, force=False)  # cache-only, never fetches
+
+    def _on_live_refresh(self) -> None:
+        url = self._reference_pane.current_ref_url()
+        if url and config.load_settings().hacktricks_live_enabled:
+            self._live_request_id += 1
+            self._dispatch_live(url, enabled=True, force=True)  # explicit user action
+
+    def _dispatch_live(self, url: str, *, enabled: bool, force: bool) -> None:
+        settings = config.load_settings()
+        worker = LiveHacktricksWorker(
+            url,
+            enabled=enabled,
+            force=force,
+            max_age_days=settings.hacktricks_cache_days,
+            request_id=self._live_request_id,
+        )
+        worker.done.connect(self._on_live_done)
+        worker.finished.connect(lambda w=worker: self._live_workers.discard(w))
+        self._live_workers.add(worker)
+        worker.start()
+
+    def _on_live_done(self, result: object, request_id: int) -> None:
+        if request_id != self._live_request_id:
+            return  # a newer service/project selection superseded this fetch
+        if isinstance(result, LiveResult):
+            self._reference_pane.apply_live_result(result)
 
     def _persist_edb(self, hits: list[Any]) -> None:
         # record the EDB references (lookup-only) into report.md; skipped in read-only mode.
@@ -965,6 +1018,9 @@ class MainWindow(QMainWindow):
         for edb_worker in list(self._edb_workers):
             if edb_worker.isRunning():
                 edb_worker.wait()
+        for live_worker in list(self._live_workers):  # let live HackTricks fetches finish cleanly
+            if live_worker.isRunning():
+                live_worker.wait()
         self._dashboard.shutdown()  # stop any in-flight workspace scan
         self._release_lock()  # best-effort lock release on shutdown
         super().closeEvent(event)

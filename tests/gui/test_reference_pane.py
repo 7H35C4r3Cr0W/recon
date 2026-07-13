@@ -4,6 +4,7 @@ from oscprecon import hacktricks
 from oscprecon.gui.widgets.reference_pane import _FINDING_SECTIONS, ReferencePane
 from oscprecon.models import DiscoveredService, Proto
 from oscprecon.references import ServiceRef
+from oscprecon.references.live_hacktricks import LiveResult
 
 _SMB_URL = "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smb/index.html"
 
@@ -92,3 +93,60 @@ def test_offline_render_strips_mdbook_callouts(qtbot: QtBot) -> None:
     text = pane.offline_text()
     assert "[!TIP]" not in text  # GitHub callout normalized, not shown raw
     assert "<summary>" not in text and "<details>" not in text
+
+
+# ---- live HackTricks states --------------------------------------------------------------------
+
+
+def test_live_disabled_by_default_refresh_button_off(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL))
+    assert pane._refresh_btn.isEnabled() is False  # live fetching off by default
+    pane.set_live_enabled(True)
+    assert pane._refresh_btn.isEnabled() is True
+    assert pane.current_ref_url() == _SMB_URL
+
+
+def test_apply_live_result_renders_then_reverts(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL))
+    result = LiveResult(
+        "live-refreshed", "# Live SMB\n\nfresh live body", ["Live SMB"], 1.0e9, _SMB_URL
+    )
+    pane.apply_live_result(result)
+    assert "fresh live body" in pane.offline_text()
+    # isHidden (not isVisible) — the top-level window isn't shown in an offscreen test
+    assert not pane._use_offline_btn.isHidden() and "live refreshed" in pane._source_state.text()
+    pane._restore_offline()
+    assert "fresh live body" not in pane.offline_text() and "445" in pane.offline_text()
+    assert pane._use_offline_btn.isHidden()
+
+
+def test_apply_live_result_for_other_page_is_ignored(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL))
+    other = "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ftp/index.html"
+    stale = LiveResult("live-refreshed", "WRONG PAGE CONTENT", [], 1.0e9, other)
+    pane.apply_live_result(stale)
+    assert "WRONG PAGE CONTENT" not in pane.offline_text()  # url mismatch -> not applied
+
+
+def test_live_fetch_error_keeps_offline_content(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL))
+    pane.apply_live_result(LiveResult("error", "", [], 0.0, _SMB_URL, "refresh failed: down"))
+    assert "445" in pane.offline_text()  # offline content intact after a failure
+    assert "failed" in pane._source_state.text().lower()
+
+
+def test_refresh_button_emits_signal(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL))
+    pane.set_live_enabled(True)
+    with qtbot.waitSignal(pane.refresh_requested, timeout=1000):
+        pane._refresh_btn.click()

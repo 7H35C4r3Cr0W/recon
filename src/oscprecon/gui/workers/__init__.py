@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from oscprecon.gui.workers.base import CancellableThread
-from oscprecon.gui.workers.scans import CommandWorker, NmapWorker, SearchsploitWorker
+from oscprecon.gui.workers.scans import (
+    CommandWorker,
+    LiveHacktricksWorker,
+    NmapWorker,
+    SearchsploitWorker,
+)
 from oscprecon.gui.workers.service_recon import (
     DnsReconResult,
     DnsReconWorker,
@@ -26,6 +31,7 @@ __all__ = [
     "LdapReconResult",
     "LdapReconWorker",
     "NmapWorker",
+    "LiveHacktricksWorker",
     "SearchsploitWorker",
     "SimpleReconResult",
     "SimpleReconWorker",

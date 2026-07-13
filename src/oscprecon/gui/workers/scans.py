@@ -8,6 +8,7 @@ from oscprecon import references, shell
 from oscprecon.gui.workers.base import CancellableThread
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
+from oscprecon.references import live_hacktricks
 
 
 class NmapWorker(CancellableThread):
@@ -87,3 +88,29 @@ class SearchsploitWorker(QThread):
         except Exception:  # boundary: never let an EDB lookup crash the worker
             hits = []
         self.done.emit(hits, self._request_id)
+
+
+class LiveHacktricksWorker(QThread):
+    done = Signal(object, int)  # (live_hacktricks.LiveResult, request_id)
+
+    def __init__(
+        self, url: str, *, enabled: bool, force: bool, max_age_days: int, request_id: int
+    ) -> None:
+        super().__init__()
+        self._url = url
+        self._enabled = enabled
+        self._force = force
+        self._max_age_days = max_age_days
+        self._request_id = request_id
+
+    def run(self) -> None:
+        try:
+            result = live_hacktricks.get_page(
+                self._url,
+                enabled=self._enabled,
+                force=self._force,
+                max_age_days=self._max_age_days,
+            )
+        except Exception:  # boundary: a fetch must never crash the worker
+            result = live_hacktricks.LiveResult("error", "", [], 0.0, self._url, "fetch failed")
+        self.done.emit(result, self._request_id)
