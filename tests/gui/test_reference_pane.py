@@ -152,6 +152,18 @@ def test_refresh_button_emits_signal(qtbot: QtBot) -> None:
         pane._refresh_btn.click()
 
 
+def test_live_content_applies_finding_aware_jump(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    findings = [{"module": "smb", "kind": "auth", "value": "null session"}]
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL), findings)
+    # live content that contains the finding's mapped section (smb auth -> Server Enumeration)
+    md = "# SMB\n\n## Basic Info\n\nintro\n\n## Server Enumeration\n\nenumerate the server here\n"
+    pane.apply_live_result(LiveResult("live-refreshed", md, [], 1.0e9, _SMB_URL))
+    assert "Server Enumeration" in pane._jump_hint.text()  # jumped into the live content, not top
+    assert pane._offline.textCursor().hasSelection()
+
+
 def test_live_content_renders_no_dangerous_links(qtbot: QtBot) -> None:
     from oscprecon.references import live_hacktricks
 

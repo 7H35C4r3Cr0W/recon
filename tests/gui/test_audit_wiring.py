@@ -64,3 +64,42 @@ def test_credential_audit_redacts_secret(qtbot: QtBot, tmp_path: Path) -> None:
     entry = next(e for e in audit.load_entries(prof.directory) if e["action"] == "credential-added")
     assert entry["details"]["username"] == "svc"
     assert "secret" not in entry["details"]  # not even a redacted placeholder — never supplied
+
+
+def test_live_refresh_is_audited(qtbot: QtBot, tmp_path: Path, monkeypatch) -> None:
+    from oscprecon import config, references
+    from oscprecon.models import DiscoveredService, Proto
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    window._set_profile(prof)
+    svc = DiscoveredService(445, Proto.TCP, "microsoft-ds")
+    window._reference_pane.show_service(svc, references.match(svc))
+    live = config.default_settings()
+    live.hacktricks_live_enabled = True
+    monkeypatch.setattr(config, "load_settings", lambda: live)
+    monkeypatch.setattr(window, "_dispatch_live", lambda *a, **k: None)  # no real network fetch
+    window._on_live_refresh()
+    ref = next(
+        e for e in audit.load_entries(prof.directory) if e["action"] == "hacktricks-live-refresh"
+    )
+    assert "hacktricks.wiki" in ref["details"]["url"]
+
+
+def test_spray_confirmation_is_audited_without_secret(qtbot: QtBot, tmp_path: Path) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    prof.add_credential(Credential(username="administrator", secret="Winter2024!", source="manual"))
+    window._set_profile(prof)
+    spray_dir = prof.directory / "spray"
+    spray_dir.mkdir(parents=True, exist_ok=True)
+    out = spray_dir / "smb.txt"
+    out.write_text("SMB 10.10.10.5 445 DC [+] corp\\administrator:Winter2024! (Pwn3d!)\n")
+    window._record_spray_success(prof, "smb", out)
+    entries = audit.load_entries(prof.directory)
+    conf = next(e for e in entries if e["action"] == "spray-confirmed")
+    assert conf["details"]["service"] == "smb" and conf["details"]["count"] == 1
+    # the winning secret must never appear anywhere in the audit log
+    assert "Winter2024!" not in (prof.directory / "audit.jsonl").read_text()

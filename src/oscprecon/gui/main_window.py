@@ -626,6 +626,7 @@ class MainWindow(QMainWindow):
         url = self._reference_pane.current_ref_url()
         if url and config.load_settings().hacktricks_live_enabled:
             self._live_request_id += 1
+            self._audit_action("hacktricks-live-refresh", url=url)  # a reference action (§6a)
             self._dispatch_live(url, enabled=True, force=True)  # explicit user action
 
     def _dispatch_live(self, url: str, *, enabled: bool, force: bool) -> None:
@@ -944,6 +945,8 @@ class MainWindow(QMainWindow):
             profile.set_credentials(cred_list)
             if profile is self._profile:
                 self._tool_panel.append_output(f"[spray] confirmed {len(confirmed)} credential(s)")
+                # audit the OUTCOME (a credential validated) — service + count only, no secret
+                self._audit_action("spray-confirmed", service=service, count=len(confirmed))
 
     def _on_browse_wordlists(self) -> None:
         dialog = QDialog(self)

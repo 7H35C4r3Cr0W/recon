@@ -103,6 +103,8 @@ class ReferencePane(QWidget):
 
         # live-reference state
         self._current_ref: ServiceRef | None = None
+        self._current_findings: list[dict[str, Any]] = []  # so live content can re-apply the jump
+        self._current_product = ""
         self._offline_markdown = ""  # the vendored copy, kept so "Use offline copy" can revert
         self._live_enabled = False
 
@@ -189,6 +191,8 @@ class ReferencePane(QWidget):
         self._use_offline_btn.setVisible(False)
         if service is None or ref is None:
             self._current_ref = None
+            self._current_findings = []
+            self._current_product = ""
             self._offline_markdown = ""
             self._label.setText("No reference mapping for this service.")
             self._link.setText("")
@@ -198,6 +202,8 @@ class ReferencePane(QWidget):
             self._load(QUrl("about:blank"))
             return
         self._current_ref = ref
+        self._current_findings = findings or []
+        self._current_product = service.product
         self._label.setText(f"{ref.label} — {service.port}/{service.proto.value}")
         self._link.setText(f'<a href="{ref.hacktricks}">{ref.hacktricks}</a>')
         self._show_offline(ref, findings or [], service.product)
@@ -245,16 +251,18 @@ class ReferencePane(QWidget):
         self._apply_finding_jump(ref.module, findings, product)
 
     def _apply_finding_jump(
-        self, module: str, findings: list[dict[str, Any]], product: str = ""
+        self, module: str, findings: list[dict[str, Any]], product: str = "", markdown: str = ""
     ) -> None:
         # relevance priority (§14a): a finding-kind heading first, then the detected product's own
-        # section, else leave at the top. Selection is LOCAL — never a server query.
+        # section, else leave at the top. Selection is LOCAL — never a server query. `markdown` is
+        # the text actually rendered (live content differs from the vendored offline copy).
+        source = markdown or self._offline_markdown
         section = self._section_for_findings(module, findings)
         if section and self._jump_to(section):
             self._jump_hint.setText(f"↳ jumped to “{section}” — from your findings")
             return
         if product:
-            picks = sections.relevant_sections(self._offline_markdown, keywords=[], product=product)
+            picks = sections.relevant_sections(source, keywords=[], product=product)
             top = picks[0] if picks else None
             hit = top and top.heading and product.lower() in (top.heading + top.body).lower()
             if hit and top is not None and self._jump_to(top.heading):
@@ -277,7 +285,13 @@ class ReferencePane(QWidget):
             return
         if result.state in ("live-refreshed", "live-cached") and result.markdown:
             self._offline.setMarkdown(result.markdown)
-            self._offline.moveCursor(QTextCursor.MoveOperation.Start)
+            if self._current_ref is not None:  # re-apply the finding-aware jump to the live content
+                self._apply_finding_jump(
+                    self._current_ref.module,
+                    self._current_findings,
+                    self._current_product,
+                    markdown=result.markdown,
+                )
             when = time.strftime("%Y-%m-%d %H:%M", time.localtime(result.fetched_at))
             kind = "live refreshed" if result.state == "live-refreshed" else "live cached"
             note = f" (offline copy shown — {result.error})" if result.error else ""
