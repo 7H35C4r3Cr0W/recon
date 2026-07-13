@@ -128,3 +128,38 @@ def test_run_parser_passes_through_success() -> None:
     from oscprecon.parsing import run_parser
 
     assert run_parser(lambda: [1, 2, 3], label="x") == [1, 2, 3]
+
+
+def test_run_parser_fail_loud_on_empty_with_substantial_output() -> None:
+    from oscprecon.parsing import run_parser
+
+    lines: list[str] = []
+    raw = "\n".join(
+        f"line {i}" for i in range(8)
+    )  # 8 substantial lines but the parser found nothing
+    result = run_parser(lambda: [], label="gobuster", on_line=lines.append, raw=raw)
+    assert result == []
+    assert any("0 findings" in line and "gobuster" in line for line in lines)  # loudly surfaced
+
+
+def test_run_parser_quiet_on_empty_with_little_output() -> None:
+    from oscprecon.parsing import run_parser
+
+    lines: list[str] = []
+    result = run_parser(lambda: [], label="x", on_line=lines.append, raw="one\ntwo")  # < 5 lines
+    assert result == [] and lines == []  # no false-positive heads-up on a near-empty output
+
+
+def test_run_parser_no_headsup_when_findings_present() -> None:
+    from oscprecon.parsing import run_parser
+
+    lines: list[str] = []
+    run_parser(lambda: [1], label="x", on_line=lines.append, raw="\n".join(["l"] * 8))
+    assert lines == []  # findings present -> nothing to warn about
+
+
+def test_nmap_saw_open_ports_is_a_drift_signal() -> None:
+    from oscprecon.orchestrator import _nmap_saw_open_ports
+
+    assert _nmap_saw_open_ports({"f": "22/tcp open ssh\n80/tcp open http"}) is True
+    assert _nmap_saw_open_ports({"f": "All 1000 scanned ports are closed"}) is False

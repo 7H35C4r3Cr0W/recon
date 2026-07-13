@@ -10,6 +10,11 @@ from oscprecon.profile import Profile
 from oscprecon.reporter import Reporter
 
 
+def _nmap_saw_open_ports(raw: dict[str, str]) -> bool:
+    # nmap prints "22/tcp open ssh"; if any output has an open-port line, 0 parsed services is drift
+    return any("open" in text and ("/tcp" in text or "/udp" in text) for text in raw.values())
+
+
 class Orchestrator:
     def __init__(
         self,
@@ -113,6 +118,10 @@ class Orchestrator:
                 break
             raw[cmd.output_file] = self._run(cmd)
         self.profile.set_services(self.nmap.discovered_services(raw))
+        # fail-loud: nmap reported open ports but the parser extracted none -> format drift, not an
+        # empty host. Silently ending up with 0 services would break everything downstream, quietly.
+        if not self.profile.discovered_services and _nmap_saw_open_ports(raw):
+            self._emit("⚠ [parse] nmap ran but 0 services parsed — check the scan output (drift?)")
         self.profile.save()
 
         open_tcp = [

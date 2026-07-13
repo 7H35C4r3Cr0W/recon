@@ -58,8 +58,13 @@ class SimpleReconWorker(CancellableThread):
             if tool:  # unparsed steps (e.g. tftp GETs) still run, but carry no parser key
                 raw[tool] = text
         module = self._spec.factory()
+        # fail-loud: pass the combined output so a 0-findings parse on drifted output is surfaced
+        combined = "\n".join(raw.values())
         found = run_parser(
-            lambda: module.parse(raw), label=self._spec.module, on_line=self.line.emit
+            lambda: module.parse(raw),
+            label=self._spec.module,
+            on_line=self.line.emit,
+            raw=combined,
         )
         self._write_findings(found)
         return SimpleReconResult(self._spec.module, self._summarize(module, found))
