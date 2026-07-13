@@ -22,6 +22,23 @@ remains is blocked on external resources:** the *timed* mock exam needs an autho
 interactive + cross-machine AppImage acceptance needs a real desktop / a second VM (see
 `packaging/ACCEPTANCE.md`). No deterministic next chunk — the next move is the owner's call.
 
+### Pre-live-testing polish (owner-requested)
+A run of owner-requested improvements before live-box testing:
+- **Finding-aware jump now applies to LIVE HackTricks content** (not just vendored); **audit coverage**
+  for live-refresh / spray-confirmations / secret-copy (all secret-free).
+- **Doctor** now checks the Spray-mode tools (hydra/medusa), labeled spray-only + excluded from
+  auto-install (recon users aren't pushed them).
+- **Fail-loud parsers**: `run_parser(raw=…)` surfaces "output present but 0 findings parsed — possible
+  drift" (the silent-zero-findings case); nmap "ran but 0 services parsed" warning in the orchestrator.
+- **FTP + SMB post-access file peek**: on anon/authed access, a bounded file **tree** (name · size ·
+  ext) plus a safe **~60-char content peek** of small text files (`peek.py` shared helpers; SMB share
+  contents are now parsed for the first time). Bounded triage (§12), never bulk exfil.
+- **Graph → BloodHound feel**: a **search bar** (type ssh/445/admin → highlight + fit), **auto-highlight
+  of notable/vulnerable findings** (anon access, writable, weak signing → red ring), and **double-click
+  drill-down** (collapse/expand a service's findings).
+- **`install.sh`**: hardened fresh-Kali bootstrap (allow-listed tools + uv + app; spray tools behind
+  `--with-spray`; fail-safe; doctor readiness check).
+
 ### Credential-spray Burp-clean UX polish
 Owner-expressed direction ("clean GUI, Burp's layout"). Applied to the credential surface:
 - **Credential Vault → a proper table** (Username / Domain / Type / Secret / Source / Confirmed) with

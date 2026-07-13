@@ -11,7 +11,7 @@
   var linkSource = null;
   var svgReady = false;
 
-  var DEFAULT_HINT = "search to highlight · red ring = notable finding · drag nodes (saved) · click for detail";
+  var DEFAULT_HINT = "search · red ring = notable · dbl-click a service to collapse · drag (saved) · click for detail";
 
   var STYLE = [
     {
@@ -55,6 +55,7 @@
     },
     { selector: "node:selected", style: { "border-width": 4, "border-color": "#cba6f7" } },
     { selector: ".hidden", style: { display: "none" } },
+    { selector: ".collapsed-child", style: { display: "none" } }, // double-click drill-down
     // search: bright ring on matches, dim everything else
     {
       selector: ".search-hit",
@@ -275,6 +276,15 @@
         return; // link mode swallows the tap — no detail sidebar
       }
       if (bridge) bridge.node_clicked(id, JSON.stringify(evt.target.data()));
+    });
+
+    // double-click a service to drill down: collapse/expand its findings & artifacts. Uses its own
+    // class (independent of the type-filter's `hidden`) so the two never clobber each other.
+    cy.on("dbltap", 'node[type="service"]', function (evt) {
+      var svc = evt.target;
+      var collapsed = !svc.data("collapsed");
+      svc.data("collapsed", collapsed);
+      svc.outgoers("node").toggleClass("collapsed-child", collapsed);
     });
 
     cy.on("dragfree", "node", function () {
