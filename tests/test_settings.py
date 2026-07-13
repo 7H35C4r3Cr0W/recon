@@ -134,6 +134,34 @@ def test_settings_prefs_hold_only_known_non_secret_keys() -> None:
     }
 
 
+def test_credential_wordlists_stay_filtered_when_a_settings_path_is_added(tmp_path: Path) -> None:
+    # the Preferences → Privacy tab promises password wordlists stay filtered; adding a Passwords/
+    # tree via the new user-editable wordlist paths must NOT bypass that engine-level guarantee.
+    # NOTE: the added root must NOT contain "password"/"passwd" in its path — is_excluded matches on
+    # every path part, so a tmp dir named after this test would filter *everything* (incl. the
+    # positive control below). Nest under a clean subdir and keep this function name secret-free.
+    from oscprecon import wordlists
+
+    wl_root = tmp_path / "seclists"
+    (wl_root / "Discovery" / "Web-Content").mkdir(parents=True)
+    (wl_root / "Passwords").mkdir(parents=True)
+    (wl_root / "Discovery" / "Web-Content" / "common.txt").write_text("a\nb\n")
+    (wl_root / "Passwords" / "rockyou.txt").write_text("secret\n")
+    config.save_settings(
+        config.Settings(
+            workspace_root="/tmp/ws",
+            wordlist_paths=[str(wl_root)],
+            theme="light",
+            font_size=0,
+            max_concurrency=4,
+            nmap_udp_full=False,
+        )
+    )
+    names = [w.path.name for w in wordlists.index_wordlists()]
+    assert "common.txt" in names  # positive control: the added path is really scanned
+    assert "rockyou.txt" not in names  # password list never surfaced
+
+
 def test_workspace_root_accessor_reflects_settings(tmp_path: Path) -> None:
     config.save_settings(
         config.Settings(
