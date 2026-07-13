@@ -21,6 +21,13 @@ DEFAULT_WORDLIST_PATHS: tuple[Path, ...] = (
 # Settings validation bounds + enums (config stays GUI-free; theme.py owns the palette application).
 THEMES = ("light", "dark")
 DEFAULT_THEME = "light"
+# Scan profiles govern the nmap discovery battery (see modules/nmap.py):
+#   quick   — top-1000 TCP only (fast triage, no full -p-, no UDP)
+#   default — top-1000 -> full -p- -> UDP top-100 (the standard battery)
+#   full    — default battery + always the slow full UDP sweep
+#   exam    — speed-tuned tight/fast: top-1000 + rate-boosted -p- + UDP top-100, exam-legal
+SCAN_PROFILES = ("quick", "default", "full", "exam")
+DEFAULT_SCAN_PROFILE = "default"
 DEFAULT_MAX_CONCURRENCY = 4
 CONCURRENCY_RANGE = (1, 16)
 FONT_SIZE_RANGE = (8, 24)  # 0 = "use the Qt default, don't override"
@@ -98,6 +105,7 @@ class Settings:
     font_size: int  # 0 = don't override the Qt default
     max_concurrency: int
     nmap_udp_full: bool
+    scan_profile: str = DEFAULT_SCAN_PROFILE
 
     def normalized(self) -> Settings:
         font = self.font_size
@@ -110,6 +118,9 @@ class Settings:
             font_size=font,
             max_concurrency=_clamp(self.max_concurrency, *CONCURRENCY_RANGE),
             nmap_udp_full=bool(self.nmap_udp_full),
+            scan_profile=self.scan_profile
+            if self.scan_profile in SCAN_PROFILES
+            else DEFAULT_SCAN_PROFILE,
         )
 
     def to_prefs(self) -> dict[str, str]:
@@ -121,6 +132,7 @@ class Settings:
             "font_size": str(self.font_size),
             "max_concurrency": str(self.max_concurrency),
             "nmap_udp_full": "true" if self.nmap_udp_full else "false",
+            "scan_profile": self.scan_profile,
         }
 
 
@@ -132,6 +144,7 @@ def default_settings() -> Settings:
         font_size=0,
         max_concurrency=DEFAULT_MAX_CONCURRENCY,
         nmap_udp_full=False,
+        scan_profile=DEFAULT_SCAN_PROFILE,
     )
 
 
@@ -149,6 +162,7 @@ def load_settings() -> Settings:
             prefs.get("max_concurrency"), base.max_concurrency, *CONCURRENCY_RANGE
         ),
         nmap_udp_full=_parse_bool(prefs.get("nmap_udp_full"), base.nmap_udp_full),
+        scan_profile=prefs.get("scan_profile", base.scan_profile),
     ).normalized()
 
 

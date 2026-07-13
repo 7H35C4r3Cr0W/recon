@@ -46,6 +46,9 @@ reference), plus a Bloodhound-style graph view (`Ctrl+G`).
 
 - **Discovery** — two-stage nmap (TCP top-1000 → full → versioned on found ports; UDP top-100),
   parsed into a service tree. Non-standard HTTP/DB ports get their own per-port nodes and output.
+  Pick a **scan profile** — `quick` (top-1000 only), `default`, `full` (adds the slow full UDP sweep),
+  or `exam` (speed-tuned, tight, exam-legal — no vuln NSE) — via Preferences, `Scan → Run recon with
+  profile`, or `oscprecon-cli scan --scan-profile`.
 - **Per-service modules** — HTTP (granular feroxbuster/gobuster/ffuf/dirsearch builder), vhost, SMB
   (tiered null/guest auto-recon), FTP, SSH, DNS, LDAP, SMTP, NFS, SNMP, TFTP, NetBIOS, IKE, NTP, and
   read-only DB modules (Redis, MongoDB, MSSQL, MySQL, PostgreSQL). Each ships Tier-1 auto recon, Tier-2 manual
@@ -87,7 +90,8 @@ and service/finding/**credential counts** (counts only — secret values never a
 - **Workspace** — workspace root (created on save if missing).
 - **Appearance** — light/dark theme and an optional application font-size override (applied live).
 - **Tool paths** — wordlist search paths (password lists are always filtered out and never shown).
-- **Scan** — opt-in full UDP port sweep for *Run Full Recon* (default stays UDP top-100).
+- **Scan** — default scan profile (quick/default/full/exam) + opt-in full UDP port sweep (default
+  stays UDP top-100).
 - **Reports** — the fixed redaction/archiving guarantees, shown for reference.
 - **Privacy** — the mandatory secret protections (§2), displayed locked-on; they cannot be disabled.
 - **Performance** — cap on concurrent recon workers.

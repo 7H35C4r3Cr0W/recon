@@ -131,7 +131,32 @@ def test_settings_prefs_hold_only_known_non_secret_keys() -> None:
         "font_size",
         "max_concurrency",
         "nmap_udp_full",
+        "scan_profile",
     }
+
+
+def test_scan_profile_roundtrips() -> None:
+    config.save_settings(
+        config.Settings(
+            workspace_root="/tmp/ws",
+            wordlist_paths=[],
+            theme="light",
+            font_size=0,
+            max_concurrency=4,
+            nmap_udp_full=False,
+            scan_profile="exam",
+        )
+    )
+    assert config.load_settings().scan_profile == "exam"
+
+
+def test_unknown_scan_profile_falls_back_to_default() -> None:
+    config.save_prefs({"scan_profile": "bogus"})
+    assert config.load_settings().scan_profile == config.DEFAULT_SCAN_PROFILE
+
+
+def test_default_scan_profile_is_default() -> None:
+    assert config.default_settings().scan_profile == "default"
 
 
 def test_credential_wordlists_stay_filtered_when_a_settings_path_is_added(tmp_path: Path) -> None:

@@ -264,6 +264,21 @@ class MainWindow(QMainWindow):
         run_action.triggered.connect(self._on_run)
         scan_menu.addAction(run_action)
 
+        profile_menu = scan_menu.addMenu("Run recon with profile")
+        _PROFILE_HINTS = {
+            "quick": "top-1000 TCP only — fastest triage",
+            "default": "top-1000 → full -p- → UDP top-100 (standard)",
+            "full": "standard battery + the slow full UDP sweep",
+            "exam": "speed-tuned tight/fast, exam-legal (no vuln NSE)",
+        }
+        for profile_name in config.SCAN_PROFILES:
+            action = QAction(profile_name.capitalize(), self)
+            action.setToolTip(_PROFILE_HINTS.get(profile_name, ""))
+            action.triggered.connect(
+                lambda _checked=False, name=profile_name: self._start_recon(name)
+            )
+            profile_menu.addAction(action)
+
         presets_menu = scan_menu.addMenu("Nmap presets")
         for preset in load_manual_commands(_SCAN_PRESETS):
             action = QAction(preset.description, self)
@@ -763,10 +778,20 @@ class MainWindow(QMainWindow):
         self._tool_panel.append_output(f"[preset] loaded: {filled}")
 
     def _on_run(self) -> None:
+        # Run Full Recon button/menu → uses the configured default scan profile.
+        self._start_recon(None)
+
+    def _start_recon(self, scan_profile: str | None) -> None:
+        # scan_profile=None → the configured default; a submenu passes an explicit override for
+        # this one run without changing the saved preference.
         if self._profile is None or not self._tasks.can_start(exclusive=True):
             return
-        self._tool_panel.append_output("[nmap] starting…")
-        worker = NmapWorker(self._profile, udp_full=config.load_settings().nmap_udp_full)
+        settings = config.load_settings()
+        profile_name = scan_profile or settings.scan_profile
+        self._tool_panel.append_output(f"[nmap] starting… (scan profile: {profile_name})")
+        worker = NmapWorker(
+            self._profile, udp_full=settings.nmap_udp_full, scan_profile=profile_name
+        )
         self._start(worker, "nmap", self._on_scan_done, exclusive=True)
 
     def _on_run_command(self, command: str) -> None:

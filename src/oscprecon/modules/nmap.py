@@ -28,8 +28,12 @@ def _now_iso() -> str:
 class NmapModule(Module):
     name = "nmap"
 
-    def __init__(self, udp_full: bool = False) -> None:
+    def __init__(self, udp_full: bool = False, scan_profile: str = "default") -> None:
         self.udp_full = udp_full
+        # why: unknown profiles fall back to the standard battery rather than raising — a stale
+        # or hand-edited pref must never wedge the scan. config.Settings.normalized() validates
+        # the persisted value; this is defence-in-depth for direct callers.
+        self.scan_profile = scan_profile if scan_profile in ("quick", "full", "exam") else "default"
 
     def triggers(self, scan_results: ScanResults) -> bool:
         return True
@@ -37,40 +41,7 @@ class NmapModule(Module):
     def commands(self, target: Target, ports: list[Port]) -> list[Command]:
         host = target.ip
         if not ports:
-            cmds = [
-                Command(
-                    "nmap",
-                    f"nmap --top-ports 1000 {host}",
-                    "Fast sweep of the 1000 most common TCP ports.",
-                    "< 1 min",
-                    "nmap/tcp-top1000.txt",
-                ),
-                Command(
-                    "nmap",
-                    f"nmap -p- {host}",
-                    "Full 65535-port TCP sweep — catches services on odd ports.",
-                    "5-15 min",
-                    "nmap/tcp-full.txt",
-                ),
-                Command(
-                    "nmap",
-                    f"nmap -sU --top-ports 100 {host}",
-                    "UDP top-100 — SNMP/DNS/NetBIOS/TFTP hide here.",
-                    "1-5 min",
-                    "nmap/udp-top100.txt",
-                ),
-            ]
-            if self.udp_full:
-                cmds.append(
-                    Command(
-                        "nmap",
-                        f"nmap -sU -p- {host}",
-                        "Full UDP sweep — very slow, opt-in only.",
-                        "slow",
-                        "nmap/udp-full.txt",
-                    )
-                )
-            return cmds
+            return self._discovery_battery(host)
 
         tcp_ports = sorted({p.number for p in ports if p.proto == Proto.TCP})
         if not tcp_ports:
@@ -85,6 +56,70 @@ class NmapModule(Module):
                 "nmap/tcp-versioned.txt",
             )
         ]
+
+    def _discovery_battery(self, host: str) -> list[Command]:
+        # why: the profile only shapes the DISCOVERY phase; the versioned -sV -sC scan on found
+        # ports is identical everywhere. exam-legal by construction — every line is `nmap` with
+        # allow-listed flags, never `--script vuln` (opt-in via Nmap presets, not the auto battery).
+        top1000 = Command(
+            "nmap",
+            f"nmap --top-ports 1000 {host}",
+            "Fast sweep of the 1000 most common TCP ports.",
+            "< 1 min",
+            "nmap/tcp-top1000.txt",
+        )
+        top1000_fast = Command(
+            "nmap",
+            f"nmap --top-ports 1000 -T4 {host}",
+            "Fast sweep of the 1000 most common TCP ports (speed-tuned).",
+            "< 1 min",
+            "nmap/tcp-top1000.txt",
+        )
+        udp_top100 = Command(
+            "nmap",
+            f"nmap -sU --top-ports 100 {host}",
+            "UDP top-100 — SNMP/DNS/NetBIOS/TFTP hide here.",
+            "1-5 min",
+            "nmap/udp-top100.txt",
+        )
+        udp_full = Command(
+            "nmap",
+            f"nmap -sU -p- {host}",
+            "Full UDP sweep — very slow, opt-in only.",
+            "slow",
+            "nmap/udp-full.txt",
+        )
+        if self.scan_profile == "quick":
+            return [top1000_fast]  # fast triage: no full -p-, no UDP
+        if self.scan_profile == "exam":
+            cmds = [
+                top1000_fast,
+                Command(
+                    "nmap",
+                    f"nmap -p- --min-rate 1000 -T4 {host}",
+                    "Full 65535-port TCP sweep, rate-boosted to finish fast under exam time. "
+                    "No --script vuln.",
+                    "2-8 min",
+                    "nmap/tcp-full.txt",
+                ),
+                udp_top100,
+            ]
+        else:  # default / full
+            cmds = [
+                top1000,
+                Command(
+                    "nmap",
+                    f"nmap -p- {host}",
+                    "Full 65535-port TCP sweep — catches services on odd ports.",
+                    "5-15 min",
+                    "nmap/tcp-full.txt",
+                ),
+                udp_top100,
+            ]
+        # `full` always adds the slow UDP sweep; others only on the explicit udp_full opt-in.
+        if self.udp_full or self.scan_profile == "full":
+            cmds.append(udp_full)
+        return cmds
 
     def discovered_services(self, raw_outputs: dict[str, str]) -> list[DiscoveredService]:
         merged: dict[tuple[int, Proto], DiscoveredService] = {}

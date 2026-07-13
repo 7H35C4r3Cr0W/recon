@@ -35,6 +35,22 @@ def test_populate_reflects_settings(qtbot: QtBot) -> None:
     ]
 
 
+def test_scan_profile_combo_populates_and_collects(qtbot: QtBot) -> None:
+    settings = config.Settings(
+        workspace_root="/tmp/ws",
+        wordlist_paths=[],
+        theme="light",
+        font_size=0,
+        max_concurrency=4,
+        nmap_udp_full=False,
+        scan_profile="exam",
+    )
+    d = _make(qtbot, settings)
+    assert d._scan_profile.currentData() == "exam"  # populated from settings
+    d._scan_profile.setCurrentIndex(d._scan_profile.findData("quick"))
+    assert d.selected_settings().scan_profile == "quick"  # collected back out
+
+
 def test_eight_sections_present(qtbot: QtBot) -> None:
     d = _make(qtbot, config.default_settings())
     labels = [d._tabs.tabText(i) for i in range(d._tabs.count())]

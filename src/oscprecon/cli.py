@@ -30,6 +30,11 @@ def scan(
         ..., "--profile", "-p", help="Profile name (folder under workspace)."
     ),
     hostname: str | None = typer.Option(None, help="Optional hostname for the target."),
+    scan_profile: str | None = typer.Option(
+        None,
+        "--scan-profile",
+        help="nmap battery: quick | default | full | exam (default: the configured preference).",
+    ),
     udp_full: bool = typer.Option(False, "--udp-full", help="Also run the slow full UDP sweep."),
     resume: bool = typer.Option(
         False,
@@ -44,6 +49,16 @@ def scan(
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     root = workspace if workspace is not None else config.workspace_root()
+    profile_choice = (
+        scan_profile if scan_profile is not None else config.load_settings().scan_profile
+    )
+    if profile_choice not in config.SCAN_PROFILES:
+        typer.echo(
+            f"[error] unknown --scan-profile '{profile_choice}'; "
+            f"choose one of {', '.join(config.SCAN_PROFILES)}.",
+            err=True,
+        )
+        raise typer.Exit(2)
     try:
         target = Target(ip=ip, hostname=hostname)
     except ValueError as exc:
@@ -68,11 +83,12 @@ def scan(
     else:
         prof = Profile.create(root, profile, target)
     config.add_recent(prof.directory)
-    typer.echo(f"[profile] {prof.directory}")
+    typer.echo(f"[profile] {prof.directory}  (scan profile: {profile_choice})")
     Orchestrator(
         prof,
         on_line=lambda line: typer.echo(line),
         udp_full=udp_full,
+        scan_profile=profile_choice,
         resume=resume,
         force=force,
     ).run_nmap()

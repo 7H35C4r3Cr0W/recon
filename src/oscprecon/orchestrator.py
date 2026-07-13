@@ -17,13 +17,14 @@ class Orchestrator:
         *,
         on_line: Callable[[str], None] | None = None,
         udp_full: bool = False,
+        scan_profile: str = "default",
         resume: bool = False,
         force: bool = False,
         cancel: threading.Event | None = None,
     ) -> None:
         self.profile = profile
         self.on_line = on_line
-        self.nmap = NmapModule(udp_full=udp_full)
+        self.nmap = NmapModule(udp_full=udp_full, scan_profile=scan_profile)
         self.resume = resume
         self.force = force
         self.cancel = cancel

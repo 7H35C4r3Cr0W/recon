@@ -106,14 +106,17 @@ Each ships: fixture, parser test, ≥ 3 pattern entries, HackTricks + `tools:` i
 
 ---
 
-## Phase 6 — Exam-day polish — 🚧 partial
+## Phase 6 — Exam-day polish — 🚧 partial (only the timed mock remains)
 <!-- DONE: `oscprecon-cli doctor` (which-check for every wrapped tool + install hints). Self-contained
-     report. TODO: exam-profile preset (tight fast command set), timed mock-exam dry run. -->
+     report. Exam-mode scan profile (quick/default/full/exam). TODO: timed mock-exam dry run (needs a
+     live target). -->
 
 
-- `oscprecon-cli doctor` + Help → Doctor (checks each wrapped tool via `which`, prints install commands).
-- Exam profile preset (tight/fast; no `--script vuln`, no deep recursion).
-- Self-contained report; mock exam (3 standalone + AD set, timed); fix roughness.
+- ✅ `oscprecon-cli doctor` + Help → Doctor (checks each wrapped tool via `which`, prints install commands).
+- ✅ **Exam-mode scan profile** (tight/fast; no `--script vuln`) — `quick`/`default`/`full`/`exam` govern
+  the nmap battery. Exam = `--top-ports 1000 -T4` → `-p- --min-rate 1000 -T4` → UDP top-100. Selectable
+  in Preferences (default), `Scan → Run recon with profile` (per-run), and `oscprecon-cli --scan-profile`.
+- ✅ Self-contained report. ⛔ Timed mock exam (3 standalone + AD set) — blocked on an authorized target.
 
 **Exit:** would trust it on the real exam.
 
@@ -153,11 +156,11 @@ subsystem-by-subsystem status map and forward plan.**
 
 Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` §27:
 
-- **Exam-profile preset + timed mock exam (Phase 6).** A tight/fast command-set preset (no `--script
-  vuln`, no deep recursion) and a timed dry run against a standalone + AD set. The *preset* is the
-  recommended next chunk (deterministic); the *timed mock* is blocked on an authorized live target.
-- **Project file operations (CLAUDE.md §19).** File → Open by IP / Import Project (.tar.gz) /
-  Export Project (.tar.gz, warns `creds.json` included). Deps (profile model + workspace index) are done.
+- **Project file operations (CLAUDE.md §19)** — *recommended next chunk.* File → Open by IP /
+  Import Project (.tar.gz) / Export Project (.tar.gz, warns `creds.json` included). Deps (profile model +
+  workspace index) are done; deterministic, no live target.
+- **Timed mock exam (Phase 6).** A timed dry run against a standalone + AD set. Blocked on an authorized
+  live target. (The exam-mode *scan profile* it would exercise is now built.)
 
 *(The concurrent-copy profile lock, CLAUDE.md §6b, the status footer §19, and the audit log §6a are now
 built — see the Workspace Dashboard section.)*

@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import config
-from oscprecon.config import CONCURRENCY_RANGE, FONT_SIZE_RANGE, THEMES, Settings
+from oscprecon.config import CONCURRENCY_RANGE, FONT_SIZE_RANGE, SCAN_PROFILES, THEMES, Settings
 
 # Mandatory, non-negotiable protections (CLAUDE.md §2) surfaced in the Privacy tab as locked-on
 # controls — the settings UI must never offer a way to switch these off.
@@ -135,11 +135,26 @@ class SettingsDialog(QDialog):
     def _build_scan_tab(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
-        self._udp_full = QCheckBox("Run a full UDP port sweep on 'Run Full Recon'")
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Default scan profile:"))
+        self._scan_profile = QComboBox()
+        for name in SCAN_PROFILES:
+            self._scan_profile.addItem(name.capitalize(), name)
+        row.addWidget(self._scan_profile)
+        row.addStretch(1)
+        layout.addLayout(row)
+        profile_note = QLabel(
+            "quick = top-1000 TCP only · default = top-1000 → full -p- → UDP top-100 · "
+            "full = default + the slow full UDP sweep · exam = speed-tuned, tight, exam-legal "
+            "(no --script vuln). Override per-run from Scan → Run recon with profile."
+        )
+        profile_note.setWordWrap(True)
+        layout.addWidget(profile_note)
+        self._udp_full = QCheckBox("Also run a full UDP port sweep on 'Run Full Recon'")
         layout.addWidget(self._udp_full)
         note = QLabel(
             "Default UDP scan is the top-100 ports. Full UDP (nmap -sU -p-) is thorough but very "
-            "slow — enable only when you can spare the time."
+            "slow — enable only when you can spare the time. The full profile includes it already."
         )
         note.setWordWrap(True)
         layout.addWidget(note)
@@ -215,6 +230,8 @@ class SettingsDialog(QDialog):
         self._font_size.setValue(settings.font_size if override else FONT_SIZE_RANGE[0])
         self._wordlist_list.clear()
         self._wordlist_list.addItems(settings.wordlist_paths)
+        prof_idx = self._scan_profile.findData(settings.scan_profile)
+        self._scan_profile.setCurrentIndex(prof_idx if prof_idx >= 0 else 0)
         self._udp_full.setChecked(settings.nmap_udp_full)
         self._concurrency.setValue(settings.max_concurrency)
 
@@ -228,6 +245,7 @@ class SettingsDialog(QDialog):
             font_size=font,
             max_concurrency=self._concurrency.value(),
             nmap_udp_full=self._udp_full.isChecked(),
+            scan_profile=str(self._scan_profile.currentData()),
         ).normalized()
 
     # ----- actions ----------------------------------------------------------

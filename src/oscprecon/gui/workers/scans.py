@@ -15,10 +15,13 @@ class NmapWorker(CancellableThread):
     done = Signal(int)
     failed = Signal(str)
 
-    def __init__(self, profile: Profile, udp_full: bool = False) -> None:
+    def __init__(
+        self, profile: Profile, udp_full: bool = False, scan_profile: str = "default"
+    ) -> None:
         super().__init__()
         self._profile = profile
         self._udp_full = udp_full
+        self._scan_profile = scan_profile
 
     def run(self) -> None:
         try:
@@ -26,6 +29,7 @@ class NmapWorker(CancellableThread):
                 self._profile,
                 on_line=self.line.emit,
                 udp_full=self._udp_full,
+                scan_profile=self._scan_profile,
                 cancel=self._cancel,
             )
             orch.run_nmap()

@@ -7,7 +7,7 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
 - **Verified:** `mypy --strict` clean (104 files) · `ruff check` + `ruff format --check` clean ·
-  **657 tests** pass (incl. 179 offscreen GUI) · `test_packaging` green (wheel ships resources).
+  **671 tests** pass (incl. 182 offscreen GUI) · `test_packaging` green (wheel ships resources).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
 ## Status legend
@@ -44,8 +44,9 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
   `profile.py`, `config.py`, `cli.py` (Typer: `scan`, `doctor`), `__main__.py`.
 - **Does:** every subprocess routes through `shell.run` → logs, times, writes raw output, enforces the
   allow/deny policy and DB-primitive backstop, kills the process group on timeout/cancel.
-- **Complete:** two-stage nmap flow, resume semantics, target validation, atomic writes, cancellation.
-- **Remaining:** none for the core; exam-mode preset (§13) will add a run profile on top.
+- **Complete:** two-stage nmap flow, **scan profiles** (quick/default/full/exam govern the nmap
+  battery), resume semantics, target validation, atomic writes, cancellation.
+- **Remaining:** none for the core.
 - **Depends on:** nothing (foundation).
 - **Risks:** the exec chokepoint is the single security-critical seam — any new module must pass
   through it and never call `subprocess` directly (CLAUDE.md §24).
@@ -209,9 +210,9 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 
 | Feature | Marker | Depends on | Note |
 |---|---|---|---|
-| **Exam-mode profile preset** | ⏭ **Next** | orchestrator, modules, settings (all ✅) | Tight/fast exam-legal run profile (no `--script vuln`, bounded recursion/threads); deterministic, no live target |
-| Timed mock-exam dry run | ⛔ | exam preset + live targets | The "timed" part needs authorized targets |
-| Project file ops (`Open by IP`, `Import`/`Export .tar.gz`) | 🕒 | profile model, workspace index (✅) | §19 tarball backup/transfer; warn `creds.json` included |
+| Scan profiles incl. **exam mode** | ✅ **Done** | orchestrator, modules, settings | quick/default/full/exam govern the nmap battery; exam is speed-tuned + exam-legal (no `--script vuln`). Preferences default + `Scan → Run recon with profile` + CLI `--scan-profile` |
+| Project file ops (`Open by IP`, `Import`/`Export .tar.gz`) | ⏭ **Next** | profile model, workspace index (✅) | §19 tarball backup/transfer; warn `creds.json` included |
+| Timed mock-exam dry run | ⛔ | exam preset (✅) + live targets | The "timed" part needs authorized targets |
 | Pattern coverage for ssh/ike/tftp/vhost | 🕒 | pattern engine (✅) | 4 modules lack `patterns/*.yaml` |
 | Report EDB-hit persistence | 🕒 | references, profile store | Needs a per-profile EDB store to render from |
 | AD / Kerberos enum workflow polish | 🕒 | smb/ldap modules (✅) | Enumeration only, no cracking |
@@ -225,8 +226,8 @@ audit log §6a, concurrent-copy lock §6b) and the full Workspace Dashboard & Or
 
 ## 15. Partial features — 🚧
 
-- **Phase 6 (exam-day polish):** `doctor` ✅ and self-contained report ✅ done; **exam preset + timed
-  mock** not done.
+- **Phase 6 (exam-day polish):** `doctor` ✅, self-contained report ✅, **exam-mode scan profile ✅**;
+  only the **timed** mock-exam dry run remains (⛔ needs an authorized target).
 - **Pattern library breadth:** 15/19 modules have pattern YAMLs (ssh/ike/tftp/vhost missing).
 - **Reports:** Exploit-DB hits not yet persisted into `report.md`.
 
@@ -273,9 +274,9 @@ flowchart TD
     ro["Read-only mode ✅"]
     activity["Activity timeline ✅"]
 
-    exam["Exam-mode preset ⏭"]
+    exam["Exam-mode scan profile ✅"]
     mock["Timed mock exam ⛔"]
-    proj["Project file ops tar.gz 🕒"]
+    proj["Project file ops tar.gz ⏭"]
     live["Live validation ⛔"]
 
     shell --> workers --> guiexec
@@ -291,7 +292,7 @@ flowchart TD
     audit --> activity
     fcn --> audit
 
-    modules -.-> exam
+    modules --> exam
     exam -.-> mock
     profile -.-> proj
     index -.-> proj
@@ -303,15 +304,14 @@ flowchart TD
     classDef next fill:#153a5b,stroke:#4aa3ff,color:#eaf4ff;
     classDef later fill:#3d3410,stroke:#c9a227,color:#fff7e0;
     classDef blocked fill:#3d1616,stroke:#d05050,color:#ffe8e8;
-    class shell,workers,modules,guiexec,profile,fcn,graph,reports,audit,index,dash,search,views,bulk,locks,ro,activity done;
-    class exam next;
-    class proj later;
+    class shell,workers,modules,guiexec,profile,fcn,graph,reports,audit,index,dash,search,views,bulk,locks,ro,activity,exam done;
+    class proj next;
     class mock,live blocked;
 ```
 
 **Do-not-start-yet rules from the graph:**
-- **Timed mock exam** waits on the exam-mode preset **and** an authorized live target.
-- **Project file ops** can start now (deps done) but is sequenced after the exam preset.
+- **Project file ops** is the next chunk — its deps (profile model + workspace index) are done.
+- **Timed mock exam** waits on the (now-complete) exam-mode profile **and** an authorized live target.
 - **Live validation** waits on everything and an authorized target — never claim it without one.
 
 ---
@@ -336,7 +336,7 @@ flowchart TD
 | Workspace dashboard | ✅ | High (`test_dashboard`, `test_workspace_index`) | Index staleness | None |
 | Global search | ✅ | High (`test_workspace_search`) | Secret leakage in results | None — usernames/domains only |
 | Profile locking | ✅ | High (`test_workspace_locks`) | PID reuse / foreign host | None — conservative already |
-| Exam mode | 🕒 | None yet | Preset must stay exam-legal & fast | **Build next** (deterministic) |
+| Exam mode (scan profile) | ✅ | High (`test_nmap_commands`, `test_cli_scan`) | Timed mock still needs a live target | Done — only the timed dry-run is blocked |
 | Live acceptance testing | ⛔ | None (needs targets) | Real parser gaps unseen | Run on 3 authorized boxes when available |
 
 ---
@@ -347,9 +347,9 @@ The originally-suggested Phases A–C (product organization, safe multi-profile 
 intelligence) are **already delivered** by the Workspace Dashboard upgrade — the code shows a different
 remaining order, so the forward plan is re-cast below (≤5 phases). One major chunk active at a time.
 
-- **Phase 1 — Exam-day readiness** ⏭ — exam-mode profile preset (tight/fast, exam-legal); self-contained
-  report audit. Deterministic; no live target. *Completes Phase 6's non-live half.*
-- **Phase 2 — Project portability & recovery** 🕒 — `File → Open by IP`, `Import Project` (.tar.gz),
+- **Phase 1 — Exam-day readiness** ✅ (preset) — exam-mode scan profile shipped (tight/fast, exam-legal;
+  quick/default/full/exam). Only the *timed* mock-exam dry run remains, which is ⛔ (needs a live target).
+- **Phase 2 — Project portability & recovery** ⏭ **Next** — `File → Open by IP`, `Import Project` (.tar.gz),
   `Export Project` (.tar.gz, warns `creds.json` included). Deps: profile model + workspace index (done).
 - **Phase 3 — Recon depth** 🕒 — pattern YAMLs for ssh/ike/tftp/vhost; report EDB-hit persistence;
   AD/Kerberos enum workflow polish (enumeration only). Deps: pattern engine + modules (done).
@@ -378,21 +378,22 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 
 ---
 
-## Immediate next chunk (do not start during this documentation pass)
+## Immediate next chunk
 
-**⏭ Exam-mode profile preset (completes Phase 6, non-live half).**
+**⏭ Project portability & recovery (§19): `Open by IP`, `Import Project`, `Export Project`.**
 
-- **Why this one:** it is the only remaining *partial* phase that needs **no live target**, depends
-  solely on already-complete subsystems (orchestrator, modules, settings), and delivers direct exam-day
-  value. Deterministic and unit-testable end-to-end.
-- **Completion definition:** a named "exam" run profile (tight/fast, exam-legal — no `--script vuln`, no
-  deep recursion, bounded threads/timeouts) selectable in Preferences (the *Default scan profile* slot)
-  and honored by Quick/Full recon in the orchestrator; unit tests assert the command set stays within
-  the §2 allow-list and omits slow/noisy scripts; docs updated.
+- **Why this one:** the exam-mode scan profile (the prior recommendation) is now shipped, so the next
+  self-contained, deterministic chunk that needs **no live target** and whose deps (profile model +
+  workspace index) are complete is the project-file model. It completes the "each `~/oscprecon/<name>/`
+  is a portable project file" story and gives fast recovery/backup/transfer.
+- **Completion definition:** `File → Open by IP…` (match `profile.json.target.ip` across the workspace);
+  `Import Project…` (extract a `<name>.tar.gz` into the workspace and open it); `Export Project…` (pack
+  the active profile to `<name>.tar.gz`, **warn `creds.json` is included**). Path-traversal-safe extract;
+  tests for round-trip + malicious archive rejection; docs updated.
 - **Explicitly excludes:** the *timed* mock-exam run (⛔ needs authorized targets) and any live validation.
 
-**Later candidates (do not start):** Project portability (Open-by-IP / Import / Export `.tar.gz`);
-pattern coverage for ssh/ike/tftp/vhost; report EDB-hit persistence.
+**Later candidates (do not start):** pattern coverage for ssh/ike/tftp/vhost; report EDB-hit
+persistence; AD/Kerberos enum workflow polish.
 
 ---
 

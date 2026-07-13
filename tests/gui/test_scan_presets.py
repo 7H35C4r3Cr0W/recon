@@ -1,9 +1,10 @@
 import shlex
 from pathlib import Path
 
+import pytest
 from pytestqt.qtbot import QtBot
 
-from oscprecon import shell
+from oscprecon import config, shell
 from oscprecon.gui.main_window import _SCAN_PRESETS, MainWindow
 from oscprecon.manual_commands import expand, load_manual_commands
 from oscprecon.models import Target
@@ -37,3 +38,28 @@ def test_scan_preset_noop_without_profile(qtbot: QtBot) -> None:
     qtbot.addWidget(window)
     window._on_scan_preset("nmap -p- {target}")  # no profile -> must not raise
     assert window._tool_panel._command.text() == ""
+
+
+def test_start_recon_passes_the_chosen_profile(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.42")))
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(window, "_start", lambda worker, *a, **k: captured.update(worker=worker))
+    window._start_recon("exam")
+    assert captured["worker"]._scan_profile == "exam"  # type: ignore[attr-defined]
+
+
+def test_start_recon_default_uses_the_configured_profile(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config.save_prefs({"scan_profile": "quick"})
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.42")))
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(window, "_start", lambda worker, *a, **k: captured.update(worker=worker))
+    window._start_recon(None)  # None -> fall back to the saved default
+    assert captured["worker"]._scan_profile == "quick"  # type: ignore[attr-defined]

@@ -10,16 +10,40 @@ Running record of what's been built, in order, so any session can pick up mid-st
 ✅/🚧/⏭/🕒/⛔/❌, dependency graph, forward phases). This "Next up" is the one-line pointer.
 
 Phases 0–5, all 19 recon modules (14 core + Redis/MongoDB/MSSQL/MySQL/PostgreSQL), Phase 3 pattern
-engine, Phase 4 graph (incl. §16 drag-persist/add-note/minimap/PNG-SVG export), and the full Workspace
+engine, Phase 4 graph (incl. §16 drag-persist/add-note/minimap/PNG-SVG export), the full Workspace
 Dashboard & Organization upgrade (index, dashboard, search, health, locks, activity, saved views, bulk
-actions, Preferences/Settings) are **DONE** — 657 tests green. Phase 6 is partial: `doctor` + status
-footer + audit log + concurrent-copy lock done.
+actions, Preferences/Settings), and the **exam-mode scan profile** are **DONE** — 671 tests green.
+Phase 6 is partial: `doctor` + status footer + audit log + concurrent-copy lock + exam profile done;
+only the *timed* mock exam remains (blocked on a live target).
 
-**Recommended next chunk (do one at a time):** the **exam-mode profile preset** — the last Phase-6
-item that needs no live target (deterministic, depends only on completed subsystems). Later candidates:
-project file ops §19 (Open-by-IP / Import / Export `.tar.gz`), pattern YAMLs for ssh/ike/tftp/vhost,
-report EDB-hit persistence. **Blocked:** live acceptance testing + timed mock exam (need an authorized
-target — verification to date is fixtures + unit/GUI tests, not live boxes).
+**Recommended next chunk (do one at a time):** **project file operations §19** — `File → Open by IP`,
+`Import Project` (.tar.gz), `Export Project` (.tar.gz, warns `creds.json` included). Deterministic, no
+live target, deps (profile model + workspace index) done. Later candidates: pattern YAMLs for
+ssh/ike/tftp/vhost, report EDB-hit persistence, AD/Kerberos workflow polish. **Blocked:** live
+acceptance testing + timed mock exam (need an authorized target — verification to date is fixtures +
+unit/GUI tests, not live boxes).
+
+### Phase 6 · exam-mode scan profile — DONE (deterministic; no live target)
+Introduced scan profiles governing the nmap discovery battery, plumbed end-to-end:
+- **`config.Settings.scan_profile`** (`quick`/`default`/`full`/`exam`, default `default`) — validated
+  in `normalized()`, persisted in `prefs.json`, invalid → default. New non-secret pref key.
+- **`NmapModule(scan_profile=...)`** — `_discovery_battery` branches by profile; unknown value falls
+  back to `default` (defence-in-depth). `default` is byte-identical to the historical battery.
+  - quick: `--top-ports 1000 -T4` only (no `-p-`, no UDP).
+  - default: `--top-ports 1000` → `-p-` → UDP top-100 (+ udp-full on the flag).
+  - full: default battery + always `-sU -p-`.
+  - exam: `--top-ports 1000 -T4` → `-p- --min-rate 1000 -T4` → UDP top-100. Tight/fast, **no `--script
+    vuln`** — every line clears the §2 exec policy.
+- **Plumbing:** `Orchestrator(scan_profile=...)`, CLI `oscprecon-cli scan --scan-profile` (validated,
+  exits 2 on unknown), GUI `NmapWorker(scan_profile=...)`, `MainWindow._start_recon` (Run Full Recon
+  uses the configured default; `Scan → Run recon with profile` overrides per-run), Preferences → Scan
+  tab default-profile combo.
+- **Tests (+14 → 671):** per-profile batteries + `default`-unchanged regression + every-profile
+  policy-clean + unknown→default; settings roundtrip/invalid/known-keys; CLI reject-unknown + threads-
+  through; GUI combo populate/collect + `_start_recon` profile pass-through. Adversarial review found +
+  fixed 2 items (KeyError-proof menu tooltips via `.get`; added the CLI validation test).
+- Gates green: `mypy --strict`, `ruff check`, `ruff format --check`, 671 pytest (182 offscreen GUI),
+  packaging. No new shipped resources.
 
 ### Workspace Dashboard & Project Organization upgrade — DONE (deterministic; no live target)
 Turned the app from individually-opened profiles into an organized local workspace. New non-GUI
