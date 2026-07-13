@@ -4,9 +4,11 @@ import os
 import sys
 
 from PySide6.QtCore import QCoreApplication, Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QSplashScreen
 
 from oscprecon.branding import APP_NAME
+from oscprecon.gui.assets import ICON, asset_path
 from oscprecon.gui.main_window import MainWindow
 from oscprecon.gui.splash import make_splash
 
@@ -19,6 +21,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)
+    app.setWindowIcon(QIcon(str(asset_path(ICON))))
 
     splash: QSplashScreen | None = None
     try:

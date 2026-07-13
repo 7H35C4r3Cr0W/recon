@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" role="img" aria-label="Nabu — Local Recon Workspace">
+  <defs>
+    <linearGradient id="tileLogo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161d2b"/>
+      <stop offset="1" stop-color="#0f1420"/>
+    </linearGradient>
+  </defs>
+  <!-- mark -->
+  <g transform="translate(20,20) scale(0.47)">
+    <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#tileLogo)"/>
+    <rect x="8.5" y="8.5" width="239" height="239" rx="51.5" fill="none" stroke="#c9a227" stroke-opacity="0.28" stroke-width="1.5"/>
+    <path d="M128 40 L142 66 L128 60 L114 66 Z" fill="#c9a227"/>
+    <rect x="125" y="60" width="6" height="20" rx="3" fill="#c9a227"/>
+    <g stroke="#5b8a8f" stroke-width="7" stroke-linecap="round" fill="none">
+      <line x1="128" y1="140" x2="76" y2="100"/>
+      <line x1="128" y1="140" x2="188" y2="108"/>
+      <line x1="128" y1="140" x2="112" y2="200"/>
+      <line x1="188" y1="108" x2="112" y2="200"/>
+    </g>
+    <circle cx="128" cy="140" r="17" fill="#c9a227"/>
+    <circle cx="76" cy="100" r="11" fill="#5b8a8f"/>
+    <circle cx="188" cy="108" r="11" fill="#5b8a8f"/>
+    <circle cx="112" cy="200" r="11" fill="#5b8a8f"/>
+  </g>
+  <!-- wordmark -->
+  <text x="150" y="86" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="58" font-weight="600" fill="#e6e9ef">Nabu</text>
+  <text x="152" y="116" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="18" letter-spacing="1.5" fill="#c9a227">LOCAL RECON WORKSPACE</text>
+</svg>

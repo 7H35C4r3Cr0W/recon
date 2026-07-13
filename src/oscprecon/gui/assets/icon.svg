@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Nabu">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#161d2b"/>
+      <stop offset="1" stop-color="#0f1420"/>
+    </linearGradient>
+  </defs>
+  <!-- tablet tile -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#tile)"/>
+  <rect x="8.5" y="8.5" width="239" height="239" rx="51.5" fill="none" stroke="#c9a227" stroke-opacity="0.28" stroke-width="1.5"/>
+  <!-- cuneiform stylus wedge (the scribe Nabu's mark) -->
+  <path d="M128 40 L142 66 L128 60 L114 66 Z" fill="#c9a227"/>
+  <rect x="125" y="60" width="6" height="20" rx="3" fill="#c9a227"/>
+  <!-- network / constellation edges -->
+  <g stroke="#5b8a8f" stroke-width="7" stroke-linecap="round" fill="none">
+    <line x1="128" y1="140" x2="76" y2="100"/>
+    <line x1="128" y1="140" x2="188" y2="108"/>
+    <line x1="128" y1="140" x2="112" y2="200"/>
+    <line x1="188" y1="108" x2="112" y2="200"/>
+  </g>
+  <!-- nodes: gold hub, teal satellites -->
+  <circle cx="128" cy="140" r="17" fill="#c9a227"/>
+  <circle cx="76" cy="100" r="11" fill="#5b8a8f"/>
+  <circle cx="188" cy="108" r="11" fill="#5b8a8f"/>
+  <circle cx="112" cy="200" r="11" fill="#5b8a8f"/>
+</svg>

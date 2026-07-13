@@ -25,6 +25,22 @@ def test_runtime_resources_resolve_package_relative() -> None:
     for module in ("index", "search", "health", "locks", "activity", "views", "bulk", "models"):
         assert (PKG / "workspace" / f"{module}.py").exists()
     assert (PKG / "gui" / "workspace" / "dashboard.py").exists()
+    # bundled Nabu visual identity (original SVG assets)
+    for asset in ("logo", "icon", "icon-light", "icon-mono", "splash", "empty-workspace"):
+        assert (PKG / "gui" / "assets" / f"{asset}.svg").exists()
+
+
+def test_brand_assets_are_wellformed_svg() -> None:
+    # the identity assets must be parseable vector art (no external <image>/href, no script) so they
+    # render offline and carry no remote dependency.
+    import xml.etree.ElementTree as ET
+
+    for svg in (PKG / "gui" / "assets").glob("*.svg"):
+        root = ET.fromstring(svg.read_text())
+        assert root.tag.endswith("svg"), svg.name
+        text = svg.read_text().lower()
+        assert "<script" not in text and "http://www.w3.org/1999/xlink" not in text, svg.name
+        assert "xlink:href" not in text and "<image" not in text, svg.name
 
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="uv not on PATH")
@@ -49,6 +65,8 @@ def test_wheel_bundles_runtime_resources(tmp_path: pathlib.Path) -> None:
     assert len([n for n in names if "/hacktricks/pages/" in n and n.endswith(".md")]) >= 18
     assert has("oscprecon/gui/graph_html/index.html")
     assert has("oscprecon/gui/graph_html/cytoscape.min.js")
+    assert has("oscprecon/gui/assets/icon.svg")
+    assert has("oscprecon/gui/assets/logo.svg")
     assert len([n for n in names if n.endswith("manual_commands.yaml")]) >= 14
     assert len([n for n in names if "/patterns/" in n and n.endswith(".yaml")]) >= 10
     assert len([n for n in names if "/templates/" in n and not n.endswith("/")]) >= 1

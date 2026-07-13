@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt, QThread
-from PySide6.QtGui import QAction, QActionGroup, QCloseEvent
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QIcon
 from PySide6.QtWidgets import (
     QDialog,
     QDockWidget,
@@ -31,6 +31,7 @@ from oscprecon import config, edb, findings, references, spray, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.branding import APP_NAME, APP_SUBTITLE, APP_TAGLINE
 from oscprecon.gui import theme
+from oscprecon.gui.assets import ICON, asset_path
 from oscprecon.gui.dialogs import (
     AddCredentialDialog,
     CredentialVaultDialog,
@@ -137,6 +138,7 @@ class MainWindow(QMainWindow):
         theme.apply_theme(settings.theme)
         theme.apply_font(settings.font_size)
         self.setWindowTitle(APP_NAME)
+        self.setWindowIcon(QIcon(str(asset_path(ICON))))
         self.resize(1200, 720)
         self._profile: Profile | None = None
         self._auditor: Auditor | None = None
