@@ -1278,9 +1278,14 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         # why: destroying the window while a QThread runs aborts the process and can truncate
-        # profile.json — wait for every in-flight task (and EDB lookup) to finish first.
+        # profile.json — so we wait for every in-flight task. But wait() on the GUI thread with no
+        # prior cancel freezes the window for the tool's full remaining runtime; cancel first so
+        # shell.run kills the child group and each worker returns promptly, then wait to tear down.
         self._notes_pane.flush()
         self._audit_action("profile-closed")
+        self._tasks.cancel_all()
+        for edb_worker in list(self._edb_workers):
+            self._tasks.cancel(edb_worker)
         for task in self._tasks.tasks():
             worker = task.worker
             if isinstance(worker, QThread) and worker.isRunning():

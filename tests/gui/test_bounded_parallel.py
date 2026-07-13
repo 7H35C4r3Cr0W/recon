@@ -41,6 +41,23 @@ def test_cancel_button_stops_a_real_inflight_worker(qtbot: QtBot, tmp_path: Path
     assert window._run_button.isEnabled() is True  # drained, exclusive nmap available again
 
 
+def test_close_event_cancels_inflight_workers(qtbot: QtBot, tmp_path: Path) -> None:
+    from PySide6.QtGui import QCloseEvent
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.5")))
+    worker = _BlockingWorker()
+    window._launch(worker, "smb full")  # starts; blocks in run() until cancelled
+    assert window._tasks.active_count == 1
+
+    window.closeEvent(
+        QCloseEvent()
+    )  # must cancel first, then wait — not block for the 5s safety net
+    assert worker._cancel.is_set()  # cancellation actually fired (else run() only exits on timeout)
+    assert not worker.isRunning()
+
+
 def test_status_bar_lists_tasks_with_working_cancel(qtbot: QtBot) -> None:
     manager = TaskManager()
     bar = TaskStatusBar(manager)
