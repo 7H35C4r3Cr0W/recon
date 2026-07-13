@@ -6,16 +6,16 @@ from PySide6.QtWidgets import QSplashScreen
 
 from oscprecon import __version__
 from oscprecon.branding import APP_NAME, APP_SUBTITLE, APP_TAGLINE
+from oscprecon.gui.theme import tokens
 
-# Nabu palette: deep ink/navy field, gold/bronze primary accent, muted teal secondary (CLAUDE.md
-# brand direction — no neon, no hacker clichés). The mark is an original network-graph motif: a few
-# nodes joined by edges, a nod to the constellation / graph identity.
-_BG = QColor("#0f1420")
-_PANEL = QColor("#161d2b")
-_GOLD = QColor("#c9a227")
-_TEAL = QColor("#5b8a8f")
-_TEXT = QColor("#e6e9ef")
-_MUTED = QColor("#8a94a6")
+# Nabu palette from the shared design tokens (single source of truth) — deep ink/navy field,
+# gold/bronze accent, muted teal secondary. The mark is an original network-graph motif.
+_BG = QColor(tokens.DARK.bg)
+_PANEL = QColor(tokens.DARK.surface)
+_GOLD = QColor(tokens.DARK.accent)
+_TEAL = QColor(tokens.DARK.secondary)
+_TEXT = QColor(tokens.DARK.text)
+_MUTED = QColor(tokens.DARK.text_muted)
 
 
 def _draw_mark(painter: QPainter, cx: float, cy: float, r: float) -> None:
