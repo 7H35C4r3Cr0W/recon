@@ -32,6 +32,40 @@ def test_run_refuses_forbidden_without_executing(tmp_path: Path) -> None:
     assert "[blocked]" in out.read_text(encoding="utf-8")
 
 
+def test_spray_mode_unlocks_credential_attacks() -> None:
+    # §2a: these are blocked in the DEFAULT mode and permitted ONLY when spray=True
+    spray_cmds = (
+        ["hydra", "-L", "u.txt", "-P", "p.txt", "ssh://10.0.0.1"],
+        ["medusa", "-h", "10.0.0.1", "-U", "u.txt", "-P", "p.txt", "-M", "ftp"],
+        ["netexec", "smb", "10.0.0.1", "-u", "u.txt", "-p", "p.txt", "--continue-on-success"],
+        ["wpscan", "--url", "http://x/", "-P", "rockyou.txt"],
+        ["nmap", "--script", "ssh-brute", "10.0.0.1"],
+    )
+    for cmd in spray_cmds:
+        assert shell.policy_violation(cmd) is not None  # OFF by default
+        assert shell.policy_violation(cmd, spray=True) is None  # unlocked only in Spray mode
+
+
+def test_spray_mode_still_blocks_everything_non_credential() -> None:
+    # Spray mode loosens ONLY the credential-attempt category; the rest stays blocked either way
+    still_blocked = (
+        ["sqlmap", "-u", "http://x"],  # not on any tool list
+        ["msfconsole"],  # not on any tool list
+        ["ike-scan", "-A", "-Ppsk.txt", "10.0.0.1"],  # PSK-hash capture (crack material)
+        ["ntpdate", "10.0.0.1"],  # sets the local clock
+        ["mysql", "-e", "SELECT x INTO OUTFILE '/tmp/x'"],  # DB file primitive
+        ["searchsploit", "--json", "-m", "47080"],  # PoC copy
+    )
+    for cmd in still_blocked:
+        assert shell.policy_violation(cmd, spray=True) is not None, cmd
+
+
+def test_run_spray_flag_threads_to_policy(tmp_path: Path) -> None:
+    out = tmp_path / "o.txt"
+    assert shell.run("hydra -L u -P p ssh://10.0.0.1", out).blocked is not None  # default: blocked
+    assert shell.run("hydra -L u -P p ssh://10.0.0.1", out, spray=True).blocked is None  # unlocked
+
+
 def test_blocks_searchsploit_non_display_flags() -> None:
     assert shell.policy_violation(["searchsploit", "--json", "-m", "47080"]) is not None
     assert shell.policy_violation(["searchsploit", "--json", "-u"]) is not None

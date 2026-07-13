@@ -86,9 +86,14 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
     }
 )
 
-# why: forbidden even on an allowed binary — brute/spray is banned (§2). '--rid-brute' is NOT
-# here: RID cycling is recon (§11), so the check is precise, not a blanket 'brute' match.
+# why: forbidden on an allowed binary in the DEFAULT (recon-only) mode — brute/spray is off by
+# default (§2). '--rid-brute' is NOT here: RID cycling is recon (§11), so the check is precise, not
+# a blanket 'brute' match. In opt-in Spray mode (policy_violation(spray=True)) these are permitted.
 _FORBIDDEN_FLAGS: frozenset[str] = frozenset({"--continue-on-success", "--passwords"})
+
+# why: OSCP-legal credential-spraying binaries (§2a). Permitted ONLY in Spray mode
+# (policy_violation(spray=True), i.e. config.spray_enabled). Off everywhere else.
+SPRAY_TOOLS: frozenset[str] = frozenset({"hydra", "medusa"})
 
 # why: the DB clients are allow-listed for read-only enum (§12), but the custom-command path lets a
 # user hand-type a query — refuse file-write / read / OS-exec / DDL primitives (not recon).
@@ -227,6 +232,8 @@ _INSTALL_HINTS: dict[str, str] = {
     "svn": "apt install subversion",
     "iscsiadm": "apt install open-iscsi",
     "openssl": "apt install openssl",
+    "hydra": "apt install hydra",
+    "medusa": "apt install medusa",
     "redis-cli": "apt install redis-tools",
     "mongosh": "apt install mongodb-mongosh",
     "mongo": "apt install mongodb-clients",
@@ -279,28 +286,36 @@ def _script_values(argv: list[str]) -> list[str]:
     return values
 
 
-def policy_violation(argv: list[str]) -> str | None:
+def policy_violation(argv: list[str], *, spray: bool = False) -> str | None:
+    # `spray=True` ONLY when the user enabled opt-in Spray mode (§2a) and the command came from the
+    # spray subsystem. It loosens EXACTLY the credential-attempt category (brute/spray tools+flags);
+    # everything else — Metasploit/SQLMap/commercial (not on any list), DB file/OS primitives,
+    # searchsploit PoC copy, ike-scan PSK capture, ntpdate clock-set — stays blocked either way.
     if not argv:
         return "empty command"
     tool = argv[0]
-    if tool not in ALLOWED_TOOLS:
+    allowed = ALLOWED_TOOLS | SPRAY_TOOLS if spray else ALLOWED_TOOLS
+    if tool not in allowed:
         return f"{tool} is not on the OSCP-allowed tool list"
-    for token in argv[1:]:
-        if token.lower() in _FORBIDDEN_FLAGS:
-            return f"{token} is a credential brute/spray flag (forbidden)"
+    if not spray:
+        for token in argv[1:]:
+            if token.lower() in _FORBIDDEN_FLAGS:
+                return (
+                    f"{token} is a credential brute/spray flag (off by default — enable Spray mode)"
+                )
     if tool == "nmap":
         for value in _script_values(argv):
-            if "brute" in value.lower():
-                return f"nmap --script {value} is credential brute force (forbidden)"
+            if "brute" in value.lower() and not spray:
+                return f"nmap --script {value} is credential brute (off by default — Spray mode)"
     if tool == "searchsploit":
         for token in argv[1:]:
             if token in _SEARCHSPLOIT_FORBIDDEN:
                 return f"searchsploit {token} is not display-only (forbidden)"
-    if tool == "wpscan":
+    if tool == "wpscan" and not spray:
         for token in argv[1:]:
             if token in _WPSCAN_FORBIDDEN:
-                return f"wpscan {token} is credential brute (forbidden — enumerate only)"
-    if tool in _NETEXEC_TOOLS:
+                return f"wpscan {token} is credential brute (off by default — enable Spray mode)"
+    if tool in _NETEXEC_TOOLS and not spray:
         netexec_violation = _netexec_violation(argv)
         if netexec_violation is not None:
             return netexec_violation
@@ -351,6 +366,7 @@ def run(
     timeout: float | None = None,
     cancel: threading.Event | None = None,
     on_line: Callable[[str], None] | None = None,
+    spray: bool = False,
 ) -> ShellResult:
     argv = shlex.split(shell_line)
     tool = argv[0] if argv else ""
@@ -359,7 +375,7 @@ def run(
     started = _now_iso()
     start = time.monotonic()
 
-    violation = policy_violation(argv)
+    violation = policy_violation(argv, spray=spray)
     if violation is not None:
         message = f"[blocked] {violation}: {shell_line}"
         logger.warning(message)

@@ -132,7 +132,15 @@ def test_settings_prefs_hold_only_known_non_secret_keys() -> None:
         "max_concurrency",
         "nmap_udp_full",
         "scan_profile",
+        "spray_enabled",
     }
+
+
+def test_spray_enabled_defaults_off_and_roundtrips() -> None:
+    assert config.default_settings().spray_enabled is False  # OFF by default (§2a)
+    config.save_prefs({"spray_enabled": "true"})
+    assert config.load_settings().spray_enabled is True
+    assert config.spray_enabled() is True  # the accessor the engine reads
 
 
 def test_scan_profile_roundtrips() -> None:

@@ -106,6 +106,9 @@ class Settings:
     max_concurrency: int
     nmap_udp_full: bool
     scan_profile: str = DEFAULT_SCAN_PROFILE
+    # opt-in, OFF BY DEFAULT (CLAUDE.md §2a): unlocks OSCP-legal credential spraying (hydra/medusa/
+    # netexec list-spray + password wordlists). With this false the tool is strictly recon-only.
+    spray_enabled: bool = False
 
     def normalized(self) -> Settings:
         font = self.font_size
@@ -121,6 +124,7 @@ class Settings:
             scan_profile=self.scan_profile
             if self.scan_profile in SCAN_PROFILES
             else DEFAULT_SCAN_PROFILE,
+            spray_enabled=bool(self.spray_enabled),
         )
 
     def to_prefs(self) -> dict[str, str]:
@@ -133,6 +137,7 @@ class Settings:
             "max_concurrency": str(self.max_concurrency),
             "nmap_udp_full": "true" if self.nmap_udp_full else "false",
             "scan_profile": self.scan_profile,
+            "spray_enabled": "true" if self.spray_enabled else "false",
         }
 
 
@@ -145,6 +150,7 @@ def default_settings() -> Settings:
         max_concurrency=DEFAULT_MAX_CONCURRENCY,
         nmap_udp_full=False,
         scan_profile=DEFAULT_SCAN_PROFILE,
+        spray_enabled=False,
     )
 
 
@@ -163,7 +169,13 @@ def load_settings() -> Settings:
         ),
         nmap_udp_full=_parse_bool(prefs.get("nmap_udp_full"), base.nmap_udp_full),
         scan_profile=prefs.get("scan_profile", base.scan_profile),
+        spray_enabled=_parse_bool(prefs.get("spray_enabled"), base.spray_enabled),
     ).normalized()
+
+
+def spray_enabled() -> bool:
+    """True when the user has opted into Spray mode (§2a). The single gate the engine reads."""
+    return load_settings().spray_enabled
 
 
 def save_settings(settings: Settings) -> None:
