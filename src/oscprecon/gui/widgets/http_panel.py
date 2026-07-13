@@ -234,7 +234,6 @@ class HttpPanel(QWidget):
     def _set_wordlist(self, path: str, dialog: QDialog) -> None:
         self._wordlist = path
         self._wordlist_label.setText(path)
-        self._auto_output = ""
         dialog.accept()
         self._refresh()
 

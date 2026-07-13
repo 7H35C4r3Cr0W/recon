@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,6 +58,12 @@ _CATEGORY_HINTS: tuple[tuple[str, str], ...] = (
     ("discovery", "discovery"),
 )
 
+# why: match each needle at a token boundary (a leading '.') after collapsing non-alphanumeric runs
+# to '.', so a short needle like "api" hits "api-list" but NOT "capital"/"therapist"/"rapid".
+_NORM_HINTS: tuple[tuple[str, str], ...] = tuple(
+    ("." + re.sub(r"[^a-z0-9]+", ".", needle), category) for needle, category in _CATEGORY_HINTS
+)
+
 
 @dataclass(frozen=True)
 class Wordlist:
@@ -86,9 +93,9 @@ def is_excluded(path: Path) -> bool:
 
 
 def _category_for(path: Path) -> str:
-    lowered = str(path).lower()
-    for needle, category in _CATEGORY_HINTS:
-        if needle in lowered:
+    norm = "." + re.sub(r"[^a-z0-9]+", ".", str(path).lower())
+    for token, category in _NORM_HINTS:
+        if token in norm:
             return category
     return "other"
 

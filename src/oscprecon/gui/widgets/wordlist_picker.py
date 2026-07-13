@@ -39,7 +39,6 @@ class _IndexWorker(QThread):
 
 class WordlistPicker(QWidget):
     wordlist_chosen = Signal(str)
-    indexed = Signal()
 
     def __init__(self, paths: Iterable[Path] | None = None) -> None:
         super().__init__()
@@ -118,7 +117,6 @@ class WordlistPicker(QWidget):
         self._category.blockSignals(False)
         self._status.setText(f"{len(self._all)} wordlists")
         self._refresh()
-        self.indexed.emit()
 
     def _matches(self, wordlist: wordlists.Wordlist) -> bool:
         category = self._category.currentText()

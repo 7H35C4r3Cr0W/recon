@@ -42,6 +42,19 @@ def test_categories_inferred_from_path(tmp_path: Path) -> None:
     assert by_name["names.txt"].category == "usernames"
 
 
+def test_category_matches_token_not_substring() -> None:
+    cat = wordlists._category_for
+    # short needles must match at token boundaries, not inside unrelated words
+    assert cat(Path("/x/capital-cities.txt")) == "other"  # 'api' inside 'capital'
+    assert cat(Path("/x/therapist-list.txt")) == "other"  # 'api' inside 'therapist'
+    assert cat(Path("/x/rapid-hosts.txt")) == "other"  # 'api' inside 'rapid'
+    # genuine tokens still categorize (including prefix matches like dirbuster/subdomains)
+    assert cat(Path("/x/api-endpoints.txt")) == "web-content"
+    assert cat(Path("/x/usernames-top100.txt")) == "usernames"
+    assert cat(Path("/usr/share/wordlists/dirbuster/dir.txt")) == "web-content"
+    assert cat(Path("/x/Discovery/DNS/subdomains-top1million.txt")) == "dns"
+
+
 def test_line_and_size_counts(tmp_path: Path) -> None:
     _make_tree(tmp_path)
     by_name = {w.name: w for w in wordlists.index_wordlists([tmp_path])}
