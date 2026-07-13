@@ -77,8 +77,11 @@ def parse_dig_axfr(text: str) -> list[DnsFinding]:
     return findings
 
 
-# dnsrecon rows: `[*]      A example.com 10.10.10.5`.
-_DNSRECON_RECORD = re.compile(r"^\[\*\]\s+(?P<type>[A-Z]+)\s+(?P<name>\S+)\s+(?P<data>\S.*?)\s*$")
+# dnsrecon rows: legacy `[*]  TYPE name data`; 1.6.x `<timestamp> INFO  TYPE name data`. The
+# _RECORD_TYPES filter below rejects non-record log lines that share either prefix.
+_DNSRECON_RECORD = re.compile(
+    r"^(?:\[[*+-]\]|\S+\s+INFO)\s+(?P<type>[A-Z]+)\s+(?P<name>\S+)\s+(?P<data>\S.*?)\s*$"
+)
 
 
 def parse_dnsrecon(text: str) -> list[DnsFinding]:

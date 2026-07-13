@@ -60,6 +60,19 @@ def test_parse_dnsrecon() -> None:
     assert not any("Records" in f.value for f in findings if f.kind == "record")
 
 
+def test_parse_dnsrecon_info_format() -> None:
+    # dnsrecon 1.6.x logs `<timestamp> INFO  TYPE name data` instead of the legacy `[*]` prefix;
+    # the parser must read records + zone-transfer from both (regression: silent data loss on Kali).
+    findings = parse_dnsrecon(_read("dnsrecon-info.txt"))
+    records = {f.value for f in findings if f.kind == "record"}
+    assert "admin.example.htb A 10.10.10.10" in records
+    assert "mail.example.htb MX 10.10.10.6" in records
+    assert "internal.example.htb A 10.10.10.20" in records
+    assert any(f.kind == "zone-transfer" and f.value == "allowed" for f in findings)
+    # status / progress INFO lines must not become records
+    assert not any("Records" in f.value or "Performing" in f.value for f in findings)
+
+
 def test_parse_nmap_dns() -> None:
     findings = parse_nmap_dns(_read("nmap-dns.txt"))
     versions = [f.value for f in findings if f.kind == "version"]

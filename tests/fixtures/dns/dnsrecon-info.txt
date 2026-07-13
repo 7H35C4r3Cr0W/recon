@@ -1,0 +1,11 @@
+2026-07-10T21:02:30 INFO     Performing General Enumeration against: example.htb...
+2026-07-10T21:02:30 INFO     SOA ns1.example.htb 10.10.10.5
+2026-07-10T21:02:30 INFO     NS ns1.example.htb 10.10.10.5
+2026-07-10T21:02:31 INFO     MX mail.example.htb 10.10.10.6
+2026-07-10T21:02:31 INFO     A example.htb 10.10.10.5
+2026-07-10T21:02:31 INFO     A admin.example.htb 10.10.10.10
+2026-07-10T21:02:31 INFO     Zone Transfer was successful!!
+2026-07-10T21:02:31 INFO     NS ns1.example.htb 10.10.10.5
+2026-07-10T21:02:31 INFO     A internal.example.htb 10.10.10.20
+2026-07-10T21:02:32 INFO     Enumerating SRV Records
+2026-07-10T21:02:32 INFO     0 Records Found
