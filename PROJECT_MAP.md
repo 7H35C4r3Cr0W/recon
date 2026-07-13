@@ -7,8 +7,10 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
 - **Verified:** `mypy --strict` clean (118 files) · `ruff check` + `ruff format --check` clean ·
-  **837 tests** pass (incl. 216 offscreen GUI) · `test_packaging` green (wheel ships resources,
-  incl. the vendored HackTricks snapshot; `packaging/` build infra excluded from the wheel).
+  **895 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
+  vendored HackTricks snapshot; `packaging/` build infra excluded from the wheel). Live-fetch +
+  credential-durability paths independently refute-reviewed (0 credential-loss / allowlist-bypass /
+  data-leak defects; one confirmed spray secret-leak found + fixed).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 - Owner-approved policy decisions: [`docs/OWNER_DECISIONS.md`](docs/OWNER_DECISIONS.md) (live
   HackTricks fetch/cache is approved; project credentials are durable in `<project>/creds.json`).
@@ -225,10 +227,12 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 | Pattern coverage for ssh/ike/tftp/vhost | ✅ **Done** | pattern engine | all 19 modules now have `patterns/*.yaml` (47 rules); commands policy-clean |
 | Report EDB-hit persistence | ✅ **Done** | references, profile store | `edb.py`→`edb.json` + report section; lookup-only (no PoC path) |
 | AD / Kerberos enum workflow | ✅ **Done** | smb/ldap modules | `modules/kerberos` (Tier-1 KDC confirm + enum-only Tier-2); parser stores no hashes |
-| Finding-aware HackTricks integration | ⏭ **Next** | §2/§27 gate ✅ (`bf42f1e`) | Vendor HackTricks markdown offline → section-aware surfacing. Gate cleared; Phase 1 = vendor + index |
-| Cred store + password spraying | 🕒 (gated) | CLAUDE.md §1/§2 amendment | OSCP-legal, but reverses recon-only identity; opt-in/off-by-default. See [[cred-spray-scope-change]] |
+| Finding-aware HackTricks (offline Phases 1–3) | ✅ **Done** | §2/§27 gate ✅ | 21 vendored pages + loader + offline render + finding-aware jump + `clean_markdown` + 12-module/30-entry verified section map |
+| Owner-approved live HackTricks fetch/cache | ✅ **Done** | §14a policy ✅ | `references/live_hacktricks.py` — allow-listed HTTPS, bounded, sanitized, XDG cache; off-by-default; never transmits target/cred data. Security-reviewed: 0 confirmed defects |
+| Cred store + password spraying | ✅ **Done** | §2a | opt-in/off-by-default; creds durable in `<project>/creds.json`, isolated, only explicit edit/delete removes; confirmed-spray recorded add-only |
+| Preserve discovered port through spray | ⏭ **Next** | spray dialog | spray uses each tool's default port; a non-standard service port isn't sprayed. Off-by-default + benign (ineffective spray, never cred loss) |
 | Timed mock-exam dry run | ⛔ | exam preset (✅) + live targets | The "timed" part needs authorized targets |
-| AD / Kerberos enum workflow polish | 🕒 | smb/ldap modules (✅) | Enumeration only, no cracking |
+| Interactive + cross-machine AppImage acceptance | 🕒 | AppImage build (✅) | build + headless construction verified on Kali; on-screen/cross-machine open — see `packaging/ACCEPTANCE.md` |
 
 ## 14. Completed features (roll-up) — ✅
 
@@ -408,23 +412,21 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 
 ## Immediate next chunk
 
-**The in-scope, deterministic recon/report backlog is now exhausted** (20 modules + patterns 20/20,
-exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
-tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
+Cred-spraying, HackTricks (**Phases 1–3 + owner-approved live fetch/cache §14a**), parser
+multi-version resilience, durable project credentials, the **`doctor` guided safe installer**, and the
+**single-click AppImage + branded splash** (real acceptance build on Kali) are all done. Exactly one
+recommended next chunk:
 
-Cred-spraying, HackTricks (**Phases 1–3**), parser resilience, the **`doctor` guided safe installer**,
-and the **single-click AppImage + branded splash** are done. HackTricks P3 = `clean_markdown()`
-(mdBook callouts/details/figures normalized) + `_FINDING_SECTIONS` expanded to 12 modules/30 verified
-entries (2 dead entries fixed) + a keyword-drift guard test. Next:
+- **⏭ Preserve the discovered service PORT through the spray path.** The Spray dialog sprays by service
+  key using each tool's default port (`hydra ssh://TARGET` = 22), so a service on a non-standard port
+  (SSH on 2222) is sprayed on the wrong port. It's a correctness gap in an **opt-in, off-by-default**
+  feature with a **benign** failure mode (an ineffective spray — never credential loss, never a safety
+  issue), which is why it wasn't force-fixed at the end of the live-fetch/creds workstream. Wiring the
+  discovered port into `spray.build_spray_command` (hydra `-s <port>` / a per-service instance in the
+  dialog) is the fix.
 
-- **⏭ Parser resilience deepening** — multi-tool-version fixtures (prove partial extraction, not just
-  no-crash). The last deterministic distribution item.
-- **HackTricks §27 live-fetch relax** — owner FYSA'd that live *scraping* may be OK. This is a POLICY
-  change (the §2/§27 scraping ban is a hard line), so it needs an explicit CLAUDE.md amendment before
-  any code — surfaced for an owner decision, not implemented. (Live *rendering* of the page already
-  works via the Live tab, which §2 permits.)
-- **AppImage acceptance** — run `packaging/build-appimage.sh` on Kali (needs display/network the
-  sandbox lacks) to produce + smoke the binary. All in [[distribution-goals]], [[hacktricks-integration]].
+**Blocked (need external resources):** the *timed* mock exam (authorized target); full interactive +
+cross-machine AppImage acceptance (a real desktop / a second VM — see `packaging/ACCEPTANCE.md`).
 
 **Parallel future tracks (need an owner decision / gate):**
 - **Credential spraying (opt-in, off by default)** — ✅ **COMPLETE** end-to-end: CLAUDE.md §1/§2/§2a

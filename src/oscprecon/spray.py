@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shlex
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -85,6 +86,40 @@ def write_spray_lists(
     _write_secret_lines(users_path, usernames)
     _write_secret_lines(passwords_path, passwords)
     return users_path, passwords_path
+
+
+def make_redactor(secrets: list[str]) -> Callable[[str], str]:
+    """A line filter that masks every vault secret in tool output before it reaches the UI/logs.
+
+    netexec/hydra echo the winning secret in plaintext (``[+] user:Password! (Pwn3d!)`` /
+    ``login: user password: Password!``). Secrets come from the vault, so we know them exactly and
+    replace each with a length-only marker. Longest-first so a short secret can't partially mask a
+    longer one it is a substring of.
+    """
+    masks = [
+        (secret, f"<redacted len={len(secret)}>")
+        for secret in sorted({s for s in secrets if s}, key=len, reverse=True)
+    ]
+
+    def redact(line: str) -> str:
+        for secret, mask in masks:
+            if secret in line:
+                line = line.replace(secret, mask)
+        return line
+
+    return redact
+
+
+def secure_output_file(path: Path) -> None:
+    """Pre-create the spray output file at 0600 — it can hold plaintext secrets the tool echoed, so
+    it must not be world/group-readable like a default-umask file. shell.run's open('w') keeps the
+    mode of the existing file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.fchmod(fd, 0o600)  # force 0600 even if it pre-existed at a looser mode
+    finally:
+        os.close(fd)
 
 
 def build_spray_command(service_key: str, target: str, users: Path, passwords: Path) -> str:

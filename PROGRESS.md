@@ -9,18 +9,43 @@ Running record of what's been built, in order, so any session can pick up mid-st
 **See [`PROJECT_MAP.md`](PROJECT_MAP.md) for the authoritative status map** (subsystem-by-subsystem
 ✅/🚧/⏭/🕒/⛔/❌, dependency graph, forward phases). This "Next up" is the one-line pointer.
 
-Phases 0–5, all **20 recon modules** (each with pattern next-steps, 51 rules), Phase 4 graph (incl. §16
-reinforcements), the full Workspace Dashboard & Organization upgrade, the **exam-mode scan profile**,
-**project file operations §19**, **report Exploit-DB-hit persistence**, and the **AD/Kerberos enum
-module** are **DONE** — 721 tests green. Phase 6 is partial: `doctor` + status footer + audit log +
-concurrent-copy lock + exam profile done; only the *timed* mock exam remains (blocked on a live target).
+Phases 0–5, all **20 recon modules**, Phase 4 graph, the full Workspace Dashboard, exam profile,
+project file ops §19, EDB persistence, AD/Kerberos, **HackTricks Phases 1–3 + owner-approved live
+fetch/cache (§14a)**, **durable project credentials + opt-in spray**, the **doctor guided installer**,
+the **single-click AppImage + splash**, and **parser multi-version resilience** are **DONE**. Phase 6
+is partial: only the *timed* mock exam remains (blocked on a live target).
 
-**The in-scope, deterministic recon/report backlog is now exhausted.** Recommended next chunk:
-**finding-aware HackTricks integration, Phase 1 (vendor + index)** — owner greenlit the direction
-(offline-vendored CC-licensed markdown, OSCP-legal). **Gate: propose a CLAUDE.md §2/§27 edit first**
-(permit offline vendoring, still forbid live scraping) + attribution. Parallel future track:
-distribution phase (installer / resilient parsers / single-click app / splash — not greenlit).
-**Blocked:** live acceptance testing + timed mock exam (need an authorized target).
+**⏭ One recommended next chunk: preserve the discovered service PORT through the spray path.**
+Today the Spray dialog sprays by service key using each tool's default port (e.g. `hydra ssh://TARGET`
+= 22), so a service on a non-standard port (SSH on 2222) is sprayed on the wrong port. Off-by-default
++ opt-in + benign (an ineffective spray, never credential loss), so it is a correctness gap, not a
+safety one. See [[owner-decisions]]. **Blocked:** timed mock exam + full interactive/cross-machine
+AppImage acceptance (see `packaging/ACCEPTANCE.md`) need an authorized target / a real desktop.
+
+### Live HackTricks fetch/cache + durable creds + parser resilience + AppImage acceptance
+A sequenced workstream (owner-approved live HackTricks + the two permanent product rules). In order:
+- **Owner decisions + policy** — `docs/OWNER_DECISIONS.md` + CLAUDE.md §14a: live fetch/cache is
+  approved but bounded (only the canonical mapped page, HTTPS + allow-listed host, NEVER transmit
+  target/cred data; vendored offline stays the fallback). Exploit-DB stays lookup-only.
+- **Live engine** (`references/live_hacktricks.py`) — allow-listed HTTPS fetch (size/timeout/
+  content-type bounded, cross-host redirects refused), HTML→own-markdown sanitizer (no remote JS/HTML
+  rendered), XDG cache with conditional requests + atomic writes + corrupt-degrade + refresh-failure
+  retention + clear-cache-spares-project-data. Off-by-default `hacktricks_*` settings.
+- **Live GUI** — reference pane states (offline vendored / live cached / live refreshed / live page /
+  unavailable) + Refresh / Use-offline buttons; off-thread `LiveHacktricksWorker`; stale-result
+  guard (request-id + url match) so A never overwrites B; References Preferences tab.
+- **Routing + sections** — fixed a real bug (DBs/services on non-standard ports routed nowhere → added
+  service-name fallbacks); `references/sections.py` local, code-fence-aware section extraction with the
+  §14a priority; product-aware jump fallback.
+- **Durable credentials** — audited (mutated only via guarded add/delete; originating-project scoped;
+  never unlinked); hardened save (partial-temp cleanup preserves the prior store); `set_credentials`
+  bulk write; confirmed-spray recording into `tested_against` (add-only, service-specific, no secret
+  leak); safe spray temp-file cleanup (only users.txt/passwords.txt, after the last worker).
+- **Parser resilience** — partial-extraction: fixed whatweb NDJSON drift (was 0 findings) + control-char
+  leak into HttpFinding; multi-version fixtures asserting valid rows survive malformed/truncated ones.
+- **AppImage acceptance** — real build on Kali; fixed two build-script defects (externally-managed pip,
+  non-relocatable symlink copy → 961 KB empty bundle); 242 MiB self-contained artifact verified from
+  outside the checkout (`packaging/ACCEPTANCE.md`). Interactive/cross-machine acceptance still open.
 
 ### AD/Kerberos enum module — DONE (enumeration only, no cracking §2)
 New `modules/kerberos/` — the 20th service module, wired into the shared SimpleRecon panel.

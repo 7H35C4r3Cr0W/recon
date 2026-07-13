@@ -86,3 +86,30 @@ def test_parse_spray_success_rejects_generic_success_word() -> None:
     # a bare "success" mention is NOT proof — only the service-specific marker counts
     assert spray.parse_spray_success("smb", "operation success for admin pw", candidates) == []
     assert spray.parse_spray_success("smb", "", candidates) == []
+
+
+def test_make_redactor_masks_secrets_in_tool_output() -> None:
+    redact = spray.make_redactor(["Password123", "pw", "Winter2024!"])
+    # netexec / hydra echo the winning secret in plaintext — it must be masked before UI/logs
+    nxc = "SMB 10.0.0.1 445 DC [+] corp\\administrator:Password123 (Pwn3d!)"
+    out = redact(nxc)
+    assert "Password123" not in out and "<redacted len=11>" in out
+    hydra = "[22][ssh] host: 10.0.0.1   login: bob   password: Winter2024!"
+    assert "Winter2024!" not in redact(hydra)
+    assert redact("no secret here") == "no secret here"  # untouched otherwise
+
+
+def test_make_redactor_longest_first_no_partial_mask() -> None:
+    # a short secret that is a substring of a longer one must not partially mask the longer
+    redact = spray.make_redactor(["pass", "password1"])
+    assert redact("got password1 ok") == "got <redacted len=9> ok"
+
+
+def test_secure_output_file_is_0600(tmp_path: Path) -> None:
+    out = tmp_path / "spray" / "smb.txt"
+    spray.secure_output_file(out)
+    assert out.exists() and stat.S_IMODE(out.stat().st_mode) == 0o600
+    # forces 0600 even if it pre-existed at a looser mode
+    out.chmod(0o644)
+    spray.secure_output_file(out)
+    assert stat.S_IMODE(out.stat().st_mode) == 0o600

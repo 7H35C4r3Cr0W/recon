@@ -167,10 +167,14 @@ Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` �
 - ✅ **AD/Kerberos enum workflow** — DONE: `modules/kerberos` (Tier-1 credential-free `nmap -sV -p88`
   KDC confirm; Tier-2 enum-only single-user AS-REP + GetADUsers/GetUserSPNs). Parser records
   principals/SPNs but **never the AS-REP/TGS hash**; no `-usersfile`, no `-request`, no cracking.
-- **Finding-aware HackTricks integration** — **Phases 1–2 DONE** (`37f0d68`, `7e5005e`, `f2fdef3`): 21
-  offline pages vendored + loader; reference pane renders the offline page (no WebEngine, offline-first)
-  beside the live link, jumps to the section matching a finding kind, + a find-in-page box. *Later:*
-  Phase 3 polish (more maps, cleaner render) + the owner FYSA §27 live-fetch relax.
+- **Finding-aware HackTricks integration** — **Phases 1–3 DONE**: (P1/P2 `37f0d68`, `7e5005e`,
+  `f2fdef3`) 21 offline pages vendored + loader; reference pane renders the offline page (no WebEngine,
+  offline-first) beside the live link, finding-aware jump, find-in-page. (P3) `clean_markdown` mdBook
+  normalization + a 12-module/30-entry verified finding→section map. **Owner-approved live fetch/cache
+  (§14a) DONE**: `references/live_hacktricks.py` fetches ONLY the single canonical mapped page (HTTPS,
+  allow-listed host), extracts + caches it under `~/.cache/oscprecon/`, with OFF-by-default Preferences,
+  stale-result protection, and offline fallback — target/credential data is never transmitted. Three
+  tiers: vendored offline (fallback) · live cached · live page.
 - ✅ **Credential spraying (opt-in, off by default)** — DONE end-to-end: CLAUDE.md §1/§2/§2a amendment,
   gated `shell.policy_violation(spray=)`, `spray.py` builder, editable Credential Vault dialog, and the
   Spray dialog + gated runner (`Scan → Credential Spray…`). `spray=True` is passed in one place, only

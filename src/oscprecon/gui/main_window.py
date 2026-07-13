@@ -890,12 +890,14 @@ class MainWindow(QMainWindow):
         )
         profile = self._profile  # capture: results/cleanup always target the ORIGINATING profile
         target = profile.target.ip
+        redact = spray.make_redactor(passwords)  # mask winning secrets in streamed tool output
         launched = 0
         for service in dialog.selected_services():
             if not self._tasks.can_start():
                 break
             command = spray.build_spray_command(service, target, users_path, passwords_path)
             output_file = profile.directory / "spray" / f"{service}.txt"
+            spray.secure_output_file(output_file)  # 0600 — it can hold plaintext secrets
             self._tool_panel.append_output(f"$ [spray] {command}")
             self._audit_action("credential-spray", service=service, target=target)
             worker = CommandWorker(command, output_file, cwd=profile.directory, spray=True)
@@ -905,6 +907,7 @@ class MainWindow(QMainWindow):
                 partial(
                     self._spray_done, profile=profile, service=service, output_file=output_file
                 ),
+                line_filter=redact,
             )
             launched += 1
         self._spray_pending = launched  # set before any queued done-callback runs (GUI thread)
@@ -995,14 +998,20 @@ class MainWindow(QMainWindow):
         on_done: Callable[[Any], None],  # done payload is int (nmap/command) or a Result object
         *,
         exclusive: bool = False,
+        line_filter: Callable[[str], str] | None = None,
     ) -> None:
         # one lifecycle path for a line/done/failed worker: wire the streaming output, the result
         # slot, and the failure slot, then admit via _launch. Callers bind the originating profile
         # into `on_done` so a stale completion persists to the profile that started it, not the
         # profile that happens to be active when it finishes. `signals`: every worker declares
         # line/done/failed on its own subclass, not on the CancellableThread base mypy sees here.
+        # `line_filter` redacts secrets from streamed output (spray) before it reaches the UI/logs.
         signals: Any = worker
-        signals.line.connect(self._tool_panel.append_output)
+        if line_filter is None:
+            signals.line.connect(self._tool_panel.append_output)
+        else:
+            redact = line_filter
+            signals.line.connect(lambda line: self._tool_panel.append_output(redact(line)))
         signals.done.connect(on_done)
         signals.failed.connect(self._on_run_failed)
         self._launch(worker, label, exclusive=exclusive)

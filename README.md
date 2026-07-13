@@ -1,9 +1,11 @@
 # oscp-recon
 
-A **recon-only**, OSCP-exam-legal desktop GUI that orchestrates standard enumeration tools
+A **recon-first**, OSCP-exam-legal desktop GUI that orchestrates standard enumeration tools
 (nmap, feroxbuster/gobuster/ffuf, nikto/whatweb, smbclient/netexec, …), links each service to
-HackTricks and Exploit-DB, and produces Obsidian-friendly reports. It does **not** exploit,
-brute-force credentials, or call any LLM at runtime.
+HackTricks and Exploit-DB, and produces Obsidian-friendly reports. It does **not** exploit, chain
+attacks, or call any LLM at runtime. **The default mode is strictly recon-only** — credential
+spraying (OSCP-legal against your own authorized targets) is an explicit **opt-in that is OFF by
+default** (Preferences → Scan → Enable Spray mode; § 2a).
 
 See [`CLAUDE.md`](CLAUDE.md) for the full project brief and hard constraints, [`ROADMAP.md`](ROADMAP.md)
 for the phase plan, [`PROJECT_MAP.md`](PROJECT_MAP.md) for the subsystem-by-subsystem status map and
@@ -42,10 +44,19 @@ oscprecon-cli scan 10.10.10.10 --profile htb-box   # headless nmap
 ## What it does
 
 Three-pane desktop GUI (service tree · command builder + output + follow-ups · HackTricks/Exploit-DB
-reference), plus a Bloodhound-style graph view (`Ctrl+G`). The reference pane renders a **vendored,
-offline HackTricks** page for the selected service (works with no internet), jumps to the section
-matching your findings, and keeps a link to the live page — see the CC BY-NC-SA attribution in
-`references/hacktricks/NOTICE.md`.
+reference), plus a Bloodhound-style graph view (`Ctrl+G`). The reference pane has three content tiers
+for the selected service, most-reliable first:
+
+1. **Vendored offline** — a build-time markdown snapshot (works with no internet), the reliable
+   fallback; jumps to the section matching your findings. CC BY-NC-SA — see
+   `references/hacktricks/NOTICE.md`.
+2. **Live cached** — an owner-approved live fetch of the single canonical mapped page, cached under
+   `~/.cache/oscprecon/` for later offline viewing. **OFF by default** (Preferences → References).
+3. **Live page** — the canonical URL rendered live.
+
+Live fetching is bounded: only the mapped page URL is requested (HTTPS, allow-listed host only), and
+**your target IP, banners, findings, and credentials are never sent** — local context only chooses
+which local sections to show. Exploit-DB stays `searchsploit` lookup + linkout only.
 
 - **Discovery** — two-stage nmap (TCP top-1000 → full → versioned on found ports; UDP top-100),
   parsed into a service tree. Non-standard HTTP/DB ports get their own per-port nodes and output.
