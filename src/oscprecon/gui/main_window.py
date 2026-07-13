@@ -863,7 +863,11 @@ class MainWindow(QMainWindow):
         if self._profile is None:
             QMessageBox.information(self, "No profile", "Open or create a profile first.")
             return
-        CredentialVaultDialog(self._profile, self).exec()
+        dialog = CredentialVaultDialog(self._profile, self)
+        dialog.secret_copied.connect(
+            lambda username: self._audit_action("credential-secret-copied", username=username)
+        )
+        dialog.exec()
         self._audit_action("credential-vault-opened")
         self._refresh_suggestions()  # has_credential may have changed
 

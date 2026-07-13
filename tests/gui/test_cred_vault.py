@@ -93,9 +93,12 @@ def test_vault_copy_actions_use_clipboard_never_the_ui(qtbot: QtBot, tmp_path: P
     d._table.selectRow(1)  # bob / hunter2
     d._on_copy_username()
     assert QGuiApplication.clipboard().text() == "bob"
+    copied: list[str] = []
+    d.secret_copied.connect(copied.append)
     d._on_copy_secret()
     assert QGuiApplication.clipboard().text() == "hunter2"  # secret only ever on the clipboard
     assert "hunter2" not in _all_cell_text(d)  # never rendered in the table
+    assert copied == ["bob"]  # audit signal carries the username only, never the secret
 
 
 def test_vault_confirmed_column_reflects_spray_confirmation(qtbot: QtBot, tmp_path: Path) -> None:

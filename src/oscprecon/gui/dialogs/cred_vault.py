@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -37,6 +37,8 @@ class CredentialVaultDialog(QDialog):
     Secrets are ALWAYS masked in the table (length only); the plaintext is only ever placed on the
     clipboard via the explicit "Copy secret" action, never shown.
     """
+
+    secret_copied = Signal(str)  # emits the USERNAME only (never the secret) for the audit trail
 
     def __init__(self, profile: Profile, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -158,3 +160,5 @@ class CredentialVaultDialog(QDialog):
         cred = self._selected_cred()
         if cred is not None:
             QGuiApplication.clipboard().setText(cred.secret)
+            # username only — the audit line this drives must carry no secret
+            self.secret_copied.emit(cred.username)
