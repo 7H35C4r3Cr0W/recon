@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, Qt, QUrl, Signal
@@ -27,7 +28,7 @@ from PySide6.QtWidgets import (
 from oscprecon import config
 from oscprecon.gui.workspace.index_worker import WorkspaceIndexWorker
 from oscprecon.profile import Profile
-from oscprecon.workspace import STATUSES, ProfileSummary, all_views, health
+from oscprecon.workspace import STATUSES, ProfileSummary, all_views, health, locks
 from oscprecon.workspace.views import SavedView
 
 _COLUMNS = ("Profile", "Target", "Status", "Tags", "Last activity", "Svc", "Find", "Cred", "Report")
@@ -41,6 +42,7 @@ class WorkspaceDashboard(QWidget):
     open_requested = Signal(object)  # directory (Path)
     create_requested = Signal()
     details_requested = Signal(object)  # directory (Path)
+    profile_mutated = Signal(object)  # directory (Path) — org metadata changed on disk
     status_message = Signal(str)
 
     def __init__(self) -> None:
@@ -145,7 +147,9 @@ class WorkspaceDashboard(QWidget):
             hide_archived = summary.archived and not self._show_archived.isChecked()
             if hide_archived and not (view is not None and view.archived):
                 continue
-            if view is not None and not view.matches(summary, self._service_names(summary)):
+            # only read profile.json for service names when the view actually filters on service
+            names = self._service_names(summary) if (view is not None and view.service) else set()
+            if view is not None and not view.matches(summary, names):
                 continue
             if needle and not self._text_match(summary, needle):
                 continue
@@ -263,10 +267,18 @@ class WorkspaceDashboard(QWidget):
     def _mutate(self, dirs: list[Path], op: object) -> None:
         changed = 0
         for directory in dirs:
+            info, _malformed = locks.read_lock(directory)
+            if info is not None and not locks.is_stale(info) and info.pid != os.getpid():
+                self.status_message.emit(
+                    f"[workspace] {directory.name}: open in another instance — skipped"
+                )
+                continue  # never write a profile locked live by a different process
             try:
                 profile = Profile.load(directory)
                 op(profile)  # type: ignore[operator]
                 changed += 1
+                # tell the host window so it can refresh an open profile it may hold in memory
+                self.profile_mutated.emit(directory)
             except Exception as exc:  # boundary: one failure must not abort the rest
                 self.status_message.emit(f"[workspace] {directory.name}: {exc}")
         if changed:
@@ -292,7 +304,10 @@ class WorkspaceDashboard(QWidget):
         lines += [f"  [{i.severity}] {i.message}" for i in issues] or ["  no issues"]
         box = QMessageBox(self)
         box.setWindowTitle(f"Details — {directory.name}")
-        box.setText("\n".join(lines))  # plain text (never rich) so previews can't render markup
+        box.setTextFormat(
+            Qt.TextFormat.PlainText
+        )  # target/tags are attacker-influenced — never rich
+        box.setText("\n".join(lines))
         self.details_requested.emit(directory)
         box.exec()
 

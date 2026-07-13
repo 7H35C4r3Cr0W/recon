@@ -20,7 +20,7 @@ class WorkspaceIndexWorker(CancellableThread):
 
     def run(self) -> None:
         try:
-            summaries = scan_workspace(self._root)
+            summaries = scan_workspace(self._root, cancel=self._cancel)
         except Exception as exc:  # boundary: surface a scan failure rather than crash the worker
             self.failed.emit(str(exc))
             return

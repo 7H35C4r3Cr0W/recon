@@ -8,7 +8,12 @@ from typing import Any
 
 from oscprecon import creds
 from oscprecon.models import Credential, DiscoveredService, Proto, Target
-from oscprecon.workspace.models import Organization, normalize_status, normalize_tag
+from oscprecon.workspace.models import (
+    Organization,
+    normalize_status,
+    normalize_tag,
+    normalize_tags,
+)
 
 SCHEMA_VERSION = 1
 
@@ -137,6 +142,13 @@ class Profile:
         directory = Path(directory)
         _ensure_service_dirs(directory)
         raw: dict[str, Any] = json.loads((directory / "profile.json").read_text(encoding="utf-8"))
+        # normalize organization on load (safe defaults for old/hand-edited profiles). Tags have ONE
+        # source of truth: organization.tags. Seed it from the legacy top-level `tags` on first load
+        # so pre-feature tags survive + still reach the report/Obsidian frontmatter, which reads
+        # profile.tags — kept mirrored to organization.tags below.
+        org = Organization.from_dict(raw.get("organization"))
+        if not org.tags:
+            org.tags = normalize_tags(raw.get("tags"))
         return cls(
             directory=directory,
             profile_name=str(raw.get("profile_name", directory.name)),
@@ -146,10 +158,8 @@ class Profile:
             command_history=[dict(c) for c in raw.get("command_history", [])],
             references_visited=[dict(r) for r in raw.get("references_visited", [])],
             module_settings=dict(raw.get("module_settings", {})),
-            tags=[str(t) for t in raw.get("tags", [])],
-            # normalize on load so an old profile (no organization) or a hand-edited one gets safe
-            # defaults + validated status/tags; unknown fields are dropped.
-            organization=Organization.from_dict(raw.get("organization")).to_dict(),
+            tags=list(org.tags),  # mirror of organization.tags (the authoritative store)
+            organization=org.to_dict(),
             schema_version=int(raw.get("schema_version", SCHEMA_VERSION)),
         )
 
@@ -199,7 +209,9 @@ class Profile:
     def _save_organization(self, org: Organization) -> None:
         # round-trip through from_dict so the persisted value is fully normalized (status validated,
         # tags deduped, display name trimmed/capped); never carries secrets.
-        self.organization = Organization.from_dict(org.to_dict()).to_dict()
+        normalized = Organization.from_dict(org.to_dict())
+        self.organization = normalized.to_dict()
+        self.tags = list(normalized.tags)  # keep the report/Obsidian tag mirror in sync
         self.save()
 
     def set_status(self, status: str) -> None:

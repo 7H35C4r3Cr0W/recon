@@ -76,6 +76,29 @@ def test_set_status_and_pin_and_archive_persist_atomically(tmp_path: Path) -> No
     assert not list(prof.directory.glob("*.tmp"))  # atomic temp+rename left nothing behind
 
 
+def test_tags_unified_between_organization_and_top_level(tmp_path: Path) -> None:
+    # workspace tag editing must ALSO update the top-level profile.tags that report/Obsidian read
+    prof = _profile(tmp_path)
+    prof.add_tag("web")
+    prof.add_tag("linux")
+    reloaded = Profile.load(prof.directory)
+    assert reloaded.tags == ["web", "linux"]  # mirror kept in sync
+    assert reloaded.organization_meta().tags == ["web", "linux"]
+    prof.remove_tag("web")
+    assert Profile.load(prof.directory).tags == ["linux"]
+
+
+def test_legacy_top_level_tags_migrate_into_organization(tmp_path: Path) -> None:
+    prof = _profile(tmp_path)
+    raw = json.loads(prof.profile_json_path.read_text())
+    raw["tags"] = ["htb", "ad"]  # a pre-feature profile with only top-level tags
+    raw.pop("organization", None)
+    prof.profile_json_path.write_text(json.dumps(raw))
+    reloaded = Profile.load(prof.directory)
+    assert reloaded.organization_meta().tags == ["htb", "ad"]  # migrated
+    assert reloaded.tags == ["htb", "ad"]
+
+
 def test_organization_never_carries_secret_material(tmp_path: Path) -> None:
     prof = _profile(tmp_path)
     prof.set_display_name("x")

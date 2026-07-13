@@ -140,12 +140,25 @@ def release(directory: Path, info: LockInfo | None = None) -> bool:
 
 def recover_stale(directory: Path) -> LockInfo | None:
     """If the current lock is provably stale (same host, dead PID) or malformed, replace it and
-    acquire a fresh one. Never steals a live or foreign-host lock (returns None)."""
+    acquire a fresh one. Never steals a live or foreign-host lock (returns None).
+
+    The claim is atomic: only the instance that wins an os.rename of the exact stale file removes
+    it, so two instances racing to recover the same stale lock can never both end up writable (the
+    loser's rename fails, and acquire() is O_EXCL so at most one gets the fresh lock)."""
     existing, malformed = read_lock(directory)
     if existing is not None and not is_stale(existing):
         return None  # live or foreign — refuse
+    path = lock_path(directory)
+    claimed = path.with_name(f".lock.stale.{os.getpid()}")
     try:
-        lock_path(directory).unlink(missing_ok=True)
+        os.rename(path, claimed)  # atomic: exactly one racer wins; the file we inspected is gone
+    except FileNotFoundError:
+        pass  # another instance already cleared it — fall through to a clean acquire
     except OSError:
         return None
-    return acquire(directory)
+    else:
+        try:
+            claimed.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return acquire(directory)  # O_EXCL — only one instance can win this

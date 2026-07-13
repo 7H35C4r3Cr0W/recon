@@ -101,6 +101,31 @@ def test_pinned_and_archived_sort_and_filter(tmp_path: Path) -> None:
     assert {s.name for s in scan_workspace(tmp_path, include_archived=False)} == {"a", "b"}
 
 
+def test_symlinked_profile_json_escaping_root_is_not_read(tmp_path: Path) -> None:
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    outside = tmp_path / "outside"
+    secret = Profile.create(outside, "secret", Target(ip="9.9.9.9", hostname="secretbox"))
+    # a REAL dir under the workspace whose profile.json is a symlink to an out-of-root file
+    pwn = workspace / "pwn"
+    pwn.mkdir()
+    (pwn / "profile.json").symlink_to(secret.profile_json_path)
+    summaries = scan_workspace(workspace)
+    row = next(s for s in summaries if s.name == "pwn")
+    assert row.corrupt and any("symlinks outside" in w for w in row.warnings)
+    assert "9.9.9.9" not in row.target  # the out-of-root file's contents were NOT read
+
+
+def test_scan_is_cancellable(tmp_path: Path) -> None:
+    import threading
+
+    _valid(tmp_path, "a")
+    _valid(tmp_path, "b")
+    cancel = threading.Event()
+    cancel.set()  # cancelled before the loop starts
+    assert scan_workspace(tmp_path, cancel=cancel) == []  # cooperative cancel -> nothing scanned
+
+
 @pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses permission bits")
 def test_unreadable_profile_does_not_crash_scan(tmp_path: Path) -> None:
     prof = _valid(tmp_path, "locked-perms")

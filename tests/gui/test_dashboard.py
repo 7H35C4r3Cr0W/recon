@@ -117,3 +117,37 @@ def test_worker_cancellation_on_shutdown(tmp_path: Path, dashboard: WorkspaceDas
     dashboard.refresh()
     dashboard.shutdown()  # must not hang / crash
     assert dashboard._index_worker is None or not dashboard._index_worker.isRunning()
+
+
+def test_mutate_skips_profile_locked_by_another_instance(
+    tmp_path: Path, dashboard: WorkspaceDashboard, qtbot: QtBot
+) -> None:
+    import json
+    import os
+    import socket
+
+    from oscprecon.workspace import locks
+
+    prof = Profile.create(tmp_path, "a", Target(ip="10.0.0.1"))
+    foreign = locks.LockInfo(
+        pid=os.getppid(), hostname=socket.gethostname(), app_version="1", started_at="t"
+    )
+    locks.lock_path(prof.directory).write_text(json.dumps(foreign.to_dict()))
+    _wait_rows(qtbot, dashboard, 1)
+    dashboard._mutate([prof.directory], lambda p: p.set_status("completed"))
+    assert Profile.load(prof.directory).organization_meta().status == "active"  # untouched
+
+
+def test_dashboard_edit_to_open_profile_is_not_clobbered(tmp_path: Path, qtbot: QtBot) -> None:
+    # regression: a dashboard org edit on the currently-open profile must survive a later
+    # self._profile.save() by the main window (which previously held a stale organization block).
+    from oscprecon.gui.main_window import MainWindow
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(tmp_path, "a", Target(ip="10.0.0.1"))
+    window._set_profile(prof)  # opens + locks + holds in memory
+    window._dashboard._mutate([prof.directory], lambda p: p.set_status("completed"))
+    window._profile.save()  # an ordinary later save must NOT revert the dashboard edit
+    assert Profile.load(prof.directory).organization_meta().status == "completed"
+    window._release_lock()

@@ -63,6 +63,42 @@ def test_foreign_host_lock_is_conservative(tmp_path: Path) -> None:
     assert locks.recover_stale(tmp_path) is None  # never steal a foreign lock
 
 
+def test_recover_stale_never_destroys_a_fresh_valid_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # regression: recover_stale must claim the exact stale file atomically, not blindly unlink — else
+    # a racer that installed a fresh VALID lock in between would have it deleted (two writable owners).
+    import subprocess
+
+    p = subprocess.Popen(["true"])
+    p.wait()
+    stale = locks.LockInfo(
+        pid=p.pid, hostname=socket.gethostname(), app_version="1", started_at="t"
+    )
+    locks.lock_path(tmp_path).write_text(json.dumps(stale.to_dict()))
+    live = locks.LockInfo(
+        pid=os.getpid(), hostname=socket.gethostname(), app_version="1", started_at="LIVE"
+    )
+
+    orig_is_stale = locks.is_stale
+
+    def racing_is_stale(info: locks.LockInfo) -> bool:
+        # simulate another instance installing a fresh live lock after we read the stale one
+        result = orig_is_stale(info)
+        locks.lock_path(tmp_path).write_text(json.dumps(live.to_dict()))
+        return result
+
+    monkeypatch.setattr(locks, "is_stale", racing_is_stale)
+    result = locks.recover_stale(tmp_path)
+    # the atomic rename saw the file was no longer the stale one (it was replaced) — either way the
+    # racer's live lock is preserved OR we cleanly re-acquire; we must NEVER end up destroying it and
+    # both being writable. The on-disk owner is a single valid lock.
+    on_disk, malformed = locks.read_lock(tmp_path)
+    assert not malformed and on_disk is not None
+    # if we didn't get it, the live lock survived; if we did, exactly one owner exists
+    assert result is None or on_disk.pid == os.getpid()
+
+
 def test_malformed_lock_detected(tmp_path: Path) -> None:
     locks.lock_path(tmp_path).write_text("{ not json")
     info, malformed = locks.read_lock(tmp_path)

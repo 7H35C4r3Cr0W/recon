@@ -57,13 +57,27 @@ def _has_report(path: Path) -> bool:
         return False
 
 
-def summarize_profile(directory: Path) -> ProfileSummary:
+def _escapes_root(path: Path, root: Path | None) -> bool:
+    # a symlinked file whose real target is outside the workspace root must not be read.
+    if root is None:
+        return False
+    try:
+        return path.exists() and not _within(path.resolve(), Path(root).resolve())
+    except OSError:
+        return False
+
+
+def summarize_profile(directory: Path, *, workspace_root: Path | None = None) -> ProfileSummary:
     directory = Path(directory)
     summary = ProfileSummary(name=directory.name, directory=directory)
     with contextlib.suppress(OSError):
         summary.locked = (directory / ".lock").exists()
 
     profile_json = directory / "profile.json"
+    if _escapes_root(profile_json, workspace_root):
+        summary.corrupt = True
+        summary.warnings.append("profile.json symlinks outside the workspace — not read")
+        return summary
     raw = _read_dict(profile_json) if profile_json.exists() else None
     if raw is None:
         summary.corrupt = True
@@ -144,9 +158,12 @@ def sort_summaries(summaries: list[ProfileSummary]) -> list[ProfileSummary]:
     return sorted(ordered, key=lambda s: (not s.pinned, s.archived))
 
 
-def scan_workspace(root: Path, *, include_archived: bool = True) -> list[ProfileSummary]:
+def scan_workspace(
+    root: Path, *, include_archived: bool = True, cancel: object | None = None
+) -> list[ProfileSummary]:
     """Discover profiles directly under `root` and return lightweight summaries. Never raises: a
-    profile that cannot be read becomes a corrupt/warning row rather than hiding or crashing."""
+    profile that cannot be read becomes a corrupt/warning row rather than hiding or crashing.
+    `cancel` (a threading.Event) is polled between profiles so a background scan can stop."""
     root = Path(root)
     summaries: list[ProfileSummary] = []
     try:
@@ -155,6 +172,8 @@ def scan_workspace(root: Path, *, include_archived: bool = True) -> list[Profile
         return summaries
     root_resolved = root.resolve()
     for entry in entries:
+        if cancel is not None and getattr(cancel, "is_set", lambda: False)():
+            break  # cooperative cancel between profiles so a stale scan stops promptly
         try:
             if not entry.is_dir():
                 continue
@@ -167,7 +186,7 @@ def scan_workspace(root: Path, *, include_archived: bool = True) -> list[Profile
         if not _is_profile_dir(entry):
             continue  # ignore unrelated folders (no profile.json / .tmp)
         try:
-            summaries.append(summarize_profile(entry))
+            summaries.append(summarize_profile(entry, workspace_root=root))
         except Exception:  # boundary: one bad profile must not kill the whole scan
             summaries.append(
                 ProfileSummary(

@@ -185,6 +185,7 @@ class MainWindow(QMainWindow):
         self._dashboard.open_requested.connect(lambda d: self._open_path(Path(str(d))))
         self._dashboard.create_requested.connect(self._on_new)
         self._dashboard.status_message.connect(self._tool_panel.append_output)
+        self._dashboard.profile_mutated.connect(self._on_dashboard_mutated)
         self._central_stack = QStackedWidget()
         self._central_stack.addWidget(splitter)  # 0: three-pane
         self._central_stack.addWidget(self._graph_view)  # 1: graph
@@ -340,6 +341,7 @@ class MainWindow(QMainWindow):
             f"PID {info.pid} on {info.hostname} (v{info.app_version}, since {info.started_at[:19]})"
         )
         box = QMessageBox(self)
+        box.setTextFormat(Qt.TextFormat.PlainText)  # profile name/host are attacker-influenced
         box.setWindowTitle("Profile in use")
         box.setText(f"“{profile.profile_name}” is open in another window.\n\n{detail}")
         ro_btn = box.addButton("Open read-only", QMessageBox.ButtonRole.AcceptRole)
@@ -401,6 +403,18 @@ class MainWindow(QMainWindow):
                 has_credential=bool(self._profile.credentials()),
             )
         )
+
+    def _on_dashboard_mutated(self, directory: object) -> None:
+        # a dashboard org edit wrote profile.json for `directory`. If that is the profile we hold in
+        # memory, re-read its organization so a later self._profile.save() can't clobber it with
+        # a stale copy. (Same-thread/direct signal, so this runs before any later save.)
+        if self._profile is not None and Path(str(directory)) == self._profile.directory:
+            try:
+                fresh = Profile.load(self._profile.directory)
+            except (OSError, ValueError, KeyError):
+                return
+            self._profile.organization = fresh.organization
+            self._profile.tags = fresh.tags
 
     def _show_workspace(self) -> None:
         self._graph_action.setChecked(False)
