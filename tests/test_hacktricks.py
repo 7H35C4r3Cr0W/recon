@@ -21,6 +21,31 @@ def test_unknown_module_is_none() -> None:
     assert hacktricks.page_for_module("does-not-exist") is None
 
 
+def test_clean_markdown_normalizes_mdbook_syntax() -> None:
+    src = (
+        "> [!TIP]\n> use a null session\n\n"
+        "<details>\n<summary>Cypher query</summary>\nMATCH (n) RETURN n\n</details>\n\n"
+        "<figure><img src='https://x/y.png'></figure>\n"
+        "plain body text\n"
+    )
+    out = hacktricks.clean_markdown(src)
+    assert "[!TIP]" not in out and "**Tip**" in out  # callout -> bold label
+    assert "<summary>" not in out and "**Cypher query**" in out  # summary -> bold heading
+    assert "<details>" not in out and "</details>" not in out  # collapsible tags dropped
+    assert "MATCH (n) RETURN n" in out  # ...but the details content is kept
+    assert "<figure" not in out and "<img" not in out  # offline images removed
+    assert "plain body text" in out  # ordinary content untouched
+
+
+def test_clean_markdown_strips_raw_tokens_from_real_pages() -> None:
+    for module in ("smb", "http"):
+        page = hacktricks.page_for_module(module)
+        assert page is not None
+        out = hacktricks.clean_markdown(page.markdown)
+        assert "[!TIP]" not in out and "[!WARNING]" not in out and "[!CAUTION]" not in out
+        assert "<details>" not in out and "<summary>" not in out
+
+
 def test_vendored_pages_are_clean_and_accurate() -> None:
     # every vendored page: non-empty, mdBook include/banner directives stripped, and — the accuracy
     # check — actually about its service (guards against a wrong module->file mapping).

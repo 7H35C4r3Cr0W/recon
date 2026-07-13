@@ -7,7 +7,7 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
 - **Verified:** `mypy --strict` clean (118 files) · `ruff check` + `ruff format --check` clean ·
-  **833 tests** pass (incl. 214 offscreen GUI) · `test_packaging` green (wheel ships resources,
+  **837 tests** pass (incl. 216 offscreen GUI) · `test_packaging` green (wheel ships resources,
   incl. the vendored HackTricks snapshot; `packaging/` build infra excluded from the wheel).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
@@ -410,18 +410,19 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
 tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-Cred-spraying, HackTricks (Phases 1–2), parser resilience, the **`doctor` guided safe installer**,
-and the **single-click AppImage + branded splash** (distribution items 4–5 — `packaging/build-appimage.sh`
-+ `gui/splash.py`, §27 amended to permit an offline splash) are done. Next — the owner explicitly
-reminded me not to forget it:
+Cred-spraying, HackTricks (**Phases 1–3**), parser resilience, the **`doctor` guided safe installer**,
+and the **single-click AppImage + branded splash** are done. HackTricks P3 = `clean_markdown()`
+(mdBook callouts/details/figures normalized) + `_FINDING_SECTIONS` expanded to 12 modules/30 verified
+entries (2 dead entries fixed) + a keyword-drift guard test. Next:
 
-- **⏭ HackTricks Phase 3.** More finding-kind→section maps, cleaner mdBook-style rendering of the
-  vendored offline pages, and the owner-FYSA §27 live-fetch relax (they noted live scraping may not be
-  outlawed). See [[hacktricks-integration]].
-- **Parser resilience deepening** — multi-tool-version fixtures (prove partial extraction, not just
-  no-crash).
-- **AppImage acceptance** — a maintainer must run `packaging/build-appimage.sh` on Kali (needs display/
-  network the sandbox lacks) to produce + smoke the actual binary. All in [[distribution-goals]].
+- **⏭ Parser resilience deepening** — multi-tool-version fixtures (prove partial extraction, not just
+  no-crash). The last deterministic distribution item.
+- **HackTricks §27 live-fetch relax** — owner FYSA'd that live *scraping* may be OK. This is a POLICY
+  change (the §2/§27 scraping ban is a hard line), so it needs an explicit CLAUDE.md amendment before
+  any code — surfaced for an owner decision, not implemented. (Live *rendering* of the page already
+  works via the Live tab, which §2 permits.)
+- **AppImage acceptance** — run `packaging/build-appimage.sh` on Kali (needs display/network the
+  sandbox lacks) to produce + smoke the binary. All in [[distribution-goals]], [[hacktricks-integration]].
 
 **Parallel future tracks (need an owner decision / gate):**
 - **Credential spraying (opt-in, off by default)** — ✅ **COMPLETE** end-to-end: CLAUDE.md §1/§2/§2a

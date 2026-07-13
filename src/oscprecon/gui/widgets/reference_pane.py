@@ -32,14 +32,56 @@ _URL_ROLE = Qt.ItemDataRole.UserRole
 _LABEL_ROLE = Qt.ItemDataRole.UserRole + 1
 
 # finding-aware jump: module -> finding-kind -> a heading/keyword that exists in the vendored page.
-# Keywords are verified against the vendored markdown; a miss is a no-op (never an error).
+# Keys are REAL parser finding kinds; keywords are verified against the cleaned page by
+# test_finding_sections_keywords_exist — a runtime miss is a no-op, never an error. The kinds come
+# from each module's parser (e.g. smb emits auth/share/policy/signing; ldap emits bind/...).
 _FINDING_SECTIONS: dict[str, dict[str, str]] = {
-    "smb": {"auth": "Server Enumeration", "share": "Shared Folders Enumeration"},
-    "ftp": {"auth": "Anonymous login"},
-    "ssh": {"algo-weak": "Weak Cipher Algorithms"},
-    "ldap": {"auth": "Anonymous Access"},
-    "snmp": {"community": "Community Strings", "system": "Enumerating SNMP"},
+    "smb": {
+        "auth": "Server Enumeration",
+        "share": "Shared Folders Enumeration",
+        "policy": "Password Policy",
+        "signing": "What is NTLM",
+    },
+    "ftp": {"auth": "Anonymous login", "banner": "Banner Grabbing"},
+    "ssh": {
+        "algo-weak": "Weak Cipher Algorithms",
+        "auth": "Username Enumeration",
+        "banner": "Banner Grabbing",
+        "hostkey": "Public SSH key",
+    },
+    "ldap": {
+        "bind": "Anonymous Access",
+        "naming-context": "Anonymous LDAP enumeration",
+        "user": "LDAP anonymous binds",
+    },
+    "snmp": {
+        "community": "Community Strings",
+        "interface": "Enumerating SNMP",
+        "process": "Enumerating SNMP",
+        "user": "Enumerating SNMP",
+    },
+    "smtp": {
+        "banner": "Banner Grabbing",
+        "ntlm": "NTLM Auth",
+        "open-relay": "Open Relay",
+        "verb": "VRFY",
+    },
+    "nfs": {"access": "Mounting", "export": "Showmount", "world-readable": "Showmount"},
+    "dns": {"recursion": "Recursion", "zone-transfer": "Zone Transfer"},
+    "mssql": {"instance": "Enumeration"},
+    "mongodb": {"access": "Basic Information", "database": "databases"},
+    "redis": {"access": "Manual Enumeration"},
+    "kerberos": {"spn": "GetUserSPNs", "user": "Usernames"},
 }
+
+# a light document stylesheet so the offline render reads less raw (mdBook-ish) — structure only, no
+# hardcoded text colours, so it stays legible under both the light and dark themes.
+_OFFLINE_CSS = (
+    "h2, h3, h4 { margin-top: 12px; }"
+    "pre, code { font-family: monospace; }"
+    "blockquote { border-left: 3px solid #7fd1b9; padding-left: 8px; }"
+    "th, td { border: 1px solid #888888; padding: 3px 6px; }"
+)
 
 
 def _webview_enabled() -> bool:
@@ -77,6 +119,7 @@ class ReferencePane(QWidget):
         # Offline vendored HackTricks (§2a): rendered natively (no WebEngine, works with no net).
         self._offline = QTextBrowser()
         self._offline.setOpenExternalLinks(True)
+        self._offline.document().setDefaultStyleSheet(_OFFLINE_CSS)
 
         self._find = QLineEdit()
         self._find.setPlaceholderText("Find in HackTricks page…")
@@ -155,7 +198,7 @@ class ReferencePane(QWidget):
             self._tabs.setTabText(self._offline_index, "Offline")
             self._tabs.setCurrentIndex(self._live_index)
             return
-        self._offline.setMarkdown(page.markdown)
+        self._offline.setMarkdown(hacktricks.clean_markdown(page.markdown))
         self._tabs.setTabText(self._offline_index, f"Offline · {page.title}")
         self._tabs.setCurrentIndex(self._offline_index)
         # finding-aware: jump to the section matching a finding kind for this service (if any).

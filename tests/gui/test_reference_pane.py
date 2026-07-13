@@ -1,6 +1,7 @@
 from pytestqt.qtbot import QtBot
 
-from oscprecon.gui.widgets.reference_pane import ReferencePane
+from oscprecon import hacktricks
+from oscprecon.gui.widgets.reference_pane import _FINDING_SECTIONS, ReferencePane
 from oscprecon.models import DiscoveredService, Proto
 from oscprecon.references import ServiceRef
 
@@ -71,3 +72,23 @@ def test_find_box_jumps_to_text(qtbot: QtBot) -> None:
     pane._find.setText("Shared Folders")
     pane._find_next()
     assert pane._offline.textCursor().hasSelection()
+
+
+def test_finding_sections_keywords_exist_in_cleaned_pages() -> None:
+    # guard: every section-map keyword must exist in its module's (cleaned) vendored page, so the
+    # finding-aware jump lands somewhere real — catches a keyword drifting out on a future refresh.
+    for module, kinds in _FINDING_SECTIONS.items():
+        page = hacktricks.page_for_module(module)
+        assert page is not None, f"{module} has a section map but no vendored page"
+        text = hacktricks.clean_markdown(page.markdown).lower()
+        for kind, keyword in kinds.items():
+            assert keyword.lower() in text, f"{module}/{kind}: '{keyword}' not found in page"
+
+
+def test_offline_render_strips_mdbook_callouts(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "smb"), _ref("smb", _SMB_URL))
+    text = pane.offline_text()
+    assert "[!TIP]" not in text  # GitHub callout normalized, not shown raw
+    assert "<summary>" not in text and "<details>" not in text

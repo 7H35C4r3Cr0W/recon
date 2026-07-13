@@ -39,6 +39,21 @@ New `modules/kerberos/` — the 20th service module, wired into the shared Simpl
   (no `-usersfile`/`-request`/cracking tools), SimpleRecon worker parse, pattern firing. The
   parametrized `test_simple_panel_manual_followups_stay_legal` now covers kerberos too.
 
+### HackTricks Phase 3 — cleaner mdBook render + expanded finding→section maps
+Offline HackTricks pane polish. Two deterministic in-scope parts; the third (§27 live-fetch relax) is a
+policy decision deliberately NOT bundled here — the scraping ban is a hard §2/§27 line (amend-first).
+- **Cleaner rendering** — `hacktricks.clean_markdown()` normalizes the mdBook/HackTricks syntax that
+  Qt's CommonMark renderer showed as literal noise: `> [!TIP]/[!WARNING]/[!CAUTION]` callouts → bold
+  labels, `<details>/<summary>` → bold heading + preserved content, offline `<figure>/<img>` removed.
+  Verified zero leftover tokens across all 21 pages. Applied at the render boundary (loader still
+  returns raw). `reference_pane` also gets a light theme-neutral document stylesheet.
+- **Expanded + fixed section map** — `_FINDING_SECTIONS` grew from 5 modules/8 entries to 12 modules/30
+  entries, all keyed on **real** parser finding kinds and all keywords verified to exist in the cleaned
+  page. Fixed two long-dead entries (`ldap:auth`→`bind`, `snmp:system`→real kinds) that never fired.
+- Tests: `clean_markdown` unit + real-page token-strip; a **guard test** that every map keyword exists
+  in its cleaned page (catches drift on a future vendor refresh); an integration test that the rendered
+  offline text has no raw callouts/tags.
+
 ### Single-click contained app + branded splash (distribution items 4–5)
 Public-release packaging + startup branding. §27 amended first to permit an offline splash + a
 build-time contained-app bundle (still no runtime network/telemetry/auto-update).
