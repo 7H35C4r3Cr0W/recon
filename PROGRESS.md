@@ -18,6 +18,30 @@ Phase 6 (doctor + exam preset). Report EDB hits are
 still deferred (need a persistent EDB store in the profile to render from). Optional: extend the
 pattern library to more services from the notes as boxes surface them.
 
+### Repo-wide cleanup pass (adversarial review — 10 findings, all fixed) — DONE
+Area-partitioned review (10 subsystem finders + refute-biased verify, all reproduced) → 10 confirmed
+findings, each fixed with a regression test in small commits:
+- **shell.py** (`11ae100`): timeout/cancel/finally killed only the direct PID; since the child is a
+  `start_new_session` group leader, forked helpers (enum4linux-ng→smbclient, dnsenum→dig) orphaned and
+  could hold the stdout pipe so timeout/cancel never landed → `_terminate()` kills the group. Plus the
+  queued **DB-client primitive backstop**: `policy_violation` now refuses INTO OUTFILE/DUMPFILE,
+  LOAD_FILE, sys_exec/eval, lo_import/export, pg_read_file/ls_dir, `\!` for mysql/psql/mongosh/redis-cli.
+- **dns** (`8eece95`): `parse_dnsrecon` only matched legacy `[*]` rows; dnsrecon 1.6.x (current Kali)
+  logs `<ts> INFO TYPE name data` → all records silently dropped. Accept both prefixes (+ INFO fixture).
+- **config/patterns/vault/graph** (`f941c01`): atomic temp+rename for prefs/recent.json; `_FORBIDDEN`
+  pattern gate gained --continue-on-success/patator/crowbar; vault re-export rmtree's its own subfolder
+  first (stale-orphan snapshot); `load_graph` coerces wrong-typed user_edges/node_overrides.
+- **wordlists + dead code** (`e3c730e`): `_category_for` matched needles as unbounded substrings so
+  "api" mis-tagged capital/therapist/rapid → token-boundary match; removed dead `_auto_output` +
+  WordlistPicker.indexed signal.
+- **gui closeEvent** (`4cfbc7f`): waited on running QThreads without cancelling first → froze the UI for
+  the tool's full remaining runtime on close. Cancel-then-wait.
+- **repo hygiene**: `.gitignore` now covers mypy/ruff caches, build/dist, coverage, `*.log`, and the
+  local `mirror.sh`; classified stray files (`autosave.sh` tracked/intentional; `mirror.sh`+`sc_audit.log`
+  local artifacts; `prompts/` empty). Repeatable **packaging smoke test** proves the wheel ships all
+  YAML/HTML/CSS/JS/template resources and the 3 console entry points load from a clean venv.
+- 511 → tests green after the pass; four gates + offscreen GUI suite clean.
+
 ### Phase 2 · MySQL module (mysql) — DONE
 Fourth DB service module — banner-only per CLAUDE.md §12 (MySQL = "Banner only"; root default-cred is
 user judgment, Tier-2), built as the direct twin of MSSQL. Shared `SimpleReconSpec`, name `mysql`
@@ -72,7 +96,7 @@ existing services.yaml 1433 + 1434-browser stubs.
   (11 agents, refute-biased verify): 6 confirmed / 0 refuted → version-newline-bleed (medium),
   multi-instance drop, WORKGROUP mislabel + coverage gaps all fixed; 2 findings dispositioned by-design
   (instance/pattern divergence is moot post-fix; `ms-sql-m`/1434 trigger with `-p 1433` recon is the
-  §12-scoped probe). Exam-legality reviewer returned zero findings. Four gates green, 484 tests. `a0e3b10`.
+  §12-scoped probe). Exam-legality reviewer returned zero findings. Four gates green, 484 tests. `fc30475`.
 
 ### Phase 2 · MongoDB module (mongodb) — DONE
 Second DB service module after Redis (the template). Read-only unauth Tier-1 auto-enum via the shared
