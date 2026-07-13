@@ -6,8 +6,8 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (109 files) · `ruff check` + `ruff format --check` clean ·
-  **732 tests** pass (incl. 194 offscreen GUI) · `test_packaging` green (wheel ships resources).
+- **Verified:** `mypy --strict` clean (111 files) · `ruff check` + `ruff format --check` clean ·
+  **741 tests** pass (incl. 202 offscreen GUI) · `test_packaging` green (wheel ships resources).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
 ## Status legend
@@ -409,24 +409,26 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
 tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-**⏭ Credential-spraying GUI (finishes the owner's cred-spray request).** The amendment + engine are
-done + committed; what remains is the user-facing surface.
+**⏭ Finding-aware HackTricks integration — Phase 1 (vendor + index).** Credential spraying is now
+complete; HackTricks is the next feature in the owner's order.
 
-- **Scope:** a **spray panel** (pick target services + creds from the vault → preview the command →
-  Run) driven by a spray worker that passes `shell.run(spray=True)` **only** when `config.spray_enabled`;
-  an **editable cred-vault UI** (add / edit / delete on `creds.json`). Clean, **Burp-style** layout
-  (UX north-star). Tests: worker gates on the setting; vault CRUD; spray commands stay single-target.
-- **Then:** finding-aware HackTricks Phase 1 (vendor + index) — §2/§27 gate already cleared (`bf42f1e`);
-  needs one-time network at vendor time.
+- **Gate:** cleared (`bf42f1e` — offline vendoring allowed). Owner FYSA: live scraping may also be OK,
+  so offer to relax §27 further when building (keep offline vendoring as the exam-safe default).
+- **Phase 1 scope:** vendor a bounded network-services-pentesting markdown snapshot under
+  `references/hacktricks/` + a refresh script + a `service/finding → file+anchor` index; ship in the
+  wheel; offline-load test. Needs one-time network at vendor time. Enforce the owner's acceptance
+  criteria when it renders: accuracy, correct parsing, clean appearance, and **show the data + a
+  clickable link**. Section extraction + finding-aware UX are later phases.
 
 **Parallel future tracks (need an owner decision / gate):**
-- **Credential spraying (opt-in, off by default)** — CLAUDE.md §1/§2/§2a amendment ✅ (`ab9829f`) +
-  **engine ✅** (`e4fcf7d`/`2923177`/`6ea11cc`): `config.spray_enabled` gate, gated
-  `shell.policy_violation(spray=)`, `spray.py` builder, editable cred vault, wordlist gating,
-  Preferences toggle. **NEXT: the spray GUI** — spray panel + editable cred-vault UI (Burp-clean); the
-  run worker passes `spray=True` ONLY when `config.spray_enabled`. See [[cred-spray-scope-change]].
-- **Finding-aware HackTricks integration** — §2/§27 gate ✅; Phase 1 (vendor + index) ready (needs
-  one-time network at vendor time).
+- **Credential spraying (opt-in, off by default)** — ✅ **COMPLETE** end-to-end: CLAUDE.md §1/§2/§2a
+  amendment (`ab9829f`); engine (`e4fcf7d`/`2923177`/`6ea11cc`) — gate, gated policy, `spray.py`
+  builder, wordlist gating; **Credential Vault dialog** (`bd4fd1e`, add/edit/delete); **Spray dialog +
+  gated runner** (`1531f59`, `Scan → Credential Spray…`). `spray=True` is passed in exactly one place,
+  only when `config.spray_enabled`. UX polish (Burp-clean) is a later refinement. See
+  [[cred-spray-scope-change]].
+- **Finding-aware HackTricks integration** — ⏭ **NEXT**. §2/§27 gate ✅; Phase 1 (vendor + index) needs
+  one-time network at vendor time. (Owner FYSA: live scraping may also be OK — §27 could relax further.)
 - **Phase 6 distribution** (installer / tool-update-resilient parsers / single-click app / splash).
 
 **Blocked:** live validation + timed mock (authorized target required). Full detail in the build memory

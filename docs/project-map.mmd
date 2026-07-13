@@ -58,10 +58,11 @@ mindmap
       Project tar.gz import/export + open-by-ip ✅
       Exploit-DB references persisted lookup-only ✅
     Safety ✅
-      Recon-only exec policy ✅
+      Recon-first exec policy ✅
       Tier 1-2-3 credential line ✅
-      Password wordlists filtered ✅
-      Exploit / brute / LLM ❌
+      Password wordlists filtered by default ✅
+      Credential spraying opt-in off-by-default ✅
+      Exploit / Metasploit / SQLMap / LLM ❌
     Quality ✅
       mypy strict ✅
       ruff check + format ✅
@@ -73,14 +74,14 @@ mindmap
       Gitea CI ✅
       doctor tool check ✅
     Current development ⏭
-      AD Kerberos enum workflow shipped ✅
-      HackTricks §2 §27 offline-vendoring gate cleared ✅
+      Credential spraying opt-in complete ✅
+      HackTricks §2 §27 gate cleared ✅
       Next chunk HackTricks vendor + index ⏭
     Future development 🕒
       Timed mock exam ⛔
-      Cred store + password spraying needs §1 §2 amendment 🕒
-      Distribution installer + resilient parsers + single-click app + splash 🕒
       HackTricks section-aware surfacing + notes UX 🕒
+      Distribution installer + resilient parsers + single-click app + splash 🕒
+      Cred-spray Burp-clean UX polish 🕒
     Live validation ⛔
       Three authorized lab targets ⛔
       Live parser validation ⛔

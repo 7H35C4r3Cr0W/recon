@@ -167,12 +167,10 @@ Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` �
   (`bf42f1e` permits offline vendoring; live scraping still forbidden). Phase 1 = vendor the bounded
   network-services markdown snapshot + build a `service → file+anchor` index (one-time network at
   vendor time). Section extraction + finding-aware UX are later phases.
-- **Credential store + OSCP-legal password spraying** (owner request) — a cred vault (add/edit/delete)
-  + spray orchestration across services (netexec/hydra smb/ftp/ssh). **Verified OSCP-legal, but it
-  REVERSES the recon-only identity** (§1) and the §2 hydra/spray ban + `shell.policy_violation`.
-  **Gate: an explicit CLAUDE.md §1/§2 amendment first** (draft on request); keep it opt-in /
-  off-by-default so the exam-legal default survives the public release. Do NOT weaken the policy until
-  then.
+- ✅ **Credential spraying (opt-in, off by default)** — DONE end-to-end: CLAUDE.md §1/§2/§2a amendment,
+  gated `shell.policy_violation(spray=)`, `spray.py` builder, editable Credential Vault dialog, and the
+  Spray dialog + gated runner (`Scan → Credential Spray…`). `spray=True` is passed in one place, only
+  when `config.spray_enabled`. Burp-clean UX polish deferred.
 - **Timed mock exam (Phase 6).** A timed dry run against a standalone + AD set. Blocked on an authorized
   live target.
 - **Distribution & resilience (future, not greenlit).** Public GitHub release: tool-update-resilient

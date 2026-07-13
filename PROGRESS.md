@@ -39,6 +39,14 @@ New `modules/kerberos/` — the 20th service module, wired into the shared Simpl
   (no `-usersfile`/`-request`/cracking tools), SimpleRecon worker parse, pattern firing. The
   parametrized `test_simple_panel_manual_followups_stay_legal` now covers kerberos too.
 
+### Credential spraying — opt-in, off by default (§2a) — COMPLETE end-to-end
+GUI (chunks 4–5): **Credential Vault dialog** (`bd4fd1e`) — Edit → Credential Vault…, list with
+redacted secrets + add/delete (Profile.add/delete_credential, read-only-guarded). **Spray dialog +
+runner** (`1531f59`) — Scan → Credential Spray…, service checkboxes + live preview; Run gated on the
+setting; `_on_credential_spray` re-checks `config.spray_enabled`, writes 0600 spray lists from the
+vault, and launches each service via `CommandWorker(spray=True)` — the ONE place spray=True is passed.
+Safety test: launches NOTHING when the setting is off, even if the dialog is stubbed to accept.
+
 ### Credential spraying — opt-in, off by default (§2a) — ENGINE DONE
 Owner-approved scope change (verified OSCP-legal). CLAUDE.md amended (`ab9829f`): §1 recon-only →
 recon-first, §2 hydra/spray gated, new §2a Spray-mode contract, Tier-3 Forbidden → Gated. Engine

@@ -120,11 +120,17 @@ Each box is a self-contained folder under the workspace root (default `~/oscprec
 
 ## Safety boundaries (OSCP exam-legal by default)
 
-Recon-only. **No** exploitation, credential brute force / spraying, Metasploit, SQLMap, or LLM calls
-at runtime — see [`CLAUDE.md`](CLAUDE.md) §2. Every command runs through one chokepoint
-(`shell.run` → `policy_violation`) that refuses non-allow-listed tools, brute/spray flags, and
-file-write / OS-exec DB primitives. The wordlist picker hides `Passwords/`. Credential attempts are
-single-shot Tier-2 actions the user clicks — never automated, never list-driven.
+Recon-first, **exam-legal by default**. **No** exploitation, Metasploit, SQLMap, or LLM calls at
+runtime — see [`CLAUDE.md`](CLAUDE.md) §2. Every command runs through one chokepoint (`shell.run` →
+`policy_violation`) that refuses non-allow-listed tools, brute/spray flags, and file-write / OS-exec DB
+primitives. By default the wordlist picker hides `Passwords/` and credential attempts are single-shot
+Tier-2 actions the user clicks.
+
+**Credential spraying** (hydra/medusa/netexec across SMB/WinRM/LDAP/SSH/FTP/RDP) is OSCP-legal against
+your own authorized targets and is supported as an **explicit, opt-in, off-by-default** mode
+(`Preferences → Scan → Enable Spray mode`; §2a). With it off, the tool is strictly recon-only. When on,
+`Edit → Credential Vault…` manages the creds and `Scan → Credential Spray…` runs single-target sprays
+from them.
 
 ## Kali app menu / taskbar icon
 
