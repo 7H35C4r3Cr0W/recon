@@ -85,3 +85,23 @@ def test_packaging_dir_is_not_shipped_in_the_wheel() -> None:
 
     cfg = loads((REPO / "pyproject.toml").read_text())
     assert cfg["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == ["src/oscprecon"]
+
+
+def test_install_script_is_present_and_safe() -> None:
+    # install.sh is the fresh-Kali bootstrap: it must be fail-safe and recon-only by default (spray
+    # tools are opt-in), and it must never install/run anything forbidden.
+    script = REPO / "install.sh"
+    assert script.exists()
+    text = script.read_text()
+    assert text.startswith("#!/usr/bin/env bash")
+    assert "set -euo pipefail" in text  # fail-safe
+
+    core = text.split("CORE_PKGS=(", 1)[1].split(")", 1)[0]
+    assert (
+        "hydra" not in core and "medusa" not in core
+    )  # spray tools are NOT in the default install
+    assert "hydra medusa" in text  # they exist only behind --with-spray
+    assert "--with-spray" in text
+    for forbidden in ("metasploit", "msfvenom", "sqlmap", "nessus", "burpsuite"):
+        assert forbidden not in text.lower()
+    assert "uv sync" in text and "oscprecon-cli doctor" in text  # sets up + checks readiness
