@@ -1276,6 +1276,8 @@ uv run ruff format --check
 - Bounded parallel execution
 - `--dry-run` / "show command, don't run" preview improvements
 - Fixture-based tests when parsers change
+- A **build-time contained-app bundle** for the public GitHub release — an **AppImage** (or equivalent) that bundles the existing PySide6 app so a user can download → `chmod +x` → double-click. Packaging only; **not** a tech-stack rewrite (§ 3 stands), no runtime network, no auto-update
+- An **offline, no-network branded splash screen** shown during GUI startup (ASCII-art wordmark + version + the recon-only tagline). Owner-requested for the public release; must degrade gracefully (a splash failure never blocks the main window) and pull in **no** network/telemetry
 
 ### No, don't propose
 
@@ -1287,7 +1289,7 @@ uv run ruff format --check
 - **Live scraping or runtime caching of the HackTricks / Exploit-DB _websites_** — fetching or persisting rendered pages at runtime (a build-time-vendored offline markdown snapshot is allowed — see "Yes to propose" and § 2)
 - Rewrites of the tech stack — decided in § 3
 - Speculative abstractions for features not in the roadmap
-- Splash screens, telemetry, update checks, login flows, cloud sync
+- Telemetry, update checks, login flows, cloud sync (an **offline, no-network branded splash screen** for the public-release build is the one allowed exception — owner-requested; see "Yes to propose")
 
 ### When Claude Code proposes something outside the current scope
 

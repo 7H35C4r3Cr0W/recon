@@ -6,9 +6,9 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
 - **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (117 files) · `ruff check` + `ruff format --check` clean ·
-  **825 tests** pass (incl. 212 offscreen GUI) · `test_packaging` green (wheel ships resources,
-  incl. the vendored HackTricks snapshot).
+- **Verified:** `mypy --strict` clean (118 files) · `ruff check` + `ruff format --check` clean ·
+  **833 tests** pass (incl. 214 offscreen GUI) · `test_packaging` green (wheel ships resources,
+  incl. the vendored HackTricks snapshot; `packaging/` build infra excluded from the wheel).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 
 ## Status legend
@@ -410,17 +410,18 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 exam scan profile, project portability, EDB persistence, AD/Kerberos enum — all done). The remaining
 tracks are forward-looking; the recommended next is the one the owner has already chosen a direction on:
 
-Cred-spraying, HackTricks (Phases 1–2), parser resilience, and the **`doctor` guided safe installer**
-(distribution item 2 — `doctor --install` builds only allow-listed curated `apt` packages, explicit
-confirm, + a GUI Help→Doctor view) are done. Next for the public-release goal — pick one:
+Cred-spraying, HackTricks (Phases 1–2), parser resilience, the **`doctor` guided safe installer**,
+and the **single-click AppImage + branded splash** (distribution items 4–5 — `packaging/build-appimage.sh`
++ `gui/splash.py`, §27 amended to permit an offline splash) are done. Next — the owner explicitly
+reminded me not to forget it:
 
-- **⏭ Single-click contained app + splash (distribution items 4–5).** A one-file/AppImage bundle that
-  launches the GUI on click, with a `QSplashScreen` showing ASCII-art branding (Burp-style). Needs a
-  bundler choice (PyInstaller/Briefcase/AppImage). — **highest public-release value.**
-- **HackTricks Phase 3** — more kind→section maps, cleaner mdBook rendering, and the owner-FYSA §27
-  live-fetch relax.
+- **⏭ HackTricks Phase 3.** More finding-kind→section maps, cleaner mdBook-style rendering of the
+  vendored offline pages, and the owner-FYSA §27 live-fetch relax (they noted live scraping may not be
+  outlawed). See [[hacktricks-integration]].
 - **Parser resilience deepening** — multi-tool-version fixtures (prove partial extraction, not just
-  no-crash). All in the build memory ([[distribution-goals]], [[hacktricks-integration]]).
+  no-crash).
+- **AppImage acceptance** — a maintainer must run `packaging/build-appimage.sh` on Kali (needs display/
+  network the sandbox lacks) to produce + smoke the actual binary. All in [[distribution-goals]].
 
 **Parallel future tracks (need an owner decision / gate):**
 - **Credential spraying (opt-in, off by default)** — ✅ **COMPLETE** end-to-end: CLAUDE.md §1/§2/§2a

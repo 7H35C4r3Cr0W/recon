@@ -4,9 +4,10 @@ import os
 import sys
 
 from PySide6.QtCore import QCoreApplication, Qt
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSplashScreen
 
 from oscprecon.gui.main_window import MainWindow
+from oscprecon.gui.splash import make_splash
 
 
 def main() -> int:
@@ -16,6 +17,17 @@ def main() -> int:
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QApplication(sys.argv)
     app.setApplicationName("oscp-recon")
+
+    splash: QSplashScreen | None = None
+    try:
+        splash = make_splash()
+        splash.show()
+        app.processEvents()  # paint it before the slower MainWindow (QtWebEngine) build
+    except Exception:  # why: the splash is optional chrome — never let it block startup (§27)
+        splash = None
+
     window = MainWindow()
     window.show()
+    if splash is not None:
+        splash.finish(window)
     return app.exec()

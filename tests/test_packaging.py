@@ -52,3 +52,36 @@ def test_wheel_bundles_runtime_resources(tmp_path: pathlib.Path) -> None:
     assert len([n for n in names if n.endswith("manual_commands.yaml")]) >= 14
     assert len([n for n in names if "/patterns/" in n and n.endswith(".yaml")]) >= 10
     assert len([n for n in names if "/templates/" in n and not n.endswith("/")]) >= 1
+
+
+def test_appimage_packaging_assets_are_present_and_well_formed() -> None:
+    # the single-click contained-app build (packaging/build-appimage.sh) is maintainer infra: it is
+    # NOT shipped in the wheel, but its inputs must stay valid so a maintainer can build on Kali.
+    pkg = REPO / "packaging"
+    script = pkg / "build-appimage.sh"
+    desktop = pkg / "oscp-recon.desktop"
+    icon = pkg / "oscp-recon.png"
+    assert script.exists() and desktop.exists() and icon.exists()
+
+    icon_bytes = icon.read_bytes()
+    assert icon_bytes[:8] == b"\x89PNG\r\n\x1a\n"  # valid PNG magic
+
+    desktop_text = desktop.read_text()
+    assert "[Desktop Entry]" in desktop_text
+    assert "Exec=oscp-recon" in desktop_text
+    assert "Icon=oscp-recon" in desktop_text
+
+    script_text = script.read_text()
+    assert script_text.startswith("#!/usr/bin/env bash")
+    # runtime app must stay network-free; the AppImage entry runs the module, nothing forbidden
+    assert "-m oscprecon" in script_text
+    for forbidden in ("metasploit", "msfvenom", "sqlmap", "hydra", "curl http", "wget http"):
+        assert forbidden not in script_text.lower()
+
+
+def test_packaging_dir_is_not_shipped_in_the_wheel() -> None:
+    # packaging/ is build infra — hatchling ships only src/oscprecon, so the wheel must not carry it
+    from tomllib import loads
+
+    cfg = loads((REPO / "pyproject.toml").read_text())
+    assert cfg["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == ["src/oscprecon"]

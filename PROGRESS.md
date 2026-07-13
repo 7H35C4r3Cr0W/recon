@@ -39,6 +39,22 @@ New `modules/kerberos/` — the 20th service module, wired into the shared Simpl
   (no `-usersfile`/`-request`/cracking tools), SimpleRecon worker parse, pattern firing. The
   parametrized `test_simple_panel_manual_followups_stay_legal` now covers kerberos too.
 
+### Single-click contained app + branded splash (distribution items 4–5)
+Public-release packaging + startup branding. §27 amended first to permit an offline splash + a
+build-time contained-app bundle (still no runtime network/telemetry/auto-update).
+- **Splash** — `src/oscprecon/gui/splash.py::make_splash()` paints an ASCII wordmark + version + the
+  recon-only tagline onto a `QSplashScreen`. Wired into `gui/app.py::main()` **defensively**: a splash
+  failure is caught and `splash=None`, so it can never block the main window. Shown → `processEvents`
+  → build MainWindow → `finish()`; no artificial delay. Offscreen smoke tests + a lifecycle smoke.
+- **AppImage** — `packaging/`: `build-appimage.sh` (maintainer script, run on Kali — bundles a
+  relocatable `uv` standalone CPython + the wheel; Qt/QtWebEngine ride inside the PySide6 wheel; AppRun
+  runs `-m oscprecon`; `appimagetool` packs `dist/oscp-recon-<ver>-x86_64.AppImage`), a validated
+  `.desktop`, and a generated `oscp-recon.png` icon. Not shipped in the wheel (build infra).
+- Can't produce/run the binary in this sandbox (no display/network for appimagetool) — the splash is
+  fully tested; the AppImage recipe is verified by lint/format/asset checks and run on Kali by the user.
+- Tests: splash render + version symbol; packaging assets present/well-formed (PNG magic, desktop keys,
+  script shebang + `-m oscprecon`, no forbidden tools) + wheel excludes `packaging/`.
+
 ### `doctor` → guided safe installer (distribution item 2)
 `oscprecon-cli doctor` gained a guided installer + a GUI Help→Doctor status view. Safety-first:
 - **`src/oscprecon/doctor.py`** engine: `scan()` (per-tool present/missing + hint), `install_plan()`
