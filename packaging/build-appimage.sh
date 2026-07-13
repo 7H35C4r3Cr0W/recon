@@ -48,12 +48,20 @@ VERSION="$(basename "$WHEEL" | sed -E 's/^oscp_recon-([^-]+)-.*/\1/')"
 say "stage a relocatable standalone Python $PYVER"
 uv python install "$PYVER"
 PYBIN="$(uv python find "$PYVER")"
-PYROOT="$(dirname "$(dirname "$PYBIN")")"   # python-build-standalone: <root>/bin/python3
+# readlink -f resolves uv's version symlink (cpython-3.11-... -> cpython-3.11.15-...) to the REAL
+# directory; copying the symlink itself would bundle a dangling link and pip would write into the
+# shared uv store instead of the AppDir. Copy real files so the bundle is self-contained.
+PYROOT="$(readlink -f "$(dirname "$(dirname "$PYBIN")")")"
+rm -rf "$APPDIR/usr/python"
 cp -a "$PYROOT" "$APPDIR/usr/python"
 APP_PY="$APPDIR/usr/python/bin/python3"
 
 say "install oscp-recon (+ PySide6 with bundled Qt/QtWebEngine) into the bundle"
-uv pip install --python "$APP_PY" "$WHEEL"
+# The bundled copy is OURS to modify (not a system/shared Python): drop uv's EXTERNALLY-MANAGED
+# marker and install with the copy's own pip, overriding PEP 668. The copy stays relocatable.
+find "$APPDIR/usr/python" -name EXTERNALLY-MANAGED -delete 2>/dev/null || true
+"$APP_PY" -m ensurepip --upgrade >/dev/null 2>&1 || true
+"$APP_PY" -m pip install --break-system-packages --no-warn-script-location "$WHEEL"
 
 say "write AppRun"
 cat > "$APPDIR/AppRun" <<'APPRUN'
