@@ -29,6 +29,22 @@ def test_forbidden_gate_flags_exploit_content() -> None:
     assert errors and "cve-" in errors[0].lower()
 
 
+def test_forbidden_gate_flags_spray_markers(tmp_path: Path) -> None:
+    # the §2 spray markers (--continue-on-success, patator, crowbar) must trip the content gate
+    d = tmp_path / "patterns"
+    d.mkdir()
+    (d / "x.yaml").write_text(
+        "- match: {service: smb}\n"
+        "  suggest:\n"
+        '    - text: "spray the box"\n'
+        '      command: "netexec smb {target} -u u.txt -p p.txt --continue-on-success"\n'
+        "# source: tests/x.md\n",
+        encoding="utf-8",
+    )
+    errors = engine.check_forbidden(d)
+    assert errors and "continue-on-success" in errors[0].lower()
+
+
 def test_suggest_for_matches_and_interpolates() -> None:
     findings: list[dict[str, Any]] = [
         {"module": "smb", "kind": "note", "value": "x", "detail": "message signing: disabled"},

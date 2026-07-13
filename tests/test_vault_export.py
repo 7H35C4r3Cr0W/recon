@@ -75,6 +75,19 @@ def test_export_creates_full_structure(tmp_path: Path) -> None:
     assert len(list((out / "notes").glob("*.md"))) == 1
 
 
+def test_reexport_removes_stale_output(tmp_path: Path) -> None:
+    prof = _seeded_profile(tmp_path)
+    out = vault_export.export_vault(prof, tmp_path / "vault")
+    stale = out / "findings" / "999-orphan.md"
+    stale.write_text("orphan from a prior export", encoding="utf-8")
+    # re-export is a fresh snapshot — the orphan must be gone, current output intact
+    out2 = vault_export.export_vault(prof, tmp_path / "vault")
+    assert out2 == out
+    assert not stale.exists()
+    assert (out / "index.md").exists()
+    assert len(list((out / "findings").glob("*.md"))) == 1
+
+
 def test_export_redacts_credential_secret(tmp_path: Path) -> None:
     prof = _seeded_profile(tmp_path)
     out = vault_export.export_vault(prof, tmp_path / "vault")

@@ -193,8 +193,12 @@ class Profile:
             data = None
         if not isinstance(data, dict):
             data = {}
-        data.setdefault("user_edges", [])
-        data.setdefault("node_overrides", {})
+        # coerce, not just setdefault: the GraphBridge write path indexes these directly, so a
+        # present-but-wrong-typed value (hand-edited graph.json) must not survive into a mutation.
+        if not isinstance(data.get("user_edges"), list):
+            data["user_edges"] = []
+        if not isinstance(data.get("node_overrides"), dict):
+            data["node_overrides"] = {}
         return data
 
     def save_graph(self, data: dict[str, Any]) -> None:

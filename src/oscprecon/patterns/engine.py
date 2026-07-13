@@ -21,9 +21,12 @@ _FORBIDDEN = (
     "meterpreter",
     "hydra",
     "medusa",
+    "patator",
+    "crowbar",
     "sqlmap",
     "rockyou",
     "--passwords",
+    "--continue-on-success",
 )
 
 

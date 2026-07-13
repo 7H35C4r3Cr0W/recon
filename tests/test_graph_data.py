@@ -115,6 +115,16 @@ def test_invalid_status_is_ignored(tmp_path: Path) -> None:
     assert "status" not in target["data"]  # only new/investigating/done/dead-end are accepted
 
 
+def test_load_graph_coerces_wrong_typed_fields(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    # a hand-edited graph.json with swapped container types must not reach the GraphBridge write
+    # path (which indexes user_edges as a list / node_overrides as a dict) — load_graph coerces.
+    prof.graph_path.write_text('{"user_edges": {}, "node_overrides": []}', encoding="utf-8")
+    graph = prof.load_graph()
+    assert graph["user_edges"] == []
+    assert graph["node_overrides"] == {}
+
+
 def test_profile_graph_persistence_roundtrip(tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     assert prof.load_graph() == {"user_edges": [], "node_overrides": {}}  # default when absent

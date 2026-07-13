@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -226,6 +227,11 @@ def _write_notes(profile: Profile, root: Path) -> None:
 
 def export_vault(profile: Profile, dest_root: Path) -> Path:
     root = Path(dest_root) / profile.profile_name
+    # why: a re-export is a fresh point-in-time snapshot — clear the profile's own export subfolder
+    # first so records deleted since the last export don't linger as orphans. Only <root> (the
+    # computed <dest>/<profile_name>) is removed, never the user-picked dest_root itself.
+    if root.exists():
+        shutil.rmtree(root, ignore_errors=True)
     for sub in _SUBDIRS:
         (root / sub).mkdir(parents=True, exist_ok=True)
     raw_findings = findings_mod.load_findings(profile.directory)

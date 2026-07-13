@@ -35,6 +35,13 @@ def _read_json(path: Path, default: Any) -> Any:
         return default
 
 
+def _write_json_atomic(path: Path, obj: Any) -> None:
+    # why: mirror profile.json/creds.json — a crash mid-write must not truncate the config file.
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(obj, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
 def load_prefs() -> dict[str, str]:
     data = _read_json(_prefs_path(), {})
     if not isinstance(data, dict):
@@ -43,7 +50,7 @@ def load_prefs() -> dict[str, str]:
 
 
 def save_prefs(prefs: dict[str, str]) -> None:
-    _prefs_path().write_text(json.dumps(prefs, indent=2), encoding="utf-8")
+    _write_json_atomic(_prefs_path(), prefs)
 
 
 def workspace_root() -> Path:
@@ -62,4 +69,4 @@ def add_recent(profile_dir: Path) -> None:
     items = [p for p in recent_profiles() if p != entry]
     items.insert(0, entry)
     del items[RECENT_LIMIT:]
-    _recent_path().write_text(json.dumps(items, indent=2), encoding="utf-8")
+    _write_json_atomic(_recent_path(), items)
