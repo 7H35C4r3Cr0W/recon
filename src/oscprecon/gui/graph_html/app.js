@@ -38,6 +38,9 @@
     { selector: 'node[type="service"][proto="tcp"]', style: { "background-color": "#89b4fa" } },
     { selector: 'node[type="service"][proto="udp"]', style: { "background-color": "#a6e3a1" } },
     { selector: 'node[type="finding"]', style: { "background-color": "#f9e2af" } },
+    // exploit-db / searchsploit hits are references to READ, not confirmed vulns — colour them
+    // distinctly (lavender) and never with the notable ring, so they don't read as danger.
+    { selector: 'node[category="reference"]', style: { "background-color": "#cba6f7" } },
     { selector: 'node[type="artifact"]', style: { "background-color": "#fab387" } },
     {
       selector: 'node[type="credential"]',

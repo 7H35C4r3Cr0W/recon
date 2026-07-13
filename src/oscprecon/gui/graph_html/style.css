@@ -55,6 +55,52 @@ body {
   position: relative;
 }
 
+#legend {
+  position: fixed;
+  top: 44px;
+  left: 12px;
+  background: rgba(24, 24, 37, 0.92);
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: #bac2de;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.legend-title {
+  font-weight: 600;
+  color: #cdd6f4;
+  margin-bottom: 4px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.5;
+}
+
+.legend-row .swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.legend-row .swatch.ring {
+  background: transparent;
+  border: 2px solid #f38ba8;
+}
+
+.legend-note {
+  margin-top: 5px;
+  color: #6c7086;
+  max-width: 190px;
+}
+
 #minimap {
   position: fixed;
   bottom: 12px;

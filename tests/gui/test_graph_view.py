@@ -137,6 +137,26 @@ def test_write_image_png_decodes_and_svg_is_text(tmp_path: Path) -> None:
     assert svg.read_text(encoding="utf-8") == "<svg><rect/></svg>"  # svg written verbatim
 
 
+_GRAPH_HTML = Path(__file__).resolve().parents[2] / "src" / "oscprecon" / "gui" / "graph_html"
+
+
+def test_graph_search_never_indexes_credential_secrets() -> None:
+    # the search hay must be built from label/type/port/module/source only — NEVER the secret field,
+    # so a redacted-but-still-present secret can never be surfaced by typing in the search box.
+    app_js = (_GRAPH_HTML / "app.js").read_text()
+    hay = app_js.split("function applySearch", 1)[1].split("function ", 1)[0]
+    assert 'n.data("secret")' not in hay
+    assert "secret" not in hay.lower()
+
+
+def test_graph_has_legend_and_reference_is_visually_distinct() -> None:
+    index_html = (_GRAPH_HTML / "index.html").read_text()
+    app_js = (_GRAPH_HTML / "app.js").read_text()
+    assert 'id="legend"' in index_html  # chunk-9 legend
+    assert "confirmed vuln" in index_html.lower()  # conservative framing stated to the user
+    assert 'node[category="reference"]' in app_js  # references coloured apart from findings/danger
+
+
 def test_graph_view_persists_status_and_note_via_detail(qtbot: QtBot, tmp_path: Path) -> None:
     prof = _profile(tmp_path)
     view = GraphView()

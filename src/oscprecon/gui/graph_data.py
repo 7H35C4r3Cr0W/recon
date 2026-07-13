@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from oscprecon import finding_severity
 from oscprecon import findings as findings_mod
 from oscprecon.creds import redact
 from oscprecon.profile import Profile
@@ -10,24 +11,10 @@ from oscprecon.references import match as ref_match
 # Cytoscape "elements" builder: turn a Profile (target + services + findings.json + creds.json),
 # overlaid with the user's graph.json (drawn edges, node positions, per-node status/notes), into the
 # {nodes, edges} JSON the vendored Cytoscape.js renders. Pure data — no Qt — so it is unit-testable.
+# Visual framing (which finding is "notable") comes from the centralized, conservative
+# finding_severity classifier — an open port / version / EDB hit is never framed as a weakness.
 
 _VALID_STATUS = frozenset({"new", "investigating", "done", "dead-end"})
-
-# Finding kinds that are inherently notable (a weak/open posture), plus text signals. Notable
-# findings are highlighted in the graph so the interesting stuff pops (anon access, writable…).
-_NOTABLE_KINDS = frozenset({"open-relay", "algo-weak", "world-readable"})
-_NOTABLE_TEXT = ("anonymous", "null session", "writable", "world-readable", "no_root_squash")
-
-
-def _is_notable(kind: str, value: str, detail: str) -> bool:
-    text = f"{value} {detail}".lower()
-    if kind == "signing":
-        return "disabled" in text  # signing is only notable when it's OFF
-    if kind in _NOTABLE_KINDS:
-        return True
-    if kind in ("auth", "bind", "access") and ("anon" in value.lower() or "null" in value.lower()):
-        return True
-    return any(signal in text for signal in _NOTABLE_TEXT)
 
 
 def _service_id(port: int, proto: str) -> str:
@@ -89,9 +76,10 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
         module = str(finding.get("module", ""))
         detail = str(finding.get("detail", ""))
         label = f"{kind}: {value}" if kind else (value or "finding")
-        extra: dict[str, Any] = {"module": module, "detail": detail}
-        if _is_notable(kind, value, detail):
-            extra["notable"] = True  # anon access / writable / weak signing / etc. -> highlighted
+        category = finding_severity.classify(kind, value, detail)
+        extra: dict[str, Any] = {"module": module, "detail": detail, "category": category}
+        if finding_severity.is_notable(category):
+            extra["notable"] = True  # anon access / exposure / relay-risk -> highlighted ring
         add_node(fid, "finding", label, extra)
         parent = module_service.get(module, "target")
         edges.append(_edge(parent, fid, "exposes-finding", f"e-find-{index}"))

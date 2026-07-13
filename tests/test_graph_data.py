@@ -163,3 +163,29 @@ def test_notable_findings_are_flagged(tmp_path: Path) -> None:
     assert finds["auth: anonymous"].get("notable") is True  # anon access highlighted
     assert "notable" not in finds["share: IT"]  # a readable share is not itself "notable"
     assert "notable" not in finds["user: administrator"]  # a username is not notable
+    # every finding node carries a conservative category from the centralized classifier
+    assert finds["signing: disabled"]["category"] == "relay-risk"
+    assert finds["auth: anonymous"]["category"] == "access"
+    assert finds["share: IT"]["category"] == "info"
+    assert finds["user: administrator"]["category"] == "info"
+
+
+def test_edb_reference_finding_is_not_highlighted_as_a_weakness(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.1"))
+    prof.set_services([DiscoveredService(22, Proto.TCP, "ssh")])
+    findings_mod.add_findings(
+        prof.directory,
+        [
+            {"module": "ssh", "kind": "edb", "value": "EDB-12345 OpenSSH", "discovered_at": "t"},
+            {"module": "nmap", "kind": "product", "value": "OpenSSH 8.4p1", "discovered_at": "t"},
+        ],
+    )
+    finds = {
+        n["data"]["label"]: n["data"]
+        for n in build_elements(prof)["nodes"]
+        if n["data"]["type"] == "finding"
+    }
+    edb = finds["edb: EDB-12345 OpenSSH"]
+    assert edb["category"] == "reference"  # a reference, not a vuln
+    assert "notable" not in edb  # never gets the danger ring
+    assert "notable" not in finds["product: OpenSSH 8.4p1"]  # a version banner is never notable
