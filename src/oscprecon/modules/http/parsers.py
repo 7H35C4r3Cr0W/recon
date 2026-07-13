@@ -37,6 +37,21 @@ def _path_of(url: str) -> str:
 _SIZE_UNITS = (("KB", 1024), ("MB", 1024 * 1024), ("GB", 1024 * 1024 * 1024), ("B", 1))
 
 
+def _to_int(value: object) -> int:
+    # why: JSON-derived numeric fields (ffuf/gobuster --json) can drift to a non-numeric type on a
+    # tool update — never let int() raise; a bad value degrades to 0, not a crash (tool-resilience).
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return 0
+    return 0
+
+
 def _parse_size(token: str) -> int:
     text = token.strip().upper()
     for unit, factor in _SIZE_UNITS:
@@ -77,8 +92,8 @@ def parse_feroxbuster(text: str, port: int) -> list[HttpFinding]:
                 HttpFinding(
                     port=port,
                     path=_path_of(str(obj.get("url", ""))),
-                    status=int(obj.get("status", 0) or 0),
-                    size=int(obj.get("content_length", 0) or 0),
+                    status=_to_int(obj.get("status", 0)),
+                    size=_to_int(obj.get("content_length", 0)),
                     redirect_to=redirect,
                 )
             )
@@ -139,8 +154,8 @@ def parse_ffuf(text: str, port: int) -> list[HttpFinding]:
             HttpFinding(
                 port=port,
                 path=_path_of(str(result.get("url", ""))),
-                status=int(result.get("status", 0) or 0),
-                size=int(result.get("length", 0) or 0),
+                status=_to_int(result.get("status", 0)),
+                size=_to_int(result.get("length", 0)),
                 redirect_to=str(result.get("redirectlocation", "") or ""),
             )
         )
@@ -208,7 +223,7 @@ def parse_whatweb(text: str, port: int) -> list[HttpFinding]:
             HttpFinding(
                 port=port,
                 path=_path_of(str(entry.get("target", ""))),
-                status=int(entry.get("http_status", 0) or 0),
+                status=_to_int(entry.get("http_status", 0)),
                 note=f"whatweb: {names}" if names else "whatweb",
             )
         )

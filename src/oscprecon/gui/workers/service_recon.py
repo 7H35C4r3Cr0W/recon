@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 
 from PySide6.QtCore import Signal
 
@@ -38,6 +39,7 @@ from oscprecon.modules.smb import (
     readable_shares,
 )
 from oscprecon.modules.ssh import SshFinding, SshModule, parse_ssh_tool
+from oscprecon.parsing import run_parser
 from oscprecon.profile import Profile
 
 
@@ -85,7 +87,13 @@ class SmbReconWorker(CancellableThread):
                 text = out.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            found.extend(parse_smb_tool(step.tool, text))
+            found.extend(
+                run_parser(
+                    partial(parse_smb_tool, step.tool, text),
+                    label=f"smb {step.tool}",
+                    on_line=self.line.emit,
+                )
+            )
             if step.tool == "netexec-shares" and netexec_auth_ok(text):
                 auth_ok = True
         return found, auth_ok
@@ -205,7 +213,11 @@ class FtpReconWorker(CancellableThread):
                 break
             nmap_text = self._run_step(step.command.shell_line, step.command.output_file)
             if step.tool:
-                collected += parse_ftp_tool(step.tool, nmap_text)
+                collected += run_parser(
+                    partial(parse_ftp_tool, step.tool, nmap_text),
+                    label=f"ftp {step.tool}",
+                    on_line=self.line.emit,
+                )
         anon = nmap_anon_ok(nmap_text)
 
         walk = self._walk(target, recurse=self._mode == "full")
@@ -235,7 +247,9 @@ class FtpReconWorker(CancellableThread):
             step = module.list_step(target, path, self._port)
             text = self._run_step(step.command.shell_line, step.command.output_file)
             listed += 1
-            for entry in parse_ftp_listing(text):
+            for entry in run_parser(
+                partial(parse_ftp_listing, text), label="ftp listing", on_line=self.line.emit
+            ):
                 child = path.rstrip("/") + "/" + entry.name
                 kind = "dir" if entry.is_dir else "file"
                 detail = "" if entry.is_dir else f"{entry.size} bytes"
@@ -314,7 +328,11 @@ class SshReconWorker(CancellableThread):
                 break
             text = self._run_step(step.command.shell_line, step.command.output_file)
             if step.tool:
-                collected += parse_ssh_tool(step.tool, text)
+                collected += run_parser(
+                    partial(parse_ssh_tool, step.tool, text),
+                    label=f"ssh {step.tool}",
+                    on_line=self.line.emit,
+                )
         self._write_findings(collected)
         return SshReconResult(self._summarize(collected))
 
@@ -385,7 +403,11 @@ class DnsReconWorker(CancellableThread):
                 break
             text = self._run_step(step.command.shell_line, step.command.output_file)
             if step.tool:
-                collected += parse_dns_tool(step.tool, text)
+                collected += run_parser(
+                    partial(parse_dns_tool, step.tool, text),
+                    label=f"dns {step.tool}",
+                    on_line=self.line.emit,
+                )
         self._write_findings(collected)
         return DnsReconResult(self._summarize(collected))
 
@@ -459,7 +481,11 @@ class LdapReconWorker(CancellableThread):
                 break
             text = self._run_step(step.command.shell_line, step.command.output_file)
             if step.tool:
-                collected += parse_ldap_tool(step.tool, text)
+                collected += run_parser(
+                    partial(parse_ldap_tool, step.tool, text),
+                    label=f"ldap {step.tool}",
+                    on_line=self.line.emit,
+                )
 
         # base DN for the user search: prefer a discovered naming context, else the entered value.
         # sanitize_basedn drops anything not DN-syntax (a hostile server-returned context too).
@@ -474,7 +500,11 @@ class LdapReconWorker(CancellableThread):
             user_step = module.user_search_step(target, basedn, self._port)
             if user_step is not None:
                 text = self._run_step(user_step.command.shell_line, user_step.command.output_file)
-                collected += parse_ldap_tool(user_step.tool, text)
+                collected += run_parser(
+                    partial(parse_ldap_tool, user_step.tool, text),
+                    label=f"ldap {user_step.tool}",
+                    on_line=self.line.emit,
+                )
 
         anon = any(f.kind == "bind" for f in collected)
         creds = [ldap_anon_credential(target)] if anon else []

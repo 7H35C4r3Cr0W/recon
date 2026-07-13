@@ -176,6 +176,29 @@ def test_kerberos_worker_parses_and_writes_findings(
     assert any("Domain Controller" in line for line in result.summary)  # Tier-1 → DC suggestion
 
 
+def test_worker_survives_a_raising_parser(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # tool-update resilience: if a module's parse() raises, the recon step must still complete
+    # gracefully (run_parser contains it) — no crash, no findings, a "couldn't parse" line emitted.
+    from oscprecon.modules.kerberos import KerberosModule
+
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.161"))
+    monkeypatch.setattr(shell, "run", _fake_run({"nmap -sV -p 88": "kerberos/nmap-sv.txt"}))
+
+    def _boom(self: object, raw: object) -> list[object]:
+        raise RuntimeError("simulated tool-format change")
+
+    monkeypatch.setattr(KerberosModule, "parse", _boom)
+    lines: list[str] = []
+    worker = mw.SimpleReconWorker(prof, "kerberos")
+    worker.line.connect(lines.append)
+    result = worker._drive()  # must not raise
+    assert result.module == "kerberos"
+    assert findings_mod.load_findings(prof.directory) == []  # nothing written
+    assert any("couldn't parse" in line for line in lines)  # surfaced, not swallowed
+
+
 def test_worker_empty_output_writes_nothing(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

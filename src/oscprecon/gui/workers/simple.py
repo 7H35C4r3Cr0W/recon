@@ -10,6 +10,7 @@ from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.workers.base import CancellableThread
 from oscprecon.models import Finding
 from oscprecon.modules.base import Module
+from oscprecon.parsing import run_parser
 from oscprecon.profile import Profile
 
 
@@ -57,7 +58,9 @@ class SimpleReconWorker(CancellableThread):
             if tool:  # unparsed steps (e.g. tftp GETs) still run, but carry no parser key
                 raw[tool] = text
         module = self._spec.factory()
-        found = module.parse(raw)
+        found = run_parser(
+            lambda: module.parse(raw), label=self._spec.module, on_line=self.line.emit
+        )
         self._write_findings(found)
         return SimpleReconResult(self._spec.module, self._summarize(module, found))
 

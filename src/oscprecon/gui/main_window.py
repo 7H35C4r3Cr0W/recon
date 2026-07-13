@@ -69,6 +69,7 @@ from oscprecon.manual_commands import expand, load_manual_commands
 from oscprecon.models import Credential, DiscoveredService, Target
 from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
 from oscprecon.modules.vhost import parse_vhost_tool
+from oscprecon.parsing import run_parser
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
 from oscprecon.workspace import locks, portability
@@ -1040,7 +1041,11 @@ class MainWindow(QMainWindow):
             text = struct_path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return
-        hits = parse_tool(tool, text, port)
+        hits = run_parser(
+            lambda: parse_tool(tool, text, port),
+            label=f"http {tool}",
+            on_line=self._tool_panel.append_output,
+        )
         if hits:
             now = datetime.now(UTC).isoformat()
             findings.add_findings(profile.directory, [h.to_dict(now) for h in hits])
@@ -1087,7 +1092,11 @@ class MainWindow(QMainWindow):
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return
-        hits = parse_vhost_tool(tool, text, domain)
+        hits = run_parser(
+            lambda: parse_vhost_tool(tool, text, domain),
+            label=f"vhost {tool}",
+            on_line=self._tool_panel.append_output,
+        )
         if hits:
             now = datetime.now(UTC).isoformat()
             findings.add_findings(profile.directory, [h.to_dict(now) for h in hits])
