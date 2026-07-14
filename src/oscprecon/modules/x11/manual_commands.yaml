@@ -10,7 +10,7 @@
   command: "nmap -sV -p 6000-6009 {target}"
 # source: HackTricks 6000-pentesting-x11 (book.hacktricks.wiki) — standard OSCP X11 recon
 
-- description: "Enumerate the open display (requires X client tooling)"
-  why: "xdpyinfo reads screen geometry / extensions from an open display — best run in a terminal"
-  command: "xdpyinfo -display {target}:0"
+- description: "Look up X11 references (searchsploit, display-only)"
+  why: "surfaces documented X11 access issues to read — lookup only, never executed"
+  command: "searchsploit x11"
 # source: HackTricks 6000-pentesting-x11 (book.hacktricks.wiki) — standard OSCP X11 recon
