@@ -1,0 +1,16 @@
+# Docker API manual follow-ups (Tier-2 — shown, never auto-run). Unauth read-only GET endpoints only;
+# {target}/{port} filled from the active profile. Container create/exec is code execution — NOT here.
+- description: "List images"
+  why: "/images/json enumerates the images present on the host — read-only"
+  command: "curl -s http://{target}:{port}/images/json"
+# source: HackTricks 2375-pentesting-docker (book.hacktricks.wiki)
+
+- description: "Inspect a container (read-only)"
+  why: "/containers/{id}/json returns a container's config incl. mounts/env — read-only"
+  command: "curl -s http://{target}:{port}/containers/<id>/json"
+# source: HackTricks 2375-pentesting-docker (book.hacktricks.wiki)
+
+- description: "HTTPS variant (TLS-protected daemon)"
+  why: "2376 normally needs a client cert; -k tests whether TLS is enforced — read-only"
+  command: "curl -sk https://{target}:{port}/version"
+# source: HackTricks 2375-pentesting-docker (book.hacktricks.wiki)

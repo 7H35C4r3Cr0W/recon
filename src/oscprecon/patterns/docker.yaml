@@ -1,0 +1,19 @@
+# Docker API recon next-steps (unauth read-only GETs). Enumerating images/containers is recon;
+# container create/exec/attach is code execution and is never suggested here.
+- match:
+    service: docker
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "Docker API is unauthenticated (full host control) — enumerate images/containers read-only"
+      command: "curl -s http://{target}:2375/images/json"
+# source: HackTricks 2375-pentesting-docker (book.hacktricks.wiki)
+
+- match:
+    service: docker
+    field: kind
+    value: "^container$"
+  suggest:
+    - text: "Inspect a discovered container's config (mounts / env) read-only"
+      command: "curl -s http://{target}:2375/containers/<id>/json"
+# source: HackTricks 2375-pentesting-docker (book.hacktricks.wiki)

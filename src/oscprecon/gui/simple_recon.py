@@ -8,6 +8,7 @@ from oscprecon.models import Command, Target
 from oscprecon.modules import (
     ajp,
     couchdb,
+    docker,
     elasticsearch,
     finger,
     ike,
@@ -135,6 +136,10 @@ def _elasticsearch_steps(target: Target, port: int) -> list[tuple[Command, str]]
 
 def _couchdb_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in couchdb.CouchdbModule().recon_steps(target, port)]
+
+
+def _docker_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in docker.DockerModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -351,5 +356,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(couchdb),
         couchdb.CouchdbModule,
         _couchdb_steps,
+    ),
+    "docker": SimpleReconSpec(
+        "docker",
+        "Run full Docker API recon (version · info · containers)",
+        "Docker remote-API recon — unauth curl of /version, /info, /containers/json; read-only GET "
+        "endpoints only. An unauthenticated daemon is full host control; exec is never run.",
+        _manual(docker),
+        docker.DockerModule,
+        _docker_steps,
     ),
 }
