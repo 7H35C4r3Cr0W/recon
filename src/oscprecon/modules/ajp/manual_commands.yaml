@@ -1,0 +1,16 @@
+# AJP manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled from
+# the active profile. The Ghostcat file-read CVE is exploitation and is deliberately NOT wrapped.
+- description: "Allowed methods on the AJP connector"
+  why: "ajp-methods in isolation confirms GET/POST/PUT support — read-only"
+  command: "nmap -p {port} --script ajp-methods {target}"
+# source: HackTricks 8009-pentesting-apache-jserv-protocol-ajp (book.hacktricks.wiki)
+
+- description: "AJP response headers (Server banner)"
+  why: "ajp-headers dumps the connector's response headers — read-only fingerprint"
+  command: "nmap -p {port} --script ajp-headers {target}"
+# source: HackTricks 8009-pentesting-apache-jserv-protocol-ajp (book.hacktricks.wiki)
+
+- description: "Fingerprint the paired Tomcat HTTP connector"
+  why: "AJP fronts the same webapps as the HTTP connector (usually 8080) — enumerate it read-only"
+  command: "nmap -sV -p 8080 --script http-title,http-server-header {target}"
+# source: HackTricks 8009-pentesting-apache-jserv-protocol-ajp (book.hacktricks.wiki)

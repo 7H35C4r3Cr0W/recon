@@ -6,6 +6,7 @@ from pathlib import Path
 
 from oscprecon.models import Command, Target
 from oscprecon.modules import (
+    ajp,
     finger,
     ike,
     kerberos,
@@ -103,6 +104,10 @@ def _finger_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _x11_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in x11.X11Module().recon_steps(target, port)]
+
+
+def _ajp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in ajp.AjpModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -265,5 +270,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(x11),
         x11.X11Module,
         _x11_steps,
+    ),
+    "ajp": SimpleReconSpec(
+        "ajp",
+        "Run full AJP recon (methods · headers)",
+        "AJP13 recon — ajp-methods (allowed HTTP methods) + ajp-headers (Server banner) on the "
+        "Tomcat AJP connector; read-only. The Ghostcat CVE is not wrapped.",
+        _manual(ajp),
+        ajp.AjpModule,
+        _ajp_steps,
     ),
 }

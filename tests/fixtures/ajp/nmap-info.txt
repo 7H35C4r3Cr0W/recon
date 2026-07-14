@@ -1,0 +1,11 @@
+Nmap scan report for 10.10.10.11
+Host is up (0.020s latency).
+
+PORT     STATE SERVICE VERSION
+8009/tcp open  ajp13   Apache Jserv (Protocol v1.3)
+| ajp-methods:
+|   Supported methods: GET HEAD POST OPTIONS
+|_  Potentially risky methods: PUT DELETE
+| ajp-headers:
+|   Server: Apache-Coyote/1.1
+|_  Content-Type: text/html
