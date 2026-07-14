@@ -47,7 +47,7 @@ class RpcbindModule(Module):
             RpcbindStep(
                 Command(
                     "rpcbind",
-                    f"rpcinfo {host}",
+                    f"rpcinfo -p {host}",
                     "Dump the portmapper — registered RPC programs, ports and service names "
                     "(unauth read-only).",
                     "< 30s",

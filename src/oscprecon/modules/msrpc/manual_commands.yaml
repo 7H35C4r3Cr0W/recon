@@ -3,14 +3,14 @@
 - description: "RPC endpoint mapper dump"
   why: "impacket-rpcdump lists interface UUIDs, named pipes, dynamic ports — unauth read-only"
   command: "impacket-rpcdump {target}"
-# source: HackTricks 135-pentesting-msrpc (book.hacktricks.wiki) — standard OSCP MSRPC recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "RPC service info (nmap NSE)"
   why: "msrpc-enum reports the reachable RPC services — read-only"
   command: "nmap -p 135 --script msrpc-enum {target}"
-# source: HackTricks 135-pentesting-msrpc (book.hacktricks.wiki) — standard OSCP MSRPC recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "Enumerate users via RPC null session (SMB side)"
   why: "the SAMR interface reachable over 135/445 lists users on a null session — read-only recon"
   command: "rpcclient -U '' -N {target} -c enumdomusers"
-# source: HackTricks 135-pentesting-msrpc (book.hacktricks.wiki) — standard OSCP MSRPC recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)

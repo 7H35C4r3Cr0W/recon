@@ -20,7 +20,8 @@ __all__ = [
 ]
 
 RMI_SERVICE_NAMES = frozenset({"java-rmi", "rmiregistry", "rmi", "ssl/java-rmi"})
-_RMI_PORTS = frozenset({1099, 1098, 1050})
+# 1099 is the registry; 1098/1050 are common activation ports; the vault notes also document 1100.
+_RMI_PORTS = frozenset({1099, 1100, 1098, 1050})
 _DEFAULT_PORT = 1099
 # rmi-dumpregistry lists the objects bound in the RMI registry (names, classes, dynamic endpoints)
 # read-only. Invoking a method / deserialization exploitation runs over the endpoints — never here.

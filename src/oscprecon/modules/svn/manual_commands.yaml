@@ -3,14 +3,14 @@
 - description: "Commit history (verbose)"
   why: "svn log -v shows every revision + changed paths — often leaks removed files/credentials"
   command: "svn log -v svn://{target}:{port}/"
-# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "Read a file at HEAD (read-only)"
   why: "svn cat prints a file's contents without checking out — read-only"
   command: "svn cat svn://{target}:{port}/trunk/README"
-# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "Recursive listing"
   why: "svn ls -R walks the whole repo tree read-only (keep it bounded)"
   command: "svn ls -R svn://{target}:{port}/"
-# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)

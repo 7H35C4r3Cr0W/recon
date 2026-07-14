@@ -7,7 +7,7 @@
   suggest:
     - text: "RPC endpoint mapper is unauthenticated — enumerate domain users via an SMB null session"
       command: "rpcclient -U '' -N {target} -c enumdomusers"
-# source: HackTricks 135-pentesting-msrpc (book.hacktricks.wiki) — standard OSCP MSRPC recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - match:
     service: msrpc
@@ -16,4 +16,4 @@
   suggest:
     - text: "Named pipes are reachable — map the SAMR/LSARPC interfaces via enum4linux-ng (read-only)"
       command: "enum4linux-ng -A {target}"
-# source: HackTricks 135-pentesting-msrpc (book.hacktricks.wiki) — standard OSCP MSRPC recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)

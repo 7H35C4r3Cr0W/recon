@@ -7,7 +7,7 @@
   suggest:
     - text: "An object is bound in the RMI registry — note its name/endpoint (method calls are out of scope)"
       command: "nmap -sV -p 1099 --script rmi-dumpregistry {target}"
-# source: HackTricks 1099-pentesting-java-rmi (book.hacktricks.wiki) — standard OSCP RMI recon
+# source: Obsidian: 0.01 Cheatsheets/All_In_One/oncybersec.md (Java RMI — rmi-dumpregistry)
 
 - match:
     service: rmi
@@ -16,4 +16,4 @@
   suggest:
     - text: "A dynamic RMI endpoint port was disclosed — confirm it is open with a targeted scan"
       command: "nmap -sV -p {port} {target}"
-# source: HackTricks 1099-pentesting-java-rmi (book.hacktricks.wiki) — standard OSCP RMI recon
+# source: Obsidian: 0.01 Cheatsheets/All_In_One/oncybersec.md (Java RMI — rmi-dumpregistry)

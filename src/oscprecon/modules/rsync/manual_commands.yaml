@@ -3,14 +3,14 @@
 - description: "List a module's contents (read-only)"
   why: "rsync --list-only on a module enumerates its top-level files/dirs without downloading"
   command: "rsync --list-only rsync://{target}:{port}/{module}/"
-# source: HackTricks 873-pentesting-rsync (book.hacktricks.wiki) — standard OSCP rsync recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "Recursive listing of a module (bounded)"
   why: "-r --list-only walks the module tree read-only; keep it bounded, never download"
   command: "rsync -r --list-only rsync://{target}:{port}/{module}/"
-# source: HackTricks 873-pentesting-rsync (book.hacktricks.wiki) — standard OSCP rsync recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "nmap module list (NSE)"
   why: "rsync-list-modules confirms the exposed modules via nmap — read-only"
   command: "nmap -p {port} --script rsync-list-modules {target}"
-# source: HackTricks 873-pentesting-rsync (book.hacktricks.wiki) — standard OSCP rsync recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)

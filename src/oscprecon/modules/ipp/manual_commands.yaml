@@ -3,14 +3,14 @@
 - description: "Read a printer's attributes"
   why: "get-printer-attributes returns a printer's config/state — read-only"
   command: "curl -s 'http://{target}:{port}/printers/{printer}?op=get-printer-attributes'"
-# source: HackTricks 631-internet-printing-protocol-ipp (book.hacktricks.wiki)
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "CUPS server + queue info (nmap NSE)"
   why: "cups-info + cups-queue-info re-run confirm the server version and queued jobs — read-only"
   command: "nmap -p {port} --script cups-info,cups-queue-info {target}"
-# source: HackTricks 631-internet-printing-protocol-ipp (book.hacktricks.wiki)
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "CUPS admin page presence"
   why: "a 200 on /admin confirms the CUPS admin console is exposed — read-only"
   command: "curl -s -o /dev/null -w '%{http_code}' http://{target}:{port}/admin"
-# source: HackTricks 631-internet-printing-protocol-ipp (book.hacktricks.wiki)
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)

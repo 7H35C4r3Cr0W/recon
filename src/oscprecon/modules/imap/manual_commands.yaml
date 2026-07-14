@@ -3,14 +3,14 @@
 - description: "Capabilities + NTLM info"
   why: "imap-capabilities + imap-ntlm-info re-run confirm STARTTLS/auth mechs + AD domain — read-only"
   command: "nmap -p {port} --script imap-capabilities,imap-ntlm-info {target}"
-# source: HackTricks pentesting-imap (book.hacktricks.wiki) — standard OSCP IMAP recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "Banner over implicit TLS (993)"
   why: "openssl s_client reads the greeting + cert on the TLS port — read-only"
   command: "openssl s_client -connect {target}:993 -quiet"
-# source: HackTricks pentesting-imap (book.hacktricks.wiki) — standard OSCP IMAP recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "Banner after STARTTLS (143)"
   why: "openssl -starttls imap upgrades 143 then reads the encrypted CAPABILITY — read-only"
   command: "openssl s_client -connect {target}:143 -starttls imap -quiet"
-# source: HackTricks pentesting-imap (book.hacktricks.wiki) — standard OSCP IMAP recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)

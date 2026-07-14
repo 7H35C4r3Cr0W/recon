@@ -7,7 +7,7 @@
   suggest:
     - text: "ident disclosed a service owner — map every port's owner across a full scan"
       command: "nmap -sV -p- --script auth-owners {target}"
-# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon
+# source: Obsidian: 0.01 Cheatsheets/All_In_One/oncybersec.md (Ident — ident-user-enum; auth-owners is the allow-listed equivalent)
 
 - match:
     service: ident
@@ -16,4 +16,4 @@
   suggest:
     - text: "Treat a named service owner as a candidate account for SSH / SMB / Kerberos enumeration"
       command: "nmap -p 22 --script ssh-auth-methods --script-args ssh.user={user} {target}"
-# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon
+# source: Obsidian: 0.01 Cheatsheets/All_In_One/oncybersec.md (Ident — ident-user-enum; auth-owners is the allow-listed equivalent)

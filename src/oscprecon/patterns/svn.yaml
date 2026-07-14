@@ -7,7 +7,7 @@
   suggest:
     - text: "svnserve allows anonymous reads — inspect the commit history for removed files / secrets"
       command: "svn log -v svn://{target}:3690/"
-# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - match:
     service: svn
@@ -16,4 +16,4 @@
   suggest:
     - text: "Read a discovered file at HEAD without checking out the repo (read-only)"
       command: "svn cat svn://{target}:3690/trunk/README"
-# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)

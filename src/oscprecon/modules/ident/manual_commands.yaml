@@ -3,14 +3,14 @@
 - description: "Map all open ports to owners"
   why: "run auth-owners across a full -p- scan so every service's owning user is disclosed — read-only"
   command: "nmap -sV -p- --script auth-owners {target}"
-# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon
+# source: Obsidian: 0.01 Cheatsheets/All_In_One/oncybersec.md (Ident — ident-user-enum; auth-owners is the allow-listed equivalent)
 
 - description: "Confirm the ident daemon banner"
   why: "a plain -sV on 113 confirms the identd product/version — read-only"
   command: "nmap -sV -p {port} {target}"
-# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon
+# source: Obsidian: 0.01 Cheatsheets/All_In_One/oncybersec.md (Ident — ident-user-enum; auth-owners is the allow-listed equivalent)
 
 - description: "Owner of a specific service port"
   why: "auth-owners scoped to one interesting port reveals just that service's user — read-only"
   command: "nmap -sV -p 22,{port} --script auth-owners {target}"
-# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon
+# source: Obsidian: 0.01 Cheatsheets/All_In_One/oncybersec.md (Ident — ident-user-enum; auth-owners is the allow-listed equivalent)

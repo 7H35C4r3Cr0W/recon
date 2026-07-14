@@ -3,14 +3,14 @@
 - description: "Desktop name + auth types (vnc-title)"
   why: "vnc-title reads the desktop name and offered security types — read-only"
   command: "nmap -p {port} --script vnc-title {target}"
-# source: HackTricks pentesting-vnc (book.hacktricks.wiki) — standard OSCP VNC recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "Version + offered security types (vnc-info)"
   why: "vnc-info re-run in isolation confirms the RFB version and whether 'None' auth is offered"
   command: "nmap -p {port} --script vnc-info {target}"
-# source: HackTricks pentesting-vnc (book.hacktricks.wiki) — standard OSCP VNC recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - description: "TLS certificate (VeNCrypt / TLS-wrapped VNC)"
   why: "when a TLS security type is offered, ssl-cert leaks the machine name — read-only"
   command: "nmap -p {port} --script ssl-cert {target}"
-# source: HackTricks pentesting-vnc (book.hacktricks.wiki) — standard OSCP VNC recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)

@@ -7,7 +7,7 @@
   suggest:
     - text: "An RPC service (e.g. nfs/mountd) is registered — enumerate NFS exports read-only"
       command: "showmount -e {target}"
-# source: HackTricks pentesting-rpcbind (book.hacktricks.wiki) — standard OSCP rpcbind recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - match:
     service: rpcbind
@@ -16,4 +16,4 @@
   suggest:
     - text: "The portmapper answers unauthenticated — dump the UDP-only programs the TCP probe misses"
       command: "rpcinfo -T udp {target}"
-# source: HackTricks pentesting-rpcbind (book.hacktricks.wiki) — standard OSCP rpcbind recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)

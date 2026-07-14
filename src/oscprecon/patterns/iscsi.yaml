@@ -7,7 +7,7 @@
   suggest:
     - text: "An iSCSI target was discovered — read its node record (parameters / CHAP requirement)"
       command: "iscsiadm -m node -T {iqn} -p {target}:3260"
-# source: HackTricks 3260-pentesting-iscsi (book.hacktricks.wiki) — standard OSCP iSCSI recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
 
 - match:
     service: iscsi
@@ -16,4 +16,4 @@
   suggest:
     - text: "Discovery answered — confirm which targets require CHAP before any authorized login"
       command: "nmap -sV -p 3260 --script iscsi-info {target}"
-# source: HackTricks 3260-pentesting-iscsi (book.hacktricks.wiki) — standard OSCP iSCSI recon
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
