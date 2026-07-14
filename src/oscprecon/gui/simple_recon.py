@@ -12,6 +12,7 @@ from oscprecon.modules import (
     elasticsearch,
     finger,
     ike,
+    imap,
     ipmi,
     kerberos,
     kubernetes,
@@ -165,6 +166,10 @@ def _rsync_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _msrpc_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in msrpc.MsrpcModule().recon_steps(target, port)]
+
+
+def _imap_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in imap.ImapModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -435,5 +440,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(msrpc),
         msrpc.MsrpcModule,
         _msrpc_steps,
+    ),
+    "imap": SimpleReconSpec(
+        "imap",
+        "Run full IMAP recon (capabilities · NTLM)",
+        "IMAP recon — nmap imap-capabilities (STARTTLS, auth mechs) + imap-ntlm-info (AD "
+        "domain/host on Exchange); read-only, no login. Credential guessing is Spray-mode only.",
+        _manual(imap),
+        imap.ImapModule,
+        _imap_steps,
     ),
 }

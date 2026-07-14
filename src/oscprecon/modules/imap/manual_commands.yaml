@@ -1,0 +1,16 @@
+# IMAP manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. USER/PASS iteration against IMAP is Tier-3 (Spray mode only).
+- description: "Capabilities + NTLM info"
+  why: "imap-capabilities + imap-ntlm-info re-run confirm STARTTLS/auth mechs + AD domain — read-only"
+  command: "nmap -p {port} --script imap-capabilities,imap-ntlm-info {target}"
+# source: HackTricks pentesting-imap (book.hacktricks.wiki) — standard OSCP IMAP recon
+
+- description: "Banner over implicit TLS (993)"
+  why: "openssl s_client reads the greeting + cert on the TLS port — read-only"
+  command: "openssl s_client -connect {target}:993 -quiet"
+# source: HackTricks pentesting-imap (book.hacktricks.wiki) — standard OSCP IMAP recon
+
+- description: "Banner after STARTTLS (143)"
+  why: "openssl -starttls imap upgrades 143 then reads the encrypted CAPABILITY — read-only"
+  command: "openssl s_client -connect {target}:143 -starttls imap -quiet"
+# source: HackTricks pentesting-imap (book.hacktricks.wiki) — standard OSCP IMAP recon

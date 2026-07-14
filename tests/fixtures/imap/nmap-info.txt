@@ -1,0 +1,13 @@
+Nmap scan report for 10.10.10.23
+Host is up (0.020s latency).
+
+PORT    STATE SERVICE VERSION
+143/tcp open  imap    Microsoft Exchange imapd
+| imap-capabilities: IMAP4rev1 STARTTLS AUTH=NTLM AUTH=GSSAPI IDLE NAMESPACE LOGINDISABLED
+| imap-ntlm-info:
+|   Target_Name: CORP
+|   NetBIOS_Domain_Name: CORP
+|   NetBIOS_Computer_Name: MAIL01
+|   DNS_Domain_Name: corp.local
+|   DNS_Computer_Name: mail01.corp.local
+|_  Product_Version: 10.0.17763
