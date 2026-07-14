@@ -72,8 +72,12 @@ class HttpPanel(QWidget):
         wl_row.addWidget(self._wordlist_label, stretch=1)
         wl_row.addWidget(choose)
 
-        self._wide_net = QCheckBox("Wide net (default)")
-        self._wide_net.setChecked(True)
+        # why: extensions default OFF (CLAUDE.md §9). "Wide net" is 60+ extensions; with the default
+        # big.txt (~20k words) it fires ~1.2M requests — far too slow/noisy for a first pass and it
+        # never finishes on the exam clock. A wordlist-only pass still finds files whose names are
+        # in the list (e.g. admin.php); opt into -x extensions deliberately once a stack is known.
+        self._wide_net = QCheckBox("Wide net (all extensions — slow)")
+        self._wide_net.setChecked(False)
         self._group_boxes: dict[str, QCheckBox] = {}
         ext_grid = QGridLayout()
         ext_grid.addWidget(self._wide_net, 0, 0, 1, 2)
@@ -346,7 +350,7 @@ class HttpPanel(QWidget):
             self._status_csv.setText(data["status_csv"])
         if isinstance(data.get("custom_exts"), str):
             self._custom_exts.setText(data["custom_exts"])
-        self._wide_net.setChecked(bool(data.get("wide_net", True)))
+        self._wide_net.setChecked(bool(data.get("wide_net", False)))
         groups = data.get("groups", [])
         if isinstance(groups, list):
             for group, box in self._group_boxes.items():

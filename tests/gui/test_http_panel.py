@@ -50,7 +50,7 @@ def test_http_panel_reproduces_section_9_via_controls(qtbot: QtBot, tmp_path: Pa
     assert panel._preview.toPlainText() == SECTION9
 
 
-def test_default_controls_are_wide_net_and_big_txt(qtbot: QtBot, tmp_path: Path) -> None:
+def test_default_controls_are_wordlist_only(qtbot: QtBot, tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     panel = HttpPanel()
     qtbot.addWidget(panel)
@@ -60,8 +60,8 @@ def test_default_controls_are_wide_net_and_big_txt(qtbot: QtBot, tmp_path: Path)
     assert preview.startswith("feroxbuster -u http://10.10.10.5/")
     assert "big.txt" in preview
     assert "-t 40" in preview and "-d 2" in preview and "-k" in preview
-    # wide net on by default => many extensions
-    assert "-x php," in preview and "bak" in preview and "json" in preview
+    # extensions OFF by default (CLAUDE.md §9): a fast first pass, no 60x -x multiplier
+    assert "-x " not in preview
 
 
 def test_extension_multiselect_and_custom(qtbot: QtBot) -> None:
