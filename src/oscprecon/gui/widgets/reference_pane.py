@@ -99,8 +99,10 @@ class ReferencePane(QWidget):
     page_visited = Signal(str, str)
     refresh_requested = Signal()  # user asked for a live refresh of the current page
 
-    def __init__(self) -> None:
+    def __init__(self, theme_name: str = "dark") -> None:
         super().__init__()
+        self._theme = theme_name
+        self._source_args: tuple[str, str, str] = ("", "", "muted")  # remembered for restyle
 
         # live-reference state
         self._current_ref: ServiceRef | None = None
@@ -188,11 +190,16 @@ class ReferencePane(QWidget):
 
     def _set_source(self, badge: str, detail: str, kind: str) -> None:
         # kind -> token colour: info=offline, muted=cached, accent=live, warning=degraded
+        self._source_args = (badge, detail, kind)
         self._source_badge.setVisible(bool(badge))
         if badge:
             self._source_badge.setText(f" {badge} ")
-            self._source_badge.setStyleSheet(styles.badge(kind, tokens.DARK))
+            self._source_badge.setStyleSheet(styles.badge(kind, tokens.palette(self._theme)))
         self._source_state.setText(detail)
+
+    def set_theme(self, theme_name: str) -> None:
+        self._theme = theme_name
+        self._set_source(*self._source_args)  # repaint the badge in the new theme
 
     def show_service(
         self,

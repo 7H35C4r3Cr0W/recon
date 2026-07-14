@@ -33,15 +33,15 @@ def _summarize(details: dict[str, Any]) -> str:
 
 
 class ActivityView(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, theme_name: str = "dark", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._profile: Profile | None = None
+        self._theme = theme_name
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
             tokens.SPACE_MD, tokens.SPACE_MD, tokens.SPACE_MD, tokens.SPACE_MD
         )
         self._summary = QLabel("No project loaded.")
-        self._summary.setStyleSheet(f"color:{tokens.DARK.text_muted};")
         layout.addWidget(self._summary)
 
         self._table = QTableWidget(0, 4)
@@ -52,11 +52,16 @@ class ActivityView(QWidget):
         self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self._table)
 
+    def set_theme(self, theme_name: str) -> None:
+        self._theme = theme_name
+        self._summary.setStyleSheet(f"color:{tokens.palette(theme_name).text_muted};")
+
     def set_profile(self, profile: Profile | None) -> None:
         self._profile = profile
         self.reload()
 
     def reload(self) -> None:
+        self._summary.setStyleSheet(f"color:{tokens.palette(self._theme).text_muted};")
         self._table.setUpdatesEnabled(False)  # batch the repaint over the bulk fill
         self._table.setRowCount(0)
         if self._profile is None:

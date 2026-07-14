@@ -235,6 +235,7 @@ class MainWindow(QMainWindow):
         self._nav = NavRail(theme_name)
         self._nav.navigate.connect(self._on_navigate)
         self._tool_panel.set_theme(theme_name)
+        self._restyle_views(theme_name)
 
         body = QWidget()
         body_layout = QHBoxLayout(body)
@@ -650,6 +651,13 @@ class MainWindow(QMainWindow):
         self._header.restyle(normalized)
         self._nav.restyle(normalized)
         self._tool_panel.set_theme(normalized)
+        self._restyle_views(normalized)
+
+    def _restyle_views(self, theme_name: str) -> None:
+        self._reference_pane.set_theme(theme_name)
+        self._findings_view.set_theme(theme_name)
+        self._activity_view.set_theme(theme_name)
+        self._dashboard.set_theme(theme_name)
 
     def _on_preferences(self) -> None:
         dialog = SettingsDialog(config.load_settings(), self)

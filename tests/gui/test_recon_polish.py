@@ -1,4 +1,5 @@
 from dataclasses import fields
+from pathlib import Path
 
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import QPushButton
@@ -58,6 +59,28 @@ def test_service_tree_colours_tcp_and_udp_apart(qtbot: QtBot) -> None:
     assert leaves[Proto.TCP] == _PROTO_COLOR[Proto.TCP]
     assert leaves[Proto.UDP] == _PROTO_COLOR[Proto.UDP]
     assert leaves[Proto.TCP] != leaves[Proto.UDP]  # visibly distinct
+
+
+def test_views_adapt_colours_to_the_active_theme(qtbot: QtBot, tmp_path: Path) -> None:
+    from oscprecon import findings as findings_mod
+    from oscprecon.gui.widgets.findings_view import FindingsView
+    from oscprecon.models import Target
+    from oscprecon.profile import Profile
+
+    prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.1"))
+    findings_mod.add_findings(
+        prof.directory,
+        [{"module": "ssh", "kind": "product", "value": "OpenSSH", "discovered_at": "t"}],
+    )
+    view = FindingsView("dark")
+    qtbot.addWidget(view)
+    view.set_profile(prof)
+    dark = view._table.item(0, 0).foreground().color().name()  # info category cell
+    view.set_theme("light")
+    light = view._table.item(0, 0).foreground().color().name()
+    assert dark.lower() == tokens.DARK.text_muted.lower()
+    assert light.lower() == tokens.LIGHT.text_muted.lower()
+    assert dark != light  # the colour actually adapts to the theme
 
 
 def test_flagship_tier1_buttons_are_ranked_primary(qtbot: QtBot) -> None:

@@ -59,10 +59,11 @@ class WorkspaceDashboard(QWidget):
     profile_mutated = Signal(object)  # directory (Path) — org metadata changed on disk
     status_message = Signal(str)
 
-    def __init__(self) -> None:
+    def __init__(self, theme_name: str = "dark") -> None:
         super().__init__()
         self._summaries: list[ProfileSummary] = []
         self._index_worker: WorkspaceIndexWorker | None = None
+        self._theme = theme_name
 
         new_btn = QPushButton("New Project…")
         new_btn.setStyleSheet(
@@ -131,7 +132,8 @@ class WorkspaceDashboard(QWidget):
             "Create your first scan profile, or set the workspace root in Preferences."
         )
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setStyleSheet(f"color:{tokens.DARK.text_muted};")
+        subtitle.setStyleSheet(f"color:{tokens.palette(self._theme).text_muted};")
+        self._empty_subtitle = subtitle
 
         create = QPushButton("New Project…")
         create.setStyleSheet(styles.primary_button(tokens.DARK))
@@ -151,6 +153,11 @@ class WorkspaceDashboard(QWidget):
     def focus_filter(self) -> None:
         self._filter.setFocus()
         self._filter.selectAll()
+
+    def set_theme(self, theme_name: str) -> None:
+        self._theme = theme_name
+        self._empty_subtitle.setStyleSheet(f"color:{tokens.palette(theme_name).text_muted};")
+        self._apply_filters()  # recolour the status cells from memory (no rescan)
 
     # --- data loading (off-thread) ---
     def refresh(self) -> None:
@@ -260,7 +267,7 @@ class WorkspaceDashboard(QWidget):
             elif col == 2:  # colour the status as a hint (text still carries the meaning)
                 field = _STATUS_COLOR.get(status_text)
                 if field is not None:
-                    item.setForeground(QColor(getattr(tokens.DARK, field)))
+                    item.setForeground(QColor(getattr(tokens.palette(self._theme), field)))
             self._table.setItem(row, col, item)
 
     # --- row actions ---

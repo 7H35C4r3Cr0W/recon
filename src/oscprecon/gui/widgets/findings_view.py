@@ -26,21 +26,23 @@ from oscprecon.profile import Profile
 # conservative category the graph uses (finding_severity), with search + category filtering. Rows
 # are loaded once into `_all`; filtering re-populates the table from memory (no disk re-read).
 
-_CATEGORY_COLOR = {
-    finding_severity.INFO: tokens.DARK.text_muted,
-    finding_severity.REFERENCE: tokens.DARK.secondary,
-    finding_severity.ACCESS: tokens.DARK.warning,
-    finding_severity.EXPOSURE: tokens.DARK.warning,
-    finding_severity.RELAY_RISK: tokens.DARK.error,
+# category -> palette FIELD (resolved against the active theme, so the colours adapt light/dark)
+_CATEGORY_FIELD = {
+    finding_severity.INFO: "text_muted",
+    finding_severity.REFERENCE: "secondary",
+    finding_severity.ACCESS: "warning",
+    finding_severity.EXPOSURE: "warning",
+    finding_severity.RELAY_RISK: "error",
 }
 _ALL_CATEGORIES = "All categories"
 _NOTABLE_ONLY = "Notable only"
 
 
 class FindingsView(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, theme_name: str = "dark", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._profile: Profile | None = None
+        self._theme = theme_name
         self._all: list[dict[str, str]] = []  # classified rows, loaded once per reload()
 
         layout = QVBoxLayout(self)
@@ -74,7 +76,6 @@ class FindingsView(QWidget):
         layout.addLayout(top)
 
         self._summary = QLabel("No project loaded.")
-        self._summary.setStyleSheet(f"color:{tokens.DARK.text_muted};")
         layout.addWidget(self._summary)
 
         self._table = QTableWidget(0, 5)
@@ -90,6 +91,10 @@ class FindingsView(QWidget):
     def focus_search(self) -> None:
         self._filter.setFocus()
         self._filter.selectAll()
+
+    def set_theme(self, theme_name: str) -> None:
+        self._theme = theme_name
+        self._apply()  # re-render category/summary colours for the new theme
 
     def set_profile(self, profile: Profile | None) -> None:
         self._profile = profile
@@ -125,6 +130,8 @@ class FindingsView(QWidget):
         return True
 
     def _apply(self, *_: Any) -> None:
+        pal = tokens.palette(self._theme)
+        self._summary.setStyleSheet(f"color:{pal.text_muted};")
         self._table.setUpdatesEnabled(False)  # one repaint after the bulk fill, not per row
         self._table.setSortingEnabled(False)
         self._table.setRowCount(0)
@@ -144,7 +151,7 @@ class FindingsView(QWidget):
             self._table.insertRow(r)
             cat_item = QTableWidgetItem(row["category"])
             cat_item.setForeground(
-                QColor(_CATEGORY_COLOR.get(row["category"], tokens.DARK.text_muted))
+                QColor(getattr(pal, _CATEGORY_FIELD.get(row["category"], "text_muted")))
             )
             self._table.setItem(r, 0, cat_item)
             self._table.setItem(r, 1, QTableWidgetItem(row["module"]))
