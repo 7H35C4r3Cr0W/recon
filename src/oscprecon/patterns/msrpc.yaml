@@ -1,0 +1,19 @@
+# MSRPC recon next-steps (endpoint-mapper dump, read-only). The named pipes map to services; the next
+# move is null-session user/group enumeration. WMI/DCOM command exec is out of scope, never suggested.
+- match:
+    service: msrpc
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "RPC endpoint mapper is unauthenticated — enumerate domain users via an SMB null session"
+      command: "rpcclient -U '' -N {target} -c enumdomusers"
+# source: HackTricks 135-pentesting-msrpc (book.hacktricks.wiki) — standard OSCP MSRPC recon
+
+- match:
+    service: msrpc
+    field: kind
+    value: "^pipe$"
+  suggest:
+    - text: "Named pipes are reachable — map the SAMR/LSARPC interfaces via enum4linux-ng (read-only)"
+      command: "enum4linux-ng -A {target}"
+# source: HackTricks 135-pentesting-msrpc (book.hacktricks.wiki) — standard OSCP MSRPC recon

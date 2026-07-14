@@ -17,6 +17,7 @@ from oscprecon.modules import (
     kubernetes,
     memcached,
     mongodb,
+    msrpc,
     mssql,
     mysql,
     netbios,
@@ -160,6 +161,10 @@ def _winrm_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _rsync_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in rsync.RsyncModule().recon_steps(target, port)]
+
+
+def _msrpc_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in msrpc.MsrpcModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -421,5 +426,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(rsync),
         rsync.RsyncModule,
         _rsync_steps,
+    ),
+    "msrpc": SimpleReconSpec(
+        "msrpc",
+        "Run full MSRPC recon (endpoint mapper)",
+        "MSRPC recon — impacket-rpcdump lists interface UUIDs / named pipes / dynamic ports + nmap "
+        "msrpc-enum; unauth read-only. WMI/DCOM command exec is out of scope.",
+        _manual(msrpc),
+        msrpc.MsrpcModule,
+        _msrpc_steps,
     ),
 }
