@@ -64,8 +64,7 @@ class Banner(QWidget):
         self._msg.setText(text)
         self._msg.setStyleSheet(f"color:{color};")
         self.setStyleSheet(
-            f"#banner {{ border-left:4px solid {color};"
-            f" border:1px solid {pal.border}; border-left:4px solid {color};"
+            f"#banner {{ border:1px solid {pal.border}; border-left:4px solid {color};"
             f" border-radius:{tokens.RADIUS_SM}px; background:{pal.surface}; }}"
         )
         self.setVisible(True)
