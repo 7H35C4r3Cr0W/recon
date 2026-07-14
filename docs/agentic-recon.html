@@ -6,20 +6,21 @@
 <title>Nabu — Agentic Recon Architecture</title>
 <style>
   :root{
-    /* dark by default — deterministic, matches the deck. Toggle flips to light. */
     --ink:#0e1420; --surface:#161d2b; --surface-2:#1b2434; --border:#28344a; --text:#e6e9ef;
     --muted:#8a94a6; --gold:#c9a227; --gold-soft:rgba(201,162,39,.14); --teal:#5b8a8f;
-    --llm:#a888f0; --llm-soft:rgba(168,136,240,.16);   /* the AI/LLM layer accent */
+    --llm:#a888f0; --llm-soft:rgba(168,136,240,.16);
+    --rel:#4fbf8b; --rel-soft:rgba(79,191,139,.12); --err:#e0a34a; --err-soft:rgba(224,163,74,.12);
     --control:#c9a227; --worker:#5b8a8f; --decision:#e0a34a; --guard:#c0564b;
     --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
     --mono:"JetBrains Mono","SF Mono","DejaVu Sans Mono",Consolas,monospace;
-    --shadow:0 12px 34px rgba(0,0,0,.4); --maxw:1200px;
+    --shadow:0 12px 34px rgba(0,0,0,.4); --maxw:1240px;
   }
   :root[data-theme="light"]{
     --ink:#f2ede1; --surface:#fbf8f0; --surface-2:#f4efe2; --border:#ddd3bf; --text:#1f2633;
     --muted:#6b6656; --gold:#9a7415; --gold-soft:rgba(154,116,21,.12); --teal:#3f6f74;
     --llm:#6f4fc0; --llm-soft:rgba(111,79,192,.12);
+    --rel:#2f8f63; --rel-soft:rgba(47,143,99,.12); --err:#b26b1e; --err-soft:rgba(178,107,30,.12);
     --control:#9a7415; --worker:#3f6f74; --decision:#b26b1e; --guard:#a5342a;
     --shadow:0 12px 34px rgba(60,50,20,.14);
   }
@@ -39,30 +40,32 @@
   .btn{font-family:var(--sans);font-size:13px;color:var(--text);background:var(--surface);
     border:1px solid var(--border);border-radius:9px;padding:8px 13px;cursor:pointer;text-decoration:none}
   .btn:hover{border-color:var(--llm)}.btn:focus-visible{outline:2px solid var(--llm);outline-offset:2px}
-  .btn.cta{background:var(--llm);color:#0d0a18;border-color:var(--llm);font-weight:600}
 
   h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,5vw,50px);line-height:1.05;
     text-wrap:balance;margin:22px 0 10px;max-width:20ch}
   h1 em{font-style:normal;color:var(--llm)}
-  .lead{font-size:clamp(15px,1.7vw,18px);color:var(--text);max-width:70ch;margin:0 0 18px}
+  .lead{font-size:clamp(15px,1.7vw,18px);color:var(--text);max-width:72ch;margin:0 0 18px}
   .lead b{color:var(--llm)}
-  .chips{display:flex;flex-wrap:wrap;gap:9px;margin:2px 0 26px}
+  .chips{display:flex;flex-wrap:wrap;gap:9px;margin:2px 0 22px}
   .chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);
     border-radius:999px;padding:6px 13px;font-size:12.5px;color:var(--muted)}
-  .chip b{color:var(--llm);font-weight:600}
-  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--llm)}
+  .chip b{color:var(--llm);font-weight:600}.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--llm)}
 
-  .grid{display:grid;grid-template-columns:1fr 400px;gap:26px;align-items:start}
-  @media(max-width:940px){.grid{grid-template-columns:1fr}}
+  /* the shared message envelope — how info passes */
+  .envelope{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--llm);
+    border-radius:12px;padding:13px 16px;margin:0 0 24px;font-size:13px;color:var(--muted)}
+  .envelope b{color:var(--text)}
+  .envelope code{font-family:var(--mono);font-size:12px;color:var(--llm);background:var(--llm-soft);
+    padding:1px 6px;border-radius:5px;display:block;margin-top:8px;white-space:pre-wrap;line-height:1.7;color:var(--text)}
+  .envelope code em{color:var(--muted);font-style:normal}
 
+  .grid{display:grid;grid-template-columns:1fr 430px;gap:26px;align-items:start}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}}
   .flowhint{color:var(--muted);font-size:13.5px;margin:0 0 14px}
-  kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--border);
-    border-radius:5px;padding:1px 6px}
+  kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
 
-  /* the vertical agent spine */
   .spine{position:relative;padding-left:34px}
-  .spine::before{content:"";position:absolute;left:9px;top:8px;bottom:44px;width:2px;
-    background:linear-gradient(var(--border),var(--border));}
+  .spine::before{content:"";position:absolute;left:9px;top:8px;bottom:44px;width:2px;background:var(--border)}
   .node{position:relative;margin:0 0 8px}
   .node .dot{position:absolute;left:-33px;top:20px;width:20px;height:20px;border-radius:50%;
     background:var(--surface);border:2px solid var(--kc);display:flex;align-items:center;justify-content:center;
@@ -83,39 +86,42 @@
   .arrow{color:var(--muted);font-family:var(--mono);font-size:11.5px;text-align:center;padding:5px 0 3px;
     display:flex;align-items:center;gap:8px;justify-content:center}
   .arrow::before,.arrow::after{content:"";height:1px;width:34px;background:var(--border)}
-  .loopnote{color:var(--decision);font-family:var(--mono);font-size:11.5px;text-align:center;
-    padding:2px 0 8px;font-style:italic}
+  .loopnote{color:var(--decision);font-family:var(--mono);font-size:11.5px;text-align:center;padding:2px 0 8px;font-style:italic}
 
-  /* detail panel */
   .detail{position:sticky;top:18px;background:var(--surface);border:1px solid var(--border);
-    border-radius:14px;padding:20px;min-height:340px}
+    border-radius:14px;padding:20px;max-height:calc(100vh - 36px);overflow:auto}
   .detail .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--kc);margin:0}
-  .detail h2{font-family:var(--serif);font-weight:600;font-size:24px;margin:6px 0 3px}
+  .detail h2{font-family:var(--serif);font-weight:600;font-size:23px;margin:6px 0 3px}
   .detail .sub{color:var(--muted);font-size:12.5px;font-family:var(--mono);margin:0 0 14px}
-  .detail .llmline{background:var(--llm-soft);border:1px solid var(--llm);border-radius:10px;
-    padding:11px 13px;font-size:13.5px;margin:0 0 15px}
+  .detail .llmline{background:var(--llm-soft);border:1px solid var(--llm);border-radius:10px;padding:11px 13px;font-size:13.5px;margin:0 0 6px}
   .detail .llmline b{color:var(--llm)}
-  .detail .glabel{display:block;color:var(--muted);font-family:var(--mono);font-size:11px;
-    letter-spacing:1px;text-transform:uppercase;margin:14px 0 7px;border-top:1px solid var(--border);padding-top:12px}
-  .detail .glabel:first-of-type{border-top:none;padding-top:0}
+  .glabel{display:block;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:1px;
+    text-transform:uppercase;margin:15px 0 7px;border-top:1px solid var(--border);padding-top:12px}
+  .glabel.rel{color:var(--rel)} .glabel.err{color:var(--err)} .glabel.dec{color:var(--decision)}
   .pill{display:inline-block;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;
     padding:3px 9px;margin:0 6px 6px 0;font-family:var(--mono);font-size:12px;color:var(--text)}
   .pill.tool{border-color:var(--worker);color:var(--worker)}
-  .decision{font-size:13px;color:var(--text);margin:0}
-  .handoff{font-size:13.5px;color:var(--text);margin:0}
-  .handoff b{color:var(--kc)}
-  .note{color:var(--muted);font-size:12.5px;font-style:italic;margin:12px 0 0}
+  .pill.io{border-color:var(--llm)}
+  .body{font-size:13px;color:var(--text);margin:0}
+  .body.rel{background:var(--rel-soft);border:1px solid var(--rel);border-radius:9px;padding:9px 11px}
+  .body.err{background:var(--err-soft);border:1px solid var(--err);border-radius:9px;padding:9px 11px}
+  .handoff{font-size:13.5px;color:var(--text);margin:0}.handoff b{color:var(--kc)}
+  .sysline{font-size:12.5px;color:var(--muted);font-style:italic;margin:0;border-left:2px solid var(--border);padding-left:10px}
+  .note{color:var(--muted);font-size:12.5px;font-style:italic;margin:14px 0 0}
 
-  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 20px;font-size:12.5px;color:var(--muted)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 18px;font-size:12.5px;color:var(--muted)}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .sw{width:12px;height:12px;border-radius:3px;border:2px solid currentColor}
 
-  section.notes{margin-top:40px;border-top:1px solid var(--border);padding-top:26px}
-  section.notes h2{font-family:var(--serif);font-weight:600;font-size:24px;margin:0 0 6px}
-  .notecards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:16px}
+  section.notes{margin-top:44px;border-top:1px solid var(--border);padding-top:26px}
+  section.notes h2{font-family:var(--serif);font-weight:600;font-size:25px;margin:0 0 6px}
+  .notecards{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:14px;margin-top:16px}
   .nc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .nc.rel{border-left:3px solid var(--rel)} .nc.err{border-left:3px solid var(--err)}
   .nc h3{font-size:15px;margin:0 0 6px;color:var(--llm)}
-  .nc p{font-size:13.5px;color:var(--muted);margin:0}
+  .nc.rel h3{color:var(--rel)} .nc.err h3{color:var(--err)}
+  .nc p{font-size:13px;color:var(--muted);margin:0}
+  .nc code{font-family:var(--mono);font-size:11.5px;color:var(--text)}
   footer{color:var(--muted);font-size:12.5px;margin-top:34px;text-align:center}
   .brand .m-tile{fill:var(--surface);stroke:var(--gold);stroke-opacity:.45;stroke-width:2}
   .brand .m-gold{fill:var(--gold)}.brand .m-teal-f{fill:var(--teal)}.brand .m-teal-s{stroke:var(--teal);fill:none}
@@ -145,16 +151,32 @@
   <h1>From one tool to an <em>agent&nbsp;swarm</em></h1>
   <p class="lead">Today Nabu is a single desktop app that runs a fixed recon pipeline. This is the
   blueprint for the next step: <b>decompose that pipeline into small, single-purpose agents</b> — each
-  one an <b>LLM (Opus)</b> that reasons about its own job — and wire them into a chronological,
-  top-down, agent-to-agent workflow. Every agent reads and writes one shared memory; every command it
-  wants to run passes a safety gate; a critic decides whether to go deeper or finish.</p>
+  one an <b>LLM (Opus)</b> with its own system prompt, its own tools, and one job. They pass typed
+  messages, share one memory, and run behind a safety gate. Below: each agent's stack, the exact data
+  it hands the next, and how the system stays reliable — <b>redundancy</b> and <b>error handling</b> at
+  every edge.</p>
 
   <div class="chips">
-    <span class="chip"><span class="dot"></span> An <b>LLM (Opus)</b> drives every agent</span>
-    <span class="chip"><span class="dot"></span> Chronological, <b>top-down</b> hand-offs</span>
-    <span class="chip"><span class="dot"></span> One <b>shared memory</b> (project state)</span>
+    <span class="chip"><span class="dot"></span> An <b>LLM (Opus)</b> per agent</span>
+    <span class="chip"><span class="dot"></span> Typed <b>message</b> hand-offs</span>
+    <span class="chip"><span class="dot"></span> One <b>shared memory</b> (blackboard)</span>
     <span class="chip"><span class="dot"></span> A <b>safety gate</b> on every command</span>
-    <span class="chip"><span class="dot"></span> A <b>critic loop</b> — go deeper, or finish</span>
+    <span class="chip"><span class="dot"></span> <b>Retries · voting · fallbacks</b></span>
+    <span class="chip"><span class="dot"></span> A <b>critic loop</b> that converges</span>
+  </div>
+
+  <div class="envelope">
+    <b>How agents talk —</b> nobody calls anyone directly. Every hand-off is a typed message on a bus,
+    and all shared state lives in one versioned blackboard (the project folder). That decoupling is
+    what lets any agent be retried, replaced, or run in parallel.
+    <code>message = {
+  <em>run_id, trace_id,</em>            <em>// correlate every step of one run</em>
+  from: "discovery", to: "routing",
+  type: "services.discovered",   <em>// a typed event</em>
+  payload: DiscoveredService[],  <em>// schema-validated</em>
+  attempt: 1, idempotency_key,   <em>// safe to retry — writes dedupe</em>
+  ts
+}</code>
   </div>
 
   <div class="legend">
@@ -162,94 +184,158 @@
     <span style="color:var(--worker)"><span class="sw"></span> Worker</span>
     <span style="color:var(--decision)"><span class="sw"></span> Decision</span>
     <span style="color:var(--guard)"><span class="sw"></span> Guardrail</span>
-    <span style="color:var(--llm)"><span class="sw"></span> 🧠 = LLM (Opus) attached</span>
+    <span style="color:var(--llm)"><span class="sw"></span> 🧠 = LLM (Opus)</span>
+    <span style="color:var(--rel)"><span class="sw"></span> ⟳ redundancy</span>
+    <span style="color:var(--err)"><span class="sw"></span> ⚠ error handling</span>
   </div>
 
   <div class="grid">
     <div>
-      <p class="flowhint">Read it top to bottom — the flow runs in order, each arrow labelled with the
-      data one agent hands the next. Click any agent for detail. <kbd>Tab</kbd> + <kbd>Enter</kbd> to explore by keyboard.</p>
+      <p class="flowhint">Read top to bottom — the flow runs in order, each arrow labelled with the
+      data one agent hands the next. Click any agent for its full spec. <kbd>↑</kbd><kbd>↓</kbd> to step.</p>
       <div class="spine" id="spine"></div>
     </div>
     <aside><div class="detail" id="detail"></div></aside>
   </div>
 
   <section class="notes">
-    <h2>How the architecture works</h2>
-    <p class="lead" style="margin-top:8px">Five ideas turn a chain of prompts into a dependable system.</p>
+    <h2>Reliability — how it stays up</h2>
+    <p class="lead" style="margin-top:8px">An agent swarm is a distributed system, so it's designed
+    like one: assume every agent, tool, and LLM call can fail, and make failure cheap.</p>
     <div class="notecards">
-      <div class="nc"><h3>An LLM per agent</h3><p>Each agent is a focused Opus instance with one job, its own system prompt, and only the tools it needs. Small scope = reliable reasoning and easy debugging.</p></div>
-      <div class="nc"><h3>Shared memory</h3><p>The project folder is the blackboard. Agents don't talk directly — they read and write structured state (services, findings, creds, graph), so any agent can be retried or replaced.</p></div>
-      <div class="nc"><h3>Hand-off, not free-for-all</h3><p>Control passes in a defined order, and each edge carries a typed payload (target → services → raw output → findings → report). Deterministic flow, inspectable at every step.</p></div>
-      <div class="nc"><h3>A guardrail agent</h3><p>The Safety Gate sits between every agent and the shell. Nothing runs until it's judged exam-legal — the compliance guarantee holds no matter what an LLM proposes.</p></div>
-      <div class="nc"><h3>A critic loop</h3><p>The Critic verifies claims against evidence and decides go-deeper-or-finish. That single feedback edge is what makes this a workflow that converges, not a one-shot pipeline.</p></div>
+      <div class="nc rel"><h3>⟳ Retries &amp; idempotency</h3><p>Every message carries an <code>attempt</code> and an <code>idempotency_key</code>. Transient failures retry with exponential backoff; because writes dedupe on the key, a retry never double-runs a scan or double-writes a finding.</p></div>
+      <div class="nc rel"><h3>⟳ Fan-out &amp; isolation</h3><p>Specialist agents run in parallel and are blind to each other. One crashing or hanging specialist is timed out and skipped — the rest keep going, and its partial output still flows.</p></div>
+      <div class="nc rel"><h3>⟳ N-of-M voting</h3><p>For the two calls that must not hallucinate — the Gate's allow/block and the Critic's verify — several independent LLM passes vote. A command runs, or a finding survives, only on a majority.</p></div>
+      <div class="nc rel"><h3>⟳ Fallbacks &amp; fail-closed</h3><p>Deterministic logic sits behind every LLM. If the model errors or is unsure, a hard rule decides — and the gate's default is <b>BLOCK</b>. Enrichment is offline-first: a network failure falls back to the vendored snapshot.</p></div>
+      <div class="nc err"><h3>⚠ Never fail silently</h3><p>"Tool ran but produced 0 findings" (parser drift) raises a loud warning and keeps the raw output for review. A missing tool logs <code>[missing]</code> and continues with an alternative. Nothing is dropped quietly.</p></div>
+      <div class="nc err"><h3>⚠ Dead-letter &amp; escalate</h3><p>A message that fails all retries goes to a dead-letter queue and the Orchestrator is notified; it re-plans (skip the service, downgrade the scan, or finish with a partial report) rather than hanging the run.</p></div>
+      <div class="nc err"><h3>⚠ Circuit breakers</h3><p>A tool that keeps failing (or a host that's down) trips a breaker — the swarm stops hammering it, marks that branch <code>degraded</code>, and routes around it.</p></div>
+      <div class="nc err"><h3>⚠ Checkpoint &amp; resume · bounded loops</h3><p>The blackboard is checkpointed to disk after each step, so a crashed run resumes where it stopped. The Critic loop has a hard iteration cap, so the workflow always converges to a report.</p></div>
     </div>
   </section>
 
   <footer>Nabu · agent-to-agent recon architecture — a design blueprint. The shipping tool is the
-  single-app pipeline shown in <a class="btn" style="padding:2px 8px" href="how-nabu-works.html">How Nabu works</a>.</footer>
+  single-app pipeline in <a class="btn" style="padding:2px 8px" href="how-nabu-works.html">How Nabu works</a>.</footer>
 </div></div>
 
 <script>
 const AGENTS = [
   {id:"orchestrator", n:"Orchestrator Agent", kind:"control",
    role:"Reads the goal, sets scope + rules, plans the run, and supervises every downstream agent.",
-   llm:"Turns a one-line goal (“recon 10.10.10.5, OSCP-legal”) into a plan: which phases, in what order, when to stop.",
-   reads:["engagement goal + scope","rules of engagement"], writes:["run plan","shared memory (initial state)"],
-   tools:["— (coordinator)"], handoff:"Target + plan → <b>Discovery Agent</b>",
-   note:"The conductor. It owns the shared memory that every other agent reads and writes."},
+   system:"“You are the run controller. Turn the objective into phases, dispatch agents, track state, decide when the run is complete. Never run tools yourself.”",
+   llm:"Turns a one-line goal (“recon 10.10.10.5, OSCP-legal, 2h”) into a phase plan, re-plans when an agent fails, and decides when there's enough to stop.",
+   recv:["operator goal + scope + budget (human / CLI)"], emit:["run_plan → Discovery","dispatch envelopes → every phase"],
+   tools:["state store (blackboard) API","message bus / dispatcher","scope + rules loader","— no recon tools"],
+   passes:"Writes run_plan + scope to the blackboard, then emits a typed dispatch message per phase. Every downstream message is correlated by the run_id it stamps here.",
+   redundancy:"Stateless between steps — the whole run is checkpointed to disk, so a crashed orchestrator resumes from the last committed state. Can run a warm standby.",
+   errors:"On a downstream agent's repeated failure it re-plans: skip that service, downgrade the scan, or abort into a partial report. Owns the global timeout + token budget and drains the dead-letter queue.",
+   handoff:"target + plan → <b>Discovery Agent</b>",
+   note:"The conductor. It owns the shared memory and the run lifecycle — start, checkpoint, resume, finish."},
+
   {id:"discovery", n:"Discovery Agent", kind:"worker",
    role:"Chooses the scan strategy for this target and parses the results into structured services.",
-   llm:"Decides scan depth/profile (quick vs full, which UDP) from the target and plan, then reads nmap output into clean service records.",
-   reads:["target IP / host","run plan"], writes:["discovered_services (ports, products, versions)"],
-   tools:["nmap — staged: top-1000 → full → UDP top-100 → -sCV"], handoff:"discovered_services → <b>Routing Agent</b>"},
+   system:"“You plan and interpret host discovery. Pick scan depth for the scope and budget; parse output into typed services; flag anything ambiguous — never guess a service silently.”",
+   llm:"Chooses the nmap profile (quick vs full, UDP depth) from scope + budget, interprets the output, resolves ambiguous service IDs, and decides whether a re-scan is worth it.",
+   recv:["run_plan {target, scope, budget}"], emit:["DiscoveredService[] → Routing","discovery.done event"],
+   tools:["nmap — staged: top-1000 → full → UDP top-100 → -sCV","output parser","the Safety Gate (commands pass through it)","state store"],
+   passes:"Emits DiscoveredService[] = {port, proto, service, product, version, confidence} to the blackboard; downstream keys off the port+proto.",
+   redundancy:"The staged scans are independent and each retries on transient failure with backoff. The slow full-port sweep runs async and streams partial results, so Routing can start on the fast top-1000 hits immediately. Falls back to top-ports if the full scan blows the budget.",
+   errors:"nmap non-zero / timeout → retry N× then emit partial + a degraded flag. Unparseable output → keep the raw file and emit a parse-warning (never dropped). Host-down → escalate to the Orchestrator.",
+   handoff:"DiscoveredService[] → <b>Routing Agent</b>"},
+
   {id:"router", n:"Routing / Dispatch Agent", kind:"decision",
    role:"For each open service, decides which specialist agent owns it — a decision tree on port + product.",
-   llm:"Matches each discovered service to the right specialist (even on non-standard ports) and writes one work item per service.",
-   reads:["discovered_services"], writes:["a job per service (which specialist + why)"],
-   tools:["service → specialist map"], handoff:"Fans out one job per service → the <b>Specialist swarm</b>",
-   decision:"22 → SSH · 80/443 → Web · 445 → SMB/AD · 389 → LDAP · 161 → SNMP · 1433/3306/5432 → DB · …"},
+   system:"“Map each discovered service to the specialist that can enumerate it. Most-specific match wins; hand anything unknown to the generic probe. No service left behind.”",
+   llm:"Matches by port + product + banner (most-specific-wins), handles non-standard ports, sets fan-out priority, and assigns unknowns to a generic agent.",
+   recv:["DiscoveredService[]"], emit:["work_item[] → the Specialist swarm (fan-out)"],
+   tools:["service → specialist map (data-driven)","state store"],
+   passes:"Emits one work_item = {service, specialist, priority, why} per service. Pure routing — it decides who works, then hands off; it never runs a tool.",
+   redundancy:"No tools, so it's cheap to re-run and fully reproducible (deterministic map + an LLM tie-break only for ambiguous banners). Every discovered service produces exactly one work item.",
+   errors:"No matching specialist → route to the generic probe + warn. Conflicting matches → the LLM picks and logs its rationale so the choice is auditable.",
+   decision:"22 → SSH · 80/443 → Web · 445 → SMB/AD · 389 → LDAP · 161 → SNMP · 1433/3306/5432 → DB · unknown → generic probe",
+   handoff:"fan-out: one job per service → the <b>Specialist swarm</b>"},
+
   {id:"specialists", n:"Service-Specialist Agents (swarm)", kind:"worker",
-   role:"One LLM agent per service type, each reasoning about its own read-only enumeration — running in parallel.",
-   llm:"Each specialist reasons about ITS service: what safe enumeration is worth running, in what order, given what's already known. N agents work concurrently.",
-   reads:["its assigned service","shared memory (creds found so far)"], writes:["raw tool output per service"],
-   tools:["Web: feroxbuster / ffuf / nikto / whatweb","SMB/AD: netexec / enum4linux-ng / smbclient","FTP·SSH·DNS·LDAP·SNMP·DB: read-only enum"],
-   handoff:"Every proposed command → <b>Safety Gate</b> (before it runs)",
-   note:"Fan-out: specialists are blind to each other and coordinate only through shared memory — so any one can be retried in isolation."},
+   role:"One LLM agent per service type, each reasoning about its own read-only enumeration — in parallel.",
+   system:"“You are the &lt;SMB / Web / …&gt; specialist. Enumerate read-only. Propose commands (they pass the gate), parse what comes back, and stop when you've covered the service. Use creds already in memory; never brute-force.”",
+   llm:"Each specialist reasons about ITS service: which safe checks are worth running, in what order, given what the swarm already knows (e.g. a cred found elsewhere). Then it parses the tool output.",
+   recv:["work_item {its service}","read: shared creds + findings so far"], emit:["raw_output {service, tool, stdout, artifacts} → Gate → Analysis"],
+   tools:["Web: feroxbuster / ffuf / gobuster / nikto / whatweb","SMB/AD: netexec / enum4linux-ng / smbclient / rpcclient","FTP·SSH·DNS·LDAP·SNMP·NFS·DB: their read-only enum tools","the Safety Gate","state store"],
+   passes:"Writes namespaced output under &lt;service&gt;/… so parallel specialists never collide. Every proposed command is an envelope to the Gate first; only allowed output is written.",
+   redundancy:"Fan-out parallelism — N specialists run concurrently and isolated; a failure in one never blocks the others. Each command is idempotent (keyed by service+tool+args), so retries don't duplicate work. A stalled specialist is timed out and its partial output still flows downstream.",
+   errors:"Missing tool → log [missing] &lt;tool&gt; and continue with an alternative. Tool crash / timeout → retry with backoff, then skip + flag. Gate blocks a command → the specialist adapts to a recon-legal alternative or drops it (it can't escalate privileges to run it).",
+   handoff:"proposed commands → <b>Safety Gate</b> · allowed output → <b>Analysis Agent</b>",
+   note:"Fan-out. Specialists coordinate only through shared memory, so any one can be retried, swapped, or scaled independently."},
+
   {id:"gate", n:"Safety / Compliance Agent", kind:"guard",
    role:"Judges every command any agent wants to run against the exam rules. Allows, or blocks with a reason.",
-   llm:"The one place that can say no. Reads each proposed command and rules it recon-legal or blocks it — no exploitation, no brute/spray unless explicitly authorized.",
-   reads:["every proposed command (from any agent)"], writes:["allowed command → runs · or a blocked notice"],
-   tools:["policy engine (allow-list + rules)"], handoff:"Allowed output → <b>Analysis Agent</b>",
-   decision:"exploit / metasploit / sqlmap / brute-force → BLOCK · read-only enum → ALLOW",
-   note:"Cross-cutting guardrail: EVERY agent's commands pass through here. This is the compliance guarantee — it holds no matter what an LLM dreams up."},
+   system:"“You are the compliance gate. Allow only read-only, in-scope, exam-legal recon. Block exploitation, brute-force/spray (unless explicitly authorized), and anything off-target. Always explain a block.”",
+   llm:"Reads each proposed command + context and rules allow/block. The LLM judgment is backed by a hard allow-list, so it can't be prompt-injected into permitting exploitation.",
+   recv:["command_request {agent, service, argv} — from ANY agent"], emit:["verdict {allow | block, reason} → run, or return to caller"],
+   tools:["policy engine (allow-list + rule set)","scope checker","audit log","state store"],
+   passes:"Sits inline on every command edge. Each request → a verdict; every verdict is written to the append-only audit log with its rationale, so the whole run is provably recon-only.",
+   redundancy:"Defense in depth — the LLM verdict AND a deterministic policy must BOTH pass, and it's fail-closed: if the LLM errors or is unsure, the hard rule decides and the default is BLOCK. Borderline commands can trigger an N-of-M vote across independent passes.",
+   errors:"LLM error / timeout → fall back to the deterministic allow-list (block on anything not explicitly allowed). Malformed command → block and ask the caller to reformulate. A blocked command is never silently swallowed — the caller gets the reason.",
+   decision:"exploit / metasploit / sqlmap / brute-force / off-scope → BLOCK · read-only enum on the target → ALLOW",
+   handoff:"allowed output → <b>Analysis Agent</b>",
+   note:"Cross-cutting guardrail. EVERY agent's commands pass here — the compliance guarantee holds no matter what an LLM proposes."},
+
   {id:"analysis", n:"Analysis / Findings Agent", kind:"worker",
    role:"Structures raw output into findings and classifies each one CONSERVATIVELY.",
-   llm:"Reads messy tool output into structured findings, then judges severity cautiously — an open port / version / Exploit-DB match is never a vuln; only real weak postures (anon access, null session, signing off) are flagged notable.",
-   reads:["allowed raw output from every specialist"], writes:["classified findings (conservative category each)"],
-   tools:["parsers + conservative classifier"], handoff:"Findings → <b>Enrichment Agent</b>"},
+   system:"“Turn tool output into typed findings and classify severity conservatively. An open port, a version, or an Exploit-DB match is NEVER a vulnerability — only real weak postures (anonymous access, null session, signing off) are notable. When unsure, downgrade.”",
+   llm:"Reads messy tool output into structured findings, dedupes across specialists, and applies the conservative severity rule — deliberately under-claiming.",
+   recv:["raw_output[] (gated) from every specialist"], emit:["Finding[] {module, kind, value, detail, category} → Enrichment"],
+   tools:["per-tool parsers","the conservative classifier","state store"],
+   passes:"Appends findings to the blackboard append-only, deduped by a content hash, so re-runs and overlapping specialists don't create duplicates.",
+   redundancy:"Parsing is per-tool and independent — one failed parser never loses the others. Two-pass: a deterministic parser runs first, and an LLM fallback structures anything left unparsed, so no signal is dropped.",
+   errors:"“Output but 0 findings” (tool-format drift) → loud warning + keep the raw for manual review, never silent. Classifier uncertain → default to the LOWER severity and flag the item for the Critic to double-check.",
+   handoff:"Finding[] → <b>Enrichment Agent</b>"},
+
   {id:"enrichment", n:"Enrichment / Reference Agent", kind:"worker",
-   role:"Adds HackTricks + Exploit-DB context to each finding — reference only, never runs anything.",
-   llm:"For each service + finding, pulls the relevant HackTricks section and Exploit-DB matches and summarises WHY they matter and what to read next.",
-   reads:["findings","service + version"], writes:["findings + reference context (links, the right sections)"],
-   tools:["HackTricks (offline + live)","searchsploit (lookup only)"], handoff:"Enriched findings → <b>Correlation Agent</b>"},
+   role:"Attaches HackTricks + Exploit-DB context to each finding — reference only, never runs anything.",
+   system:"“For each service and finding, attach the relevant HackTricks section and Exploit-DB matches and say WHY they matter and what to read next. Reference only — you never execute anything.”",
+   llm:"Picks the right HackTricks section per finding, summarises why it matters, and ranks Exploit-DB matches by relevance to the detected product + version.",
+   recv:["Finding[] + service + version"], emit:["EnrichedFinding[] {…, refs:[hacktricks, edb_ids], why} → Correlation"],
+   tools:["HackTricks — vendored offline + optional live cache","searchsploit (lookup only, no PoC fetch)","state store"],
+   passes:"Enrichment is additive — it annotates findings, never mutates them — so it's safe to re-run and can't corrupt the analysis.",
+   redundancy:"Offline-first: the vendored HackTricks snapshot is always available, so enrichment works with no network. A live fetch is best-effort behind a cache; if it fails, the offline copy is used and flagged.",
+   errors:"Live fetch fails / rate-limited → fall back to the offline snapshot (marked) with backoff. No Exploit-DB match → empty refs, the finding still flows. A reference lookup never blocks the pipeline.",
+   handoff:"EnrichedFinding[] → <b>Correlation Agent</b>"},
+
   {id:"graph", n:"Correlation / Graph Agent", kind:"worker",
    role:"Builds the attack-surface graph and reasons about relationships across services.",
-   llm:"Connects target → services → findings → credentials and spots cross-service links — e.g. “the credential in this SMB share unlocks that WinRM host.”",
-   reads:["enriched findings","credentials"], writes:["attack-surface graph + correlations"],
-   tools:["graph builder"], handoff:"Graph + correlations → <b>Critic Agent</b>"},
+   system:"“Build the attack-surface graph and find cross-service links — e.g. a credential found in one SMB share that unlocks another host. Redact every secret. Propose leads, don't act on them.”",
+   llm:"Connects target → services → findings → credentials and spots relationships (credential reuse, trust paths, shared users) that no single specialist could see, then proposes leads.",
+   recv:["EnrichedFinding[] + Credential[]"], emit:["graph {nodes, edges} + correlations[] + leads[] → Critic"],
+   tools:["graph builder","correlation heuristics","state store"],
+   passes:"Writes graph.json + correlations to the blackboard; secrets are redacted at write time, so no credential value ever enters the graph.",
+   redundancy:"The graph is deterministic from state — rebuildable at any time. The LLM correlation pass is advisory: if it fails, you still get a correct graph, just fewer proposed leads.",
+   errors:"Malformed finding → skipped node + warn (partial graph, never a crash). A secret detected in a would-be node → redacted / dropped, never leaked. Correlation LLM error → emit the graph without leads.",
+   handoff:"graph + correlations → <b>Critic Agent</b>"},
+
   {id:"critic", n:"Critic / Verifier Agent", kind:"decision",
    role:"Adversarially checks findings + next steps for accuracy, then decides: go deeper, or finish.",
-   llm:"Asks of every claim “does the evidence actually support this?”, kills hallucinations, and rules the run complete or not.",
-   reads:["all findings + correlations"], writes:["verified findings","a verdict: iterate or finalize"],
-   tools:["— (adversarial review)"], handoff:"iterate → back to <b>Routing Agent</b> · finalize → <b>Reporting Agent</b>",
-   decision:"evidence weak / gaps remain → ITERATE (loop) · confident + complete → FINALIZE",
+   system:"“Adversarially verify every finding and proposed next step against the evidence in memory. Kill hallucinations — no claim without support. Then decide: iterate for deeper recon, or finalize.”",
+   llm:"Asks of each claim “does the evidence actually support this?”, spots coverage gaps (a service enumerated too shallowly), and rules the run complete or not.",
+   recv:["all Finding[] + correlations + graph"], emit:["VerifiedFinding[] + verdict {iterate | finalize, gaps, next_targets}"],
+   tools:["state store (the evidence)","an independent re-verification pass (can re-run a read-only check via the Gate)"],
+   passes:"The ONE feedback edge in the system. On finalize it writes verified state to Reporting; on iterate it writes fresh work_items back to Routing.",
+   redundancy:"N-of-M adversarial voting — several independent verifier passes; a finding survives only if a majority confirm it, which kills single-pass hallucination. The iteration count is capped, so the loop always converges.",
+   errors:"Verifiers disagree → keep the finding but mark it unverified (never silently drop, never over-claim). Loop-guard: at the iteration cap it finalizes with an explicit “gaps remain” note rather than spinning forever.",
+   decision:"evidence weak / gaps remain / under the iteration cap → ITERATE (loop) · confident + complete, or cap reached → FINALIZE",
+   handoff:"iterate → back to <b>Routing Agent</b> · finalize → <b>Reporting Agent</b>",
    note:"The quality gate AND the loop. This single feedback edge is what makes the whole thing a convergent workflow instead of a one-shot chain."},
+
   {id:"report", n:"Reporting Agent", kind:"worker",
    role:"Writes the human-facing, Obsidian-ready report — the narrative, generated.",
-   llm:"Synthesises the whole verified state into a report: open ports, per-service findings, next steps with citations, and the full command log.",
-   reads:["the whole shared memory (verified)"], writes:["report.md (+ vault export)"],
-   tools:["report renderer"], handoff:"Done — hand the report to the operator",
+   system:"“Write the operator's report from the verified state: open ports, per-service findings, prioritized next steps with citations, and the full command log. Redact secrets. If a section has no data, say so.”",
+   llm:"Synthesises the whole verified state into a readable report + a prioritized, cited next-steps list.",
+   recv:["the whole verified blackboard"], emit:["report.md (+ Obsidian vault export) → the operator"],
+   tools:["report renderer / template engine","state store"],
+   passes:"Terminal node — reads everything, writes the report, and archives the previous version before overwriting.",
+   redundancy:"Idempotent and re-runnable; each render archives the prior report. Even on a partial or aborted run it emits a “partial report”, so the operator never loses work.",
+   errors:"A missing section renders “(none)”, not a crash. A render error falls back to a raw structured dump of the state, so the operator still gets every fact the swarm gathered.",
+   handoff:"done — hand the report to the operator",
    note:"Terminal node. Everything the swarm learned, written up for a human."},
 ];
 
@@ -267,22 +353,17 @@ AGENTS.forEach((a,i)=>{
     +`<p class="role">${a.role}</p>`;
   btn.onclick=()=>select(i);
   node.appendChild(btn); spine.appendChild(node);
-  // data-flow arrow to the next agent (from this agent's handoff)
-  if(i<AGENTS.length-1){
-    const arr=document.createElement("div"); arr.className="arrow";
-    arr.textContent=flowLabel(a.id); spine.appendChild(arr);
-  }
+  if(i<AGENTS.length-1){ const arr=document.createElement("div"); arr.className="arrow"; arr.textContent=flowLabel(a.id); spine.appendChild(arr); }
   if(a.id==="critic"){ const l=document.createElement("div"); l.className="loopnote";
     l.textContent="↺  or ITERATE — loop back up to Routing for deeper recon"; spine.appendChild(l); }
 });
 
 function flowLabel(id){
-  const m={orchestrator:"target + plan", discovery:"discovered_services", router:"one job per service",
-    specialists:"proposed commands → gated", gate:"allowed raw output", analysis:"classified findings",
-    enrichment:"enriched findings", graph:"graph + correlations", critic:"✓ finalize → verified state"};
+  const m={orchestrator:"target + plan", discovery:"DiscoveredService[]", router:"work_item per service",
+    specialists:"proposed commands → gated", gate:"allowed raw_output", analysis:"Finding[] (classified)",
+    enrichment:"EnrichedFinding[]", graph:"graph + correlations", critic:"✓ finalize → verified state"};
   return "▾  "+(m[id]||"");
 }
-
 function esc(s){return (s||"").toString();}
 function pills(arr,cls){return arr.map(x=>`<span class="pill ${cls||''}">${esc(x)}</span>`).join("");}
 
@@ -290,16 +371,20 @@ function select(i){
   active=i; const a=AGENTS[i];
   detail.style.setProperty("--kc",KIND[a.kind]);
   [...spine.querySelectorAll(".card")].forEach((c,n)=>c.classList.toggle("on",n===i));
-  let html=`<p class="eyebrow">Step ${i+1} of ${AGENTS.length} · ${KLABEL[a.kind]}</p>`
+  let h=`<p class="eyebrow">Step ${i+1} of ${AGENTS.length} · ${KLABEL[a.kind]}</p>`
     +`<h2>${a.n}</h2><p class="sub">🧠 powered by an LLM (Opus)</p>`
     +`<div class="llmline"><b>What the LLM does:</b> ${a.llm}</div>`
-    +`<span class="glabel">Reads</span>${pills(a.reads)}`
-    +`<span class="glabel">Writes / produces</span>${pills(a.writes)}`
-    +`<span class="glabel">Tools</span>${pills(a.tools,"tool")}`;
-  if(a.decision) html+=`<span class="glabel">Decision</span><p class="decision">${a.decision}</p>`;
-  html+=`<span class="glabel">Hands off</span><p class="handoff">${a.handoff}</p>`;
-  if(a.note) html+=`<p class="note">${a.note}</p>`;
-  detail.innerHTML=html;
+    +`<span class="glabel">System prompt</span><p class="sysline">${a.system}</p>`
+    +`<span class="glabel">Receives (inbox)</span>${pills(a.recv,"io")}`
+    +`<span class="glabel">Emits (outbox)</span>${pills(a.emit,"io")}`
+    +`<span class="glabel">Tools &amp; stack</span>${pills(a.tools,"tool")}`
+    +`<span class="glabel">How it passes info</span><p class="body">${a.passes}</p>`
+    +`<span class="glabel rel">⟳ Redundancy</span><p class="body rel">${a.redundancy}</p>`
+    +`<span class="glabel err">⚠ Error handling</span><p class="body err">${a.errors}</p>`;
+  if(a.decision) h+=`<span class="glabel dec">Decision logic</span><p class="body">${a.decision}</p>`;
+  h+=`<span class="glabel">Hands off</span><p class="handoff">${a.handoff}</p>`;
+  if(a.note) h+=`<p class="note">${a.note}</p>`;
+  detail.innerHTML=h; detail.scrollTop=0;
 }
 
 addEventListener("keydown",e=>{
@@ -308,7 +393,7 @@ addEventListener("keydown",e=>{
 });
 
 const root=document.documentElement;
-root.setAttribute("data-theme","dark");  // dark by default; button flips to light
+root.setAttribute("data-theme","dark");
 document.getElementById("themeBtn").addEventListener("click",()=>{
   const cur=root.getAttribute("data-theme")==="light"?"light":"dark";
   root.setAttribute("data-theme",cur==="dark"?"light":"dark");
