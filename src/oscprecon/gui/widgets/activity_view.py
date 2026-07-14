@@ -57,9 +57,11 @@ class ActivityView(QWidget):
         self.reload()
 
     def reload(self) -> None:
+        self._table.setUpdatesEnabled(False)  # batch the repaint over the bulk fill
         self._table.setRowCount(0)
         if self._profile is None:
             self._summary.setText("No project loaded.")
+            self._table.setUpdatesEnabled(True)
             return
         entries = list(reversed(audit.load_entries(self._profile.directory)))  # newest first
         for entry in entries:
@@ -73,5 +75,6 @@ class ActivityView(QWidget):
             self._table.setItem(row, 3, QTableWidgetItem(summary))
         self._table.resizeColumnsToContents()
         self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self._table.setUpdatesEnabled(True)
         plural = "event" if len(entries) == 1 else "events"
         self._summary.setText(f"{len(entries)} {plural} (audit trail, newest first)")

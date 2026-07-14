@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import json
 import re
 from dataclasses import dataclass
@@ -31,8 +32,10 @@ _FIGURE_RE = re.compile(r"<figure>.*?</figure>", re.DOTALL | re.IGNORECASE)
 _IMG_RE = re.compile(r"<img[^>]*>", re.IGNORECASE)
 
 
+@functools.lru_cache(maxsize=64)
 def clean_markdown(md: str) -> str:
-    # GitHub callouts (> [!TIP]) -> a bold label line so the note reads instead of showing "[!TIP]".
+    # cached: the vendored pages are static at runtime, so re-selecting a service reuses the cleaned
+    # text instead of re-running the regex passes. GitHub callouts (> [!TIP]) -> a bold label line.
     md = _CALLOUT_RE.sub(lambda m: f"{m.group(1)}**{m.group(2).capitalize()}**", md)
     # collapsible blocks: keep the summary as a bold heading, drop the non-rendering <details> tags.
     md = _SUMMARY_RE.sub(lambda m: f"\n**{m.group(1).strip()}**\n", md)
@@ -43,7 +46,9 @@ def clean_markdown(md: str) -> str:
     return md
 
 
+@functools.lru_cache(maxsize=1)
 def load_index() -> dict[str, dict[str, str]]:
+    # cached: the vendored index.json is static at runtime. Callers only READ the result.
     try:
         data = json.loads(_INDEX.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -57,7 +62,9 @@ def available_modules() -> list[str]:
     return sorted(load_index())
 
 
+@functools.lru_cache(maxsize=32)
 def page_for_module(module: str) -> HacktricksPage | None:
+    # cached: static vendored markdown; avoids a disk read on every service (re)selection
     entry = load_index().get(module)
     if entry is None:
         return None

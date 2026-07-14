@@ -125,11 +125,13 @@ class FindingsView(QWidget):
         return True
 
     def _apply(self, *_: Any) -> None:
+        self._table.setUpdatesEnabled(False)  # one repaint after the bulk fill, not per row
         self._table.setSortingEnabled(False)
         self._table.setRowCount(0)
         if self._profile is None:
             self._summary.setText("No project loaded.")
             self._table.setSortingEnabled(True)
+            self._table.setUpdatesEnabled(True)
             return
         needle = self._filter.text().strip().lower()
         category = self._category.currentText()
@@ -153,6 +155,7 @@ class FindingsView(QWidget):
         self._table.resizeColumnsToContents()
         self._table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         self._table.setSortingEnabled(True)
+        self._table.setUpdatesEnabled(True)
         filtered = "" if shown == len(self._all) else f" (of {len(self._all)})"
         plural = "finding" if shown == 1 else "findings"
         self._summary.setText(
