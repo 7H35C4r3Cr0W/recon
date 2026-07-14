@@ -16,6 +16,7 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 5 | Explosion | 10.129.1.13 | rdp/3389 (+135/139/445/5985) | NLA enforced, OS build 10.0.17763; Admin:'' is manual | none (clean; validated the nmap fix) | — |
 | 6 | Preignition | 10.129.32.196 | http/80 (nginx 1.14.2) | dir-bust found `/admin.php` (admin/admin manual) | "Wide net" (60+ ext) ON by default → dir-bust never finished | `31a746c` |
 | 7 | Mongod | 10.129.32.198 | mongodb/27017 (+22 ssh) | nmap NSE listed DBs incl. `sensitive_information` | Tier-1 needed mongosh (not on stock Kali) | `ac9fc75` |
+| 8 | Synced | 10.129.228.37 | rsync/873 | `rsync --list-only` found anonymous `public` module (access=unauth) | nmap parenthetical banner `(protocol version 31)` mangled product/version | `ab1a809` |
 
 ## Per-box notes
 
@@ -54,6 +55,15 @@ which isn't a stock Kali tool and version-refuses old MongoDB. Fix: Tier-1 now
 uses nmap NSE (`mongodb-info,mongodb-databases`) — no client needed, speaks the
 old wire protocol — and listed `sensitive_information`. mongosh deep-enum stays
 Tier-2. **Lesson:** 27017 also isn't in top-1000 (use `-p-`).
+
+**8 · Synced — rsync.** `rsync --list-only rsync://IP:873/` found the anonymous
+`public` module (access=unauth); Tier-2 follow-ups list its contents read-only
+(where flag.txt lives). rsync is a stock tool, so Tier-1 works out of the box —
+the well-designed counter-example to Mongod. **Bug (cosmetic):** nmap reports the
+rsync version column as just `(protocol version 31)` (no product name); the
+version-token split mangled it into product=`(protocol version`/version=`31)`.
+Fix: a leading `(` means no product — leave both empty. 873 *is* in top-1000, so
+`quick` finds it.
 
 ## Trends & lessons (adapt going forward)
 
