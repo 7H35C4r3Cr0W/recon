@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.models import Credential
 
 
@@ -47,10 +48,18 @@ class AddCredentialDialog(QDialog):
         )
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        self._ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        self._ok.setStyleSheet(styles.primary_button(tokens.DARK))
+        self._username.textChanged.connect(self._validate)
+        self._secret.textChanged.connect(self._validate)
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(buttons)
+        self._validate()  # Ok stays disabled until the required fields are present
+
+    def _validate(self) -> None:
+        self._ok.setEnabled(bool(self._username.text().strip()) and bool(self._secret.text()))
 
     def credential(self) -> Credential | None:
         username = self._username.text().strip()

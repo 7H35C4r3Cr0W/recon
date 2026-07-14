@@ -39,14 +39,27 @@ def test_vault_table_shows_masked_secrets(qtbot: QtBot, tmp_path: Path) -> None:
     assert "redacted" in joined
 
 
-def test_vault_delete_removes_selected(qtbot: QtBot, tmp_path: Path) -> None:
+def test_vault_delete_removes_selected(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     prof = _profile(tmp_path)
     d = CredentialVaultDialog(prof)
     qtbot.addWidget(d)
     d._table.selectRow(0)
+    # deleting durable creds is confirmed — a "No" must leave the store untouched
+    monkeypatch.setattr(
+        cred_vault.QMessageBox, "question", lambda *a, **k: cred_vault.QMessageBox.StandardButton.No
+    )
+    d._on_delete()
+    assert d._table.rowCount() == 2 and len(prof.credentials()) == 2  # cancelled -> nothing removed
+    monkeypatch.setattr(
+        cred_vault.QMessageBox,
+        "question",
+        lambda *a, **k: cred_vault.QMessageBox.StandardButton.Yes,
+    )
     d._on_delete()
     assert d._table.rowCount() == 1
-    assert len(prof.credentials()) == 1  # persisted (durable, only explicit delete removes)
+    assert len(prof.credentials()) == 1  # persisted (durable, only confirmed delete removes)
 
 
 def test_vault_add_via_dialog(
@@ -116,5 +129,6 @@ def test_vault_read_only_disables_mutation_but_not_copy(qtbot: QtBot, tmp_path: 
     prof.read_only = True
     d = CredentialVaultDialog(prof)
     qtbot.addWidget(d)
+    d._table.selectRow(0)  # row actions are selection-gated; copy stays available read-only
     assert not d._add.isEnabled() and not d._edit.isEnabled() and not d._delete.isEnabled()
     assert d._copy_user.isEnabled() and d._copy_secret.isEnabled()  # copy is read-only-safe

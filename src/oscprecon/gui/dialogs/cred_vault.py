@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from oscprecon import creds as creds_mod
 from oscprecon.gui.dialogs.credential import AddCredentialDialog
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.models import Credential
 from oscprecon.profile import Profile
 
@@ -57,15 +59,18 @@ class CredentialVaultDialog(QDialog):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
         self._add = QPushButton("Add…")
+        self._add.setStyleSheet(styles.primary_button(tokens.DARK))  # primary action
         self._add.clicked.connect(self._on_add)
         self._edit = QPushButton("Edit…")
         self._edit.clicked.connect(self._on_edit)
         self._delete = QPushButton("Delete")
+        self._delete.setStyleSheet(styles.danger_button(tokens.DARK))  # destructive
         self._delete.clicked.connect(self._on_delete)
         self._copy_user = QPushButton("Copy username")
         self._copy_user.clicked.connect(self._on_copy_username)
         self._copy_secret = QPushButton("Copy secret")
         self._copy_secret.clicked.connect(self._on_copy_secret)
+        self._table.itemSelectionChanged.connect(self._update_actions)
 
         row = QHBoxLayout()
         for widget in (self._add, self._edit, self._delete):
@@ -90,10 +95,18 @@ class CredentialVaultDialog(QDialog):
         layout.addWidget(note)
         layout.addWidget(buttons)
 
-        if self._read_only:  # copy stays available; mutation does not
-            for widget in (self._add, self._edit, self._delete):
-                widget.setEnabled(False)
+        if self._read_only:  # add stays off entirely; row actions are gated by selection below
+            self._add.setEnabled(False)
         self._refresh()
+        self._update_actions()
+
+    def _update_actions(self) -> None:
+        # row actions need a selected credential; mutation also needs a writable profile
+        has = self._selected_cred() is not None
+        self._edit.setEnabled(has and not self._read_only)
+        self._delete.setEnabled(has and not self._read_only)
+        self._copy_user.setEnabled(has)
+        self._copy_secret.setEnabled(has)
 
     def _refresh(self) -> None:
         self._table.setRowCount(0)
@@ -113,6 +126,7 @@ class CredentialVaultDialog(QDialog):
                 if col == 0:
                     item.setData(_CRED_ROLE, cred)
                 self._table.setItem(r, col, item)
+        self._update_actions()
 
     def _selected_cred(self) -> Credential | None:
         rows = self._table.selectionModel().selectedRows() if self._table.selectionModel() else []
@@ -146,7 +160,17 @@ class CredentialVaultDialog(QDialog):
 
     def _on_delete(self) -> None:
         current = self._selected_cred()
-        if current is not None and not self._read_only:
+        if current is None or self._read_only:
+            return
+        # credentials are durable project data — a destructive removal is confirmed explicitly
+        confirm = QMessageBox.question(
+            self,
+            "Delete credential",
+            f"Delete the stored credential for “{current.username}”? This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirm == QMessageBox.StandardButton.Yes:
             self._profile.delete_credential(current)
             self._refresh()
 

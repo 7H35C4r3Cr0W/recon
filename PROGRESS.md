@@ -61,13 +61,19 @@ Renaming the product to **Nabu** and lifting it toward a polished desktop produc
   default). Each service panel's **flagship Tier-1 button** (Run full SMB/FTP/SSH/DNS/LDAP + simple)
   now carries the gold **primary** style, ranking it above the secondary "just check" actions and the
   Tier-2 manual follow-ups. Rendered + eyeballed. +1 test; reference-pane badge test updated.
+- **Vault/spray UX + dialog uniformity** — new `styles.danger_button` (outline-error). Credential
+  Vault: **Add** primary-gold, **Delete** destructive-outline + a **confirm dialog** (durable creds
+  never vanish on a stray click), row actions **selection-gated**. Add/Edit Credential: **Ok** is
+  primary and **disabled until username+secret** are present (near-field validation). Spray dialog:
+  **Run** primary + right-most (consistent ordering), warning banner uses the token error colour.
+  Rendered + eyeballed. +4 tests; two vault tests updated for the confirm + gating.
 
-**Remaining Nabu chunks (not yet done):** richer Findings view (filter/group/search); vault/spray UX
-polish; dialog/form uniformity; feedback/loading/error banners; full keyboard-shortcut + accessibility
-sweep; performance pass; `docs/screenshots/` (generated data only); the 22-angle adversarial
-refute-review; the docs/packaging finalization; and **(do LAST) the interactive HTML module-flow
-mind-map for management** ([[final-flowchart-deliverable]]). **Recommended single next chunk:**
-vault/spray UX polish + dialog/form uniformity.
+**Remaining Nabu chunks (not yet done):** richer Findings view (filter/group/search); feedback/
+loading/error banners; full keyboard-shortcut + accessibility sweep; performance pass;
+`docs/screenshots/` (generated data only); the 22-angle adversarial refute-review; the docs/packaging
+finalization; and **(do LAST) the interactive HTML module-flow mind-map for management**
+([[final-flowchart-deliverable]]). **Recommended single next chunk:** richer Findings view +
+feedback/error banners.
 
 ### Pre-live-testing polish (owner-requested)
 A run of owner-requested improvements before live-box testing:

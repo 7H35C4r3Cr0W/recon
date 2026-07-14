@@ -50,6 +50,20 @@ def secondary_button(pal: Palette) -> str:
     )
 
 
+def danger_button(pal: Palette) -> str:
+    # outline-danger: error-coloured border+text, fills on hover — destructive without shouting
+    return (
+        "QPushButton {"
+        f" background:transparent; color:{pal.error};"
+        f" border:1px solid {pal.error}; border-radius:{tokens.RADIUS_SM}px;"
+        f" padding:6px {tokens.SPACE_MD}px; min-height:{tokens.CONTROL_HEIGHT}px; }}"
+        f" QPushButton:hover {{ background:{pal.error}; color:{pal.bg}; }}"
+        f" QPushButton:pressed {{ background:{_darken(pal.error)}; }}"
+        f" QPushButton:focus {{ border:2px solid {pal.focus}; }}"
+        f" QPushButton:disabled {{ color:{pal.text_muted}; border-color:{pal.surface_alt}; }}"
+    )
+
+
 def badge(kind: str, pal: Palette) -> str:
     color = status_color(kind, pal)
     return (

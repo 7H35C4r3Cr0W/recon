@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from oscprecon import spray
 from oscprecon.gui.dialogs.cred_vault import CredentialVaultDialog
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.profile import Profile
 
 
@@ -43,7 +44,7 @@ class SprayDialog(QDialog):
                 "OSCP-legal against your own authorized targets only (§ 2a)."
             )
             banner.setWordWrap(True)
-            banner.setStyleSheet("color: #c0392b; font-weight: bold;")
+            banner.setStyleSheet(f"color: {tokens.DARK.error}; font-weight: bold;")
             layout.addWidget(banner)
 
         # ── Credentials ──────────────────────────────────────────────
@@ -77,13 +78,14 @@ class SprayDialog(QDialog):
 
         button_row = QHBoxLayout()
         self._run = QPushButton("Run selected sprays")
+        self._run.setStyleSheet(styles.primary_button(tokens.DARK))  # primary (gated) action
         self._run.setEnabled(spray_enabled)
         self._run.clicked.connect(self._on_run)
         close = QPushButton("Close")
         close.clicked.connect(self.reject)
         button_row.addStretch(1)
-        button_row.addWidget(self._run)
         button_row.addWidget(close)
+        button_row.addWidget(self._run)  # primary sits right-most (consistent dialog ordering)
         layout.addLayout(button_row)
 
         self._refresh_vault_summary()
