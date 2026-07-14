@@ -7,7 +7,6 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -63,18 +62,17 @@ class LdapPanel(QWidget):
         summary_box = QGroupBox("Findings so far")
         QVBoxLayout(summary_box).addWidget(self._summary)
 
-        left = QVBoxLayout()
-        left.addWidget(button_box)
-        left.addWidget(summary_box, stretch=1)
-        top = QHBoxLayout()
-        top.addLayout(left, stretch=1)
-        top.addWidget(manual_box, stretch=1)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(
-            QLabel("LDAP recon — anonymous root DSE + bounded user enumeration; binds are Tier-2.")
+        intro = QLabel(
+            "LDAP recon — anonymous root DSE + bounded user enumeration; binds are Tier-2."
         )
-        layout.addLayout(top, stretch=1)
+        intro.setWordWrap(True)
+        # single column keeps the panel narrow (no sideways scroll); the tool panel scrolls
+        # vertically to reach the boxes on a short window.
+        layout = QVBoxLayout(self)
+        layout.addWidget(intro)
+        layout.addWidget(button_box)
+        layout.addWidget(manual_box, stretch=1)
+        layout.addWidget(summary_box, stretch=1)
 
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile

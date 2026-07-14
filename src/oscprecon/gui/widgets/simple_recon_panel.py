@@ -4,7 +4,6 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -54,18 +53,15 @@ class SimpleReconPanel(QWidget):
         summary_box = QGroupBox("Findings so far")
         QVBoxLayout(summary_box).addWidget(self._summary)
 
-        left = QVBoxLayout()
-        left.addWidget(button_box)
-        left.addWidget(summary_box, stretch=1)
-        top = QHBoxLayout()
-        top.addLayout(left, stretch=1)
-        top.addWidget(manual_box, stretch=1)
-
         intro = QLabel(spec.intro)
         intro.setWordWrap(True)  # long intros must not force a wide minimum on the whole tool panel
+        # single column keeps the panel narrow (no sideways scroll); the tool panel scrolls
+        # vertically to reach the boxes on a short window.
         layout = QVBoxLayout(self)
         layout.addWidget(intro)
-        layout.addLayout(top, stretch=1)
+        layout.addWidget(button_box)
+        layout.addWidget(manual_box, stretch=1)
+        layout.addWidget(summary_box, stretch=1)
 
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile

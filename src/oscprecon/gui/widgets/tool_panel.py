@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -36,6 +36,24 @@ from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef, expand_hint
 
 _COMMAND_ROLE = Qt.ItemDataRole.UserRole
+
+
+class _CurrentPageStack(QStackedWidget):
+    # why: a QStackedWidget reserves the MAX size over ALL pages, so the tool panel always demanded
+    # the tallest/widest builder's footprint even when showing a small one. Size to the VISIBLE page
+    # so short panels stay compact and the surrounding scroll area only scrolls when truly needed.
+    def __init__(self) -> None:
+        super().__init__()
+        self.currentChanged.connect(lambda _index: self.updateGeometry())
+
+    def sizeHint(self) -> QSize:
+        widget = self.currentWidget()
+        return widget.sizeHint() if widget is not None else super().sizeHint()
+
+    def minimumSizeHint(self) -> QSize:
+        widget = self.currentWidget()
+        return widget.minimumSizeHint() if widget is not None else super().minimumSizeHint()
+
 
 # leading [tag] on a status line -> banner kind. Untagged lines (raw tool output) never touch the
 # banner. Only actionable/outcome tags surface; info chatter (running/dry-run) stays in the log.
@@ -152,7 +170,7 @@ class ToolPanel(QWidget):
             panel.manual_requested.connect(self.run_requested)
             self._simple[spec.module] = panel
 
-        self._stack = QStackedWidget()
+        self._stack = _CurrentPageStack()
         self._stack.addWidget(generic)  # 0: generic hints
         self._stack.addWidget(self._web_tabs)  # 1: http/vhost builders
         self._stack.addWidget(self._smb)  # 2: smb
@@ -178,19 +196,26 @@ class ToolPanel(QWidget):
         self._output.setReadOnly(True)
         self._output.setAccessibleName("Command output")
 
-        # why: a QStackedWidget's minimum is the MAX over all pages, and wide builder pages (long
-        # SimpleRecon intros, SMB/SSH forms) pushed that to ~1250px — which pinned the whole window
-        # wide and unresizable. Scrolling the stack decouples that minimum; the window now shrinks
-        # freely and the output/next-steps below stay always-visible.
-        stack_scroll = QScrollArea()
-        stack_scroll.setWidgetResizable(True)
-        stack_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        stack_scroll.setWidget(self._stack)
+        # why: on a short/narrow window the builder group boxes used to be crushed to an unusable
+        # sliver — the Run button scrolled out of reach. Put header + builder + next-steps in one
+        # vertical scroll region so each box keeps its natural size and the panel scrolls as a whole
+        # when the window shrinks; the live output + banner stay pinned below. `_CurrentPageStack`
+        # keeps the scrolled content the size of the VISIBLE builder, so there is no scrollbar at
+        # normal size. The scroll area's own minimum stays tiny, so the window still resizes freely.
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.addWidget(self._header)
+        body_layout.addWidget(self._stack, stretch=1)
+        body_layout.addWidget(next_box)
+
+        body_scroll = QScrollArea()
+        body_scroll.setWidgetResizable(True)
+        body_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        body_scroll.setWidget(body)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(self._header)
-        layout.addWidget(stack_scroll, stretch=2)
-        layout.addWidget(next_box)
+        layout.addWidget(body_scroll, stretch=3)
         layout.addWidget(self._banner)
         layout.addWidget(self._output, stretch=1)
 

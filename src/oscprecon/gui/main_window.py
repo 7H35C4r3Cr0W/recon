@@ -260,6 +260,9 @@ class MainWindow(QMainWindow):
         self._notes_dock = QDockWidget("Notes", self)
         self._notes_dock.setWidget(self._notes_pane)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._notes_dock)
+        # why: the notes dock defaulted to ~1/3 of the height, squeezing the recon three-pane so the
+        # tool-panel builder scrolled even at full size. Start it compact — the user can drag it up.
+        self.resizeDocks([self._notes_dock], [150], Qt.Orientation.Vertical)
 
         # status footer (§19): app+version · active profile · workspace · exam-legal reminder
         self._status_profile = QLabel()

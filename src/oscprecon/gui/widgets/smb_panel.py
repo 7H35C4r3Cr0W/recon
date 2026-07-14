@@ -6,7 +6,6 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -63,18 +62,15 @@ class SmbPanel(QWidget):
         summary_layout = QVBoxLayout(summary_box)
         summary_layout.addWidget(self._summary)
 
-        left = QVBoxLayout()
-        left.addWidget(button_box)
-        left.addWidget(summary_box, stretch=1)
-        top = QHBoxLayout()
-        top.addLayout(left, stretch=1)
-        top.addWidget(manual_box, stretch=1)
-
+        intro = QLabel("SMB recon — Tier framing is enforced (§11); Tier-3 is never shown.")
+        intro.setWordWrap(True)
+        # single column keeps the panel narrow (no sideways scroll); the tool panel scrolls
+        # vertically to reach the boxes on a short window.
         layout = QVBoxLayout(self)
-        layout.addWidget(
-            QLabel("SMB recon — Tier framing is enforced (§11); Tier-3 is never shown.")
-        )
-        layout.addLayout(top, stretch=1)
+        layout.addWidget(intro)
+        layout.addWidget(button_box)
+        layout.addWidget(manual_box, stretch=1)
+        layout.addWidget(summary_box, stretch=1)
 
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
