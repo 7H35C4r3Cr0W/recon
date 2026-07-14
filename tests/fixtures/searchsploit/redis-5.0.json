@@ -1,0 +1,12 @@
+{
+	"SEARCH": "redis 5.0",
+	"DB_PATH_EXPLOIT": "/usr/share/exploitdb",
+	"RESULTS_EXPLOIT": [
+		{"Title":"Redis 5.0 - Denial of Service","EDB-ID":"44908","Date_Published":"2018-06-20","Date_Added":"2018-06-20","Date_Updated":"2018-06-20","Author":"Fakhri Zulkifli","Type":"dos","Platform":"linux","Port":"","Verified":"0","Codes":"CVE-2018-12453","Tags":"Denial of Service (DoS)","Aliases":"","Screenshot":"","Application":"http://www.exploit-db.comredis-5.0-rc1.tar.gz","Source":"","Path":"/usr/share/exploitdb/exploits/linux/dos/44908.txt"},
+		{"Title":"Redis-cli < 5.0 - Buffer Overflow (PoC)","EDB-ID":"44904","Date_Published":"2018-06-18","Date_Added":"2018-06-18","Date_Updated":"2018-06-19","Author":"Fakhri Zulkifli","Type":"local","Platform":"linux","Port":"","Verified":"0","Codes":"CVE-2018-12326","Tags":"Denial of Service (DoS)","Aliases":"","Screenshot":"","Application":"","Source":"","Path":"/usr/share/exploitdb/exploits/linux/local/44904.py"}
+	],
+	"DB_PATH_SHELLCODE": "/usr/share/exploitdb",
+	"RESULTS_SHELLCODE": [	],
+	"DB_PATH_PAPER": "/usr/share/exploitdb-papers",
+	"RESULTS_PAPER": [	]
+}

@@ -88,11 +88,18 @@ def _group_edb(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not edb_id or edb_id in seen.setdefault(service, set()):
             continue
         seen[service].add(edb_id)
+        badge = "·".join(
+            part
+            for part in (str(entry.get("type", "")), str(entry.get("platform", "")))
+            if part.strip()
+        )
         groups.setdefault(service, []).append(
             {
                 "edb_id": edb_id,
                 "title": str(entry.get("title", "")),
                 "url": str(entry.get("url", "")),
+                "badge": badge,
+                "cve": str(entry.get("cve", "")),
             }
         )
     return [{"service": service, "hits": groups[service]} for service in groups]

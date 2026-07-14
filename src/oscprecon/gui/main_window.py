@@ -753,8 +753,25 @@ class MainWindow(QMainWindow):
         if ref is not None:
             self._maybe_fetch_live(ref)
         self._edb_request_id += 1
-        if selected is None or not selected.product or self._profile is None:
+        if selected is None or self._profile is None or ref is None:
             return
+        edb_product, edb_version = selected.product, selected.version
+        if not edb_product:
+            # nmap couldn't fingerprint (e.g. Sequel's `mysql?`) but a module finding carries the
+            # version — search Exploit-DB on the service label + that version instead of skipping.
+            found_version = next(
+                (
+                    str(f.get("value", ""))
+                    for f in (service_findings or [])
+                    if f.get("kind") == "version" and f.get("value")
+                ),
+                "",
+            )
+            if found_version:
+                edb_product, edb_version = ref.label, found_version
+                self._reference_pane.set_exploits_searching()  # override the "skipped" placeholder
+        if not edb_product:
+            return  # show_service already displayed "no product/version — Exploit-DB skipped"
         output_file = (
             self._profile.directory
             / "references"
@@ -762,23 +779,21 @@ class MainWindow(QMainWindow):
         )
         self._edb_context = (
             f"{selected.port}/{selected.proto.value} {selected.service}".strip(),
-            selected.product,
-            selected.version,
+            edb_product,
+            edb_version,
         )
-        worker = SearchsploitWorker(
-            selected.product, selected.version, output_file, self._edb_request_id
-        )
+        worker = SearchsploitWorker(edb_product, edb_version, output_file, self._edb_request_id)
         worker.done.connect(self._on_edb_done)
         worker.finished.connect(lambda w=worker: self._edb_workers.discard(w))
         self._edb_workers.add(worker)
         worker.start()
 
-    def _on_edb_done(self, hits: object, request_id: int) -> None:
+    def _on_edb_done(self, search: object, request_id: int) -> None:
         if request_id != self._edb_request_id:
             return  # a newer selection superseded this lookup
-        if isinstance(hits, list):
-            self._reference_pane.show_exploits(hits)
-            self._persist_edb(hits)
+        if isinstance(search, references.EdbSearch):
+            self._reference_pane.show_exploits(search)
+            self._persist_edb(search.hits)
 
     # ----- live HackTricks (§14a) ------------------------------------------
 

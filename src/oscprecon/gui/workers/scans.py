@@ -73,7 +73,7 @@ class CommandWorker(CancellableThread):
 
 
 class SearchsploitWorker(QThread):
-    done = Signal(object, int)  # (list[ExploitHit], request_id)
+    done = Signal(object, int)  # (references.EdbSearch, request_id)
 
     def __init__(self, product: str, version: str, output_file: Path, request_id: int) -> None:
         super().__init__()
@@ -84,10 +84,10 @@ class SearchsploitWorker(QThread):
 
     def run(self) -> None:
         try:
-            hits = references.search_exploits(self._product, self._version, self._output_file)
+            search = references.search_exploits(self._product, self._version, self._output_file)
         except Exception:  # boundary: never let an EDB lookup crash the worker
-            hits = []
-        self.done.emit(hits, self._request_id)
+            search = references.EdbSearch([], "", "none")
+        self.done.emit(search, self._request_id)
 
 
 class LiveHacktricksWorker(QThread):

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import html
 import os
 import time
 from typing import Any
 
 from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QTextCursor
+from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -23,7 +24,7 @@ from PySide6.QtWidgets import (
 from oscprecon import hacktricks
 from oscprecon.gui.theme import styles, tokens
 from oscprecon.models import DiscoveredService
-from oscprecon.references import ExploitHit, ServiceRef, sections
+from oscprecon.references import EdbSearch, ExploitHit, ServiceRef, sections
 from oscprecon.references.live_hacktricks import LiveResult
 
 try:
@@ -178,10 +179,18 @@ class ReferencePane(QWidget):
         hacktricks_layout.addWidget(self._tabs, stretch=1)
 
         self._exploits = QListWidget()
+        self._exploits.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self._exploits.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._exploits.setAlternatingRowColors(True)
         self._exploits.itemClicked.connect(self._on_exploit_activated)
         self._exploits.itemActivated.connect(self._on_exploit_activated)
+        self._edb_header = QLabel("")
+        self._edb_header.setWordWrap(True)
+        self._edb_header.setTextFormat(Qt.TextFormat.RichText)
+        self._edb_header.setVisible(False)
         exploits_box = QGroupBox("Exploit-DB (searchsploit — lookup only)")
         exploits_layout = QVBoxLayout(exploits_box)
+        exploits_layout.addWidget(self._edb_header)
         exploits_layout.addWidget(self._exploits)
 
         layout = QVBoxLayout(self)
@@ -208,6 +217,7 @@ class ReferencePane(QWidget):
         findings: list[dict[str, Any]] | None = None,
     ) -> None:
         self._exploits.clear()
+        self._set_edb_header("")
         self._jump_hint.setText("")
         self._use_offline_btn.setVisible(False)
         if service is None or ref is None:
@@ -235,16 +245,73 @@ class ReferencePane(QWidget):
         else:
             self._placeholder("no product/version — Exploit-DB skipped")
 
-    def show_exploits(self, hits: list[ExploitHit]) -> None:
+    def set_exploits_searching(self) -> None:
         self._exploits.clear()
-        if not hits:
-            self._placeholder("no Exploit-DB matches")
+        self._set_edb_header("")
+        self._placeholder("searching Exploit-DB…")
+
+    def show_exploits(self, search: EdbSearch) -> None:
+        self._exploits.clear()
+        if not search.hits:
+            self._set_edb_header(self._edb_no_match_text(search))
+            skipped = search.scope == "none"
+            self._placeholder(
+                "no product/version — Exploit-DB skipped" if skipped else "no Exploit-DB matches"
+            )
             return
-        for hit in hits:
-            item = QListWidgetItem(f"EDB-{hit.edb_id}  {hit.title}")
+        self._set_edb_header(self._edb_summary_text(search))
+        for hit in search.hits:
+            item = QListWidgetItem(self._format_hit(hit))
             item.setData(_URL_ROLE, hit.url)
             item.setData(_LABEL_ROLE, f"EDB-{hit.edb_id}")
+            item.setToolTip(self._hit_tooltip(hit))
+            if hit.version_match:
+                font = item.font()
+                font.setWeight(QFont.Weight.DemiBold)
+                item.setFont(font)
             self._exploits.addItem(item)
+
+    def _set_edb_header(self, text: str) -> None:
+        self._edb_header.setText(text)
+        self._edb_header.setVisible(bool(text))
+
+    @staticmethod
+    def _edb_summary_text(search: EdbSearch) -> str:
+        count = len(search.hits)
+        plural = "s" if count != 1 else ""
+        query = html.escape(search.query)
+        if search.scope == "version":
+            matched = sum(1 for h in search.hits if h.version_match)
+            note = f"{matched} version-matched (★)" if matched else "version query"
+            return f"<b>{count}</b> result{plural} for <code>{query}</code> — {note}"
+        return (
+            f"<b>{count}</b> result{plural} for <code>{query}</code> — "
+            "product-wide (no version-specific match)"
+        )
+
+    @staticmethod
+    def _edb_no_match_text(search: EdbSearch) -> str:
+        if search.scope == "none":
+            return ""
+        return f"No Exploit-DB entries for <code>{html.escape(search.query)}</code>."
+
+    @staticmethod
+    def _format_hit(hit: ExploitHit) -> str:
+        badge = "·".join(part for part in (hit.type, hit.platform, hit.date[:4]) if part)
+        marker = "★ " if hit.version_match else ""
+        head = f"{marker}EDB-{hit.edb_id}"
+        return f"{head}  [{badge}]  {hit.title}" if badge else f"{head}  {hit.title}"
+
+    @staticmethod
+    def _hit_tooltip(hit: ExploitHit) -> str:
+        lines = [hit.title, f"EDB-{hit.edb_id}"]
+        meta = " · ".join(part for part in (hit.type, hit.platform, hit.date) if part)
+        if meta:
+            lines.append(meta)
+        if hit.cve:
+            lines.append(hit.cve)
+        lines.append("Opens exploit-db.com — lookup only (no download or run)")
+        return "\n".join(lines)
 
     def _show_offline(
         self, ref: ServiceRef, findings: list[dict[str, Any]], product: str = ""

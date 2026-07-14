@@ -50,7 +50,7 @@ _Run nmap to populate this section._
 
 ### {{ g.service }}
 {% for h in g.hits %}
-- [EDB-{{ h.edb_id }}]({{ h.url }}) — {{ h.title }}
+- [EDB-{{ h.edb_id }}]({{ h.url }}){% if h.badge %} `{{ h.badge }}`{% endif %} — {{ h.title }}{% if h.cve %} ({{ h.cve }}){% endif %}
 {% endfor %}
 {% else %}
 

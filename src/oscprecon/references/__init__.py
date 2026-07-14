@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -166,7 +167,35 @@ class ExploitHit:
     edb_id: str
     title: str
     url: str
-    path: str
+    path: str  # local PoC path — used only to know a hit is real; NEVER persisted or opened (§14)
+    type: str = ""  # remote | local | webapps | dos | shellcode
+    platform: str = ""  # linux | windows | multiple | php | …
+    date: str = ""  # Date_Published (YYYY-MM-DD)
+    cve: str = ""  # comma-joined CVE ids parsed from searchsploit's Codes field
+    version_match: bool = False  # title names the detected version (ranked + emphasised in the UI)
+
+
+@dataclass(frozen=True)
+class EdbSearch:
+    # scope: "version" = product+major.minor produced hits; "product" = version-wide fallback;
+    # "none" = no searchable product term. The GUI shows the scope so a fallback isn't mistaken for
+    # a version-specific match.
+    hits: list[ExploitHit]
+    query: str
+    scope: str
+
+
+_CVE_RE = re.compile(r"CVE-\d{4}-\d{4,}", re.IGNORECASE)
+
+
+def _format_cve(codes: object) -> str:
+    # searchsploit "Codes" joins CVE-/OSVDB- ids with ';'. Keep only CVEs, upper-cased + deduped.
+    seen: list[str] = []
+    for code in _CVE_RE.findall(str(codes or "")):
+        upper = code.upper()
+        if upper not in seen:
+            seen.append(upper)
+    return ", ".join(seen)
 
 
 def parse_searchsploit_json(text: str) -> list[ExploitHit]:
@@ -192,26 +221,113 @@ def parse_searchsploit_json(text: str) -> list[ExploitHit]:
                 title=str(item.get("Title", "")).strip(),
                 url=EDB_URL.format(edb_id=edb_id),
                 path=str(item.get("Path", "")).strip(),
+                type=str(item.get("Type", "")).strip(),
+                platform=str(item.get("Platform", "")).strip(),
+                date=str(item.get("Date_Published", "")).strip(),
+                cve=_format_cve(item.get("Codes", "")),
             )
         )
     return hits
 
 
-def _safe_query(product: str, version: str) -> str:
-    cleaned = _SAFE_QUERY.sub(" ", f"{product} {version}")
+def _sanitize_query(text: str) -> str:
+    cleaned = _SAFE_QUERY.sub(" ", text)
     # why: a token starting with '-' becomes a searchsploit FLAG after shlex.split — a hostile
     # banner 'product=-m 47080' would run `searchsploit -m` (copies a PoC). Strip leading dashes.
     return " ".join(t.lstrip("-") for t in cleaned.split() if t.lstrip("-"))
 
 
-def search_exploits(product: str, version: str, output_file: Path) -> list[ExploitHit]:
-    query = _safe_query(product, version)
-    if not query:
+def _safe_query(product: str, version: str) -> str:
+    # the (product, version) sanitizer the tests pin; the tiered search sanitizes each query term.
+    return _sanitize_query(f"{product} {version}")
+
+
+# nmap leads a few banners with a generic VENDOR word before the real product; search on the
+# product, not the vendor. Kept tiny — the default (first banner word) is right for almost all.
+_VENDOR_PREFIXES = frozenset({"microsoft"})
+
+
+def _short_version(version: str) -> str:
+    # major.minor is the sweet spot: the exact patch level (2.4.38) rarely appears in an exploit
+    # title, but the minor line (2.4) does — searchsploit ANDs terms, so over-specifying returns 0.
+    match = re.search(r"(\d+)\.(\d+)", version)
+    return f"{match.group(1)}.{match.group(2)}" if match is not None else ""
+
+
+def normalize_product(product: str, version: str) -> tuple[str, str]:
+    """Reduce a noisy nmap product/version banner to (core search term, major.minor version)."""
+    blob = f"{product} {version}".lower()
+    # MariaDB rides behind a MySQL '5.5.5-' compatibility prefix and nmap often labels it "MySQL";
+    # search Exploit-DB for the real engine + its real version, not the fake 5.5.5 prefix.
+    if "mariadb" in blob:
+        real = re.sub(r"^5\.5\.5-", "", version.strip())
+        return "mariadb", _short_version(real)
+    words = _sanitize_query(product).split()
+    if not words:
+        return "", _short_version(version)
+    core = words[0].lower()
+    if core in _VENDOR_PREFIXES and len(words) > 1:
+        core = words[1].lower()
+    return core, _short_version(version)
+
+
+def _title_matches_version(title: str, version: str, short: str) -> bool:
+    low = title.lower()
+    if version and version.lower() in low:
+        return True
+    if not short:
+        return False
+    # match major.minor as a whole version token: "2.4" hits "2.4.49" but not "12.4" or "2.41".
+    return re.search(rf"(?<![\d.]){re.escape(short)}(?!\d)", low) is not None
+
+
+def _as_int(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError:
+        return 0
+
+
+def _rank_hits(hits: list[ExploitHit], version: str, short: str) -> list[ExploitHit]:
+    # flag + float hits whose title names the detected version; newest EDB-ID first within a tier.
+    flagged = [
+        replace(hit, version_match=_title_matches_version(hit.title, version, short))
+        for hit in hits
+    ]
+    return sorted(flagged, key=lambda h: (0 if h.version_match else 1, -_as_int(h.edb_id)))
+
+
+def _run_searchsploit(query: str, output_file: Path) -> list[ExploitHit]:
+    safe = _sanitize_query(query)
+    if not safe:
         return []
-    result = shell.run(f"searchsploit --json {query}", output_file)
+    result = shell.run(f"searchsploit --json {safe}", output_file)
     if result.missing_tool is not None or result.blocked is not None:
         return []
     try:
         return parse_searchsploit_json(output_file.read_text(encoding="utf-8"))
     except OSError:
         return []
+
+
+def search_exploits(
+    product: str,
+    version: str,
+    output_file: Path,
+    *,
+    runner: Callable[[str], list[ExploitHit]] | None = None,
+) -> EdbSearch:
+    # tiered lookup (never a brute): product + major.minor first (version-relevant), then product-
+    # only so a version with no title match still surfaces the product's exploit surface. `runner`
+    # is an injection seam for tests; production runs searchsploit once per tier.
+    core, short = normalize_product(product, version)
+    if not core:
+        return EdbSearch([], "", "none")
+    run = runner if runner is not None else (lambda q: _run_searchsploit(q, output_file))
+    if short:
+        primary = f"{core} {short}"
+        hits = run(primary)
+        if hits:
+            return EdbSearch(_rank_hits(hits, version, short), primary, "version")
+        return EdbSearch(_rank_hits(run(core), version, short), core, "product")
+    return EdbSearch(_rank_hits(run(core), version, short), core, "product")

@@ -47,6 +47,10 @@ def add_edb(
             "edb_id": hit.edb_id,
             "title": hit.title,
             "url": hit.url,  # canonical exploit-db.com page — lookup only, no PoC path stored
+            "type": hit.type,
+            "platform": hit.platform,
+            "cve": hit.cve,
+            "date": hit.date,
             "discovered_at": stamp,
         }
         if _key(entry) in seen:

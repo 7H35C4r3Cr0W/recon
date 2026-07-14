@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from PySide6.QtGui import QFont
 from pytestqt.qtbot import QtBot
 
 from oscprecon import references
@@ -9,7 +10,7 @@ from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
-from oscprecon.references import ExploitHit
+from oscprecon.references import EdbSearch, ExploitHit
 
 
 def _services() -> list[DiscoveredService]:
@@ -115,11 +116,40 @@ def test_reference_pane_emits_page_visited(qtbot: QtBot) -> None:
 def test_reference_pane_show_exploits(qtbot: QtBot) -> None:
     pane = ReferencePane()
     qtbot.addWidget(pane)
-    pane.show_exploits(
-        [ExploitHit("50973", "nginx DoS", "https://www.exploit-db.com/exploits/50973", "")]
+    hit = ExploitHit(
+        "44908",
+        "Redis 5.0 - Denial of Service",
+        "https://www.exploit-db.com/exploits/44908",
+        "",
+        type="dos",
+        platform="linux",
+        date="2018-06-20",
+        cve="CVE-2018-12453",
+        version_match=True,
     )
+    pane.show_exploits(EdbSearch([hit], "redis 5.0", "version"))
     assert pane._exploits.count() == 1
-    assert "50973" in pane._exploits.item(0).text()
+    text = pane._exploits.item(0).text()
+    assert "EDB-44908" in text and "dos" in text and "★" in text  # id + type badge + match marker
+    assert not pane._edb_header.isHidden() and "redis 5.0" in pane._edb_header.text()
+    assert "CVE-2018-12453" in pane._exploits.item(0).toolTip()  # CVE surfaced in the tooltip
+    assert pane._exploits.item(0).font().weight() >= QFont.Weight.DemiBold  # match is emphasised
+
+
+def test_reference_pane_show_exploits_product_scope(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    hit = ExploitHit("49765", "MariaDB 10.2 - OS Command Execution", "url", "")
+    pane.show_exploits(EdbSearch([hit], "mariadb", "product"))
+    assert "product-wide" in pane._edb_header.text()  # fallback labelled, not mistaken for a match
+
+
+def test_reference_pane_show_exploits_none(qtbot: QtBot) -> None:
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_exploits(EdbSearch([], "", "none"))
+    assert pane._edb_header.isHidden()
+    assert "skipped" in pane._exploits.item(0).text()
 
 
 def test_main_window_edb_stale_result_ignored(qtbot: QtBot) -> None:
@@ -127,9 +157,10 @@ def test_main_window_edb_stale_result_ignored(qtbot: QtBot) -> None:
     qtbot.addWidget(window)
     window._edb_request_id = 5
     hit = ExploitHit("1", "title", "https://www.exploit-db.com/exploits/1", "")
-    window._on_edb_done([hit], 4)  # stale id -> ignored
+    search = EdbSearch([hit], "apache 2.4", "version")
+    window._on_edb_done(search, 4)  # stale id -> ignored
     assert window._reference_pane._exploits.count() == 0
-    window._on_edb_done([hit], 5)  # current id -> shown
+    window._on_edb_done(search, 5)  # current id -> shown
     assert window._reference_pane._exploits.count() == 1
 
 

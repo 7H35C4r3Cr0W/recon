@@ -10,7 +10,18 @@ def _hit(edb_id: str, title: str = "example", path: str = "linux/remote/x.py") -
         title=title,
         url=f"https://www.exploit-db.com/exploits/{edb_id}",
         path=path,
+        type="remote",
+        platform="linux",
+        cve="CVE-2020-1234",
+        date="2020-01-01",
     )
+
+
+def test_stores_display_fields_but_never_the_poc_path(tmp_path: Path) -> None:
+    edb.add_edb(tmp_path, service="s", product="OpenSSH", version="7.2", hits=[_hit("40136")])
+    row = edb.load_edb(tmp_path)[0]
+    assert row["type"] == "remote" and row["platform"] == "linux" and row["cve"] == "CVE-2020-1234"
+    assert "path" not in row  # lookup-only: the local PoC path is NEVER persisted
 
 
 def test_add_and_load_roundtrip(tmp_path: Path) -> None:

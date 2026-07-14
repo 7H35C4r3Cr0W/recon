@@ -139,11 +139,88 @@ def test_parse_searchsploit_json() -> None:
     assert first.edb_id == "50973"
     assert first.url == "https://www.exploit-db.com/exploits/50973"
     assert "nginx" in first.title.lower()
+    assert first.type == "dos" and first.platform == "multiple"  # enriched display fields parsed
+
+
+def test_parse_searchsploit_extracts_type_platform_cve() -> None:
+    # real searchsploit output for `redis 5.0` — carries Type/Platform/Date_Published/Codes(CVE).
+    text = (FIXTURES / "searchsploit" / "redis-5.0.json").read_text(encoding="utf-8")
+    hits = references.parse_searchsploit_json(text)
+    by_id = {h.edb_id: h for h in hits}
+    dos = by_id["44908"]
+    assert dos.type == "dos" and dos.platform == "linux" and dos.date == "2018-06-20"
+    assert dos.cve == "CVE-2018-12453"  # parsed out of the Codes field
+
+
+def test_format_cve_keeps_only_cves_deduped() -> None:
+    assert references._format_cve("CVE-2018-12453") == "CVE-2018-12453"
+    assert references._format_cve("cve-2019-1234;CVE-2019-1234;OSVDB-77") == "CVE-2019-1234"
+    assert references._format_cve("CVE-2020-1;OSVDB-9") == ""  # too-short seq isn't a real CVE
+    assert references._format_cve("CVE-2099-12345678") == "CVE-2099-12345678"  # long id, not cut
+    assert references._format_cve("") == "" and references._format_cve(None) == ""
+
+
+def test_title_version_match_is_token_bounded() -> None:
+    m = references._title_matches_version
+    assert m("Apache HTTP Server 2.4.49 - Path Traversal", "2.4.41", "2.4")  # 2.4.x line hits
+    assert m("Redis 5.0 - Denial of Service", "5.0.7", "5.0")
+    assert not m("Product 15.0 - bug", "5.0.7", "5.0")  # 15.0 must NOT count as a 5.0 match
+    assert not m("Product 5.01 - bug", "5.0.7", "5.0")  # 5.01 must NOT count as a 5.0 match
+    assert m("thing 5.5.5-10.3.27-mariadb", "5.5.5-10.3.27-MariaDB", "10.3")  # full-version substr
 
 
 def test_parse_searchsploit_handles_garbage() -> None:
     assert references.parse_searchsploit_json("not json") == []
     assert references.parse_searchsploit_json("{}") == []
+
+
+def test_normalize_product_reduces_noisy_banners() -> None:
+    # first bander word is the search term; noise words after it are dropped by taking only word[0]
+    assert references.normalize_product("Apache httpd", "2.4.38") == ("apache", "2.4")
+    assert references.normalize_product("Redis key-value store", "5.0.7") == ("redis", "5.0")
+    assert references.normalize_product("OpenSSH", "8.2p1 Ubuntu") == ("openssh", "8.2")
+    assert references.normalize_product("Microsoft IIS httpd", "10.0") == ("iis", "10.0")  # vendor
+    assert references.normalize_product("", "") == ("", "")
+
+
+def test_normalize_product_unmasks_mariadb_behind_mysql() -> None:
+    # Sequel: nmap labels it MySQL, the version carries the fake 5.5.5- prefix; the real engine is
+    # MariaDB 10.3 — search for that, not "mysql 5.5".
+    core, short = references.normalize_product("MySQL", "5.5.5-10.3.27-MariaDB-0+deb10u1")
+    assert core == "mariadb" and short == "10.3"
+
+
+def test_search_exploits_falls_back_to_product_when_version_misses() -> None:
+    # injected runner: the version query misses, the product-only query hits -> product scope.
+    calls: list[str] = []
+
+    def runner(query: str) -> list[references.ExploitHit]:
+        calls.append(query)
+        if query == "openssh":
+            return [references.ExploitHit("1", "OpenSSH 9.8 - Race Condition", "u", "p")]
+        return []
+
+    result = references.search_exploits("OpenSSH", "8.2p1", Path("/unused"), runner=runner)
+    assert calls == ["openssh 8.2", "openssh"]  # primary tried first, then the fallback
+    assert result.scope == "product" and result.query == "openssh" and len(result.hits) == 1
+
+
+def test_search_exploits_version_scope_ranks_matches_first() -> None:
+    def runner(query: str) -> list[references.ExploitHit]:
+        return [
+            references.ExploitHit("100", "Redis - unrelated", "u", "p"),
+            references.ExploitHit("200", "Redis 5.0 - Denial of Service", "u", "p"),
+        ]
+
+    result = references.search_exploits("Redis", "5.0.7", Path("/unused"), runner=runner)
+    assert result.scope == "version" and result.query == "redis 5.0"
+    assert result.hits[0].edb_id == "200" and result.hits[0].version_match  # match floated to top
+    assert not result.hits[1].version_match
+
+
+def test_search_exploits_no_product_is_none_scope() -> None:
+    result = references.search_exploits("", "", Path("/unused"), runner=lambda q: [])
+    assert result.scope == "none" and result.hits == []
 
 
 def test_safe_query_strips_shell_hostile_chars() -> None:
