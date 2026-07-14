@@ -35,6 +35,8 @@ _NEW_SERVICES = [
     ("mdns", 5353, Proto.UDP, "mdns"),
     ("upnp", 1900, Proto.UDP, "upnp"),
     ("rmi", 1099, Proto.TCP, "java-rmi"),
+    ("openvpn", 1194, Proto.UDP, "openvpn"),
+    ("rpcbind", 111, Proto.TCP, "rpcbind"),
 ]
 
 

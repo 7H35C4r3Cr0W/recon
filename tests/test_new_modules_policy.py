@@ -39,6 +39,8 @@ _NEW_MODULES = [
     "mdns",
     "upnp",
     "rmi",
+    "openvpn",
+    "rpcbind",
 ]
 
 
