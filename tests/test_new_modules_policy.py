@@ -13,8 +13,24 @@ from oscprecon.modules import base
 # pass the shell policy (else the tool would silently [blocked] them), and their Tier-2 manual
 # follow-ups must be runnable too — every command's binary has to be on the OSCP allow-list.
 _NEW_MODULES = [
-    "rdp", "vnc", "finger", "x11", "ajp", "ipmi", "sip", "oracle", "elasticsearch",
-    "couchdb", "docker", "kubernetes", "memcached", "winrm", "rsync", "msrpc", "imap", "pop3",
+    "rdp",
+    "vnc",
+    "finger",
+    "x11",
+    "ajp",
+    "ipmi",
+    "sip",
+    "oracle",
+    "elasticsearch",
+    "couchdb",
+    "docker",
+    "kubernetes",
+    "memcached",
+    "winrm",
+    "rsync",
+    "msrpc",
+    "imap",
+    "pop3",
 ]
 
 
