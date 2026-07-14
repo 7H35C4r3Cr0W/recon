@@ -229,7 +229,9 @@ class HttpModule(Module):
             commands += [
                 Command(
                     "http",
-                    f"whatweb {url}",
+                    # --colour=never: whatweb colours its summary even when piped, so without this
+                    # the saved file is full of ANSI escapes and the parser can't read the plugins.
+                    f"whatweb --colour=never {url}",
                     "Fingerprint the web stack.",
                     "< 30s",
                     f"{base}/whatweb.txt",

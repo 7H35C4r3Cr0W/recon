@@ -137,7 +137,7 @@ def test_light_probe_commands() -> None:
     module = HttpModule()
     cmds = module.commands(Target(ip="10.10.10.5"), [Port(80, Proto.TCP, "http")])
     lines = [c.shell_line for c in cmds]
-    assert any(line.startswith("whatweb http://10.10.10.5/") for line in lines)
+    assert any(line.startswith("whatweb --colour=never http://10.10.10.5/") for line in lines)
     assert any(".git/HEAD" in line for line in lines)
     assert all(c.output_file.startswith("http/80/") for c in cmds)
 

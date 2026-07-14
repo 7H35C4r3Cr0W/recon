@@ -89,6 +89,33 @@ def test_whatweb() -> None:
     assert detect_wordpress(_read("whatweb.json")) is True
 
 
+def test_whatweb_plain_summary() -> None:
+    # the default `whatweb --colour=never <url>` emits the human summary, not JSON — it must still
+    # parse (Appointment: the login form surfaces as PasswordField + Title[Login]).
+    findings = parse_whatweb(_read("whatweb-plain.txt"), 80)
+    assert len(findings) == 1
+    assert findings[0].status == 200
+    assert findings[0].path == "/"
+    assert findings[0].port == 80
+    # plugin names extracted at bracket depth 0, so Title[Login] and HTTPServer[..., ...] stay whole
+    assert "PasswordField" in findings[0].note
+    assert "Title" in findings[0].note
+    assert "Apache" in findings[0].note
+
+
+def test_whatweb_plain_strips_ansi_colour() -> None:
+    coloured = (
+        "\x1b[1m\x1b[34mhttp://t/\x1b[0m [200 OK] "
+        "\x1b[1mApache\x1b[0m[\x1b[32m2.4.38\x1b[0m], "
+        "\x1b[1mTitle\x1b[0m[\x1b[33mDashboard, home\x1b[0m]\n"
+    )
+    findings = parse_whatweb(coloured, 80)
+    assert len(findings) == 1
+    assert findings[0].status == 200
+    # the comma inside Title[Dashboard, home] must not split into a bogus plugin name
+    assert findings[0].note == "whatweb: Apache, Title"
+
+
 def test_wpscan() -> None:
     findings = parse_wpscan(_read("wpscan.json"), 80)
     notes = " ".join(f.note for f in findings)

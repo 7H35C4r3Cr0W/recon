@@ -220,7 +220,7 @@ def parse_nikto(text: str, port: int) -> list[HttpFinding]:
     return findings
 
 
-def parse_whatweb(text: str, port: int) -> list[HttpFinding]:
+def _parse_whatweb_json(text: str, port: int) -> list[HttpFinding]:
     # whatweb --log-json drifts between a single JSON array/object and NDJSON (one object per line)
     # across versions. Try the whole doc first, then fall back to line-by-line, skipping bad rows —
     # so a format change or one malformed line never drops the rest.
@@ -253,6 +253,59 @@ def parse_whatweb(text: str, port: int) -> list[HttpFinding]:
             )
         )
     return findings
+
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+# plain summary line: "http://host/ [200 OK] Apache[2.4.38], JQuery[3.2.1], PasswordField[password]"
+_WHATWEB_PLAIN = re.compile(r"^(?P<url>\S+)\s+\[(?P<status>\d{3})[^\]]*\]\s+(?P<plugins>.+)$")
+
+
+def _split_top_level(text: str) -> list[str]:
+    # split on commas that are NOT inside [...] — a whatweb plugin detail (e.g. a page Title) can
+    # itself carry commas, so a naive split would shred the plugin names.
+    parts: list[str] = []
+    depth = 0
+    start = 0
+    for i, ch in enumerate(text):
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth = max(0, depth - 1)
+        elif ch == "," and depth == 0:
+            parts.append(text[start:i])
+            start = i + 1
+    parts.append(text[start:])
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _parse_whatweb_plain(text: str, port: int) -> list[HttpFinding]:
+    findings: list[HttpFinding] = []
+    for raw in text.splitlines():
+        line = _ANSI_RE.sub("", raw).strip()
+        match = _WHATWEB_PLAIN.match(line)
+        if match is None:
+            continue
+        names = sorted(
+            {seg.split("[", 1)[0].strip() for seg in _split_top_level(match.group("plugins"))}
+            - {""}
+        )
+        findings.append(
+            HttpFinding(
+                port=port,
+                path=_path_of(match.group("url")),
+                status=int(match.group("status")),
+                note=f"whatweb: {', '.join(names)}" if names else "whatweb",
+            )
+        )
+    return findings
+
+
+def parse_whatweb(text: str, port: int) -> list[HttpFinding]:
+    # whatweb emits JSON (--log-json) or the default human summary line. Parse JSON first (richer);
+    # fall back to the plain summary so the default `whatweb --colour=never <url>` still yields a
+    # finding instead of silently dropping the fingerprint (e.g. an exposed login form).
+    findings = _parse_whatweb_json(text, port)
+    return findings if findings else _parse_whatweb_plain(text, port)
 
 
 def parse_wpscan(text: str, port: int) -> list[HttpFinding]:
