@@ -96,6 +96,6 @@ def test_flagship_tier1_buttons_are_ranked_primary(qtbot: QtBot) -> None:
         qtbot.addWidget(widget)
     primary = [smb._full, ftp._full, ssh._recon, dns._recon, ldap._recon, simple._recon]
     for button in primary:
-        assert tokens.DARK.accent in button.styleSheet()  # gold primary CTA
+        assert tokens.active_palette().accent in button.styleSheet()  # accent primary CTA
     # a secondary Tier-1 action is NOT styled primary (visual ranking holds)
-    assert tokens.DARK.accent not in smb._null.styleSheet()
+    assert tokens.active_palette().accent not in smb._null.styleSheet()

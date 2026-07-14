@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import manual_commands
-from oscprecon.gui.theme import styles, tokens
+from oscprecon.gui.theme import styles
 from oscprecon.models import DiscoveredService
 from oscprecon.modules import ssh as ssh_mod
 from oscprecon.profile import Profile
@@ -36,7 +36,7 @@ class SshPanel(QWidget):
         self._port = 22
 
         self._recon = QPushButton("Run full SSH recon (banner, algos, host keys, auth methods)")
-        self._recon.setStyleSheet(styles.primary_button(tokens.DARK))  # flagship Tier-1 action
+        self._recon.setStyleSheet(styles.accent_button())  # flagship Tier-1 action
         self._recon.clicked.connect(lambda: self.recon_requested.emit(self._port))
         button_box = QGroupBox("Tier 1 — SSH fingerprint (read-only; no login attempted)")
         QVBoxLayout(button_box).addWidget(self._recon)

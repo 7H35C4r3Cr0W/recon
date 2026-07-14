@@ -78,7 +78,7 @@ class SprayDialog(QDialog):
 
         button_row = QHBoxLayout()
         self._run = QPushButton("Run selected sprays")
-        self._run.setStyleSheet(styles.primary_button(tokens.DARK))  # primary (gated) action
+        self._run.setStyleSheet(styles.accent_button())  # primary (gated) action
         self._run.setEnabled(spray_enabled)
         self._run.clicked.connect(self._on_run)
         close = QPushButton("Close")

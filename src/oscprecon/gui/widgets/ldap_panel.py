@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import manual_commands
-from oscprecon.gui.theme import styles, tokens
+from oscprecon.gui.theme import styles
 from oscprecon.models import DiscoveredService
 from oscprecon.modules import ldap as ldap_mod
 from oscprecon.profile import Profile
@@ -45,7 +45,7 @@ class LdapPanel(QWidget):
         form.addRow("Base DN:", self._basedn)
 
         self._recon = QPushButton("Run full LDAP recon (root DSE + anonymous users)")
-        self._recon.setStyleSheet(styles.primary_button(tokens.DARK))  # flagship Tier-1 action
+        self._recon.setStyleSheet(styles.accent_button())  # flagship Tier-1 action
         self._recon.clicked.connect(self._on_recon)
         button_box = QGroupBox("Tier 1 — anonymous LDAP recon (read-only, bounded)")
         box_layout = QVBoxLayout(button_box)

@@ -28,7 +28,7 @@ def test_normalize_falls_back_to_default() -> None:
     assert theme.normalize("nonsense") == theme.DEFAULT_THEME
 
 
-def test_htb_theme_is_dark_with_green_highlight(qtbot: QtBot) -> None:
+def test_htb_theme_is_dark_with_parrot_highlight(qtbot: QtBot) -> None:
     from PySide6.QtWidgets import QApplication
 
     app = QApplication.instance()
@@ -37,8 +37,17 @@ def test_htb_theme_is_dark_with_green_highlight(qtbot: QtBot) -> None:
     window = app.palette().color(QPalette.ColorRole.Window)
     highlight = app.palette().color(QPalette.ColorRole.Highlight)
     theme.apply_theme("light")  # restore for other tests
-    assert window.lightness() < 60  # a deep navy ground
-    assert (highlight.green(), highlight.red(), highlight.blue()) == (239, 159, 0)  # #9fef00
+    assert window.lightness() < 60  # a deep dark ground
+    assert (highlight.red(), highlight.green(), highlight.blue()) == (21, 228, 241)  # #15e4f1
+
+
+def test_htb_primary_buttons_use_the_theme_accent() -> None:
+    from oscprecon.gui.theme import styles, tokens
+
+    theme.apply_theme("htb")
+    qss = styles.primary_button(tokens.active_palette())
+    theme.apply_theme("light")  # restore
+    assert "#15e4f1" in qss  # the Parrot cyan-green accent drives the primary button in HTB mode
 
 
 def test_theme_label_is_friendly() -> None:

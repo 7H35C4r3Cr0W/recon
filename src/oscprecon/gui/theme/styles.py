@@ -43,6 +43,11 @@ def primary_button(pal: Palette) -> str:
     )
 
 
+def accent_button() -> str:
+    """primary_button() in the ACTIVE theme's accent — so CTAs turn cyan-green in HTB mode."""
+    return primary_button(tokens.active_palette())
+
+
 def secondary_button(pal: Palette) -> str:
     return (
         "QPushButton {"

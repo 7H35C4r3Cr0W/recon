@@ -64,32 +64,45 @@ LIGHT = Palette(
 )
 
 
-# HTB — a Hack The Box-flavoured dark theme: deep navy ground with the signature acid-green accent.
-# Green carries active nav / focus / selection / links; gold-ish warnings and a hot-pink error stay
-# legible on the navy so state never rides on the green alone.
+# HTB — a Hack-The-Box / Parrot-OS-flavoured dark theme: dark teal-slate ground with Parrot
+# Security's signature cyan-green accent (#15e4f1). The accent carries active nav / focus /
+# selection / links AND the primary action buttons; amber warnings and a hot-pink error stay
+# legible on the dark so state never rides on the green alone.
 HTB = Palette(
-    bg="#111927",
-    surface="#1a2432",
-    surface_alt="#202c3d",
-    border="#2b3a52",
-    text="#e6edf6",
-    text_muted="#8698b3",
-    accent="#9fef00",  # the Hack The Box green
-    accent_text="#0a1200",
-    secondary="#5cb8ff",
-    focus="#9fef00",
-    selection="#1d3a26",  # green-tinted selected row
+    bg="#0f171d",
+    surface="#16212a",
+    surface_alt="#1c2833",
+    border="#29373f",
+    text="#e3edf2",
+    text_muted="#8098a3",
+    accent="#15e4f1",  # Parrot Security cyan-green
+    accent_text="#04181c",
+    secondary="#5cc8ff",
+    focus="#15e4f1",
+    selection="#123138",  # teal-tinted selected row
     success="#3ddc84",
     warning="#f5c518",
     error="#ff5c7a",
-    info="#5cb8ff",
+    info="#5cc8ff",
 )
 
 _PALETTES = {"dark": DARK, "light": LIGHT, "htb": HTB}
+_active_theme = "light"
 
 
 def palette(theme: str) -> Palette:
     return _PALETTES.get(theme, LIGHT)
+
+
+def set_active_theme(name: str) -> None:
+    # why: lets primary buttons pick up the CURRENT theme's accent (green in HTB) without threading
+    # the theme name through every constructor. Set by theme.apply_theme().
+    global _active_theme
+    _active_theme = name if name in _PALETTES else "light"
+
+
+def active_palette() -> Palette:
+    return _PALETTES.get(_active_theme, LIGHT)
 
 
 # spacing scale (px) — use these, not magic margins

@@ -59,7 +59,7 @@ class CredentialVaultDialog(QDialog):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
         self._add = QPushButton("Add…")
-        self._add.setStyleSheet(styles.primary_button(tokens.DARK))  # primary action
+        self._add.setStyleSheet(styles.accent_button())  # primary action
         self._add.clicked.connect(self._on_add)
         self._edit = QPushButton("Edit…")
         self._edit.clicked.connect(self._on_edit)

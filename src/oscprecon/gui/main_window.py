@@ -44,7 +44,7 @@ from oscprecon.gui.dialogs import (
 )
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
-from oscprecon.gui.theme import styles, tokens
+from oscprecon.gui.theme import styles
 from oscprecon.gui.widgets.activity_view import ActivityView
 from oscprecon.gui.widgets.app_header import AppHeader
 from oscprecon.gui.widgets.findings_view import FindingsView
@@ -159,7 +159,7 @@ class MainWindow(QMainWindow):
 
         self._target_label = QLabel("No profile loaded.")
         self._run_button = QPushButton("Run Full Recon")
-        self._run_button.setStyleSheet(styles.primary_button(tokens.DARK))  # primary recon action
+        self._run_button.setStyleSheet(styles.accent_button())  # primary recon action
         self._run_button.setAccessibleName("Run full recon")
         self._run_button.setEnabled(False)
         self._run_button.clicked.connect(self._on_run)
@@ -658,6 +658,7 @@ class MainWindow(QMainWindow):
         self._header.restyle(normalized)
         self._nav.restyle(normalized)
         self._tool_panel.set_theme(normalized)
+        self._run_button.setStyleSheet(styles.accent_button())  # theme accent
         self._restyle_views(normalized)
 
     def _restyle_views(self, theme_name: str) -> None:

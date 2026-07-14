@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon.gui.theme import styles, tokens
+from oscprecon.gui.theme import styles
 from oscprecon.models import Credential
 
 
@@ -49,7 +49,7 @@ class AddCredentialDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         self._ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        self._ok.setStyleSheet(styles.primary_button(tokens.DARK))
+        self._ok.setStyleSheet(styles.accent_button())
         self._username.textChanged.connect(self._validate)
         self._secret.textChanged.connect(self._validate)
 

@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import manual_commands
-from oscprecon.gui.theme import styles, tokens
+from oscprecon.gui.theme import styles
 from oscprecon.models import DiscoveredService
 from oscprecon.modules import smb as smb_mod
 from oscprecon.profile import Profile
@@ -35,7 +35,7 @@ class SmbPanel(QWidget):
         self._profile: Profile | None = None
 
         self._full = QPushButton("Run full SMB recon")
-        self._full.setStyleSheet(styles.primary_button(tokens.DARK))  # flagship Tier-1 action
+        self._full.setStyleSheet(styles.accent_button())  # flagship Tier-1 action
         self._full.clicked.connect(lambda: self.recon_requested.emit("full"))
         self._null = QPushButton("Just check null session")
         self._null.clicked.connect(lambda: self.recon_requested.emit("null"))

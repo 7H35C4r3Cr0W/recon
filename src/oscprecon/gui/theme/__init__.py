@@ -3,6 +3,8 @@ from __future__ import annotations
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
+from oscprecon.gui.theme import tokens
+
 # why: §19/§23 — a dark/light toggle for exam-day comfort. Fusion + a dark QPalette is the robust
 # Qt way (complete coverage of every widget role, no fragile per-widget QSS to maintain).
 THEMES = ("light", "dark", "htb")
@@ -45,27 +47,27 @@ def _dark_palette() -> QPalette:
 
 
 def _htb_palette() -> QPalette:
-    # Hack The Box flavour — deep navy ground, acid-green highlight. Mirrors _dark_palette's roles
-    # so every Fusion-drawn widget (tables, inputs) reads correctly on the navy.
-    bg = QColor("#111927")
-    base = QColor("#1a2432")
-    text = QColor("#e6edf6")
-    green = QColor("#9fef00")
-    disabled = QColor("#6b7688")
+    # HTB / Parrot-OS flavour — dark teal-slate ground, Parrot cyan-green highlight. Mirrors
+    # _dark_palette's roles so every Fusion widget (tables, inputs) reads right on the dark.
+    bg = QColor("#0f171d")
+    base = QColor("#16212a")
+    text = QColor("#e3edf2")
+    green = QColor("#15e4f1")  # Parrot Security cyan-green
+    disabled = QColor("#7f95a3")
     p = QPalette()
     p.setColor(QPalette.ColorRole.Window, bg)
     p.setColor(QPalette.ColorRole.WindowText, text)
     p.setColor(QPalette.ColorRole.Base, base)
-    p.setColor(QPalette.ColorRole.AlternateBase, QColor("#202c3d"))
+    p.setColor(QPalette.ColorRole.AlternateBase, QColor("#1c2833"))
     p.setColor(QPalette.ColorRole.ToolTipBase, base)
     p.setColor(QPalette.ColorRole.ToolTipText, text)
     p.setColor(QPalette.ColorRole.Text, text)
     p.setColor(QPalette.ColorRole.Button, base)
     p.setColor(QPalette.ColorRole.ButtonText, text)
     p.setColor(QPalette.ColorRole.BrightText, QColor("#ff5c7a"))
-    p.setColor(QPalette.ColorRole.Link, QColor("#5cb8ff"))
+    p.setColor(QPalette.ColorRole.Link, QColor("#5cc8ff"))
     p.setColor(QPalette.ColorRole.Highlight, green)
-    p.setColor(QPalette.ColorRole.HighlightedText, QColor("#0a1200"))
+    p.setColor(QPalette.ColorRole.HighlightedText, QColor("#04181c"))
     for role in (
         QPalette.ColorRole.Text,
         QPalette.ColorRole.ButtonText,
@@ -84,6 +86,7 @@ def apply_theme(name: str) -> None:
     if not isinstance(app, QApplication):
         return
     normalized = normalize(name)
+    tokens.set_active_theme(normalized)  # so primary buttons pick up this theme's accent
     if normalized == "dark":
         app.setStyle("Fusion")
         app.setPalette(_dark_palette())

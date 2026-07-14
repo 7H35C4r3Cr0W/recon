@@ -69,11 +69,11 @@ class WorkspaceDashboard(QWidget):
         self._index_worker: WorkspaceIndexWorker | None = None
         self._theme = theme_name
 
+        self._primary_btns: list[QPushButton] = []  # re-styled to the theme accent on set_theme
         new_btn = QPushButton("New Project…")
-        new_btn.setStyleSheet(
-            styles.primary_button(tokens.DARK)
-        )  # primary action (gold, both themes)
+        new_btn.setStyleSheet(styles.accent_button())  # theme accent
         new_btn.clicked.connect(self.create_requested.emit)
+        self._primary_btns.append(new_btn)
         refresh_btn = QPushButton("Refresh")
         refresh_btn.clicked.connect(self.refresh)
         self._filter = QLineEdit()
@@ -141,8 +141,9 @@ class WorkspaceDashboard(QWidget):
         self._empty_subtitle = subtitle
 
         create = QPushButton("New Project…")
-        create.setStyleSheet(styles.primary_button(tokens.DARK))
+        create.setStyleSheet(styles.accent_button())
         create.clicked.connect(self.create_requested.emit)
+        self._primary_btns.append(create)
 
         for widget, align in (
             (art, Qt.AlignmentFlag.AlignHCenter),
@@ -166,6 +167,8 @@ class WorkspaceDashboard(QWidget):
         # otherwise renders with the stale window palette after a theme switch.
         self.setStyleSheet(f"#dashboardView {{ background:{pal.bg}; }}")
         self._empty_subtitle.setStyleSheet(f"color:{pal.text_muted};")
+        for btn in self._primary_btns:  # re-tint primary CTAs to the new theme's accent
+            btn.setStyleSheet(styles.primary_button(pal))
         self._apply_filters()  # recolour the status cells from memory (no rescan)
 
     # --- data loading (off-thread) ---

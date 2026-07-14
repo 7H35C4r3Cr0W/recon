@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 
 from oscprecon import manual_commands
 from oscprecon.gui.simple_recon import SimpleReconSpec
-from oscprecon.gui.theme import styles, tokens
+from oscprecon.gui.theme import styles
 from oscprecon.models import DiscoveredService
 from oscprecon.profile import Profile
 
@@ -36,7 +36,7 @@ class SimpleReconPanel(QWidget):
         self._port = 0
 
         self._recon = QPushButton(spec.label)
-        self._recon.setStyleSheet(styles.primary_button(tokens.DARK))  # flagship Tier-1 action
+        self._recon.setStyleSheet(styles.accent_button())  # flagship Tier-1 action
         self._recon.clicked.connect(lambda: self.recon_requested.emit(spec.module, self._port))
         button_box = QGroupBox(
             "Tier 1 — read-only recon (streams to the output pane + findings.json)"
