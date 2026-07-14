@@ -19,6 +19,7 @@ from oscprecon.modules import (
     iscsi,
     kerberos,
     kubernetes,
+    mdns,
     memcached,
     mongodb,
     msrpc,
@@ -200,6 +201,10 @@ def _svn_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _ident_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in ident.IdentModule().recon_steps(target, port)]
+
+
+def _mdns_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in mdns.MdnsModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -533,5 +538,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(ident),
         ident.IdentModule,
         _ident_steps,
+    ),
+    "mdns": SimpleReconSpec(
+        "mdns",
+        "Run full mDNS recon (advertised services)",
+        "mDNS recon (UDP) — nmap dns-service-discovery lists advertised services, ports and host "
+        "addresses (read-only). Often reveals ports outside the top-1000 scan.",
+        _manual(mdns),
+        mdns.MdnsModule,
+        _mdns_steps,
     ),
 }

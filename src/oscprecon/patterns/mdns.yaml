@@ -1,0 +1,19 @@
+# mDNS recon next-steps (service discovery, read-only). Advertised services point at ports worth
+# enumerating; no credential guessing is ever suggested here.
+- match:
+    service: mdns
+    field: kind
+    value: "^service$"
+  suggest:
+    - text: "mDNS advertised a service — enumerate that port directly (often outside the top-1000 scan)"
+      command: "nmap -sV -p- {target}"
+# source: HackTricks 5353-udp-multicast-dns-mdns (book.hacktricks.wiki) — standard OSCP mDNS recon
+
+- match:
+    service: mdns
+    field: kind
+    value: "^address$"
+  suggest:
+    - text: "mDNS leaked a host address (incl. IPv6) — add it to scope-confirmed enumeration"
+      command: "nmap -sU -p 5353 --script dns-service-discovery {target}"
+# source: HackTricks 5353-udp-multicast-dns-mdns (book.hacktricks.wiki) — standard OSCP mDNS recon
