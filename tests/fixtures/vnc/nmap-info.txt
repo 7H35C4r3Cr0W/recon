@@ -1,0 +1,14 @@
+Nmap scan report for 10.10.10.9
+Host is up (0.019s latency).
+
+PORT     STATE SERVICE VERSION
+5900/tcp open  vnc     VNC (protocol 3.8)
+| vnc-info:
+|   Protocol version: 3.8
+|   Security types:
+|     VNC Authentication (2)
+|_    Tight (16)
+| vnc-title:
+|_  Desktop name: root's X desktop (target:0)
+
+Service Info: OS: Unix

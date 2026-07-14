@@ -1,0 +1,16 @@
+# VNC manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. VNC password guessing is list-based (Tier-3, Spray-mode only) — not here.
+- description: "Desktop name + auth types (vnc-title)"
+  why: "vnc-title reads the desktop name and offered security types — read-only"
+  command: "nmap -p {port} --script vnc-title {target}"
+# source: HackTricks pentesting-vnc (book.hacktricks.wiki) — standard OSCP VNC recon
+
+- description: "Version + offered security types (vnc-info)"
+  why: "vnc-info re-run in isolation confirms the RFB version and whether 'None' auth is offered"
+  command: "nmap -p {port} --script vnc-info {target}"
+# source: HackTricks pentesting-vnc (book.hacktricks.wiki) — standard OSCP VNC recon
+
+- description: "TLS certificate (VeNCrypt / TLS-wrapped VNC)"
+  why: "when a TLS security type is offered, ssl-cert leaks the machine name — read-only"
+  command: "nmap -p {port} --script ssl-cert {target}"
+# source: HackTricks pentesting-vnc (book.hacktricks.wiki) — standard OSCP VNC recon

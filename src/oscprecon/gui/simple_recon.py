@@ -20,6 +20,7 @@ from oscprecon.modules import (
     smtp,
     snmp,
     tftp,
+    vnc,
 )
 from oscprecon.modules.base import Module
 
@@ -88,6 +89,10 @@ def _postgresql_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _rdp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in rdp.RdpModule().recon_steps(target, port)]
+
+
+def _vnc_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in vnc.VncModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -223,5 +228,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(rdp),
         rdp.RdpModule,
         _rdp_steps,
+    ),
+    "vnc": SimpleReconSpec(
+        "vnc",
+        "Run full VNC recon (version · auth types · desktop)",
+        "VNC recon — unauth vnc-info (RFB version + offered security types) + vnc-title (desktop "
+        "name); read-only. A 'None' security type means an open display. Password guessing is off.",
+        _manual(vnc),
+        vnc.VncModule,
+        _vnc_steps,
     ),
 }
