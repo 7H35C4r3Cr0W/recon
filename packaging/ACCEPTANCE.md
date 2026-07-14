@@ -60,8 +60,22 @@ These need an interactive desktop session and/or another machine; they are **not
   those or the build must be re-run with `linuxdeploy`.
 - **Second clean VM.** Only one host was available.
 
+## Nabu identity (rebrand) — verify on the packed build
+
+The product is **Nabu**; the AppImage carries that identity. Verified here at the input level
+(`test_packaging`): `packaging/nabu.desktop` has `Name=Nabu`, `Exec=nabu`, `Icon=nabu`;
+`packaging/nabu.png` is the Nabu mark rendered from `icon.svg`; `build-appimage.sh` emits
+`dist/Nabu-<version>-<arch>.AppImage`. **Not yet accepted** (need a real build on Kali):
+
+- The produced artifact is actually named `Nabu-<version>-<arch>.AppImage`.
+- The desktop entry shows **Nabu** with the Nabu icon in a real application menu.
+- The window title, splash, and About dialog read **Nabu** in the packed binary.
+- `nabu` / `nabu-cli` console scripts resolve when installed from the wheel (verified out-of-checkout
+  in the dev venv; re-check inside the AppImage's bundled interpreter).
+
 ## Verdict
 
 The AppImage **builds and runs on this Kali host**: it is self-contained for Python + PySide6 +
 QtWebEngine + all app data, and the app object constructs and tears down cleanly from outside the
-checkout. Full interactive + cross-machine acceptance remains open (see above).
+checkout. Full interactive + cross-machine acceptance — and the Nabu identity on the packed binary —
+remain open (see above).

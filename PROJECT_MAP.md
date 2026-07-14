@@ -5,13 +5,22 @@ Project-control map of what the application **actually is** right now, confirmed
 is the single "what is done / partial / next / blocked" view. Historical build detail stays in
 `PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
 
-- **Version:** 0.0.1 · **Entry points:** `oscp-recon`, `oscprecon`, `oscprecon-cli`
-- **Verified:** `mypy --strict` clean (118 files) · `ruff check` + `ruff format --check` clean ·
-  **902 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
-  vendored HackTricks snapshot; `packaging/` build infra excluded from the wheel). Live-fetch +
-  credential-durability paths independently refute-reviewed (0 credential-loss / allowlist-bypass /
-  data-leak defects; one confirmed spray secret-leak found + fixed, both low-sev residuals hardened).
-  Spray preserves the discovered port.
+- **Product name:** **Nabu** (*Local Recon Workspace*) · internal package `oscprecon`, distribution
+  `oscp-recon` (unchanged; see [`docs/OWNER_DECISIONS.md`](docs/OWNER_DECISIONS.md)).
+- **Version:** 0.0.1 · **Entry points:** `nabu`, `nabu-cli` (preferred) + `oscp-recon`, `oscprecon`,
+  `oscprecon-cli` (legacy aliases).
+- **Verified:** `mypy --strict` clean (132 files) · `ruff check` + `ruff format --check` clean ·
+  **970 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
+  vendored HackTricks snapshot + the Nabu SVG identity; `packaging/` build infra excluded from the
+  wheel), verified installed out-of-checkout (`nabu`/`nabu-cli` + legacy scripts + assets resolve).
+  Live-fetch + credential-durability paths independently refute-reviewed; the Nabu UI pass was
+  inline adversarial-reviewed (no secret-exposure / behaviour / policy defects). Spray preserves the
+  discovered port.
+- **Nabu UI/UX pass DONE** (12 commits): rename+entry points, original SVG identity, typed design
+  tokens/styles/icons, conservative `finding_severity`, primary-nav shell + compact header,
+  Findings/Activity views, dashboard + recon polish, reference tier badge + Tier-1 ranking, vault/
+  spray/dialog uniformity, richer Findings filter, feedback banner, keyboard+a11y sweep, performance
+  caching, `docs/screenshots/`. Remaining: interactive HTML module-flow mind-map for management (last).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 - Owner-approved policy decisions: [`docs/OWNER_DECISIONS.md`](docs/OWNER_DECISIONS.md) (live
   HackTricks fetch/cache is approved; project credentials are durable in `<project>/creds.json`).

@@ -8,6 +8,8 @@ Companion files in this repo elaborate specific slices — `ROADMAP.md` for phas
 
 ## 1. What this project is
 
+**The product is named "Nabu"** (*Local Recon Workspace*) — the user-facing brand. The **internal Python package stays `oscprecon`** and the distribution/wheel name stays `oscp-recon` (renaming either buys nothing and breaks installs/imports/data paths). Preferred entry points are `nabu` (GUI) and `nabu-cli` (headless); `oscp-recon` / `oscprecon` / `oscprecon-cli` remain as legacy aliases. Data paths are unchanged: workspace `~/oscprecon/`, config `~/.config/oscprecon/`, cache `~/.cache/oscprecon/`. See `docs/OWNER_DECISIONS.md`.
+
 A **PySide6 desktop GUI recon orchestrator** for OSCP exam prep and exam day, built in Python. It runs on Kali Linux. Two goals in parallel:
 
 1. **Learn** — work each box on Lain Kusanagi's OSCP-like list manually to build muscle memory.

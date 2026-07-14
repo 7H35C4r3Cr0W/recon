@@ -77,11 +77,22 @@ Renaming the product to **Nabu** and lifting it toward a polished desktop produc
   drift→warning, done/restored/exported/imported→success); untagged tool output never touches it.
   MainWindow feeds + restyles it. Rendered. +2 tests.
 
-**Remaining Nabu chunks (not yet done):** full keyboard-shortcut + accessibility sweep; performance
-pass; `docs/screenshots/` (generated data only); the 22-angle adversarial refute-review; the
-docs/packaging finalization; and **(do LAST) the interactive HTML module-flow mind-map for
-management** ([[final-flowchart-deliverable]]). **Recommended single next chunk:** keyboard-shortcut
-+ accessibility sweep.
+- **Keyboard + accessibility sweep** — context-aware `Ctrl+F` (focuses the active view's search),
+  `Escape` dismisses the banner, accessible names on the key controls, focus helpers select-all;
+  status is never colour-only. +3 tests.
+- **Performance pass** — `hacktricks.load_index`/`page_for_module`/`clean_markdown` lru_cached
+  (reference-pane hot path); Findings/Activity bulk fills batch their repaint. +2 tests.
+- **Screenshots** — `docs/screenshots/generate.py` (committed, offline, synthetic data) + the PNG set
+  (shell light/dark, dashboard, findings, vault, SMB panel, offline reference) + README index.
+- **Adversarial self-review** — inline refute-pass over the whole Nabu diff: no secret-exposure /
+  behaviour / policy defects (cached dict only read; nothing secret reaches the banner/findings/
+  activity). One cosmetic QSS fix. (Full multi-agent 22-angle review: `/code-review ultra`.)
+- **Docs/packaging finalization** — CLAUDE.md §1 Nabu note, PROJECT_MAP header (Nabu + 970 tests +
+  entry points), `docs/keyboard-shortcuts.md`, `packaging/ACCEPTANCE.md` Nabu-identity section,
+  README screenshot + shortcuts links. Wheel re-verified out-of-checkout (all new widgets import).
+
+**Remaining Nabu chunk:** **(do LAST) the interactive HTML module-flow mind-map for management**
+([[final-flowchart-deliverable]]) — then the final report.
 
 ### Pre-live-testing polish (owner-requested)
 A run of owner-requested improvements before live-box testing:
