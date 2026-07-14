@@ -22,6 +22,7 @@ from oscprecon.modules import (
     snmp,
     tftp,
     vnc,
+    x11,
 )
 from oscprecon.modules.base import Module
 
@@ -98,6 +99,10 @@ def _vnc_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _finger_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in finger.FingerModule().recon_steps(target, port)]
+
+
+def _x11_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in x11.X11Module().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -251,5 +256,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(finger),
         finger.FingerModule,
         _finger_steps,
+    ),
+    "x11": SimpleReconSpec(
+        "x11",
+        "Run full X11 recon (open-display check)",
+        "X11 recon — x11-access tests whether the X server (:0-:9) grants unauthenticated access; "
+        "read-only, no screen capture. An open display is flagged as an exposure.",
+        _manual(x11),
+        x11.X11Module,
+        _x11_steps,
     ),
 }

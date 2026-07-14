@@ -1,0 +1,19 @@
+# X11 recon next-steps (x11-access, read-only). An open display is an unauthenticated exposure;
+# screen capture / keylogging is beyond this recon tool and never suggested here.
+- match:
+    service: x11
+    field: kind
+    value: "^access$"
+  suggest:
+    - text: "X server grants unauthenticated access — the display is open; note it as an exposure"
+      command: "nmap -p 6000-6009 --script x11-access {target}"
+# source: HackTricks 6000-pentesting-x11 (book.hacktricks.wiki) — standard OSCP X11 recon
+
+- match:
+    service: x11
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "Confirm which of the X displays (:0-:9) are listening across the range"
+      command: "nmap -sV -p 6000-6009 {target}"
+# source: HackTricks 6000-pentesting-x11 (book.hacktricks.wiki) — standard OSCP X11 recon

@@ -1,0 +1,16 @@
+# X11 manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. Screen capture / input injection on an open display is beyond recon.
+- description: "Re-test unauthenticated display access"
+  why: "x11-access in isolation confirms whether the X server is open — read-only"
+  command: "nmap -p {port} --script x11-access {target}"
+# source: HackTricks 6000-pentesting-x11 (book.hacktricks.wiki) — standard OSCP X11 recon
+
+- description: "Banner / version detect on the X range"
+  why: "nmap -sV over 6000-6009 confirms which displays (:0-:9) are listening"
+  command: "nmap -sV -p 6000-6009 {target}"
+# source: HackTricks 6000-pentesting-x11 (book.hacktricks.wiki) — standard OSCP X11 recon
+
+- description: "Enumerate the open display (requires X client tooling)"
+  why: "xdpyinfo reads screen geometry / extensions from an open display — best run in a terminal"
+  command: "xdpyinfo -display {target}:0"
+# source: HackTricks 6000-pentesting-x11 (book.hacktricks.wiki) — standard OSCP X11 recon

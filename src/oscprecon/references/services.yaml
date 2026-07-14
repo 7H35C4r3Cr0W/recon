@@ -357,6 +357,7 @@
 - { match: { service_name: snmp },           label: SNMP,  module: snmp,  hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-snmp/index.html" }
 - { match: { service_name: nfs },            label: NFS,   module: nfs,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/nfs-service-pentesting.html" }
 - { match: { service_name: ntp },            label: NTP,   module: ntp,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ntp.html" }
+- { match: { service_name: X11 },            label: X11,   module: x11,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/6000-pentesting-x11.html" }
 
 # --- Product-specific overrides ---
 # Order matters: on an equal-specificity tie the first match wins, so list SPECIFIC apps
@@ -396,6 +397,13 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-vnc.html
   tools:
     - { name: "nmap -sV --script vnc-info,vnc-title -p {port} {target}", purpose: "VNC version + auth types + desktop title" }
+
+- match: { port: 6000, proto: tcp }
+  label: X11
+  module: x11
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/6000-pentesting-x11.html
+  tools:
+    - { name: "nmap -sV --script x11-access -p {port} {target}", purpose: "is the X display open to unauthenticated clients?" }
 
 - match: { port: 8009, proto: tcp }
   label: AJP
