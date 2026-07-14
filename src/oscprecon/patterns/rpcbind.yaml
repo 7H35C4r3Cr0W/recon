@@ -1,0 +1,19 @@
+# rpcbind recon next-steps (portmapper dump, read-only). The registered RPC services point at further
+# read-only enumeration (NFS exports, etc.); no credential guessing is ever suggested here.
+- match:
+    service: rpcbind
+    field: kind
+    value: "^program$"
+  suggest:
+    - text: "An RPC service (e.g. nfs/mountd) is registered — enumerate NFS exports read-only"
+      command: "showmount -e {target}"
+# source: HackTricks pentesting-rpcbind (book.hacktricks.wiki) — standard OSCP rpcbind recon
+
+- match:
+    service: rpcbind
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "The portmapper answers unauthenticated — dump the UDP-only programs the TCP probe misses"
+      command: "rpcinfo -T udp {target}"
+# source: HackTricks pentesting-rpcbind (book.hacktricks.wiki) — standard OSCP rpcbind recon

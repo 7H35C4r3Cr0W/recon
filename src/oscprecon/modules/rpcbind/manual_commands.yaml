@@ -1,0 +1,16 @@
+# rpcbind manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. Enumerating the mapped RPC services further is read-only recon.
+- description: "Dump the portmapper (rpcinfo)"
+  why: "rpcinfo lists every registered RPC program, port and service name — unauth read-only"
+  command: "rpcinfo {target}"
+# source: HackTricks pentesting-rpcbind (book.hacktricks.wiki) — standard OSCP rpcbind recon
+
+- description: "NFS exports (if nfs/mountd is registered)"
+  why: "showmount -e lists world-readable NFS exports advertised via the portmapper — read-only"
+  command: "showmount -e {target}"
+# source: HackTricks pentesting-rpcbind (book.hacktricks.wiki) — standard OSCP rpcbind recon
+
+- description: "UDP-only RPC programs (rpcinfo -T udp)"
+  why: "some programs register only over UDP and are missed by the TCP probe — read-only"
+  command: "rpcinfo -T udp {target}"
+# source: HackTricks pentesting-rpcbind (book.hacktricks.wiki) — standard OSCP rpcbind recon

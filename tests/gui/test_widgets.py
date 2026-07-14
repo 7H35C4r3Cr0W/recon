@@ -37,9 +37,15 @@ def test_tool_panel_populates_hints_and_expands(qtbot: QtBot) -> None:
     panel = ToolPanel()
     qtbot.addWidget(panel)
     panel.set_target("10.10.10.5")
-    # rpcbind uses the generic hints page (it has no dedicated builder/recon panel)
-    svc = DiscoveredService(111, Proto.TCP, "rpcbind")
-    panel.show_service(svc, references.match(svc))
+    # a ref with tool hints but no dedicated panel falls back to the generic hints page. Built
+    # synthetically so the test never breaks when a real service later gains a module.
+    ref = references.ServiceRef(
+        label="Generic",
+        hacktricks="https://book.hacktricks.wiki/x",
+        module="genericsvc",
+        tools=[references.ToolHint(name="nmap -sV {target}", purpose="version scan")],
+    )
+    panel.show_service(DiscoveredService(9999, Proto.TCP, "genericsvc"), ref)
     assert panel._hints.count() >= 1
     panel._on_hint_activated(panel._hints.item(0))
     assert "10.10.10.5" in panel._command.text()

@@ -35,6 +35,7 @@ from oscprecon.modules import (
     rdp,
     redis,
     rmi,
+    rpcbind,
     rsync,
     sip,
     smtp,
@@ -220,6 +221,10 @@ def _rmi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _openvpn_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in openvpn.OpenvpnModule().recon_steps(target, port)]
+
+
+def _rpcbind_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in rpcbind.RpcbindModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -589,5 +594,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(openvpn),
         openvpn.OpenvpnModule,
         _openvpn_steps,
+    ),
+    "rpcbind": SimpleReconSpec(
+        "rpcbind",
+        "Run full rpcbind recon (portmapper dump)",
+        "rpcbind recon — rpcinfo + nmap rpcinfo dump the portmapper's registered RPC programs "
+        "(nfs, mountd, nlockmgr, …); unauth read-only. Flags NFS for showmount follow-up.",
+        _manual(rpcbind),
+        rpcbind.RpcbindModule,
+        _rpcbind_steps,
     ),
 }
