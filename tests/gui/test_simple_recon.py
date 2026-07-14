@@ -84,19 +84,14 @@ def test_mongodb_worker_parses_and_writes_findings(
     monkeypatch.setattr(
         shell,
         "run",
-        _fake_run(
-            {
-                "print(db.version())": "mongodb/version.txt",
-                "print('DB '+n)": "mongodb/databases.txt",
-                "print(n+'.'+c)": "mongodb/collections.txt",
-            }
-        ),
+        _fake_run({"mongodb-info,mongodb-databases": "mongodb/nmap-info.txt"}),
     )
     result = mw.SimpleReconWorker(prof, "mongodb")._drive()
     assert result.module == "mongodb"
     assert any(line.startswith("→") for line in result.summary)  # unauth suggestion surfaced
     kinds = {f.get("kind") for f in findings_mod.load_findings(prof.directory)}
-    assert {"access", "version", "database", "collection"} <= kinds
+    # Tier-1 nmap NSE gives access/version/database; collections are a Tier-2 mongosh follow-up
+    assert {"access", "version", "database"} <= kinds
 
 
 def test_mssql_worker_parses_and_writes_findings(

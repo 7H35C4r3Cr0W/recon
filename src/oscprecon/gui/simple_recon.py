@@ -330,8 +330,9 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
     ),
     "mongodb": SimpleReconSpec(
         "mongodb",
-        "Run full MongoDB recon (version · databases · collections)",
-        "MongoDB recon — unauth version/databases/collections (read-only); else Tier-2.",
+        "Run full MongoDB recon (nmap NSE · version · databases)",
+        "MongoDB recon — unauth server info + database list via nmap NSE (no client needed; works "
+        "on old servers mongosh refuses). Collection/document dumps are Tier-2 mongosh follow-ups.",
         _manual(mongodb),
         mongodb.MongoDbModule,
         _mongodb_steps,

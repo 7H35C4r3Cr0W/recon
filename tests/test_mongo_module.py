@@ -46,20 +46,15 @@ def test_triggers_on_service_or_port() -> None:
     assert module.triggers(other) is False
 
 
-def test_recon_steps_are_readonly_mongosh_and_policy_clean() -> None:
+def test_recon_steps_are_readonly_nmap_nse_and_policy_clean() -> None:
+    # Tier-1 uses nmap NSE (no external client, works on the old wire-v6 servers mongosh refuses).
     steps = MongoDbModule().recon_steps(_target())
-    assert [s.tool for s in steps] == [
-        "mongodb-version",
-        "mongodb-databases",
-        "mongodb-collections",
-    ]
+    assert [s.tool for s in steps] == ["mongodb-nmap"]
     for step in steps:
         argv = shlex.split(step.command.shell_line)
-        assert argv[0] == "mongosh"
-        # the --eval JS must survive shlex as ONE token (quoting is correct)
-        eval_index = argv.index("--eval")
-        js = argv[eval_index + 1]
-        assert js.endswith(")") and ("print" in js or "getDBNames" in js)
+        assert argv[0] == "nmap"
+        assert "--script" in argv
+        assert "mongodb-info,mongodb-databases" in argv
         assert not any(verb in step.command.shell_line for verb in _WRITE_VERBS)
         # each auto command passes the exec policy at the shell chokepoint
         assert shell.policy_violation(argv) is None

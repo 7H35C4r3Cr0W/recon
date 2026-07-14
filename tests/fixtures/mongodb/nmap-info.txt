@@ -1,0 +1,30 @@
+Nmap scan report for 10.129.32.198
+PORT      STATE SERVICE
+27017/tcp open  mongodb
+| mongodb-databases:
+|   databases
+|       sizeOnDisk = 32768.0
+|       name = users
+|       empty = false
+|       sizeOnDisk = 73728.0
+|       name = admin
+|       empty = false
+|       sizeOnDisk = 73728.0
+|       name = config
+|       empty = false
+|       sizeOnDisk = 73728.0
+|       name = local
+|       empty = false
+|       sizeOnDisk = 32768.0
+|       name = sensitive_information
+|       empty = false
+|   ok = 1.0
+|_  totalSize = 245760.0
+| mongodb-info:
+|   MongoDB Build info
+|     version = 3.6.8
+|       name = wiredTiger
+|     ok = 1.0
+|_    bits = 64
+
+Service detection performed.

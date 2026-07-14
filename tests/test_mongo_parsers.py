@@ -1,8 +1,30 @@
+from pathlib import Path
+
 from oscprecon.modules.mongodb import (
     parse_mongo_collections,
     parse_mongo_databases,
+    parse_mongo_nmap,
     parse_mongo_version,
 )
+
+_FIXTURES = Path(__file__).parent / "fixtures" / "mongodb"
+
+
+def test_parse_nmap_nse_lists_databases_and_version() -> None:
+    findings = parse_mongo_nmap((_FIXTURES / "nmap-info.txt").read_text(encoding="utf-8"))
+    kinds = {(f.kind, f.value) for f in findings}
+    assert ("access", "unauth") in kinds
+    assert ("version", "3.6.8") in kinds
+    dbs = {f.value for f in findings if f.kind == "database"}
+    assert dbs == {"users", "admin", "config", "local", "sensitive_information"}
+    # the storage-engine `name = wiredTiger` (in the mongodb-info block) must NOT be a database
+    assert "wiredTiger" not in dbs
+
+
+def test_parse_nmap_nse_auth_required() -> None:
+    text = "| mongodb-databases:\n|_  ERROR: command listDatabases requires authentication\n"
+    findings = parse_mongo_nmap(text)
+    assert [(f.kind, f.value) for f in findings] == [("access", "auth-required")]
 
 # `print()`-wrapped --eval yields identical text from mongosh and the legacy `mongo` shell.
 _DBS_UNAUTH = """DB admin

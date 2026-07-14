@@ -140,7 +140,58 @@ def parse_mongo_collections(text: str) -> list[MongoFinding]:
     return findings
 
 
+# nmap NSE (mongodb-info + mongodb-databases) — the Tier-1 path. It needs no external client
+# (mongosh isn't a stock Kali tool and version-refuses old MongoDB), and speaks the wire protocol
+# directly. Each NSE line is prefixed with "| " / "|_" / "|   "; db names live under the
+# `mongodb-databases:` block as `name = <db>` (the storage-engine `name = wiredTiger` sits in the
+# separate `mongodb-info:` block, so scope the walk to the databases block to avoid it).
+_NMAP_VERSION = re.compile(r"\bversion\s*=\s*v?(\d+\.\d+\.\d+)")
+_NMAP_NAME = re.compile(r"^name\s*=\s*(.+?)$")
+
+
+def _strip_nmap(line: str) -> str:
+    return line.strip().lstrip("|").lstrip("_").strip()
+
+
+def parse_mongo_nmap(text: str) -> list[MongoFinding]:
+    text = _sanitize(text)
+    if _skip(text):
+        return []
+    if _AUTH.search(text):
+        return [
+            MongoFinding("access", "auth-required", "nmap mongodb-databases refused without creds")
+        ]
+    findings: list[MongoFinding] = []
+    vmatch = _NMAP_VERSION.search(text)
+    if vmatch is not None:
+        findings.append(MongoFinding("version", vmatch.group(1)))
+    names: list[str] = []
+    in_dbs = False
+    for raw in text.splitlines():
+        line = _strip_nmap(raw)
+        if line.startswith("mongodb-databases"):
+            in_dbs = True
+            continue
+        if not in_dbs:
+            continue
+        if line.startswith(("ok ", "ok=", "totalSize")) or (
+            line.startswith("mongodb-") and "databases" not in line
+        ):
+            in_dbs = False
+            continue
+        match = _NMAP_NAME.match(line)
+        if match is not None and match.group(1) not in names:
+            names.append(match.group(1))
+    if names:
+        findings.append(
+            MongoFinding("access", "unauth", "nmap mongodb-databases listed DBs without auth")
+        )
+        findings.extend(MongoFinding("database", name) for name in names)
+    return findings
+
+
 _PARSERS = {
+    "mongodb-nmap": parse_mongo_nmap,
     "mongodb-version": parse_mongo_version,
     "mongodb-databases": parse_mongo_databases,
     "mongodb-collections": parse_mongo_collections,

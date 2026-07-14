@@ -8,6 +8,7 @@ from oscprecon.modules.mongodb.parsers import (
     MongoFinding,
     parse_mongo_collections,
     parse_mongo_databases,
+    parse_mongo_nmap,
     parse_mongo_tool,
     parse_mongo_version,
 )
@@ -19,6 +20,7 @@ __all__ = [
     "MongoFinding",
     "parse_mongo_collections",
     "parse_mongo_databases",
+    "parse_mongo_nmap",
     "parse_mongo_tool",
     "parse_mongo_version",
 ]
@@ -26,16 +28,6 @@ __all__ = [
 MONGODB_SERVICE_NAMES = frozenset({"mongodb", "mongod"})
 _MONGODB_PORTS = frozenset({27017, 27018, 27019})
 _DEFAULT_PORT = 27017
-
-# print()-wrapped so output is identical across mongosh and the legacy `mongo` shell (which render
-# objects differently). getDBNames() asserts: on auth it throws the server errmsg in both shells,
-# so auth-required is always detectable. All read-only — no insert/update/drop/eval.
-_VERSION_EVAL = "print(db.version())"
-_DB_EVAL = "db.getMongo().getDBNames().forEach(function(n){print('DB '+n)})"
-_COLL_EVAL = (
-    "db.getMongo().getDBNames().forEach(function(n){"
-    "db.getSiblingDB(n).getCollectionNames().forEach(function(c){print(n+'.'+c)})})"
-)
 
 
 @dataclass
@@ -54,37 +46,22 @@ class MongoDbModule(Module):
         )
 
     def recon_steps(self, target: Target) -> list[MongoDbStep]:
-        base = f"mongosh --host {target.ip} --port {_DEFAULT_PORT} --quiet"
+        # why: Tier-1 uses nmap NSE, not mongosh. mongosh isn't a stock Kali tool, and modern
+        # mongosh version-refuses the old MongoDB (<= 3.6, wire v6) these boxes run — the wall the
+        # write-up hits. nmap needs no client and speaks the wire protocol directly, so it lists the
+        # databases anonymously every time (read-only). Deeper mongosh enum (collections, document
+        # samples, serverStatus) stays in the Tier-2 manual follow-ups.
         return [
             MongoDbStep(
                 Command(
                     "mongodb",
-                    f'{base} --eval "{_VERSION_EVAL}"',
-                    "Unauth server version — a MongoDB that answers without creds (read-only).",
+                    f"nmap -p {_DEFAULT_PORT} --script mongodb-info,mongodb-databases {target.ip}",
+                    "Unauth server info + database list via nmap NSE — no client needed; a locked "
+                    "server returns an auth error instead of the DB list (read-only).",
                     "< 30s",
-                    "mongodb/version.txt",
+                    "mongodb/nmap-info.txt",
                 ),
-                "mongodb-version",
-            ),
-            MongoDbStep(
-                Command(
-                    "mongodb",
-                    f'{base} --eval "{_DB_EVAL}"',
-                    "Unauth database list — a locked server throws an auth error (read-only).",
-                    "< 30s",
-                    "mongodb/databases.txt",
-                ),
-                "mongodb-databases",
-            ),
-            MongoDbStep(
-                Command(
-                    "mongodb",
-                    f'{base} --eval "{_COLL_EVAL}"',
-                    "Unauth per-DB collection names — maps the data namespace (read-only).",
-                    "< 30s",
-                    "mongodb/collections.txt",
-                ),
-                "mongodb-collections",
+                "mongodb-nmap",
             ),
         ]
 
