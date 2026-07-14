@@ -250,7 +250,9 @@
         <h3>A new specialist — one per service (candidates: service · port · a tool to start with)</h3>
         <p>Register a <code>port → agent</code> mapping and Routing spawns it (the <b>＋</b> slot in the
         swarm grid above). It enumerates its service read-only and hands output to the same Scope Gate —
-        nothing upstream or downstream changes. Good specialists to add next:</p>
+        nothing upstream or downstream changes. <b>The shipping single-app tool already implements
+        read-only modules for every service below</b> (48 service modules, TCP + UDP) — the agent
+        architecture simply wraps each as its own specialist:</p>
         <div class="p2svc">
           <div class="r"><b>WinRM</b><span class="pt">5985/6</span><span class="tl">netexec winrm</span></div>
           <div class="r"><b>RDP</b><span class="pt">3389</span><span class="tl">nmap rdp-ntlm-info</span></div>

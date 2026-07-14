@@ -112,6 +112,18 @@ SLIDES: list[dict] = [
     },
     {
         "kind": "image",
+        "eyebrow": "Coverage",
+        "title": "48 service modules, TCP & UDP",
+        "body": "Every service the scanner maps has a dedicated read-only module — the AD/web core "
+        "(HTTP, SMB, LDAP, Kerberos, RDP, WinRM, MSRPC), databases (MSSQL/MySQL/Postgres/Oracle/"
+        "Redis/Mongo), HTTP-API stores (Elasticsearch, CouchDB, Docker, Kubernetes, etcd), and the "
+        "long tail (VNC, IPMI, SIP, rsync, SVN, iSCSI, mDNS, UPnP, RMI, Finger, X11, and more). Each "
+        "ships Tier-1 auto recon, Tier-2 follow-ups, a parser, and pattern-based next steps.",
+        "image": "services-breadth.png",
+        "caption": "One click per service — the tree groups TCP (blue) and UDP (green)",
+    },
+    {
+        "kind": "image",
         "eyebrow": "Web",
         "title": "Content discovery, by dropdown",
         "body": "The HTTP builder reproduces a full feroxbuster/ffuf/gobuster command from controls — "

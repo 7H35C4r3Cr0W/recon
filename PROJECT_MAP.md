@@ -70,20 +70,26 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 
 ## 3. Recon modules — ✅ (core) · 🚧 (breadth)
 
-- **Status:** ✅ for the 20 built modules; 🚧 as a set (extended §12 services not modularized).
+- **Status:** ✅ — **48 service modules** (every `services.yaml`-mapped service has a backing module).
 - **Files:** `modules/base.py` (ABC) + `modules/nmap.py` + `modules/<svc>/{__init__.py,parsers.py,
   manual_commands.yaml}` for: **http, vhost, smb, ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios,
-  ike, ntp, kerberos** and read-only DB modules **redis, mongodb, mssql, mysql, postgresql**.
+  ike, ntp, kerberos**, read-only DB modules **redis, mongodb, mssql, mysql, postgresql, oracle**, the
+  Windows/remote-access set **rdp, winrm, vnc, msrpc**, mail **imap, pop3, telnet**, HTTP-API data
+  stores **elasticsearch, couchdb, docker, kubernetes, memcached, etcd**, and **rsync, ajp, ipmi, sip,
+  finger, x11, ipp, iscsi, svn, ident, mdns, upnp, rmi, openvpn, rpcbind**.
 - **Does:** each module gives Tier-1 auto recon (credential-free), Tier-2 manual follow-ups, a parser →
   `findings.json`, and pattern "recon next steps". HTTP reproduces the §9 feroxbuster line via controls;
   SMB is tiered (null/guest, never list-driven); **kerberos** confirms the KDC (Tier-1 `nmap -sV`) and
   offers enum-only AD follow-ups (single-user AS-REP, GetADUsers/GetUserSPNs) — **no cracking, and the
   parser records principals/SPNs but never the AS-REP/TGS hash**.
-- **Complete:** all 20 modules ship engine + parser tests + fixtures + `manual_commands.yaml` +
-  `services.yaml` hints, and **all 20 now have `patterns/*.yaml`** (51 rules).
-- **Remaining:** extended §12 services (rsync, finger, memcached, elasticsearch, couchdb, docker, etcd,
-  zookeeper, vnc, webdav, ipmi, ipp, mdns, upnp) are **not** dedicated modules (❌ until a real box
-  needs one).
+- **Complete:** all 48 modules ship engine + parser tests + fixtures + `manual_commands.yaml` +
+  `services.yaml` hints + `patterns/*.yaml`. The read-only service modules share one `SimpleReconPanel`
+  + `SimpleReconWorker` via `SIMPLE_SPECS` (42 specs); http/smb/ftp/ssh/dns/ldap keep bespoke panels.
+  Guard tests: `test_new_modules_policy` (every Tier-1 passes `shell.policy_violation`; every Tier-2
+  binary is allow-listed) + `tests/gui/test_new_service_panels` (each service opens its panel).
+- **Remaining:** only **webdav** (an HTTP sub-capability, lives in the http module) and **zookeeper**
+  (its 4-letter-word probe needs `nc`, which is not allow-listed) are deliberately not dedicated
+  modules. Everything else in §12 now ships.
 - **Depends on:** core execution + references + patterns.
 - **Risks:** a Tier-2 command drifting into list-driven brute (guard: policy + review).
 - **Tests:** `test_<svc>_module` + `test_<svc>_parsers` for every module; fixtures under
@@ -246,7 +252,8 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 
 ## 14. Completed features (roll-up) — ✅
 
-Phases 0–5 (scaffold, GUI shell + wordlists + references, all 14 core modules + 5 DB modules, pattern
+Phases 0–5 (scaffold, GUI shell + wordlists + references, 48 service modules — 14 core + 6 DB + the
+§12 extended set, pattern
 library + suggestion engine, graph view, resume + Obsidian output, dark/light theme, status footer,
 audit log §6a, concurrent-copy lock §6b) and the full Workspace Dashboard & Organization upgrade
 (index, dashboard, search, health, locks, activity, saved views, bulk actions, Preferences dialog).
@@ -271,8 +278,9 @@ audit log §6a, concurrent-copy lock §6b) and the full Workspace Dashboard & Or
 Metasploit / msfvenom / meterpreter · SQLMap · hydra/medusa/patator/crowbar · password spraying /
 list-driven auth · commercial scanners (Nessus/Burp Pro/…) · **any LLM/AI call at runtime** ·
 automated exploit chains · Exploit-DB PoC download/execute/transform · HackTricks scraping/caching ·
-tech-stack rewrites (CLAUDE.md §3/§27). Dedicated modules for §12 extended services are ❌ until a real
-box needs one (no module merely because a port exists).
+tech-stack rewrites (CLAUDE.md §3/§27). The §12 extended services now ship as dedicated modules (48
+service modules total); only webdav (http territory) and zookeeper (needs the non-allow-listed `nc`)
+are intentionally not modularized.
 
 ---
 
@@ -348,7 +356,7 @@ flowchart TD
 |---|---|---|---|---|
 | Shell & command policy | ✅ | High (`test_shell_policy`, `test_shell_cancel`) | Any new module bypassing the chokepoint | Keep it the only exec path |
 | Task lifecycle | ✅ | High (`test_task_lifecycle/manager`, `test_workers`) | Cancellation under profile switch | None — stable |
-| Service modules | ✅ (20) | High (per-module + parser tests + 51 patterns) | Tier-2 drift toward brute | None — all 20 have patterns; kerberos enum-only |
+| Service modules | ✅ (48) | High (per-module + parser tests + patterns; policy + panel guard tests) | Tier-2 drift toward brute | None — every module has patterns; kerberos enum-only |
 | PostgreSQL | ✅ | High (`test_postgresql_*`) | DB-primitive backstop coverage | None — hardened |
 | GUI architecture | ✅ | High (`tests/gui/*`) | Worker lifecycle regressions | None — refactor landed |
 | Profiles | ✅ | High (`test_config/organization`) | Future schema migrations | Keep schema backward-compatible |

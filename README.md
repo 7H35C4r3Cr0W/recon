@@ -115,7 +115,7 @@ with profile`, or `nabu-cli scan --scan-profile <name>`.
   (**Elasticsearch**, **CouchDB**, **Docker API**, **Kubernetes**, **Memcached**),
   **rsync**, **AJP/Tomcat**, **IPMI**, **SIP/VoIP**, **Finger**, **X11**, and the discovery/legacy
   services **Telnet**, **IPP/CUPS**, **iSCSI**, **Subversion (SVN)**, **Ident**, **mDNS**, **UPnP**,
-  **Java RMI**, **OpenVPN**, and **rpcbind/portmapper**. Each ships Tier-1 auto recon, Tier-2 manual
+  **Java RMI**, **OpenVPN**, **rpcbind/portmapper**, and **etcd**. Each ships Tier-1 auto recon, Tier-2 manual
   follow-ups, a parser, and pattern-library "recon next steps".
 - **Findings & credentials** persist to `findings.json` / `creds.json` (mode `0600`); anonymous / null
   enum auto-records a credential entry that later modules consume.
