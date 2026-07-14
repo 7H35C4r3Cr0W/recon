@@ -19,11 +19,16 @@ os.environ.setdefault("OSCPRECON_DISABLE_WEBVIEW", "1")
 
 from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
 
+from oscprecon import audit  # noqa: E402
 from oscprecon import findings as findings_mod  # noqa: E402
 from oscprecon.gui import theme  # noqa: E402
 from oscprecon.gui.dialogs.cred_vault import CredentialVaultDialog  # noqa: E402
+from oscprecon.gui.dialogs.new_profile import NewProfileDialog  # noqa: E402
+from oscprecon.gui.dialogs.spray import SprayDialog  # noqa: E402
 from oscprecon.gui.main_window import MainWindow  # noqa: E402
+from oscprecon.gui.widgets.activity_view import ActivityView  # noqa: E402
 from oscprecon.gui.widgets.findings_view import FindingsView  # noqa: E402
+from oscprecon.gui.widgets.http_panel import HttpPanel  # noqa: E402
 from oscprecon.gui.widgets.reference_pane import ReferencePane  # noqa: E402
 from oscprecon.gui.widgets.smb_panel import SmbPanel  # noqa: E402
 from oscprecon.models import Credential, DiscoveredService, Proto, Target  # noqa: E402
@@ -122,7 +127,7 @@ def main() -> int:
     empty._dashboard.shutdown()
 
     prof = _demo_profile(tmp / "views")
-    fv = FindingsView()
+    fv = FindingsView("light")  # match the light Qt palette applied above
     fv.set_profile(prof)
     _save(fv, "findings.png", (820, 360))
 
@@ -135,13 +140,39 @@ def main() -> int:
     smb.configure(DiscoveredService(445, Proto.TCP, "microsoft-ds"))
     _save(smb, "smb-tool-panel.png", (600, 440))
 
-    ref = ReferencePane()
+    ref = ReferencePane("light")
     ref.show_service(
         DiscoveredService(445, Proto.TCP, "microsoft-ds", "Samba", "4.9"),
         ServiceRef(label="SMB", hacktricks=_SMB_URL, module="smb", tools=[]),
         [{"module": "smb", "kind": "auth", "value": "null session"}],
     )
     _save(ref, "reference-offline.png", (400, 620))
+
+    dlg = NewProfileDialog()
+    dlg._name.setText("htb-active")
+    dlg._ip.setText("10.10.10.100")
+    _save(dlg, "new-project.png", (440, 220))
+
+    http = HttpPanel()
+    http.set_profile(prof)
+    http.configure(
+        DiscoveredService(80, Proto.TCP, "http", "nginx", "1.18"),
+        ServiceRef(label="HTTP", hacktricks="", module="http", tools=[]),
+    )
+    _save(http, "http-panel.png", (620, 560))
+
+    spray = SprayDialog(prof, spray_enabled=True)
+    for key in ("smb", "ftp"):
+        if key in spray._checks:
+            spray._checks[key].setChecked(True)
+    _save(spray, "spray-dialog.png", (620, 460))
+
+    audit.record(prof.directory, prof.profile_name, "run-command", details={"module": "nmap"})
+    audit.record(prof.directory, prof.profile_name, "credential-added", details={"source": "smb"})
+    audit.record(prof.directory, prof.profile_name, "reference-visited", details={"service": "smb"})
+    act = ActivityView("light")
+    act.set_profile(prof)
+    _save(act, "activity.png", (820, 300))
     return 0
 
 

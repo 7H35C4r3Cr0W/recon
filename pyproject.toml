@@ -53,6 +53,9 @@ select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 # why: Typer's public API requires calling Option()/Argument() in parameter defaults.
 "src/oscprecon/cli.py" = ["B008"]
+# why: a doc-generation script with an embedded HTML/CSS/JS template + demo prose — its long
+# template lines must not be reflowed to 100 cols (it would mangle the markup).
+"docs/build-demo-deck.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
