@@ -1,0 +1,21 @@
+# RDP manual follow-ups (Tier-2 — shown, never auto-run). All read-only enum; {target}/{port} filled
+# from the active profile. RDP credential testing is list-based spray (Tier-3) — never wrapped here.
+- description: "NTLM info + hostname/domain/OS build (netexec)"
+  why: "nxc rdp prints host, domain, OS and NLA status in one line — no login attempt"
+  command: "netexec rdp {target}"
+# source: HackTricks pentesting-rdp (book.hacktricks.wiki) — standard OSCP RDP recon
+
+- description: "TLS certificate (CN usually equals the hostname)"
+  why: "ssl-cert leaks the machine name / SANs — read-only"
+  command: "nmap -p {port} --script ssl-cert {target}"
+# source: HackTricks pentesting-rdp (book.hacktricks.wiki) — standard OSCP RDP recon
+
+- description: "Encryption / security-layer detail"
+  why: "rdp-enum-encryption re-run in isolation confirms whether NLA (CredSSP) is enforced"
+  command: "nmap -p {port} --script rdp-enum-encryption {target}"
+# source: HackTricks pentesting-rdp (book.hacktricks.wiki) — standard OSCP RDP recon
+
+- description: "Screenshot the pre-auth RDP login (netexec, no creds)"
+  why: "nxc rdp --nla-screenshot grabs the login screen without authenticating — read-only recon"
+  command: "netexec rdp {target} --nla-screenshot"
+# source: HackTricks pentesting-rdp (book.hacktricks.wiki) — standard OSCP RDP recon

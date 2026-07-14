@@ -15,6 +15,7 @@ from oscprecon.modules import (
     nfs,
     ntp,
     postgresql,
+    rdp,
     redis,
     smtp,
     snmp,
@@ -83,6 +84,10 @@ def _mysql_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _postgresql_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in postgresql.PostgresqlModule().recon_steps(target, port)]
+
+
+def _rdp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in rdp.RdpModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -209,5 +214,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(postgresql),
         postgresql.PostgresqlModule,
         _postgresql_steps,
+    ),
+    "rdp": SimpleReconSpec(
+        "rdp",
+        "Run full RDP recon (NTLM info · NLA · encryption)",
+        "RDP recon — unauth rdp-ntlm-info (AD domain/host/OS build) + rdp-enum-encryption (NLA "
+        "state); read-only, no login. Credential testing is Spray-mode only.",
+        _manual(rdp),
+        rdp.RdpModule,
+        _rdp_steps,
     ),
 }

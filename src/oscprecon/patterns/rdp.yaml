@@ -1,0 +1,28 @@
+# RDP recon next-steps (banner-only Tier-1: rdp-ntlm-info + rdp-enum-encryption, read-only, no login).
+# Credential testing against RDP is list-based spray (Tier-3) and never suggested here.
+- match:
+    service: rdp
+    field: kind
+    value: "^domain$"
+  suggest:
+    - text: "RDP NTLM leaks the AD domain — pivot the domain into LDAP / SMB / Kerberos enumeration"
+      command: "nmap -p 389 --script ldap-rootdse {target}"
+# source: HackTricks pentesting-rdp (book.hacktricks.wiki) — standard OSCP RDP recon
+
+- match:
+    service: rdp
+    field: kind
+    value: "^nla$"
+  suggest:
+    - text: "Capture the pre-auth login screen (no credentials) to confirm the host/branding"
+      command: "netexec rdp {target} --nla-screenshot"
+# source: HackTricks pentesting-rdp (book.hacktricks.wiki) — standard OSCP RDP recon
+
+- match:
+    service: rdp
+    field: kind
+    value: "^hostname$"
+  suggest:
+    - text: "Read the TLS certificate — the CN/SAN usually confirms the machine name"
+      command: "nmap -p 3389 --script ssl-cert {target}"
+# source: HackTricks pentesting-rdp (book.hacktricks.wiki) — standard OSCP RDP recon

@@ -1,0 +1,23 @@
+Nmap scan report for 10.10.10.5
+Host is up (0.021s latency).
+
+PORT     STATE SERVICE       VERSION
+3389/tcp open  ms-wbt-server Microsoft Terminal Services
+| rdp-ntlm-info:
+|   Target_Name: CORP
+|   NetBIOS_Domain_Name: CORP
+|   NetBIOS_Computer_Name: RDP-01
+|   DNS_Domain_Name: corp.local
+|   DNS_Computer_Name: RDP-01.corp.local
+|   DNS_Tree_Name: corp.local
+|   Product_Version: 10.0.17763
+|_  System_Time: 2026-07-14T12:00:00+00:00
+| rdp-enum-encryption:
+|   Security layer
+|     Native RDP: SUCCESS
+|     SSL: SUCCESS
+|     CredSSP (NLA): SUCCESS
+|   RDP Encryption level: Client Compatible
+|_  RDP Protocol Version:  5.1
+
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
