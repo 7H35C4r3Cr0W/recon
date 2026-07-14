@@ -141,17 +141,14 @@ SLIDES: list[dict] = [
         "caption": "Reference pane — offline HackTricks + the source badge",
     },
     {
-        "kind": "text",
+        "kind": "image",
         "eyebrow": "Visualize",
         "title": "The attack-surface graph",
         "body": "Press Ctrl+G for a BloodHound-style map: target → services → findings → credentials. "
         "Notable/weak items are ringed, Exploit-DB references are coloured apart from danger, and "
-        "credential secrets are never searchable. Drag, drill in, annotate, and export to PNG/SVG.",
-        "bullets": [
-            "Search: type ssh / 445 / admin to highlight + fit",
-            "Double-click a service to collapse its findings",
-            "A legend spells out every colour and the notable ring",
-        ],
+        "credential secrets are never searchable. Search, drill in, annotate, and export to PNG/SVG.",
+        "image": "graph.png",
+        "caption": "Attack-surface graph — illustrative (the live view is interactive Cytoscape)",
     },
     {
         "kind": "image",
@@ -198,18 +195,14 @@ SLIDES: list[dict] = [
         "caption": "Activity — the append-only audit trail",
     },
     {
-        "kind": "text",
+        "kind": "image",
         "eyebrow": "Step 7 — Present",
         "title": "An Obsidian-ready report",
-        "body": "Everything becomes a single markdown report with YAML front-matter, per-service "
-        "findings, suggested next steps with their sources, and the full command log with "
-        "timings and exit codes. Drop it into your vault and the write-up is half done.",
-        "bullets": [
-            "Open ports at a glance (TCP + UDP)",
-            "Findings + references + suggestions, cited",
-            "Every command shown with full args — nothing hidden",
-            "Also exports as a linked Obsidian vault folder",
-        ],
+        "body": "Everything becomes a single markdown report — front-matter, an open-ports summary, "
+        "per-service findings with HackTricks links, suggested next steps with sources, and the full "
+        "command log with timings. Drop it into your vault and the write-up is half done.",
+        "image": "report.png",
+        "caption": "The generated report.md, rendered — nothing about what ran is hidden",
     },
     {
         "kind": "split",

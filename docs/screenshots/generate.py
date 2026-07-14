@@ -18,6 +18,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("OSCPRECON_DISABLE_WEBVIEW", "1")
 os.environ.setdefault("QT_SCALE_FACTOR", "2")  # 2x device pixels -> crisp screenshots when enlarged
 
+from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtGui import QImage, QPainter  # noqa: E402
+from PySide6.QtSvg import QSvgRenderer  # noqa: E402
 from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
 
 from oscprecon import audit  # noqa: E402
@@ -31,6 +34,7 @@ from oscprecon.gui.widgets.activity_view import ActivityView  # noqa: E402
 from oscprecon.gui.widgets.findings_view import FindingsView  # noqa: E402
 from oscprecon.gui.widgets.http_panel import HttpPanel  # noqa: E402
 from oscprecon.gui.widgets.reference_pane import ReferencePane  # noqa: E402
+from oscprecon.gui.widgets.report_view import ReportView  # noqa: E402
 from oscprecon.gui.widgets.smb_panel import SmbPanel  # noqa: E402
 from oscprecon.models import Credential, DiscoveredService, Proto, Target  # noqa: E402
 from oscprecon.profile import Profile  # noqa: E402
@@ -108,6 +112,18 @@ def _save(widget: QWidget, name: str, size: tuple[int, int]) -> None:
     print("wrote", name)
 
 
+def _save_svg(svg_name: str, png_name: str, size: tuple[int, int]) -> None:
+    # render a static illustration (e.g. the graph, which needs Chromium to screenshot live) at 2x
+    renderer = QSvgRenderer(str(OUT / svg_name))
+    img = QImage(size[0] * 2, size[1] * 2, QImage.Format.Format_ARGB32)
+    img.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(img)
+    renderer.render(painter)
+    painter.end()
+    img.save(str(OUT / png_name))
+    print("wrote", png_name)
+
+
 def main() -> int:
     QApplication([])  # Qt holds the singleton; no local ref needed
     tmp = Path(tempfile.mkdtemp())
@@ -174,6 +190,12 @@ def main() -> int:
     act = ActivityView("light")
     act.set_profile(prof)
     _save(act, "activity.png", (820, 300))
+
+    report = ReportView()
+    report.set_profile(prof)
+    _save(report, "report.png", (820, 620))
+
+    _save_svg("graph-demo.svg", "graph.png", (940, 560))
     return 0
 
 
