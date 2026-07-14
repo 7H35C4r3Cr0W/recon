@@ -40,6 +40,7 @@ from oscprecon.modules import (
     svn,
     telnet,
     tftp,
+    upnp,
     vnc,
     winrm,
     x11,
@@ -205,6 +206,10 @@ def _ident_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _mdns_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in mdns.MdnsModule().recon_steps(target, port)]
+
+
+def _upnp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in upnp.UpnpModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -547,5 +552,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(mdns),
         mdns.MdnsModule,
         _mdns_steps,
+    ),
+    "upnp": SimpleReconSpec(
+        "upnp",
+        "Run full UPnP recon (device description)",
+        "UPnP recon (UDP) — nmap upnp-info reads the SSDP server banner, device description URL "
+        "and manufacturer/model (read-only). Adding a port mapping is out of scope.",
+        _manual(upnp),
+        upnp.UpnpModule,
+        _upnp_steps,
     ),
 }

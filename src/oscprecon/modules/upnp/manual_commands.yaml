@@ -1,0 +1,16 @@
+# UPnP manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled from
+# the active profile. Adding/removing a port mapping is an action and is never wrapped.
+- description: "Fetch the device description XML"
+  why: "rootDesc.xml lists the device's services + control URLs — read-only recon"
+  command: "curl -s http://{target}:{port}/rootDesc.xml"
+# source: HackTricks 1900-pentesting-upnp (book.hacktricks.wiki) — standard OSCP UPnP recon
+
+- description: "UPnP info (re-run, UDP)"
+  why: "upnp-info in isolation re-reads the SSDP banner + description URL — read-only"
+  command: "nmap -sU -p {port} --script upnp-info {target}"
+# source: HackTricks 1900-pentesting-upnp (book.hacktricks.wiki) — standard OSCP UPnP recon
+
+- description: "Broadcast UPnP discovery (nmap NSE)"
+  why: "broadcast-upnp-info enumerates UPnP devices on the segment — read-only"
+  command: "nmap --script broadcast-upnp-info {target}"
+# source: HackTricks 1900-pentesting-upnp (book.hacktricks.wiki) — standard OSCP UPnP recon

@@ -1,0 +1,19 @@
+# UPnP recon next-steps (device description, read-only). Fetching the description XML is recon;
+# adding/removing port mappings is an action and is never suggested here.
+- match:
+    service: upnp
+    field: kind
+    value: "^location$"
+  suggest:
+    - text: "UPnP exposes a device description URL — fetch the XML read-only for the internal service map"
+      command: "curl -s http://{target}:1900/rootDesc.xml"
+# source: HackTricks 1900-pentesting-upnp (book.hacktricks.wiki) — standard OSCP UPnP recon
+
+- match:
+    service: upnp
+    field: kind
+    value: "^server$"
+  suggest:
+    - text: "Match the UPnP server/device banner against documented issues (searchsploit, display-only)"
+      command: "searchsploit upnp miniupnpd"
+# source: HackTricks 1900-pentesting-upnp (book.hacktricks.wiki) — standard OSCP UPnP recon
