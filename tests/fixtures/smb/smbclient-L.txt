@@ -5,5 +5,6 @@
 	C$              Disk      Default share
 	IPC$            IPC       Remote IPC
 	Replication     Disk
-
-SMB1 disabled -- no workgroup available
+	WorkShares      Disk
+Reconnecting with SMB1 for workgroup listing.
+Unable to connect with SMB1 -- no workgroup available

@@ -166,6 +166,12 @@ def parse_netexec_passpol(text: str) -> list[SmbFinding]:
     return findings
 
 
+# smbclient -L share row: "<name>  <Type>  [comment]" where Type is Disk/IPC/Printer. Its trailing
+# status prose ("Reconnecting with SMB1 ...", "Unable to connect ...") has no Type column, so it
+# must not be mistaken for a share name when smbclient omits the usual blank line before it.
+_SHARE_TYPES = {"Disk", "IPC", "Printer", "Device"}
+
+
 def parse_smbclient_shares(text: str) -> list[SmbFinding]:
     findings: list[SmbFinding] = []
     in_table = False
@@ -181,7 +187,7 @@ def parse_smbclient_shares(text: str) -> list[SmbFinding]:
                 in_table = False
                 continue
             cols = re.split(r"\s{2,}", stripped)  # 2+ spaces: keep multi-word share names intact
-            if cols and cols[0]:
+            if len(cols) >= 2 and cols[1] in _SHARE_TYPES and cols[0]:
                 findings.append(SmbFinding("share", cols[0]))
     return findings
 

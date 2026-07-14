@@ -79,7 +79,9 @@ def test_netexec_passpol() -> None:
 
 def test_smbclient_shares() -> None:
     shares = {f.value for f in parse_smbclient_shares(_read("smbclient-L.txt"))}
-    assert shares == {"ADMIN$", "C$", "IPC$", "Replication"}
+    # real shares only — smbclient's trailing status prose (no blank line before it on some hosts,
+    # e.g. HTB Dancing) must NOT be picked up as share names.
+    assert shares == {"ADMIN$", "C$", "IPC$", "Replication", "WorkShares"}
 
 
 def test_rpcclient_users() -> None:
