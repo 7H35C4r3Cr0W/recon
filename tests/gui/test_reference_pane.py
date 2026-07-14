@@ -137,6 +137,16 @@ def test_apply_live_result_for_other_page_is_ignored(qtbot: QtBot) -> None:
     assert "WRONG PAGE CONTENT" not in pane.offline_text()  # url mismatch -> not applied
 
 
+def test_failed_live_on_service_without_offline_page_says_no_offline(qtbot: QtBot) -> None:
+    # regression: a service with no vendored offline page must not claim "OFFLINE" when live fails
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    other = "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-vhost.html"
+    pane.show_service(DiscoveredService(80, Proto.TCP, "http"), _ref("vhost", other))  # no offline
+    pane.apply_live_result(LiveResult("error", "", [], 0.0, other, "refresh failed: down"))
+    assert pane._source_badge.text().strip() == "NO OFFLINE"  # not a false "OFFLINE"
+
+
 def test_live_fetch_error_keeps_offline_content(qtbot: QtBot) -> None:
     pane = ReferencePane()
     qtbot.addWidget(pane)

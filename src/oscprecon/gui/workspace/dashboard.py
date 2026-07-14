@@ -64,7 +64,7 @@ class WorkspaceDashboard(QWidget):
         self._summaries: list[ProfileSummary] = []
         self._index_worker: WorkspaceIndexWorker | None = None
 
-        new_btn = QPushButton("New Profile…")
+        new_btn = QPushButton("New Project…")
         new_btn.setStyleSheet(
             styles.primary_button(tokens.DARK)
         )  # primary action (gold, both themes)

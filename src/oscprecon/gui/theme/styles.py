@@ -23,6 +23,13 @@ def status_color(kind: str, pal: Palette) -> str:
     return str(getattr(pal, STATUS_FIELDS.get(kind, "info")))
 
 
+# why: these button styles are applied once with a fixed palette (a gold CTA is intentionally the
+# same in both themes), so the disabled state must be theme-NEUTRAL — a palette-bound surface_alt
+# would paint a dark-navy chip in the light default theme. Translucent grey reads on both grounds.
+_DISABLED = " QPushButton:disabled { background:rgba(128,128,128,0.16);"
+_DISABLED += " color:rgba(128,128,128,0.85); border-color:rgba(128,128,128,0.35); }"
+
+
 def primary_button(pal: Palette) -> str:
     return (
         "QPushButton {"
@@ -32,8 +39,7 @@ def primary_button(pal: Palette) -> str:
         " font-weight:600; }"
         f" QPushButton:hover {{ background:{_lighten(pal.accent)}; }}"
         f" QPushButton:pressed {{ background:{_darken(pal.accent)}; }}"
-        f" QPushButton:focus {{ outline:none; border:2px solid {pal.focus}; }}"
-        f" QPushButton:disabled {{ background:{pal.surface_alt}; color:{pal.text_muted}; }}"
+        f" QPushButton:focus {{ outline:none; border:2px solid {pal.focus}; }}" + _DISABLED
     )
 
 
@@ -45,8 +51,7 @@ def secondary_button(pal: Palette) -> str:
         f" padding:6px {tokens.SPACE_MD}px; min-height:{tokens.CONTROL_HEIGHT}px; }}"
         f" QPushButton:hover {{ border-color:{pal.accent}; }}"
         f" QPushButton:pressed {{ background:{pal.surface_alt}; }}"
-        f" QPushButton:focus {{ border:2px solid {pal.focus}; }}"
-        f" QPushButton:disabled {{ color:{pal.text_muted}; border-color:{pal.surface_alt}; }}"
+        f" QPushButton:focus {{ border:2px solid {pal.focus}; }}" + _DISABLED
     )
 
 
@@ -59,8 +64,7 @@ def danger_button(pal: Palette) -> str:
         f" padding:6px {tokens.SPACE_MD}px; min-height:{tokens.CONTROL_HEIGHT}px; }}"
         f" QPushButton:hover {{ background:{pal.error}; color:{pal.bg}; }}"
         f" QPushButton:pressed {{ background:{_darken(pal.error)}; }}"
-        f" QPushButton:focus {{ border:2px solid {pal.focus}; }}"
-        f" QPushButton:disabled {{ color:{pal.text_muted}; border-color:{pal.surface_alt}; }}"
+        f" QPushButton:focus {{ border:2px solid {pal.focus}; }}" + _DISABLED
     )
 
 

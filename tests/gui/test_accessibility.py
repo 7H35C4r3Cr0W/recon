@@ -45,7 +45,10 @@ def test_find_routes_to_active_view_search(
     window._on_find()  # recon three-pane -> reference-pane find
     window._show_workspace()
     window._on_find()
-    assert calls == ["findings", "reference", "workspace"]
+    # regression: Ctrl+F must NOT focus the reference pane on graph (it isn't visible there)
+    window._graph_action.setChecked(True)
+    window._on_find()
+    assert calls == ["findings", "reference", "workspace"]  # graph added nothing
     window._dashboard.shutdown()
 
 

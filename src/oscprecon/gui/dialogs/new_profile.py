@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 class NewProfileDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("New Scan Profile")
+        self.setWindowTitle("New Project")
         self._name = QLineEdit()
         self._ip = QLineEdit()
         self._box = QComboBox()

@@ -105,6 +105,11 @@ def test_findings_view_search_and_category_filter(qtbot: QtBot, tmp_path: Path) 
     kinds = {view._table.item(r, 2).text() for r in range(view._table.rowCount())}
     assert kinds == {"signing", "auth"}  # both notable; the version banner is filtered away
 
+    # the "N notable" count reflects the SHOWN rows, not the whole set (regression: was over _all)
+    view._category.setCurrentText("info")  # only the non-notable product row is shown
+    assert view._table.rowCount() == 1
+    assert "0 notable" in view._summary.text()  # nothing notable is on screen
+
 
 def test_activity_view_lists_audit_events(qtbot: QtBot, tmp_path: Path) -> None:
     prof = _profile(tmp_path)

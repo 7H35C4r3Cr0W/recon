@@ -311,10 +311,14 @@ class ReferencePane(QWidget):
             badge = "LIVE" if live else "CACHED"
             note = f" · offline shown ({result.error})" if result.error else ""
             self._set_source(badge, f"{when}{note}", "accent" if live else "muted")
-            self._use_offline_btn.setVisible(True)
+            # "Use offline copy" only makes sense when there IS a vendored offline copy to revert to
+            self._use_offline_btn.setVisible(bool(self._offline_markdown))
         elif "failed" in result.error.lower():
-            # a real fetch failure: keep the offline content, surface a clear, non-destructive note.
-            self._set_source("OFFLINE", f"live fetch failed ({result.error})", "warning")
+            # a real fetch failure: don't claim an offline copy exists when it doesn't
+            if self._offline_markdown:
+                self._set_source("OFFLINE", f"live fetch failed ({result.error})", "warning")
+            else:
+                self._set_source("NO OFFLINE", f"live fetch failed ({result.error})", "warning")
         # a "disabled" / "no cache" result is expected and left silent (offline stays shown).
 
     def _restore_offline(self) -> None:

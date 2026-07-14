@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import DiscoveredService
 from oscprecon.modules.http import (
@@ -131,6 +132,7 @@ class HttpPanel(QWidget):
         self._preview.setReadOnly(True)
         self._preview.setMaximumHeight(70)
         run = QPushButton("Run")
+        run.setStyleSheet(styles.primary_button(tokens.DARK))  # primary content-discovery action
         run.clicked.connect(self._on_run)
         dry = QPushButton("Dry-run")
         dry.clicked.connect(self._on_dry_run)

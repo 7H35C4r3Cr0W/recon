@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import DiscoveredService, validate_host
 from oscprecon.modules.http import is_tls
@@ -95,6 +96,7 @@ class VhostPanel(QWidget):
         self._preview.setReadOnly(True)
         self._preview.setMaximumHeight(60)
         run = QPushButton("Run")
+        run.setStyleSheet(styles.primary_button(tokens.DARK))  # primary vhost-enumeration action
         run.clicked.connect(self._on_run)
         dry = QPushButton("Dry-run")
         dry.clicked.connect(self._on_dry_run)

@@ -41,15 +41,13 @@ class NavRail(QWidget):
         )
         layout.setSpacing(tokens.SPACE_XS)
 
-        muted = tokens.palette(theme_name).text_muted
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
         self._buttons: dict[str, QToolButton] = {}
-        for key, label, icon, is_action, hint in _ITEMS:
+        for key, label, _icon, is_action, hint in _ITEMS:
             button = QToolButton()
             button.setText("  " + label)
-            button.setIcon(icons.get_icon(icon, muted, tokens.ICON_MD))
-            button.setIconSize(QSize(tokens.ICON_MD, tokens.ICON_MD))
+            button.setIconSize(QSize(tokens.ICON_MD, tokens.ICON_MD))  # icon set by restyle() below
             button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
             button.setCheckable(not is_action)  # action items don't hold a persistent state
             button.setAutoRaise(True)

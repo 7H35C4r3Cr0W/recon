@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QToolButton, QWidget
 
-from oscprecon.gui.theme import tokens
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.gui.theme.tokens import Palette
 
 # A compact, dismissible inline banner for the latest actionable feedback (blocked command, missing
@@ -11,13 +11,6 @@ from oscprecon.gui.theme.tokens import Palette
 # the most recent significant state impossible to miss. Colour-coded but always carries text, so the
 # meaning never depends on colour alone.
 
-_KIND_FIELD = {
-    "info": "info",
-    "success": "success",
-    "warning": "warning",
-    "error": "error",
-    "loading": "accent",
-}
 _KIND_MARK = {
     "info": "ℹ",
     "success": "✓",
@@ -54,11 +47,14 @@ class Banner(QWidget):
         layout.addWidget(self._mark)
         layout.addWidget(self._msg, stretch=1)
         layout.addWidget(self._dismiss)
+        self._kind = ""  # remembered so restyle() can repaint a banner that's already showing
         self.setVisible(False)
 
     def show_message(self, kind: str, text: str) -> None:
+        self._kind = kind
         pal: Palette = tokens.palette(self._theme)
-        color = str(getattr(pal, _KIND_FIELD.get(kind, "info")))
+        # "loading" reuses the accent; everything else routes through the shared status_color helper
+        color = styles.status_color("accent" if kind == "loading" else kind, pal)
         self._mark.setText(_KIND_MARK.get(kind, "ℹ"))
         self._mark.setStyleSheet(f"color:{color}; font-weight:600;")
         self._msg.setText(text)
@@ -70,8 +66,11 @@ class Banner(QWidget):
         self.setVisible(True)
 
     def clear(self) -> None:
+        self._kind = ""
         self._msg.setText("")
         self.setVisible(False)
 
     def restyle(self, theme_name: str) -> None:
         self._theme = theme_name
+        if self._kind and not self.isHidden():  # repaint a visible banner in the new theme
+            self.show_message(self._kind, self._msg.text())

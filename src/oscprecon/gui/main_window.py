@@ -278,14 +278,14 @@ class MainWindow(QMainWindow):
         self._load_last_profile()
 
     def _on_find(self) -> None:
-        # focus the search box of whatever view is showing (workspace filter / findings search /
-        # otherwise the reference-pane find)
+        # focus the search of whatever view is showing; the reference-pane find only exists on the
+        # recon three-pane (index 0), so Ctrl+F is a no-op on graph/report/activity
         current = self._central_stack.currentWidget()
         if current is self._dashboard:
             self._dashboard.focus_filter()
         elif current is self._findings_view:
             self._findings_view.focus_search()
-        else:
+        elif self._central_stack.currentIndex() == 0:
             self._reference_pane.focus_find()
 
     def _on_escape(self) -> None:
@@ -299,7 +299,7 @@ class MainWindow(QMainWindow):
     def _build_menus(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
 
-        self._new_action = QAction("New Scan Profile...", self)
+        self._new_action = QAction("New Project...", self)
         self._new_action.setShortcut("Ctrl+N")
         self._new_action.triggered.connect(self._on_new)
         file_menu.addAction(self._new_action)

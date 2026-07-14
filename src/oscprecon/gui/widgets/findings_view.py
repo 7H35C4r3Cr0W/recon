@@ -136,7 +136,7 @@ class FindingsView(QWidget):
         needle = self._filter.text().strip().lower()
         category = self._category.currentText()
         shown = 0
-        notable = sum(1 for r in self._all if finding_severity.is_notable(r["category"]))
+        notable = 0  # count over the SHOWN rows so it can't contradict the filtered total
         for row in self._all:
             if not self._matches(row, needle, category):
                 continue
@@ -152,6 +152,8 @@ class FindingsView(QWidget):
             self._table.setItem(r, 3, QTableWidgetItem(row["value"]))
             self._table.setItem(r, 4, QTableWidgetItem(row["detail"]))
             shown += 1
+            if finding_severity.is_notable(row["category"]):
+                notable += 1
         self._table.resizeColumnsToContents()
         self._table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         self._table.setSortingEnabled(True)
