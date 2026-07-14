@@ -1,0 +1,16 @@
+# CouchDB manual follow-ups (Tier-2 — shown, never auto-run). Unauth read-only HTTP GETs;
+# {target}/{port} filled from the active profile. No document writes / no config changes.
+- description: "Read bounded docs from a database"
+  why: "_all_docs?limit=5 returns a few document IDs from a db — bounded, read-only"
+  command: "curl -s http://{target}:{port}/_users/_all_docs?limit=5"
+# source: HackTricks 5984-pentesting-couchdb (book.hacktricks.wiki)
+
+- description: "Server config (older / misconfigured nodes)"
+  why: "_config can leak admin hashes / bind config on unsecured nodes — read-only"
+  command: "curl -s http://{target}:{port}/_config"
+# source: HackTricks 5984-pentesting-couchdb (book.hacktricks.wiki)
+
+- description: "Fauxton admin UI presence"
+  why: "a 200 on /_utils/ confirms the web admin console is exposed — read-only"
+  command: "curl -s -o /dev/null -w '%{http_code}' http://{target}:{port}/_utils/"
+# source: HackTricks 5984-pentesting-couchdb (book.hacktricks.wiki)

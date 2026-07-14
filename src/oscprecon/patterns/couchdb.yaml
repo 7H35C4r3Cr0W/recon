@@ -1,0 +1,19 @@
+# CouchDB recon next-steps (unauth read-only HTTP GETs). Reading databases/documents is recon; no
+# document writes, no config changes, no credential guessing are ever suggested here.
+- match:
+    service: couchdb
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "CouchDB is in admin party (unauthenticated) — list databases, then read bounded docs"
+      command: "curl -s http://{target}:5984/_all_dbs"
+# source: HackTricks 5984-pentesting-couchdb (book.hacktricks.wiki)
+
+- match:
+    service: couchdb
+    field: kind
+    value: "^database$"
+  suggest:
+    - text: "Read a small sample of documents from a discovered database (bounded, read-only)"
+      command: "curl -s http://{target}:5984/_users/_all_docs?limit=5"
+# source: HackTricks 5984-pentesting-couchdb (book.hacktricks.wiki)

@@ -7,6 +7,7 @@ from pathlib import Path
 from oscprecon.models import Command, Target
 from oscprecon.modules import (
     ajp,
+    couchdb,
     elasticsearch,
     finger,
     ike,
@@ -130,6 +131,10 @@ def _elasticsearch_steps(target: Target, port: int) -> list[tuple[Command, str]]
     return [
         (s.command, s.tool) for s in elasticsearch.ElasticsearchModule().recon_steps(target, port)
     ]
+
+
+def _couchdb_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in couchdb.CouchdbModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -337,5 +342,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(elasticsearch),
         elasticsearch.ElasticsearchModule,
         _elasticsearch_steps,
+    ),
+    "couchdb": SimpleReconSpec(
+        "couchdb",
+        "Run full CouchDB recon (version · databases · nodes)",
+        "CouchDB recon — unauth curl of / (version), _all_dbs (database list), and _membership; "
+        "read-only. A list returned without a 401 means 'admin party' (no auth).",
+        _manual(couchdb),
+        couchdb.CouchdbModule,
+        _couchdb_steps,
     ),
 }
