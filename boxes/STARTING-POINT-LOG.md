@@ -17,7 +17,9 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 6 | Preignition | 10.129.32.196 | http/80 (nginx 1.14.2) | dir-bust found `/admin.php` (admin/admin manual) | "Wide net" (60+ ext) ON by default → dir-bust never finished | `31a746c` |
 | 7 | Mongod | 10.129.32.198 | mongodb/27017 (+22 ssh) | nmap NSE listed DBs incl. `sensitive_information` | Tier-1 needed mongosh (not on stock Kali) | `ac9fc75` |
 | 8 | Synced | 10.129.228.37 | rsync/873 | `rsync --list-only` found anonymous `public` module (access=unauth) | nmap parenthetical banner `(protocol version 31)` mangled product/version | `ab1a809` |
-| 9 | Appointment | 10.129.32.201 | http/80 (Apache 2.4.38, login form) | nmap clean; whatweb fingerprint now surfaces the login form (`PasswordField`, `Title[Login]`); SQLi bypass is manual | `whatweb` emitted a coloured summary the JSON-only parser silently dropped → 0 findings on every http box | _this commit_ |
+| 9 | Appointment | 10.129.32.201 | http/80 (Apache 2.4.38, login form) | nmap clean; whatweb fingerprint now surfaces the login form (`PasswordField`, `Title[Login]`); SQLi bypass is manual | `whatweb` emitted a coloured summary the JSON-only parser silently dropped → 0 findings on every http box | `d868c6d` |
+| 10 | Sequel | 10.129.32.202 | mysql/3306 (MariaDB 10.3.27) | validated the reworked Exploit-DB lookup live — nmap can't fingerprint (`mysql?`) so EDB now falls back to the mysql-info version → 7 MariaDB refs; passwordless root is manual | (EDB rework, not a box bug) `9a61cf2` | `9a61cf2` |
+| 11 | Crocodile | 10.129.32.203 | ftp/21 (vsftpd 3.0.3, anon) + http/80 (Apache 2.4.41) | anon FTP listed both cred files; whatweb + EDB (vsftpd 3.0.3 → EDB-49719 ★, apache 2.4 → 31) both clean; login.php foothold is manual | FTP files listed **twice** — nmap ftp-anon and the curl walk both enumerate root | _this commit_ |
 
 ## Per-box notes
 
@@ -78,6 +80,28 @@ shred plugin names. The fingerprint now surfaces, including `PasswordField` /
 manual exploitation the tool deliberately leaves to the user (recon-only, §2).
 **Lesson:** validate against a live http box, not just a JSON fixture — the fixture
 encoded a format the emitted command never produces.
+
+**10 · Sequel — mysql (MariaDB).** MariaDB 10.3.27 on 3306. No box-specific bug;
+used as the **live validation** for the session's Exploit-DB rework. nmap returns
+`3306/tcp open mysql?` with an **empty product/version** (low-confidence
+fingerprint), so the old EDB lookup skipped it entirely. The rework: when nmap
+has no product but a module finding carries the version (the `mysql-info` NSE
+gives `5.5.5-10.3.27-MariaDB`), the lookup runs on the service label + that
+version, unmasks MariaDB from behind MySQL's fake `5.5.5-` prefix, and surfaces
+**7** MariaDB references (product-wide, since no title names 10.3). Passwordless
+`mysql -h <ip> -u root` is the manual foothold (Tier-2, correctly not auto).
+
+**11 · Crocodile — ftp + http.** vsftpd 3.0.3 (anonymous) + Apache 2.4.41. Both
+this session's shipped features validated live: whatweb fingerprints the Apache
+2.4.41 stack cleanly, and Exploit-DB now resolves **vsftpd 3.0.3 → EDB-49719
+(version-matched ★)** and **apache 2.4 → 31 refs**. **Bug:** the FTP recon listed
+`allowed.userlist` and `allowed.userlist.passwd` **twice each** — `parse_nmap_ftp`
+extracts the ftp-anon root listing *and* the curl walk lists the same root, so
+every root file was collected (and persisted) twice. Fawn hid it (one file).
+Fix: `dedup_ftp_findings()` collapses each `(kind, value)` to one, keeping the
+walk's richer `size + extension` detail, applied in both `FtpModule.parse()` and
+the worker — nmap stays a fallback if curl ever fails, but never double-counts.
+The credential-list → `login.php` login is manual (recon-only).
 
 ## Trends & lessons (adapt going forward)
 
