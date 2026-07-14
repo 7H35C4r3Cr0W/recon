@@ -1,0 +1,16 @@
+# iSCSI manual follow-ups (Tier-2 — shown, never auto-run). Read-only discovery; {target}/{port}/{iqn}
+# filled from the active profile. Logging into / mounting a LUN is an explicit action, not wrapped.
+- description: "SendTargets discovery"
+  why: "iscsiadm discovery lists exported targets/LUNs without a login — read-only"
+  command: "iscsiadm -m discovery -t st -p {target}:{port}"
+# source: HackTricks 3260-pentesting-iscsi (book.hacktricks.wiki) — standard OSCP iSCSI recon
+
+- description: "Target + auth info (nmap NSE)"
+  why: "iscsi-info reports the targets and whether CHAP authentication is required — read-only"
+  command: "nmap -sV -p {port} --script iscsi-info {target}"
+# source: HackTricks 3260-pentesting-iscsi (book.hacktricks.wiki) — standard OSCP iSCSI recon
+
+- description: "Show a discovered target's node record"
+  why: "iscsiadm node -T lists the stored parameters for a target — read-only, no login"
+  command: "iscsiadm -m node -T {iqn} -p {target}:{port}"
+# source: HackTricks 3260-pentesting-iscsi (book.hacktricks.wiki) — standard OSCP iSCSI recon

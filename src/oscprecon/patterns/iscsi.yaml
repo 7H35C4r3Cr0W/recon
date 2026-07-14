@@ -1,0 +1,19 @@
+# iSCSI recon next-steps (SendTargets discovery, read-only). Enumerating targets is recon; logging
+# into a LUN / mounting it is an explicit action and is never suggested here.
+- match:
+    service: iscsi
+    field: kind
+    value: "^target$"
+  suggest:
+    - text: "An iSCSI target was discovered — read its node record (parameters / CHAP requirement)"
+      command: "iscsiadm -m node -T {iqn} -p {target}:3260"
+# source: HackTricks 3260-pentesting-iscsi (book.hacktricks.wiki) — standard OSCP iSCSI recon
+
+- match:
+    service: iscsi
+    field: value
+    value: "^discovery-open$"
+  suggest:
+    - text: "Discovery answered — confirm which targets require CHAP before any authorized login"
+      command: "nmap -sV -p 3260 --script iscsi-info {target}"
+# source: HackTricks 3260-pentesting-iscsi (book.hacktricks.wiki) — standard OSCP iSCSI recon

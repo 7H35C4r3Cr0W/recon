@@ -15,6 +15,7 @@ from oscprecon.modules import (
     imap,
     ipmi,
     ipp,
+    iscsi,
     kerberos,
     kubernetes,
     memcached,
@@ -185,6 +186,10 @@ def _telnet_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _ipp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in ipp.IppModule().recon_steps(target, port)]
+
+
+def _iscsi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in iscsi.IscsiModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -491,5 +496,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(ipp),
         ipp.IppModule,
         _ipp_steps,
+    ),
+    "iscsi": SimpleReconSpec(
+        "iscsi",
+        "Run full iSCSI recon (SendTargets discovery)",
+        "iSCSI recon — iscsiadm SendTargets discovery + nmap iscsi-info list exported targets/LUNs "
+        "(read-only). Logging into / mounting a LUN is an explicit follow-up, not run here.",
+        _manual(iscsi),
+        iscsi.IscsiModule,
+        _iscsi_steps,
     ),
 }
