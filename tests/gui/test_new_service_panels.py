@@ -27,6 +27,14 @@ _NEW_SERVICES = [
     ("msrpc", 135, Proto.TCP, "msrpc"),
     ("imap", 143, Proto.TCP, "imap"),
     ("pop3", 110, Proto.TCP, "pop3"),
+    ("telnet", 23, Proto.TCP, "telnet"),
+    ("ipp", 631, Proto.TCP, "ipp"),
+    ("iscsi", 3260, Proto.TCP, "iscsi"),
+    ("svn", 3690, Proto.TCP, "svnserve"),
+    ("ident", 113, Proto.TCP, "ident"),
+    ("mdns", 5353, Proto.UDP, "mdns"),
+    ("upnp", 1900, Proto.UDP, "upnp"),
+    ("rmi", 1099, Proto.TCP, "java-rmi"),
 ]
 
 

@@ -31,6 +31,14 @@ _NEW_MODULES = [
     "msrpc",
     "imap",
     "pop3",
+    "telnet",
+    "ipp",
+    "iscsi",
+    "svn",
+    "ident",
+    "mdns",
+    "upnp",
+    "rmi",
 ]
 
 

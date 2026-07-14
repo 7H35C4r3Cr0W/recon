@@ -37,8 +37,8 @@ def test_tool_panel_populates_hints_and_expands(qtbot: QtBot) -> None:
     panel = ToolPanel()
     qtbot.addWidget(panel)
     panel.set_target("10.10.10.5")
-    # telnet uses the generic hints page (it has no dedicated builder/recon panel)
-    svc = DiscoveredService(23, Proto.TCP, "telnet")
+    # rpcbind uses the generic hints page (it has no dedicated builder/recon panel)
+    svc = DiscoveredService(111, Proto.TCP, "rpcbind")
     panel.show_service(svc, references.match(svc))
     assert panel._hints.count() >= 1
     panel._on_hint_activated(panel._hints.item(0))
