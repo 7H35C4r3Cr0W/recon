@@ -4,8 +4,9 @@ import json
 import os
 from pathlib import Path
 
-from PySide6.QtCore import QPoint, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QPoint, QSize, Qt, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices
+from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -26,6 +27,8 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import config
+from oscprecon.gui.assets import EMPTY_WORKSPACE, asset_path
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.gui.workspace.index_worker import WorkspaceIndexWorker
 from oscprecon.profile import Profile
 from oscprecon.workspace import STATUSES, ProfileSummary, all_views, health, locks
@@ -33,6 +36,17 @@ from oscprecon.workspace.views import SavedView
 
 _COLUMNS = ("Profile", "Target", "Status", "Tags", "Last activity", "Svc", "Find", "Cred", "Report")
 _DIR_ROLE = Qt.ItemDataRole.UserRole
+
+# status -> token field, so a project's state reads at a glance (colour is a hint, not the only
+# signal — the status text is always present too)
+_STATUS_COLOR = {
+    "new": "text_muted",
+    "active": "accent",
+    "needs-review": "warning",
+    "blocked": "error",
+    "completed": "success",
+    "archived": "text_muted",
+}
 
 
 class WorkspaceDashboard(QWidget):
@@ -51,6 +65,9 @@ class WorkspaceDashboard(QWidget):
         self._index_worker: WorkspaceIndexWorker | None = None
 
         new_btn = QPushButton("New Profile…")
+        new_btn.setStyleSheet(
+            styles.primary_button(tokens.DARK)
+        )  # primary action (gold, both themes)
         new_btn.clicked.connect(self.create_requested.emit)
         refresh_btn = QPushButton("Refresh")
         refresh_btn.clicked.connect(self.refresh)
@@ -86,12 +103,7 @@ class WorkspaceDashboard(QWidget):
         if header is not None:
             header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
 
-        self._empty = QLabel(
-            "No profiles yet.\n\nUse “New Profile…” to create your first scan profile,\n"
-            "or set the workspace root in Preferences."
-        )
-        self._empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._empty.setAccessibleName("Empty workspace guidance")
+        self._empty = self._build_empty_state()
         self._stack = QStackedWidget()
         self._stack.addWidget(self._table)  # 0
         self._stack.addWidget(self._empty)  # 1
@@ -101,6 +113,40 @@ class WorkspaceDashboard(QWidget):
         layout.addWidget(self._stack, stretch=1)
 
         self._reload_views()
+
+    def _build_empty_state(self) -> QWidget:
+        wrap = QWidget()
+        wrap.setAccessibleName("Empty workspace guidance")
+        outer = QVBoxLayout(wrap)
+        outer.addStretch(1)
+
+        art = QSvgWidget(str(asset_path(EMPTY_WORKSPACE)))
+        art.setFixedSize(QSize(280, 210))  # matches the illustration's 4:3 viewBox (no distortion)
+        art.setAccessibleName("No projects illustration")
+
+        heading = QLabel("No projects yet")
+        heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        heading.setStyleSheet(f"font-size:{tokens.FONT_SIZE_LG}px; font-weight:600;")
+        subtitle = QLabel(
+            "Create your first scan profile, or set the workspace root in Preferences."
+        )
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet(f"color:{tokens.DARK.text_muted};")
+
+        create = QPushButton("New Project…")
+        create.setStyleSheet(styles.primary_button(tokens.DARK))
+        create.clicked.connect(self.create_requested.emit)
+
+        for widget, align in (
+            (art, Qt.AlignmentFlag.AlignHCenter),
+            (heading, Qt.AlignmentFlag.AlignHCenter),
+            (subtitle, Qt.AlignmentFlag.AlignHCenter),
+            (create, Qt.AlignmentFlag.AlignHCenter),
+        ):
+            outer.addWidget(widget, alignment=align)
+            outer.addSpacing(tokens.SPACE_SM)
+        outer.addStretch(1)
+        return wrap
 
     # --- data loading (off-thread) ---
     def refresh(self) -> None:
@@ -200,12 +246,17 @@ class WorkspaceDashboard(QWidget):
             str(summary.credential_count),  # count only — never a secret
             "✓" if summary.has_report else "",
         ]
+        status_text = cells[2]
         for col, text in enumerate(cells):
             item = QTableWidgetItem(text)
             if col == 0:
                 item.setData(_DIR_ROLE, str(summary.directory))
                 if summary.warnings:
                     item.setToolTip("; ".join(summary.warnings))
+            elif col == 2:  # colour the status as a hint (text still carries the meaning)
+                field = _STATUS_COLOR.get(status_text)
+                if field is not None:
+                    item.setForeground(QColor(getattr(tokens.DARK, field)))
             self._table.setItem(row, col, item)
 
     # --- row actions ---

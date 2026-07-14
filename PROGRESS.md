@@ -49,13 +49,18 @@ Renaming the product to **Nabu** and lifting it toward a polished desktop produc
   conservative classifier) and **ActivityView** (audit.jsonl). Both theme-aware (light + dark),
   `WA_StyledBackground` so panels paint, restyled on theme change; rendered + eyeballed both themes.
   +7 tests. Existing graph/report toggle indices (0/1/2/3) preserved.
+- **Dashboard + three-pane recon visual polish** — dashboard empty state is now an **illustrated**
+  card (empty-workspace SVG + heading + subtitle + a **primary gold CTA**); the `New Profile` and
+  `Run Full Recon` buttons use the token **primary-button** style; project **status** renders as a
+  colour hint (new/active/needs-review/blocked/completed → token colours, text still carries meaning);
+  the **service tree** colours TCP-blue vs UDP-green with bold transport-group headers. Rendered +
+  eyeballed. +3 tests (empty-state illustration, status-colour coverage, proto colouring).
 
-**Remaining Nabu chunks (not yet done):** dashboard empty-state illustration + row hierarchy;
-three-pane recon visual polish; reference-pane presentation; richer Findings view (filter/group/
-search); vault/spray UX polish; dialog/form uniformity; feedback/loading/error banners; full
-keyboard-shortcut + accessibility sweep; performance pass; `docs/screenshots/` (generated data only);
-the 22-angle adversarial refute-review; and the docs/packaging finalization. **Recommended single
-next chunk:** dashboard + three-pane recon visual polish (now that the shell/tokens are in place).
+**Remaining Nabu chunks (not yet done):** reference-pane presentation; richer Findings view
+(filter/group/search); vault/spray UX polish; dialog/form uniformity; feedback/loading/error banners;
+full keyboard-shortcut + accessibility sweep; performance pass; `docs/screenshots/` (generated data
+only); the 22-angle adversarial refute-review; and the docs/packaging finalization. **Recommended
+single next chunk:** reference-pane presentation + tool-panel action ranking (Tier-1/2/Spray).
 
 ### Pre-live-testing polish (owner-requested)
 A run of owner-requested improvements before live-box testing:

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import QMenu, QTreeWidget, QTreeWidgetItem
 
 from oscprecon.models import DiscoveredService, Proto
 
 _SERVICE_ROLE = Qt.ItemDataRole.UserRole
+
+# TCP vs UDP get distinct port colours so the two transports read apart at a glance (mirrors the
+# graph's TCP-blue / UDP-green language). Chosen for legibility on both the light and dark tree.
+_PROTO_COLOR = {Proto.TCP: QColor("#4a7fb5"), Proto.UDP: QColor("#4f8a5f")}
 
 
 class ServiceTree(QTreeWidget):
@@ -16,7 +21,7 @@ class ServiceTree(QTreeWidget):
         super().__init__()
         self._signature: tuple[tuple[int, str, str, str, str], ...] = ()
         self.setHeaderLabels(["Port", "Service", "Product"])
-        self.setColumnWidth(0, 90)
+        self.setColumnWidth(0, 110)
         self.setColumnWidth(1, 120)
         self.currentItemChanged.connect(self._on_current_changed)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -49,11 +54,15 @@ class ServiceTree(QTreeWidget):
             if not members:
                 continue
             parent = QTreeWidgetItem(self, [f"{proto.value.upper()} ({len(members)})", "", ""])
+            header_font = parent.font(0)
+            header_font.setWeight(QFont.Weight.DemiBold)
+            parent.setFont(0, header_font)
             for service in members:
                 product = f"{service.product} {service.version}".strip()
                 item = QTreeWidgetItem(
                     parent, [f"{service.port}/{service.proto.value}", service.service, product]
                 )
+                item.setForeground(0, QBrush(_PROTO_COLOR[proto]))
                 item.setData(0, _SERVICE_ROLE, service)
         self.expandAll()
 
