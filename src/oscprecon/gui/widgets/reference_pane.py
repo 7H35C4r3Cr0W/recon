@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import hacktricks
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.models import DiscoveredService
 from oscprecon.references import ExploitHit, ServiceRef, sections
 from oscprecon.references.live_hacktricks import LiveResult
@@ -114,6 +115,10 @@ class ReferencePane(QWidget):
         self._link.setWordWrap(True)
         self._link.setOpenExternalLinks(True)
 
+        # a colour-coded tier badge (OFFLINE/CACHED/LIVE) + a muted detail line, so the source of
+        # the reference is obvious at a glance. Offline is the reliable default (§14a).
+        self._source_badge = QLabel("")
+        self._source_badge.setVisible(False)
         self._source_state = QLabel("")
         self._source_state.setWordWrap(True)
         self._source_state.setStyleSheet("color: gray;")
@@ -156,6 +161,7 @@ class ReferencePane(QWidget):
         self._live_index = self._tabs.addTab(web_widget, "Live page")
 
         state_row = QHBoxLayout()
+        state_row.addWidget(self._source_badge)
         state_row.addWidget(self._source_state, stretch=1)
         state_row.addWidget(self._use_offline_btn)
         state_row.addWidget(self._refresh_btn)
@@ -180,6 +186,14 @@ class ReferencePane(QWidget):
         layout.addWidget(hacktricks_box, stretch=3)
         layout.addWidget(exploits_box, stretch=1)
 
+    def _set_source(self, badge: str, detail: str, kind: str) -> None:
+        # kind -> token colour: info=offline, muted=cached, accent=live, warning=degraded
+        self._source_badge.setVisible(bool(badge))
+        if badge:
+            self._source_badge.setText(f" {badge} ")
+            self._source_badge.setStyleSheet(styles.badge(kind, tokens.DARK))
+        self._source_state.setText(detail)
+
     def show_service(
         self,
         service: DiscoveredService | None,
@@ -196,7 +210,7 @@ class ReferencePane(QWidget):
             self._offline_markdown = ""
             self._label.setText("No reference mapping for this service.")
             self._link.setText("")
-            self._source_state.setText("")
+            self._set_source("", "", "muted")
             self._refresh_btn.setEnabled(False)
             self._offline.setMarkdown("")
             self._load(QUrl("about:blank"))
@@ -239,14 +253,14 @@ class ReferencePane(QWidget):
             )
             self._tabs.setTabText(self._offline_index, "Offline")
             self._tabs.setCurrentIndex(self._live_index)
-            self._source_state.setText("Source: no offline page — use the Live page tab")
+            self._set_source("NO OFFLINE", "use the Live page tab or the link above", "warning")
             self._refresh_btn.setEnabled(self._live_enabled)
             return
         self._offline_markdown = hacktricks.clean_markdown(page.markdown)
         self._offline.setMarkdown(self._offline_markdown)
         self._tabs.setTabText(self._offline_index, f"Offline · {page.title}")
         self._tabs.setCurrentIndex(self._offline_index)
-        self._source_state.setText("Source: offline vendored snapshot")
+        self._set_source("OFFLINE", "vendored snapshot", "info")
         self._refresh_btn.setEnabled(self._live_enabled)
         self._apply_finding_jump(ref.module, findings, product)
 
@@ -293,20 +307,21 @@ class ReferencePane(QWidget):
                     markdown=result.markdown,
                 )
             when = time.strftime("%Y-%m-%d %H:%M", time.localtime(result.fetched_at))
-            kind = "live refreshed" if result.state == "live-refreshed" else "live cached"
-            note = f" (offline copy shown — {result.error})" if result.error else ""
-            self._source_state.setText(f"Source: {kind} · {when}{note}")
+            live = result.state == "live-refreshed"
+            badge = "LIVE" if live else "CACHED"
+            note = f" · offline shown ({result.error})" if result.error else ""
+            self._set_source(badge, f"{when}{note}", "accent" if live else "muted")
             self._use_offline_btn.setVisible(True)
         elif "failed" in result.error.lower():
             # a real fetch failure: keep the offline content, surface a clear, non-destructive note.
-            self._source_state.setText(f"Live fetch failed ({result.error}) — showing offline copy")
+            self._set_source("OFFLINE", f"live fetch failed ({result.error})", "warning")
         # a "disabled" / "no cache" result is expected and left silent (offline stays shown).
 
     def _restore_offline(self) -> None:
         if self._offline_markdown:
             self._offline.setMarkdown(self._offline_markdown)
             self._offline.moveCursor(QTextCursor.MoveOperation.Start)
-        self._source_state.setText("Source: offline vendored snapshot")
+        self._set_source("OFFLINE", "vendored snapshot", "info")
         self._use_offline_btn.setVisible(False)
 
     @staticmethod

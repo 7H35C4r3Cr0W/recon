@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import manual_commands
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.models import DiscoveredService, validate_host
 from oscprecon.modules import dns as dns_mod
 from oscprecon.profile import Profile
@@ -44,6 +45,7 @@ class DnsPanel(QWidget):
         form.addRow("Domain:", self._domain)
 
         self._recon = QPushButton("Run full DNS recon (version, recursion, zone transfer)")
+        self._recon.setStyleSheet(styles.primary_button(tokens.DARK))  # flagship Tier-1 action
         self._recon.clicked.connect(self._on_recon)
         button_box = QGroupBox("Tier 1 — DNS-protocol recon (read-only queries)")
         box_layout = QVBoxLayout(button_box)

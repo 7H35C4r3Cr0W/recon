@@ -55,12 +55,19 @@ Renaming the product to **Nabu** and lifting it toward a polished desktop produc
   colour hint (new/active/needs-review/blocked/completed → token colours, text still carries meaning);
   the **service tree** colours TCP-blue vs UDP-green with bold transport-group headers. Rendered +
   eyeballed. +3 tests (empty-state illustration, status-colour coverage, proto colouring).
+- **Reference-pane presentation + tool-panel action ranking** — the reference pane's source line is
+  now a **colour-coded tier badge** (OFFLINE=teal · CACHED=muted · LIVE=gold · degraded=warning) +
+  a muted detail line, so the reference's provenance reads at a glance (offline stays the reliable
+  default). Each service panel's **flagship Tier-1 button** (Run full SMB/FTP/SSH/DNS/LDAP + simple)
+  now carries the gold **primary** style, ranking it above the secondary "just check" actions and the
+  Tier-2 manual follow-ups. Rendered + eyeballed. +1 test; reference-pane badge test updated.
 
-**Remaining Nabu chunks (not yet done):** reference-pane presentation; richer Findings view
-(filter/group/search); vault/spray UX polish; dialog/form uniformity; feedback/loading/error banners;
-full keyboard-shortcut + accessibility sweep; performance pass; `docs/screenshots/` (generated data
-only); the 22-angle adversarial refute-review; and the docs/packaging finalization. **Recommended
-single next chunk:** reference-pane presentation + tool-panel action ranking (Tier-1/2/Spray).
+**Remaining Nabu chunks (not yet done):** richer Findings view (filter/group/search); vault/spray UX
+polish; dialog/form uniformity; feedback/loading/error banners; full keyboard-shortcut + accessibility
+sweep; performance pass; `docs/screenshots/` (generated data only); the 22-angle adversarial
+refute-review; the docs/packaging finalization; and **(do LAST) the interactive HTML module-flow
+mind-map for management** ([[final-flowchart-deliverable]]). **Recommended single next chunk:**
+vault/spray UX polish + dialog/form uniformity.
 
 ### Pre-live-testing polish (owner-requested)
 A run of owner-requested improvements before live-box testing:

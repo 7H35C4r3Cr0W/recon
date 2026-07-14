@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import manual_commands
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.models import DiscoveredService
 from oscprecon.modules import ftp as ftp_mod
 from oscprecon.profile import Profile
@@ -35,6 +36,7 @@ class FtpPanel(QWidget):
         self._port = 21
 
         self._full = QPushButton("Run full FTP recon (bounded walk)")
+        self._full.setStyleSheet(styles.primary_button(tokens.DARK))  # flagship Tier-1 action
         self._full.clicked.connect(lambda: self.recon_requested.emit("full", self._port))
         self._anon = QPushButton("Just list anonymous root")
         self._anon.clicked.connect(lambda: self.recon_requested.emit("anon", self._port))

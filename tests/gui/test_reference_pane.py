@@ -118,10 +118,13 @@ def test_apply_live_result_renders_then_reverts(qtbot: QtBot) -> None:
     pane.apply_live_result(result)
     assert "fresh live body" in pane.offline_text()
     # isHidden (not isVisible) — the top-level window isn't shown in an offscreen test
-    assert not pane._use_offline_btn.isHidden() and "live refreshed" in pane._source_state.text()
+    assert not pane._use_offline_btn.isHidden()
+    assert pane._source_badge.text().strip() == "LIVE"  # colour-coded source tier
+    assert not pane._source_badge.isHidden()
     pane._restore_offline()
     assert "fresh live body" not in pane.offline_text() and "445" in pane.offline_text()
     assert pane._use_offline_btn.isHidden()
+    assert pane._source_badge.text().strip() == "OFFLINE"  # reverted to the reliable default
 
 
 def test_apply_live_result_for_other_page_is_ignored(qtbot: QtBot) -> None:
