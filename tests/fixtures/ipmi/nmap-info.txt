@@ -1,0 +1,16 @@
+Nmap scan report for 10.10.10.13
+Host is up (0.021s latency).
+
+PORT    STATE SERVICE  VERSION
+623/udp open  asf-rmcp
+| ipmi-version:
+|   Version:
+|     IPMI-2.0
+|   UserAuth: auth_msg, auth_user, non_null_user
+|   PassAuth: password, md5, md2
+|_  Level: 1.5, 2.0
+| ipmi-cipher-zero:
+|   VULNERABLE:
+|   IPMI 2.0 RAKP Cipher Zero Authentication Bypass
+|     State: VULNERABLE
+|_    Any password is accepted for a valid user.

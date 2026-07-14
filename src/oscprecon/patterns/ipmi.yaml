@@ -1,0 +1,19 @@
+# IPMI recon next-steps (ipmi-version + ipmi-cipher-zero, read-only). Cipher-zero detection is a
+# config check, not exploitation; RAKP hash retrieval / login are out of scope and never suggested.
+- match:
+    service: ipmi
+    field: kind
+    value: "^cipher-zero$"
+  suggest:
+    - text: "IPMI Cipher Zero enabled — authentication is bypassable; record it as a critical exposure"
+      command: "nmap -sU -p 623 --script ipmi-cipher-zero {target}"
+# source: HackTricks 623-udp-ipmi (book.hacktricks.wiki) — standard OSCP IPMI recon
+
+- match:
+    service: ipmi
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "Note the IPMI version and auth levels; confirm the UDP port with a retry (UDP is lossy)"
+      command: "nmap -sU -p 623 --script ipmi-version {target}"
+# source: HackTricks 623-udp-ipmi (book.hacktricks.wiki) — standard OSCP IPMI recon

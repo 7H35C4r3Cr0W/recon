@@ -9,6 +9,7 @@ from oscprecon.modules import (
     ajp,
     finger,
     ike,
+    ipmi,
     kerberos,
     mongodb,
     mssql,
@@ -108,6 +109,10 @@ def _x11_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _ajp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in ajp.AjpModule().recon_steps(target, port)]
+
+
+def _ipmi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in ipmi.IpmiModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -279,5 +284,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(ajp),
         ajp.AjpModule,
         _ajp_steps,
+    ),
+    "ipmi": SimpleReconSpec(
+        "ipmi",
+        "Run full IPMI recon (version · cipher-zero)",
+        "IPMI recon (UDP) — ipmi-version (IPMI/auth levels) + ipmi-cipher-zero (auth-bypass "
+        "misconfig detection); read-only. RAKP hash retrieval is out of scope.",
+        _manual(ipmi),
+        ipmi.IpmiModule,
+        _ipmi_steps,
     ),
 }

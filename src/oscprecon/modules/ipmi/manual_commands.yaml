@@ -1,0 +1,16 @@
+# IPMI manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. IPMI 2.0 RAKP hash retrieval is credential harvesting and is NOT wrapped.
+- description: "IPMI version + supported auth levels"
+  why: "ipmi-version in isolation confirms IPMI 1.5/2.0 and the auth entities — read-only"
+  command: "nmap -sU -p {port} --script ipmi-version {target}"
+# source: HackTricks 623-udp-ipmi (book.hacktricks.wiki) — standard OSCP IPMI recon
+
+- description: "Cipher-zero auth-bypass check"
+  why: "ipmi-cipher-zero detects the misconfig where any password authenticates — detection only"
+  command: "nmap -sU -p {port} --script ipmi-cipher-zero {target}"
+# source: HackTricks 623-udp-ipmi (book.hacktricks.wiki) — standard OSCP IPMI recon
+
+- description: "Confirm the UDP port is open (retry — UDP is lossy)"
+  why: "a single UDP probe can be dropped; a targeted re-scan confirms 623/udp is really open"
+  command: "nmap -sU -p {port} --host-timeout 60s {target}"
+# source: HackTricks 623-udp-ipmi (book.hacktricks.wiki) — standard OSCP IPMI recon
