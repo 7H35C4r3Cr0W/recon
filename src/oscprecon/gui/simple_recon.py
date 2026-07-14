@@ -33,6 +33,7 @@ from oscprecon.modules import (
     sip,
     smtp,
     snmp,
+    telnet,
     tftp,
     vnc,
     winrm,
@@ -175,6 +176,10 @@ def _imap_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _pop3_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in pop3.Pop3Module().recon_steps(target, port)]
+
+
+def _telnet_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in telnet.TelnetModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -463,5 +468,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(pop3),
         pop3.Pop3Module,
         _pop3_steps,
+    ),
+    "telnet": SimpleReconSpec(
+        "telnet",
+        "Run full Telnet recon (encryption · NTLM)",
+        "Telnet recon — nmap telnet-encryption (cleartext posture) + telnet-ntlm-info (AD "
+        "domain/host on Windows telnet); read-only, no login. Credential testing is Spray-only.",
+        _manual(telnet),
+        telnet.TelnetModule,
+        _telnet_steps,
     ),
 }

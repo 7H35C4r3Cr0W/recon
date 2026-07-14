@@ -1,0 +1,14 @@
+Nmap scan report for 10.10.10.27
+Host is up (0.020s latency).
+
+PORT   STATE SERVICE VERSION
+23/tcp open  telnet  Microsoft Windows Telnet
+| telnet-encryption:
+|_  Telnet server does not support encryption
+| telnet-ntlm-info:
+|   Target_Name: CORP
+|   NetBIOS_Domain_Name: CORP
+|   NetBIOS_Computer_Name: WEB01
+|   DNS_Domain_Name: corp.local
+|   DNS_Computer_Name: web01.corp.local
+|_  Product_Version: 10.0.17763

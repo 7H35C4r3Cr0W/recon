@@ -1,0 +1,16 @@
+# Telnet manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. Credential iteration against telnet is Tier-3 (Spray mode only).
+- description: "Encryption + NTLM info"
+  why: "telnet-encryption + telnet-ntlm-info re-run confirm cleartext exposure + AD domain — read-only"
+  command: "nmap -p {port} --script telnet-encryption,telnet-ntlm-info {target}"
+# source: HackTricks pentesting-telnet (book.hacktricks.wiki) — standard OSCP telnet recon
+
+- description: "Grab the login banner (nmap -sV)"
+  why: "the -sV banner often reveals the OS / device behind the telnet prompt — read-only"
+  command: "nmap -sV -p {port} {target}"
+# source: HackTricks pentesting-telnet (book.hacktricks.wiki) — standard OSCP telnet recon
+
+- description: "Look up references for the banner (searchsploit, display-only)"
+  why: "surfaces documented issues for the identified telnet daemon/device — lookup only"
+  command: "searchsploit telnet"
+# source: HackTricks pentesting-telnet (book.hacktricks.wiki) — standard OSCP telnet recon

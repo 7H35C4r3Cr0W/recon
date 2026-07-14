@@ -1,0 +1,19 @@
+# Telnet recon next-steps (encryption + NTLM, read-only). Login / credential guessing are Tier-3
+# (Spray mode) and never suggested; the useful signals are the cleartext posture and AD domain leak.
+- match:
+    service: telnet
+    field: kind
+    value: "^domain$"
+  suggest:
+    - text: "Telnet NTLM leaks the AD domain — pivot the domain into LDAP / SMB / Kerberos enumeration"
+      command: "nmap -p 389 --script ldap-rootdse {target}"
+# source: HackTricks pentesting-telnet (book.hacktricks.wiki) — standard OSCP telnet recon
+
+- match:
+    service: telnet
+    field: value
+    value: "^not-supported$"
+  suggest:
+    - text: "No transport encryption — record that any telnet login would be sent in cleartext"
+      command: "nmap -p 23 --script telnet-encryption {target}"
+# source: HackTricks pentesting-telnet (book.hacktricks.wiki) — standard OSCP telnet recon
