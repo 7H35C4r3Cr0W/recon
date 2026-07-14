@@ -1,0 +1,16 @@
+# SVN manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled from
+# the active profile. Checking out / committing are explicit actions and are not wrapped.
+- description: "Commit history (verbose)"
+  why: "svn log -v shows every revision + changed paths — often leaks removed files/credentials"
+  command: "svn log -v svn://{target}:{port}/"
+# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)
+
+- description: "Read a file at HEAD (read-only)"
+  why: "svn cat prints a file's contents without checking out — read-only"
+  command: "svn cat svn://{target}:{port}/trunk/README"
+# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)
+
+- description: "Recursive listing"
+  why: "svn ls -R walks the whole repo tree read-only (keep it bounded)"
+  command: "svn ls -R svn://{target}:{port}/"
+# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)

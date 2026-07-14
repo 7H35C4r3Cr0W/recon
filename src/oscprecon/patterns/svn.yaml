@@ -1,0 +1,19 @@
+# SVN recon next-steps (anonymous listing, read-only). Reading history/files is recon; checkout /
+# commit are explicit actions and are never suggested here.
+- match:
+    service: svn
+    field: value
+    value: "^anonymous$"
+  suggest:
+    - text: "svnserve allows anonymous reads — inspect the commit history for removed files / secrets"
+      command: "svn log -v svn://{target}:3690/"
+# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)
+
+- match:
+    service: svn
+    field: kind
+    value: "^entry$"
+  suggest:
+    - text: "Read a discovered file at HEAD without checking out the repo (read-only)"
+      command: "svn cat svn://{target}:3690/trunk/README"
+# source: HackTricks 3690-pentesting-subversion-svn-server (book.hacktricks.wiki)

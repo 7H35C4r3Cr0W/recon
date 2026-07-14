@@ -35,6 +35,7 @@ from oscprecon.modules import (
     sip,
     smtp,
     snmp,
+    svn,
     telnet,
     tftp,
     vnc,
@@ -190,6 +191,10 @@ def _ipp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _iscsi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in iscsi.IscsiModule().recon_steps(target, port)]
+
+
+def _svn_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in svn.SvnModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -505,5 +510,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(iscsi),
         iscsi.IscsiModule,
         _iscsi_steps,
+    ),
+    "svn": SimpleReconSpec(
+        "svn",
+        "Run full SVN recon (anon listing · info)",
+        "SVN recon — svn ls (anonymous repo-root listing) + nmap svn-info (version/UUID/revision); "
+        "read-only. Checkout / commit are explicit follow-ups, not run here.",
+        _manual(svn),
+        svn.SvnModule,
+        _svn_steps,
     ),
 }
