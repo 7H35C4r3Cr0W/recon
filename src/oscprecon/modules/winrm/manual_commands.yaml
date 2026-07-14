@@ -1,0 +1,17 @@
+# WinRM manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. Credential iteration against WinRM is Tier-3 (Spray mode only).
+- description: "WinRM banner (host / domain / OS)"
+  why: "netexec winrm prints host, domain and OS build without a credential — read-only"
+  command: "netexec winrm {target}"
+# source: HackTricks 5985-5986-pentesting-winrm (book.hacktricks.wiki)
+
+- description: "Confirm the WinRM endpoint (HTTP)"
+  why: "a 405 on GET /wsman confirms a live WinRM listener — read-only"
+  command: "curl -s -i http://{target}:{port}/wsman"
+# source: HackTricks 5985-5986-pentesting-winrm (book.hacktricks.wiki)
+
+- description: "Single default-cred check (Tier-2, requires a candidate)"
+  why: "one login attempt with a known account/password — not a list; needs a real credential"
+  command: "netexec winrm {target} -u {user} -p {password}"
+  requires: ["creds"]
+# source: HackTricks 5985-5986-pentesting-winrm (book.hacktricks.wiki)

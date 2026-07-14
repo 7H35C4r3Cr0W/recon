@@ -31,6 +31,7 @@ from oscprecon.modules import (
     snmp,
     tftp,
     vnc,
+    winrm,
     x11,
 )
 from oscprecon.modules.base import Module
@@ -150,6 +151,10 @@ def _kubernetes_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _memcached_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in memcached.MemcachedModule().recon_steps(target, port)]
+
+
+def _winrm_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in winrm.WinrmModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -393,5 +398,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(memcached),
         memcached.MemcachedModule,
         _memcached_steps,
+    ),
+    "winrm": SimpleReconSpec(
+        "winrm",
+        "Run full WinRM recon (banner · endpoint)",
+        "WinRM recon — netexec banner (host/domain/OS) + a GET /wsman endpoint check; read-only, "
+        "no login. WinRM is a shell target once creds exist (Spray mode, off by default).",
+        _manual(winrm),
+        winrm.WinrmModule,
+        _winrm_steps,
     ),
 }

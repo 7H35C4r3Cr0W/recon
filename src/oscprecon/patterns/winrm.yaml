@@ -1,0 +1,19 @@
+# WinRM recon next-steps (netexec banner + /wsman probe, read-only). WinRM yields little unauth — it
+# is a shell target once creds exist; credential iteration is Tier-3 (Spray mode) and never suggested.
+- match:
+    service: winrm
+    field: kind
+    value: "^domain$"
+  suggest:
+    - text: "WinRM leaks the AD domain — pivot the domain into LDAP / SMB / Kerberos enumeration"
+      command: "nmap -p 389 --script ldap-rootdse {target}"
+# source: HackTricks 5985-5986-pentesting-winrm (book.hacktricks.wiki)
+
+- match:
+    service: winrm
+    field: kind
+    value: "^endpoint$"
+  suggest:
+    - text: "WinRM endpoint confirmed — it becomes a shell target once valid credentials are found"
+      command: "netexec winrm {target}"
+# source: HackTricks 5985-5986-pentesting-winrm (book.hacktricks.wiki)
