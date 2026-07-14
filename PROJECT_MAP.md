@@ -10,7 +10,7 @@ is the single "what is done / partial / next / blocked" view. Historical build d
 - **Version:** 0.0.1 · **Entry points:** `nabu`, `nabu-cli` (preferred) + `oscp-recon`, `oscprecon`,
   `oscprecon-cli` (legacy aliases).
 - **Verified:** `mypy --strict` clean (132 files) · `ruff check` + `ruff format --check` clean ·
-  **970 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
+  **972 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
   vendored HackTricks snapshot + the Nabu SVG identity; `packaging/` build infra excluded from the
   wheel), verified installed out-of-checkout (`nabu`/`nabu-cli` + legacy scripts + assets resolve).
   Live-fetch + credential-durability paths independently refute-reviewed; the Nabu UI pass was
@@ -169,9 +169,9 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 - **Risks:** none material (fully local, no network).
 - **Tests:** `test_graph_data`, `tests/gui/test_graph_view`.
 
-## 9. Reports and exports — ✅ · 🚧 (project archive)
+## 9. Reports and exports — ✅
 
-- **Status:** ✅ report + Obsidian; 🚧 project `.tar.gz` portability not built.
+- **Status:** ✅ report + Obsidian; ✅ project `.tar.gz` portability (`workspace/portability.py`).
 - **Files:** `reporter.py`, `templates/report.md.j2`, `vault_export.py`, `gui/widgets/report_view.py`,
   `workspace/bulk.py` (`generate_report`, `export_project`→vault export).
 - **Does:** `report.md` with Obsidian YAML frontmatter + callouts + full command log; prior report
@@ -208,7 +208,7 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 - **Status:** ✅ Complete and enforced.
 - **Files:** `tests/` (92 test modules), `tests/fixtures/`, `tests/gui/`, `pyproject.toml` gate config.
 - **Does:** parser tests against committed fixtures; pytest-qt offscreen GUI smoke; four gates green.
-- **Complete:** 657 tests pass; mypy strict clean; ruff clean; format clean.
+- **Complete:** 972 tests pass; mypy strict clean; ruff clean; format clean.
 - **Remaining:** none (grows with each feature).
 - **Depends on:** everything.
 - **Risks:** GUI tests must stay offscreen (`QT_QPA_PLATFORM=offscreen`) and never hit the network.
@@ -234,7 +234,7 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 |---|---|---|---|
 | Scan profiles incl. **exam mode** | ✅ **Done** | orchestrator, modules, settings | quick/default/full/exam govern the nmap battery; exam is speed-tuned + exam-legal (no `--script vuln`). Preferences default + `Scan → Run recon with profile` + CLI `--scan-profile` |
 | Project file ops (`Open by IP`, `Import`/`Export .tar.gz`) | ✅ **Done** | profile model, workspace index | `workspace/portability.py` + File menu + CLI `export-project`/`import-project`; traversal-safe import, warns `creds.json` included |
-| Pattern coverage for ssh/ike/tftp/vhost | ✅ **Done** | pattern engine | all 19 modules now have `patterns/*.yaml` (47 rules); commands policy-clean |
+| Pattern coverage for ssh/ike/tftp/vhost | ✅ **Done** | pattern engine | all 20 modules now have `patterns/*.yaml` (51 rules); commands policy-clean |
 | Report EDB-hit persistence | ✅ **Done** | references, profile store | `edb.py`→`edb.json` + report section; lookup-only (no PoC path) |
 | AD / Kerberos enum workflow | ✅ **Done** | smb/ldap modules | `modules/kerberos` (Tier-1 KDC confirm + enum-only Tier-2); parser stores no hashes |
 | Finding-aware HackTricks (offline Phases 1–3) | ✅ **Done** | §2/§27 gate ✅ | 21 vendored pages + loader + offline render + finding-aware jump + `clean_markdown` + 12-module/30-entry verified section map |

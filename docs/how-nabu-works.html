@@ -18,15 +18,6 @@
     --mono: "JetBrains Mono", "SF Mono", "DejaVu Sans Mono", Consolas, monospace;
     --maxw: 1180px;
   }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --ink: #f2ede1; --surface: #fbf8f0; --surface-2: #f4efe2; --border: #ddd3bf;
-      --text: #1f2633; --muted: #6b6656; --gold: #9a7415; --gold-soft: rgba(154,116,21,.12);
-      --teal: #3f6f74; --present: #3f5f8c;
-      --auto: #3f6f74; --shown: #9a7415; --optin: #b26b1e; --gate: #a5342a;
-      --shadow: 0 10px 30px rgba(60,50,20,.12);
-    }
-  }
   :root[data-theme="dark"] {
     --ink: #0f1420; --surface: #161d2b; --surface-2: #1b2434; --border: #2a3446;
     --text: #e6e9ef; --muted: #8a94a6; --gold: #c9a227; --gold-soft: rgba(201,162,39,.14);
@@ -277,16 +268,16 @@
       reads: ["target IP / hostname"], writes: ["project folder ~/oscprecon/<name>/"], next: ["nmap"],
       end: "One folder per box — open it later and the whole state comes back." },
     { id: "nmap", phase: "discover", tier: "auto", title: "Port & service discovery (nmap)",
-      blurb: "One click runs nmap in stages: fast top-1000 TCP, then a full all-ports sweep, then a version + default-script scan on what’s open, plus a top-100 UDP pass. Discovery only — nothing invasive.",
+      blurb: "One click runs nmap in stages: fast top-1000 TCP, then a full all-ports sweep, then a top-100 UDP pass — and finally a version + default-script (-sCV) scan on the ports it found open. Discovery only — nothing invasive.",
       reads: ["the target"], writes: ["discovered services (open ports + versions)"], next: ["dispatch"],
       end: "The result is the map of what’s listening — the input to everything after." },
     { id: "dispatch", phase: "enumerate", tier: "auto", title: "Service dispatch",
       blurb: "Each open port is matched to the module that knows how to enumerate it — web, SMB, FTP, SSH, DNS, LDAP, databases, and more — using Nabu’s service map. Non-standard ports match too.",
       reads: ["discovered services"], writes: ["a work plan per service"], next: ["modules", "refs"],
       end: "Routing only — it decides who does the work, then hands off." },
-    { id: "modules", phase: "enumerate", tier: "shown", title: "Service recon (per module)",
-      blurb: "Each module runs safe, read-only checks automatically (anonymous / guest access, shares, banners, listings). It shows single default-credential checks for you to click, and — only if you opt in — password spraying from your vault.",
-      reads: ["the service", "credential vault"], writes: ["raw tool output"], next: ["gate", "parse"],
+    { id: "modules", phase: "enumerate", tier: "auto", title: "Service recon (per module)",
+      blurb: "Each module runs safe, read-only checks automatically (anonymous / guest access, shares, banners, listings). It shows single default-credential checks for you to click, and — only if you opt in — password spraying from your vault. Anonymous / null-session wins auto-record to the credential vault.",
+      reads: ["the service", "credential vault"], writes: ["raw tool output", "creds.json (on anonymous wins)"], next: ["gate"],
       end: "Three tiers, clearly separated: Auto runs, Shown waits for your click, Opt-in stays off until you enable it." },
     { id: "gate", phase: "enumerate", tier: "gate", title: "Command safety gate",
       blurb: "Every single command — automatic or manual — passes through one checkpoint that enforces the exam rules. It blocks exploitation frameworks and brute-force. Brute/spray is refused unless you’ve explicitly turned on Spray mode against your own target.",
@@ -313,7 +304,7 @@
       reads: ["services", "findings", "credentials"], writes: ["interactive graph"], next: ["report"],
       end: "The whole discovery story on one canvas." },
     { id: "report", phase: "present", tier: "auto", title: "Report",
-      blurb: "Everything becomes an Obsidian-friendly markdown report: open ports, per-service findings, suggested next steps with sources, and the full command log with timings. Exportable to a vault; nothing about what ran is hidden.",
+      blurb: "Everything becomes an Obsidian-friendly markdown report: open ports, per-service findings, your notes, suggested next steps with sources, the full command log with timings, and an audit-trail appendix of every action. Exportable to a vault; nothing about what ran is hidden.",
       reads: ["the whole project"], writes: ["report.md + vault export"], next: [],
       end: "Drop it into your notes and the write-up is already half done." },
   ];
@@ -330,7 +321,7 @@
     { id: "startup", label: "Startup", role: "restore or choose a project", flow: "the workspace, last project reopened",
       files: [
         { id: "config", name: "config.py", role: "settings + paths", does: "Settings, recent projects, and the fixed data paths (~/oscprecon, ~/.config/oscprecon, ~/.cache/oscprecon).", reads: ["prefs.json, recent.json"], writes: ["Settings"] },
-        { id: "dash", name: "gui/workspace/dashboard.py", role: "home view", does: "The workspace home — every project as a searchable, filterable table, scanned off-thread.", reads: ["workspace/index.py"], writes: ["dashboard rows"] },
+        { id: "dash", name: "gui/workspace/dashboard.py", role: "home view", does: "The workspace home — every project as a searchable, filterable table, scanned off-thread.", reads: ["workspace/index_worker.py"], writes: ["dashboard rows"] },
         { id: "profileload", name: "profile.py", role: "load state", does: "Loads a project folder back into memory: services, findings, creds, notes, graph, command history.", reads: ["profile.json"], writes: ["a Profile object"] },
       ] },
     { id: "new", label: "New project — enter IP", role: "create the project folder", flow: "a project folder on disk (profile.json)",
@@ -341,7 +332,7 @@
     { id: "discover", label: "Discovery", role: "find open ports & services", flow: "discovered_services",
       files: [
         { id: "orch", name: "orchestrator.py", role: "run the battery", does: "Runs the nmap stages in order and records each command in the project’s history.", reads: ["target, scan profile"], writes: ["command history"] },
-        { id: "nmap", name: "modules/nmap.py", role: "scan + parse", does: "Builds the staged nmap commands (top-1000 → full → -sCV → UDP) and parses services from the output.", reads: ["the target"], writes: ["discovered_services"] },
+        { id: "nmap", name: "modules/nmap.py", role: "scan + parse", does: "Builds the staged nmap commands (top-1000 TCP → full TCP → UDP top-100, then a -sCV version pass on the open ports) and parses services from the output.", reads: ["the target"], writes: ["discovered_services"] },
         { id: "shell1", name: "shell.py", role: "the exec gate", gate: true, does: "THE exec chokepoint — every subprocess runs here. Enforces the §2 policy: no exploitation, no brute-force unless Spray mode is on.", reads: ["a command"], writes: ["an output file — or a block"] },
       ] },
     { id: "dispatch", label: "Dispatch", role: "route each service to its module", flow: "a module + panel per service",
@@ -367,13 +358,13 @@
       files: [
         { id: "sev", name: "finding_severity.py", role: "conservative classing", does: "The single conservative classifier — an open port / version / EDB hit is never a vuln; only real weak postures escalate.", reads: ["findings"], writes: ["a category per finding"] },
         { id: "patterns", name: "patterns/engine.py", role: "suggestions", does: "Reads findings and proposes sourced next-step recon commands — pre-fill only, never auto-run.", reads: ["findings"], writes: ["suggestions"] },
-        { id: "refs", name: "references/ (hacktricks · edb · live_hacktricks)", role: "references", does: "Offline HackTricks (cached), an optional live copy, and searchsploit Exploit-DB lookup — reference only.", reads: ["service + version"], writes: ["reference links"] },
+        { id: "refs", name: "hacktricks.py · edb.py · references/live_hacktricks.py", role: "references", does: "Vendored offline HackTricks, an optional live copy (cached), and searchsploit Exploit-DB lookup — reference only.", reads: ["service + version"], writes: ["reference links"] },
       ] },
     { id: "present", label: "Present", role: "graph & report", flow: "the graph · report.md",
       files: [
         { id: "graphdata", name: "gui/graph_data.py", role: "build graph", does: "Turns the project into Cytoscape nodes/edges; redacts secrets; marks notable findings (via finding_severity).", reads: ["services, findings, creds"], writes: ["graph elements"] },
         { id: "graphview", name: "gui/widgets/graph_view.py", role: "the graph", does: "The BloodHound-style graph (vendored Cytoscape.js) — search, drill-down, notes, export.", reads: ["graph elements + graph.json"], writes: ["the interactive graph"] },
-        { id: "reporter", name: "reporter.py", role: "the report", does: "Renders the Obsidian-friendly report — ports, findings, suggestions, and the full command log.", reads: ["the whole project"], writes: ["report.md + vault export"] },
+        { id: "reporter", name: "reporter.py", role: "the report", does: "Renders the Obsidian-friendly report — ports, findings, notes, suggestions, the command log, and the audit-trail appendix.", reads: ["the whole project"], writes: ["report.md + vault export"] },
       ] },
   ];
   const CROSSCUT = {
@@ -516,11 +507,12 @@
   document.getElementById("tab-overview").addEventListener("click", () => switchMode("overview"));
   document.getElementById("tab-system").addEventListener("click", () => switchMode("system"));
 
-  // theme toggle — resolve the effective theme first (OS preference until the user overrides)
+  // theme — present dark by default (matches the deck + the dark GUI screenshots); the button flips
+  // to light. Deterministic, not OS-driven, so the page always opens the same way.
   const root = document.documentElement;
+  root.setAttribute("data-theme", "dark");
   document.getElementById("themeBtn").addEventListener("click", () => {
-    const cur = root.getAttribute("data-theme")
-      || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const cur = root.getAttribute("data-theme") === "dark" ? "dark" : "light";
     root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
   });
 

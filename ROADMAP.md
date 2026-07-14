@@ -146,7 +146,7 @@ dialog:
   `config.Settings` layer (validate + clamp + atomic, no secrets). Mandatory secret protections are
   shown **locked-on** and cannot be disabled.
 
-Verified: four gates + offscreen GUI green (657 tests); wheel ships and imports `workspace/` +
+Verified: four gates + offscreen GUI green (972 tests); wheel ships and imports `workspace/` +
 `gui/workspace/` from a clean venv. **See [`PROJECT_MAP.md`](PROJECT_MAP.md) for the current
 subsystem-by-subsystem status map and forward plan.**
 
@@ -160,8 +160,8 @@ subsystem-by-subsystem status map and forward plan.**
 
 Out-of-scope items surfaced during earlier phases, parked here per `CLAUDE.md` §27:
 
-- ✅ **Pattern-library coverage** — DONE: `patterns/{ssh,ike,tftp,vhost}.yaml` added; **all 19 modules**
-  now have provenance-cited, forbidden-gate-clean, policy-clean pattern entries (47 rules).
+- ✅ **Pattern-library coverage** — DONE: `patterns/{ssh,ike,tftp,vhost}.yaml` added; **all 20 modules**
+  now have provenance-cited, forbidden-gate-clean, policy-clean pattern entries (51 rules).
 - ✅ **Report Exploit-DB-hit persistence** — DONE: `edb.py` → per-profile `edb.json` + an "Exploit-DB
   references" report section. Lookup-only (§14): EDB-ID/title/URL only, never the local PoC path.
 - ✅ **AD/Kerberos enum workflow** — DONE: `modules/kerberos` (Tier-1 credential-free `nmap -sV -p88`
