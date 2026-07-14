@@ -358,6 +358,7 @@
 - { match: { service_name: nfs },            label: NFS,   module: nfs,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/nfs-service-pentesting.html" }
 - { match: { service_name: ntp },            label: NTP,   module: ntp,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ntp.html" }
 - { match: { service_name: X11 },            label: X11,   module: x11,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/6000-pentesting-x11.html" }
+- { match: { service_name: kube-apiserver }, label: Kubernetes API, module: kubernetes, hacktricks: "https://book.hacktricks.wiki/en/pentesting-web/pentesting-kubernetes/index.html" }
 
 # --- Product-specific overrides ---
 # Order matters: on an equal-specificity tie the first match wins, so list SPECIFIC apps
@@ -411,6 +412,21 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/8009-pentesting-apache-jserv-protocol-ajp.html
   tools:
     - { name: "nmap --script ajp-methods -p {port} {target}", purpose: "list HTTP methods on the AJP13 connector" }
+
+- match: { port: 6443, proto: tcp }
+  label: Kubernetes API
+  module: kubernetes
+  hacktricks: https://book.hacktricks.wiki/en/pentesting-web/pentesting-kubernetes/index.html
+  tools:
+    - { name: "curl -sk https://{target}:{port}/version", purpose: "API server version (gitVersion)" }
+    - { name: "curl -sk https://{target}:{port}/api", purpose: "anonymous access to the API groups?" }
+
+- match: { port: 10250, proto: tcp }
+  label: Kubelet
+  module: kubernetes
+  hacktricks: https://book.hacktricks.wiki/en/pentesting-web/pentesting-kubernetes/index.html
+  tools:
+    - { name: "curl -sk https://{target}:{port}/pods", purpose: "pod list if the kubelet allows anonymous auth" }
 
 - match: { port: 3260, proto: tcp }
   label: iSCSI

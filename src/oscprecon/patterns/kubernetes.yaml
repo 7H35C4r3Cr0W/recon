@@ -1,0 +1,19 @@
+# Kubernetes recon next-steps (read-only GETs over TLS). Enumerating reachable resources is recon;
+# pod exec, creating workloads, and token abuse are out of scope and never suggested here.
+- match:
+    service: kubernetes
+    field: value
+    value: "^anonymous$"
+  suggest:
+    - text: "The API server allows anonymous access — enumerate namespaces/resources read-only"
+      command: "curl -sk https://{target}:6443/api/v1/namespaces"
+# source: HackTricks pentesting-kubernetes (book.hacktricks.wiki)
+
+- match:
+    service: kubernetes
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "Check the kubelet on 10250 for anonymous pod listing (a common misconfig)"
+      command: "curl -sk https://{target}:10250/pods"
+# source: HackTricks pentesting-kubernetes (book.hacktricks.wiki)

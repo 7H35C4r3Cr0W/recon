@@ -14,6 +14,7 @@ from oscprecon.modules import (
     ike,
     ipmi,
     kerberos,
+    kubernetes,
     mongodb,
     mssql,
     mysql,
@@ -140,6 +141,10 @@ def _couchdb_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _docker_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in docker.DockerModule().recon_steps(target, port)]
+
+
+def _kubernetes_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in kubernetes.KubernetesModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -365,5 +370,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(docker),
         docker.DockerModule,
         _docker_steps,
+    ),
+    "kubernetes": SimpleReconSpec(
+        "kubernetes",
+        "Run full Kubernetes recon (version · anon API · health)",
+        "Kubernetes API recon — curl -k of /version, /api (anonymous-access check), and /healthz; "
+        "read-only GETs. Pod exec / creating workloads is never issued.",
+        _manual(kubernetes),
+        kubernetes.KubernetesModule,
+        _kubernetes_steps,
     ),
 }

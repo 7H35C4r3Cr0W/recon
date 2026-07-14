@@ -1,0 +1,16 @@
+# Kubernetes manual follow-ups (Tier-2 — shown, never auto-run). Read-only GETs over TLS (-k);
+# {target}/{port} filled from the active profile. Pod exec / creating workloads is NOT recon.
+- description: "List namespaces (if anonymous access)"
+  why: "/api/v1/namespaces enumerates namespaces read-only when anonymous is allowed"
+  command: "curl -sk https://{target}:{port}/api/v1/namespaces"
+# source: HackTricks pentesting-kubernetes (book.hacktricks.wiki)
+
+- description: "Kubelet pod list (10250)"
+  why: "the kubelet /pods leaks running pods if anonymous-auth=true — read-only"
+  command: "curl -sk https://{target}:10250/pods"
+# source: HackTricks pentesting-kubernetes (book.hacktricks.wiki)
+
+- description: "TLS certificate (SANs leak cluster/service names)"
+  why: "the API server cert SANs reveal cluster / service-account names — read-only"
+  command: "nmap -p {port} --script ssl-cert {target}"
+# source: HackTricks pentesting-kubernetes (book.hacktricks.wiki)
