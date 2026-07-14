@@ -537,6 +537,17 @@ class MainWindow(QMainWindow):
         self._sync_nav()
         self._tool_panel.set_target(target.ip)
         self._tool_panel.set_profile(profile)
+        if not profile.discovered_services:
+            scanned = any(e.get("module") == "nmap" for e in profile.command_history)
+            if scanned:
+                self._service_tree.set_empty_message(
+                    f"Last scan found 0 open ports on {target.ip}.\n"
+                    "Run Full Recon again once the VPN / target IP is confirmed."
+                )
+            else:
+                self._service_tree.set_empty_message(
+                    f"No services yet.\nClick “Run Full Recon” to scan {target.ip}."
+                )
         self._service_tree.populate(profile.discovered_services, force=True)
         self._graph_view.set_profile(profile)
         self._report_view.set_profile(profile)
@@ -1294,6 +1305,10 @@ class MainWindow(QMainWindow):
             f"[nmap] starting… (scan profile: {profile_name}) — port discovery can take a few "
             "minutes; live output streams below."
         )
+        self._service_tree.set_empty_message(
+            f"Scanning {self._profile.target.ip} — discovering open ports…\n"
+            "Services appear here as nmap finds them."
+        )
         worker = NmapWorker(
             self._profile, udp_full=settings.nmap_udp_full, scan_profile=profile_name
         )
@@ -1587,6 +1602,17 @@ class MainWindow(QMainWindow):
 
     def _on_scan_done(self, count: int) -> None:
         self._tool_panel.append_output(f"[nmap] done — {count} services")
+        if count == 0:
+            ip = self._profile.target.ip if self._profile is not None else "the target"
+            self._service_tree.set_empty_message(
+                f"Scan complete — 0 open ports found on {ip}.\n\n"
+                "The host may be down or filtered. Confirm the VPN is up and the target IP is "
+                "current, then re-run — or try a slower profile (Scan → Run recon with profile)."
+            )
+            self._tool_panel.append_output(
+                "[hint] 0 open ports — confirm the VPN is up and the target IP is current "
+                "(HTB IPs change per session), then re-run."
+            )
 
     def _command_done(self, exit_code: int, parse: Callable[[], None] | None) -> None:
         # why: the per-worker `parse` closure carries this command's own output context, so parallel

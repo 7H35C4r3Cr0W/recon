@@ -33,6 +33,31 @@ def _counting_run(calls: list[str]) -> Callable[..., object]:
     return run
 
 
+def _down_run(
+    shell_line: str,
+    output_file: Path,
+    *,
+    cwd: Path | None = None,
+    timeout: object | None = None,
+    cancel: object | None = None,
+    on_line: object | None = None,
+) -> object:
+    out = Path(output_file)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("Note: Host seems down. No response.\n", encoding="utf-8")
+    return shell.ShellResult(shell_line, 0, out, "", "", 0.0)
+
+
+def test_zero_open_ports_emits_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    prof = Profile.create(tmp_path, "down", Target(ip="192.0.2.1"))
+    monkeypatch.setattr(shell, "run", _down_run)
+    lines: list[str] = []
+    Orchestrator(prof, on_line=lines.append).run_nmap()
+    assert prof.discovered_services == []
+    assert any("[done] 0 services" in ln for ln in lines)
+    assert any(ln.startswith("[hint] no open ports") for ln in lines)
+
+
 def test_resume_skips_completed_commands(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     first: list[str] = []

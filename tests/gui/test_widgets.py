@@ -20,6 +20,18 @@ def _services() -> list[DiscoveredService]:
     ]
 
 
+def test_service_tree_empty_message(qtbot: QtBot) -> None:
+    tree = ServiceTree()
+    qtbot.addWidget(tree)
+    # an empty tree carries a helpful placeholder, not a silent blank box
+    assert tree.topLevelItemCount() == 0
+    assert "No services yet" in tree._empty_message
+    tree.set_empty_message("Scan complete — 0 open ports found.")
+    assert tree._empty_message == "Scan complete — 0 open ports found."
+    tree.populate(_services())  # a real result replaces the empty state
+    assert tree.topLevelItemCount() == 2
+
+
 def test_service_tree_groups_and_emits(qtbot: QtBot) -> None:
     tree = ServiceTree()
     qtbot.addWidget(tree)

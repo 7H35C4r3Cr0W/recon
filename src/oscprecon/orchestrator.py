@@ -138,7 +138,10 @@ class Orchestrator:
             self.profile.save()
 
         Reporter(self.profile).write()
-        self._emit(
-            f"[done] {len(self.profile.discovered_services)} services — "
-            f"report: {self.profile.directory / 'report.md'}"
-        )
+        count = len(self.profile.discovered_services)
+        self._emit(f"[done] {count} services — report: {self.profile.directory / 'report.md'}")
+        if count == 0 and not _nmap_saw_open_ports(raw):
+            self._emit(
+                "[hint] no open ports found — the host may be down or filtered. Confirm the VPN "
+                "is up and the target IP is current, or retry with --scan-profile full."
+            )

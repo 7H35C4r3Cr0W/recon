@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPaintEvent
 from PySide6.QtWidgets import QMenu, QTreeWidget, QTreeWidgetItem
 
 from oscprecon.models import DiscoveredService, Proto
@@ -20,6 +20,10 @@ class ServiceTree(QTreeWidget):
     def __init__(self) -> None:
         super().__init__()
         self._signature: tuple[tuple[int, str, str, str, str], ...] = ()
+        # why: an empty QTreeWidget is just a blank box — with no message the user can't tell a
+        # not-scanned-yet host from a 0-open-ports one from a scan-in-progress. This text is painted
+        # over the empty viewport and the MainWindow updates it as the scan state changes.
+        self._empty_message = "No services yet.\nClick “Run Full Recon” to scan the target."
         self.setAccessibleName("Discovered services")
         self.setHeaderLabels(["Port", "Service", "Product"])
         self.setColumnWidth(0, 110)
@@ -27,6 +31,26 @@ class ServiceTree(QTreeWidget):
         self.currentItemChanged.connect(self._on_current_changed)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
+
+    def set_empty_message(self, text: str) -> None:
+        self._empty_message = text
+        viewport = self.viewport()
+        if viewport is not None:
+            viewport.update()
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        super().paintEvent(event)
+        if self.topLevelItemCount() > 0:
+            return
+        viewport = self.viewport()
+        if viewport is None:
+            return
+        painter = QPainter(viewport)
+        painter.setPen(self.palette().placeholderText().color())
+        rect = viewport.rect().adjusted(16, 16, -16, -16)
+        flags = Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap
+        painter.drawText(rect, int(flags), self._empty_message)
+        painter.end()
 
     def _on_context_menu(self, pos: QPoint) -> None:
         item = self.itemAt(pos)
