@@ -1,0 +1,16 @@
+# Elasticsearch manual follow-ups (Tier-2 — shown, never auto-run). Unauth read-only HTTP GETs;
+# {target}/{port} filled from the active profile. No document writes / no mapping changes.
+- description: "Node list + versions"
+  why: "_cat/nodes shows the cluster nodes and their versions — read-only"
+  command: "curl -s http://{target}:{port}/_cat/nodes?v"
+# source: HackTricks 9200-pentesting-elasticsearch (book.hacktricks.wiki)
+
+- description: "Read a bounded sample from an index"
+  why: "_search?size=5 returns a few documents from an index — bounded, read-only"
+  command: "curl -s http://{target}:{port}/_all/_search?size=5&pretty"
+# source: HackTricks 9200-pentesting-elasticsearch (book.hacktricks.wiki)
+
+- description: "HTTPS variant (TLS clusters)"
+  why: "some clusters wrap 9200 in TLS; -k skips the self-signed cert — read-only"
+  command: "curl -sk https://{target}:{port}/"
+# source: HackTricks 9200-pentesting-elasticsearch (book.hacktricks.wiki)

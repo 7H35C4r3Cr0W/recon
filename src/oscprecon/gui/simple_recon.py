@@ -7,6 +7,7 @@ from pathlib import Path
 from oscprecon.models import Command, Target
 from oscprecon.modules import (
     ajp,
+    elasticsearch,
     finger,
     ike,
     ipmi,
@@ -123,6 +124,12 @@ def _sip_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _oracle_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in oracle.OracleModule().recon_steps(target, port)]
+
+
+def _elasticsearch_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [
+        (s.command, s.tool) for s in elasticsearch.ElasticsearchModule().recon_steps(target, port)
+    ]
 
 
 @dataclass(frozen=True)
@@ -321,5 +328,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(oracle),
         oracle.OracleModule,
         _oracle_steps,
+    ),
+    "elasticsearch": SimpleReconSpec(
+        "elasticsearch",
+        "Run full Elasticsearch recon (version · indices · health)",
+        "Elasticsearch recon — unauth curl of / (version), _cat/indices (index list), and "
+        "_cluster/health; read-only. A secured cluster answers 401 and no data is leaked.",
+        _manual(elasticsearch),
+        elasticsearch.ElasticsearchModule,
+        _elasticsearch_steps,
     ),
 }

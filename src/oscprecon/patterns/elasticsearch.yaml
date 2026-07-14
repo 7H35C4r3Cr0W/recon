@@ -1,0 +1,19 @@
+# Elasticsearch recon next-steps (unauth read-only HTTP GETs). Reading indices/documents is recon;
+# no document writes, no mapping changes, no credential guessing are ever suggested here.
+- match:
+    service: elasticsearch
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "Elasticsearch answers unauthenticated — list indices, then read a bounded sample"
+      command: "curl -s http://{target}:9200/_cat/indices?v"
+# source: HackTricks 9200-pentesting-elasticsearch (book.hacktricks.wiki)
+
+- match:
+    service: elasticsearch
+    field: kind
+    value: "^index$"
+  suggest:
+    - text: "Read a small sample from a discovered index (bounded, read-only)"
+      command: "curl -s http://{target}:9200/_all/_search?size=5&pretty"
+# source: HackTricks 9200-pentesting-elasticsearch (book.hacktricks.wiki)
