@@ -1,0 +1,19 @@
+# POP3 recon next-steps (capabilities + NTLM, read-only). Mailbox login / credential guessing are
+# Tier-3 (Spray mode) and never suggested; the useful signals are the AD domain leak and TLS posture.
+- match:
+    service: pop3
+    field: kind
+    value: "^domain$"
+  suggest:
+    - text: "POP3 NTLM leaks the AD domain (Exchange) — pivot into LDAP / SMB / Kerberos enumeration"
+      command: "nmap -p 389 --script ldap-rootdse {target}"
+# source: HackTricks pentesting-pop (book.hacktricks.wiki) — standard OSCP POP3 recon
+
+- match:
+    service: pop3
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "Read the TLS banner on 995 to confirm the mail product/version and certificate identity"
+      command: "openssl s_client -connect {target}:995 -quiet"
+# source: HackTricks pentesting-pop (book.hacktricks.wiki) — standard OSCP POP3 recon

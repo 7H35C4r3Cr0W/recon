@@ -1,0 +1,16 @@
+# POP3 manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. USER/PASS iteration against POP3 is Tier-3 (Spray mode only).
+- description: "Capabilities + NTLM info"
+  why: "pop3-capabilities + pop3-ntlm-info re-run confirm STLS/SASL + AD domain — read-only"
+  command: "nmap -p {port} --script pop3-capabilities,pop3-ntlm-info {target}"
+# source: HackTricks pentesting-pop (book.hacktricks.wiki) — standard OSCP POP3 recon
+
+- description: "Banner over implicit TLS (995)"
+  why: "openssl s_client reads the +OK greeting + cert on the TLS port — read-only"
+  command: "openssl s_client -connect {target}:995 -quiet"
+# source: HackTricks pentesting-pop (book.hacktricks.wiki) — standard OSCP POP3 recon
+
+- description: "Banner after STLS (110)"
+  why: "openssl -starttls pop3 upgrades 110 then reads the encrypted CAPA — read-only"
+  command: "openssl s_client -connect {target}:110 -starttls pop3 -quiet"
+# source: HackTricks pentesting-pop (book.hacktricks.wiki) — standard OSCP POP3 recon

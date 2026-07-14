@@ -25,6 +25,7 @@ from oscprecon.modules import (
     nfs,
     ntp,
     oracle,
+    pop3,
     postgresql,
     rdp,
     redis,
@@ -170,6 +171,10 @@ def _msrpc_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _imap_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in imap.ImapModule().recon_steps(target, port)]
+
+
+def _pop3_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in pop3.Pop3Module().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -449,5 +454,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(imap),
         imap.ImapModule,
         _imap_steps,
+    ),
+    "pop3": SimpleReconSpec(
+        "pop3",
+        "Run full POP3 recon (capabilities · NTLM)",
+        "POP3 recon — nmap pop3-capabilities (STLS, SASL mechs) + pop3-ntlm-info (AD domain/host "
+        "on Exchange); read-only, no login. Credential guessing is Spray-mode only.",
+        _manual(pop3),
+        pop3.Pop3Module,
+        _pop3_steps,
     ),
 }

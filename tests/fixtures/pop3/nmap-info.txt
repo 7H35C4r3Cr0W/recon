@@ -1,0 +1,13 @@
+Nmap scan report for 10.10.10.25
+Host is up (0.020s latency).
+
+PORT    STATE SERVICE VERSION
+110/tcp open  pop3    Microsoft Exchange pop3d
+| pop3-capabilities: USER SASL(PLAIN LOGIN) STLS TOP UIDL RESP-CODES
+| pop3-ntlm-info:
+|   Target_Name: CORP
+|   NetBIOS_Domain_Name: CORP
+|   NetBIOS_Computer_Name: MAIL01
+|   DNS_Domain_Name: corp.local
+|   DNS_Computer_Name: mail01.corp.local
+|_  Product_Version: 10.0.17763
