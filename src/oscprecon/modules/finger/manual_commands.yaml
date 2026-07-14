@@ -1,0 +1,16 @@
+# Finger manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target} filled from
+# the active profile. Wordlist-driven user enumeration (finger-user-enum) is Tier-3 — not wrapped.
+- description: "Query a single well-known account"
+  why: "one-shot lookup of a known name (root) — reveals home dir / shell / last login, not a list"
+  command: "finger root@{target}"
+# source: HackTricks pentesting-finger (book.hacktricks.wiki) — standard OSCP finger recon
+
+- description: "List currently logged-in users"
+  why: "finger @{target} dumps the active session table — read-only"
+  command: "finger @{target}"
+# source: HackTricks pentesting-finger (book.hacktricks.wiki) — standard OSCP finger recon
+
+- description: "nmap finger NSE (banner + default response)"
+  why: "confirms the finger daemon and its default disclosure — read-only"
+  command: "nmap -sV -p 79 --script finger {target}"
+# source: HackTricks pentesting-finger (book.hacktricks.wiki) — standard OSCP finger recon

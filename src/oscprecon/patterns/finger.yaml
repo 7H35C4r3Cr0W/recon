@@ -1,0 +1,19 @@
+# Finger recon next-steps (read-only user disclosure). Usernames become targets for later authorized
+# enumeration on other services — never wordlist user-enum (Tier-3) or password guessing here.
+- match:
+    service: finger
+    field: kind
+    value: "^user$"
+  suggest:
+    - text: "Finger disclosed a username — check whether it is also a valid SSH / SMB account"
+      command: "nmap -p 22 --script ssh-auth-methods --script-args ssh.user={user} {target}"
+# source: HackTricks pentesting-finger (book.hacktricks.wiki) — standard OSCP finger recon
+
+- match:
+    service: finger
+    field: kind
+    value: "^user$"
+  suggest:
+    - text: "Query the disclosed user directly for home dir / shell / last-login detail (read-only)"
+      command: "finger {user}@{target}"
+# source: HackTricks pentesting-finger (book.hacktricks.wiki) — standard OSCP finger recon

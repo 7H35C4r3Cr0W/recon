@@ -6,6 +6,7 @@ from pathlib import Path
 
 from oscprecon.models import Command, Target
 from oscprecon.modules import (
+    finger,
     ike,
     kerberos,
     mongodb,
@@ -93,6 +94,10 @@ def _rdp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _vnc_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in vnc.VncModule().recon_steps(target, port)]
+
+
+def _finger_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in finger.FingerModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -237,5 +242,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(vnc),
         vnc.VncModule,
         _vnc_steps,
+    ),
+    "finger": SimpleReconSpec(
+        "finger",
+        "Run full Finger recon (logged-in users)",
+        "Finger recon — finger @{target} + nmap finger NSE disclose system usernames (read-only). "
+        "Wordlist user-enumeration is Tier-3 and never wrapped.",
+        _manual(finger),
+        finger.FingerModule,
+        _finger_steps,
     ),
 }
