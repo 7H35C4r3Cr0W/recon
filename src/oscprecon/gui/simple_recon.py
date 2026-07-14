@@ -26,6 +26,7 @@ from oscprecon.modules import (
     postgresql,
     rdp,
     redis,
+    rsync,
     sip,
     smtp,
     snmp,
@@ -155,6 +156,10 @@ def _memcached_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _winrm_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in winrm.WinrmModule().recon_steps(target, port)]
+
+
+def _rsync_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in rsync.RsyncModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -407,5 +412,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(winrm),
         winrm.WinrmModule,
         _winrm_steps,
+    ),
+    "rsync": SimpleReconSpec(
+        "rsync",
+        "Run full rsync recon (module list)",
+        "rsync recon — list exposed modules via rsync --list-only + nmap rsync-list-modules; "
+        "read-only. Listing a module's contents / downloading files are Tier-2 follow-ups.",
+        _manual(rsync),
+        rsync.RsyncModule,
+        _rsync_steps,
     ),
 }

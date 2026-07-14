@@ -1,0 +1,19 @@
+# rsync recon next-steps (module listing, read-only). Listing a module's contents is recon; file
+# download and auth to a password-protected module are explicit follow-ups, never suggested here.
+- match:
+    service: rsync
+    field: kind
+    value: "^module$"
+  suggest:
+    - text: "An rsync module is exposed — list its contents read-only (no download)"
+      command: "rsync --list-only rsync://{target}/{module}/"
+# source: HackTricks 873-pentesting-rsync (book.hacktricks.wiki) — standard OSCP rsync recon
+
+- match:
+    service: rsync
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "Modules listed without auth — walk each one read-only for readable config/backup data"
+      command: "rsync -r --list-only rsync://{target}/{module}/"
+# source: HackTricks 873-pentesting-rsync (book.hacktricks.wiki) — standard OSCP rsync recon
