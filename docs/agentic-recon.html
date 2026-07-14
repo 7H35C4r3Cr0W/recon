@@ -106,6 +106,11 @@
   .p2ex{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
   .p2ex span{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border);
     border-radius:6px;padding:2px 7px;color:var(--text)}
+  .p2svc{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:0 18px;margin-top:12px}
+  .p2svc .r{display:flex;align-items:baseline;gap:8px;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border)}
+  .p2svc .r b{color:var(--text);font-weight:600;font-size:12.5px;min-width:70px}
+  .p2svc .r .pt{font-family:var(--mono);color:var(--worker);font-size:10.5px;min-width:62px}
+  .p2svc .r .tl{font-family:var(--mono);color:var(--muted);font-size:10.5px}
   .p2note{background:var(--llm-soft);border:1px solid var(--llm);border-radius:12px;padding:13px 16px;
     margin-top:16px;font-size:13.5px;color:var(--text)} .p2note b{color:var(--llm)}
 
@@ -169,7 +174,7 @@
   blueprint for the next step: <b>decompose it into small, single-purpose agents</b> — each an
   <b>LLM (Opus)</b> with its own prompt, tools, and one job. The chain is linear until Discovery; then
   <b>Routing fans out to one specialist agent per discovered service</b> — Web, SMB/AD, FTP, SSH, DNS,
-  LDAP, SNMP, Database, or a Generic probe — which run <b>in parallel</b> and converge on a safety gate.
+  LDAP, SNMP, Database, or a Generic probe — which run <b>in parallel</b> and converge on a scope gate.
   Below: each agent's stack, the typed data it hands the next, and how the system stays reliable —
   <b>redundancy</b> and <b>error handling</b> at every edge.</p>
 
@@ -177,7 +182,7 @@
     <span class="chip"><span class="dot"></span> An <b>LLM (Opus)</b> per agent</span>
     <span class="chip"><span class="dot"></span> Linear chain → <b>fan-out</b> swarm → fan-in</span>
     <span class="chip"><span class="dot"></span> One <b>agent per service</b> (only what's found)</span>
-    <span class="chip"><span class="dot"></span> A <b>safety gate</b> on every command</span>
+    <span class="chip"><span class="dot"></span> A <b>scope + objective gate</b> on every command</span>
     <span class="chip"><span class="dot"></span> <b>Retries · voting · fallbacks</b></span>
     <span class="chip"><span class="dot"></span> A <b>critic loop</b> that converges</span>
   </div>
@@ -209,7 +214,7 @@
   <div class="grid">
     <div>
       <p class="flowhint">Read top to bottom. The chain is linear until <b>Routing (3)</b>, where it
-      branches into the parallel specialist swarm, then converges on the <b>Gate (5)</b>. Click any
+      branches into the parallel specialist swarm, then converges on the <b>Scope Gate (5)</b>. Click any
       agent — including each specialist — for its full spec. <kbd>↑</kbd><kbd>↓</kbd> to step.</p>
       <div class="spine" id="spine"></div>
     </div>
@@ -223,7 +228,7 @@
     <div class="notecards">
       <div class="nc rel"><h3>⟳ Retries &amp; idempotency</h3><p>Every message carries an <code>attempt</code> and an <code>idempotency_key</code>. Transient failures retry with exponential backoff; because writes dedupe on the key, a retry never double-runs a scan or double-writes a finding.</p></div>
       <div class="nc rel"><h3>⟳ Fan-out &amp; isolation</h3><p>Only discovered ports spawn a specialist, and they run in parallel, blind to each other. One crashing or hanging specialist is timed out and skipped — the rest keep going, and its partial output still flows.</p></div>
-      <div class="nc rel"><h3>⟳ N-of-M voting</h3><p>For the two calls that must not hallucinate — the Gate's allow/block and the Critic's verify — several independent LLM passes vote. A command runs, or a finding survives, only on a majority.</p></div>
+      <div class="nc rel"><h3>⟳ N-of-M voting</h3><p>For the two calls that must not hallucinate — the Scope gate's allow/block and the Critic's verify — several independent LLM passes vote. A command runs, or a finding survives, only on a majority.</p></div>
       <div class="nc rel"><h3>⟳ Fallbacks &amp; fail-closed</h3><p>Deterministic logic sits behind every LLM. If the model errors or is unsure, a hard rule decides — and the gate's default is <b>BLOCK</b>. Enrichment is offline-first: a network failure falls back to the vendored snapshot.</p></div>
       <div class="nc err"><h3>⚠ Never fail silently</h3><p>"Tool ran but produced 0 findings" (parser drift) raises a loud warning and keeps the raw output. A missing tool logs <code>[missing]</code> and continues with an alternative. Nothing is dropped quietly.</p></div>
       <div class="nc err"><h3>⚠ Dead-letter &amp; escalate</h3><p>A message that fails all retries goes to a dead-letter queue and the Orchestrator re-plans (skip the service, downgrade the scan, or finish with a partial report) rather than hanging the run.</p></div>
@@ -235,23 +240,48 @@
   <section class="notes phase2" id="phase2">
     <h2>Phase 2 — where new agents plug in</h2>
     <p class="lead" style="margin-top:8px">The bus + blackboard design exists so you add capability by
-    adding an agent, never by rewiring. There are exactly three plug-in points — and the Safety Gate
-    still governs every one of them, so recon-only-by-default holds however the swarm grows.</p>
+    adding an agent, never by rewiring. There are exactly three plug-in points — and the Scope Gate
+    still governs every one of them, so the run stays in-scope and on-objective however the swarm grows.</p>
     <div class="notecards">
-      <div class="nc">
+      <div class="nc" style="grid-column:1/-1">
         <span class="p2where">➊ into the swarm ⑃</span>
-        <h3>A new specialist — one per service</h3>
+        <h3>A new specialist — one per service (candidates: service · port · a tool to start with)</h3>
         <p>Register a <code>port → agent</code> mapping and Routing spawns it (the <b>＋</b> slot in the
-        swarm grid above). It enumerates its service read-only and hands output to the same Gate —
-        nothing upstream or downstream changes.</p>
-        <div class="p2ex"><span>WinRM</span><span>RDP</span><span>VNC</span><span>Kerberos</span><span>NFS</span><span>rsync</span><span>Mail (SMTP/IMAP/POP3)</span><span>Redis / Memcached</span><span>Elastic / CouchDB</span><span>IPMI</span><span>Docker / K8s API</span><span>IKE / VPN</span></div>
+        swarm grid above). It enumerates its service read-only and hands output to the same Scope Gate —
+        nothing upstream or downstream changes. Good specialists to add next:</p>
+        <div class="p2svc">
+          <div class="r"><b>WinRM</b><span class="pt">5985/6</span><span class="tl">netexec winrm</span></div>
+          <div class="r"><b>RDP</b><span class="pt">3389</span><span class="tl">nmap rdp-ntlm-info</span></div>
+          <div class="r"><b>VNC</b><span class="pt">5900-6</span><span class="tl">nmap vnc-info</span></div>
+          <div class="r"><b>Kerberos</b><span class="pt">88</span><span class="tl">GetNPUsers / GetUserSPNs</span></div>
+          <div class="r"><b>NFS</b><span class="pt">2049/111</span><span class="tl">showmount -e</span></div>
+          <div class="r"><b>rsync</b><span class="pt">873</span><span class="tl">rsync --list-only</span></div>
+          <div class="r"><b>SMTP</b><span class="pt">25/587</span><span class="tl">smtp-user-enum</span></div>
+          <div class="r"><b>IMAP/POP3</b><span class="pt">143/110</span><span class="tl">nmap imap-*/pop3-*</span></div>
+          <div class="r"><b>Redis</b><span class="pt">6379</span><span class="tl">redis-cli INFO</span></div>
+          <div class="r"><b>Memcached</b><span class="pt">11211</span><span class="tl">nmap memcached-info</span></div>
+          <div class="r"><b>Elasticsearch</b><span class="pt">9200</span><span class="tl">curl _cat/indices</span></div>
+          <div class="r"><b>CouchDB</b><span class="pt">5984</span><span class="tl">curl _all_dbs</span></div>
+          <div class="r"><b>Oracle&nbsp;DB</b><span class="pt">1521</span><span class="tl">odat / tnscmd10g</span></div>
+          <div class="r"><b>IPMI</b><span class="pt">623/udp</span><span class="tl">nmap ipmi-version</span></div>
+          <div class="r"><b>Docker&nbsp;API</b><span class="pt">2375/6</span><span class="tl">curl /containers/json</span></div>
+          <div class="r"><b>Kubernetes</b><span class="pt">6443</span><span class="tl">kubectl / curl /version</span></div>
+          <div class="r"><b>IKE/VPN</b><span class="pt">500/udp</span><span class="tl">ike-scan -M</span></div>
+          <div class="r"><b>NTP</b><span class="pt">123/udp</span><span class="tl">ntpq -c rv</span></div>
+          <div class="r"><b>TFTP</b><span class="pt">69/udp</span><span class="tl">tftp GET configs</span></div>
+          <div class="r"><b>SIP/VoIP</b><span class="pt">5060</span><span class="tl">svmap (sipvicious)</span></div>
+          <div class="r"><b>WMI/DCOM</b><span class="pt">135</span><span class="tl">impacket rpcdump</span></div>
+          <div class="r"><b>Finger</b><span class="pt">79</span><span class="tl">finger @host</span></div>
+          <div class="r"><b>X11</b><span class="pt">6000</span><span class="tl">nmap x11-access</span></div>
+          <div class="r"><b>AJP&nbsp;(Tomcat)</b><span class="pt">8009</span><span class="tl">nmap ajp-methods</span></div>
+        </div>
       </div>
       <div class="nc">
         <span class="p2where">➋ into the chain ▾</span>
         <h3>A new phase</h3>
         <p>Insert a phase between two existing ones; it reads and writes the blackboard like any agent,
-        behind the same Gate. The edges either side just re-point.</p>
-        <div class="p2ex"><span>Passive / OSINT — before Discovery</span><span>Credential-Spray — opt-in, OFF by default, after the Gate</span><span>Pivot / Lateral planner — after Correlation</span><span>Human-in-the-loop checkpoint</span></div>
+        behind the same Scope Gate. The edges either side just re-point.</p>
+        <div class="p2ex"><span>Passive / OSINT — before Discovery</span><span>Credential-Spray — opt-in, OFF by default, after the Scope Gate</span><span>Pivot / Lateral planner — after Correlation</span><span>Human-in-the-loop checkpoint</span></div>
       </div>
       <div class="nc">
         <span class="p2where">➌ cross-cutting ⟟</span>
@@ -261,8 +291,8 @@
       </div>
     </div>
     <div class="p2note"><b>The boundary doesn't move.</b> Every Phase-2 agent — new specialist, new
-    phase, or background service — still routes its commands through the <b>Safety Gate</b> and writes
-    to the same audited blackboard. Growth adds capability, never a way around the compliance guarantee.</div>
+    phase, or background service — still routes its commands through the <b>Scope Gate</b> and writes
+    to the same audited blackboard. Growth adds capability, never a way around the scope + objective boundary.</div>
   </section>
 
   <footer>Nabu · agent-to-agent recon architecture — a design blueprint. The shipping tool is the
@@ -274,7 +304,7 @@ const AGENTS = [
   {id:"orchestrator", n:"Orchestrator Agent", kind:"control",
    role:"Reads the goal, sets scope + rules, plans the run, and supervises every downstream agent.",
    system:"“You are the run controller. Turn the objective into phases, dispatch agents, track state, decide when the run is complete. Never run tools yourself.”",
-   llm:"Turns a one-line goal (“recon 10.10.10.5, OSCP-legal, 2h”) into a phase plan, re-plans when an agent fails, and decides when there's enough to stop.",
+   llm:"Turns the engagement goal (“recon the in-scope hosts in Jira PENTEST-142, 2h budget”) into a phase plan, re-plans when an agent fails, and decides when the objectives are met.",
    recv:["operator goal + scope + budget"], emit:["run_plan → Discovery","dispatch envelopes → every phase"],
    tools:["state store (blackboard) API","message bus / dispatcher","scope + rules loader","— no recon tools"],
    passes:"Writes run_plan + scope to the blackboard, then emits a typed dispatch per phase. Every downstream message is correlated by the run_id it stamps here.",
@@ -288,7 +318,7 @@ const AGENTS = [
    system:"“You plan and interpret host discovery. Pick scan depth for the scope and budget; parse output into typed services; flag anything ambiguous — never guess a service silently.”",
    llm:"Chooses the nmap profile (quick vs full, UDP depth) from scope + budget, interprets output, resolves ambiguous service IDs, and decides whether a re-scan is worth it.",
    recv:["run_plan {target, scope, budget}"], emit:["DiscoveredService[] → Routing","discovery.done event"],
-   tools:["nmap — staged: top-1000 → full → UDP top-100 → -sCV","output parser","the Safety Gate","state store"],
+   tools:["nmap — staged: top-1000 → full → UDP top-100 → -sCV","output parser","the Scope Gate","state store"],
    passes:"Emits DiscoveredService[] = {port, proto, service, product, version, confidence}; Routing keys off port+proto.",
    redundancy:"Staged scans are independent and retry on transient failure with backoff. The slow full sweep runs async and streams partial results, so Routing can start on top-1000 hits immediately.",
    errors:"nmap non-zero / timeout → retry N× then emit partial + a degraded flag. Unparseable output → keep the raw file + emit a parse-warning (never dropped). Host-down → escalate to the Orchestrator.",
@@ -310,26 +340,26 @@ const AGENTS = [
    role:"Routing fans out to one specialist agent per discovered service — they enumerate in parallel, then converge.",
    system:"(no single prompt — each specialist below is its own Opus agent with its own prompt + tools)",
    llm:"There isn't one LLM here — there are up to nine. Each specialist is its own Opus agent. Routing spawns only the ones whose service was discovered, and they run concurrently, coordinating through shared memory.",
-   recv:["work_item[] from Routing (one per service)"], emit:["raw_output[] → Safety Gate → Analysis"],
+   recv:["work_item[] from Routing (one per service)"], emit:["raw_output[] → Scope Gate → Analysis"],
    tools:["the 9 specialist agents below — click each for its stack"],
-   passes:"Each specialist writes namespaced output (<service>/…) so parallel runs never collide, and every command it proposes hits the Safety Gate first. Add a new service type = add a new specialist; the swarm scales horizontally (that's how Phase 2 grows).",
+   passes:"Each specialist writes namespaced output (<service>/…) so parallel runs never collide, and every command it proposes hits the Scope Gate first. Add a new service type = add a new specialist; the swarm scales horizontally (that's how Phase 2 grows).",
    redundancy:"Fan-out parallelism + isolation: a failing or hanging specialist is timed out and skipped while the rest keep going. Only discovered ports spawn an agent — a box with just HTTP + SMB runs 2 of the 9, not all of them.",
    errors:"Per-specialist (open each). A specialist that dies never takes the swarm down — its slot is marked degraded and the run continues; its partial output still flows.",
-   handoff:"every specialist's commands → <b>Safety Gate</b> · output → <b>Analysis</b>",
+   handoff:"every specialist's commands → <b>Scope Gate</b> · output → <b>Analysis</b>",
    note:"This is the branch point. The nine agents below are the parallel lanes — new service types slot in as new specialists with nothing else changing."},
 
-  {id:"gate", n:"Safety / Compliance Agent", kind:"guard",
-   role:"Judges every command any agent wants to run against the exam rules. Allows, or blocks with a reason.",
-   system:"“You are the compliance gate. Allow only read-only, in-scope, exam-legal recon. Block exploitation, brute-force/spray (unless explicitly authorized), and anything off-target. Always explain a block.”",
-   llm:"Reads each proposed command + context and rules allow/block. The LLM judgment is backed by a hard allow-list, so it can't be prompt-injected into permitting exploitation.",
-   recv:["command_request {agent, service, argv} — from ANY agent"], emit:["verdict {allow | block, reason} → run, or return to caller"],
-   tools:["policy engine (allow-list + rule set)","scope checker","audit log","state store"],
-   passes:"Sits inline on every command edge — including all nine specialists. Each request → a verdict; every verdict is written to the append-only audit log, so the whole run is provably recon-only.",
-   redundancy:"Defense in depth — the LLM verdict AND a deterministic policy must BOTH pass, and it's fail-closed: if the LLM errors or is unsure, the hard rule decides and the default is BLOCK. Borderline commands trigger an N-of-M vote.",
-   errors:"LLM error / timeout → fall back to the deterministic allow-list (block anything not explicitly allowed). Malformed command → block + ask the caller to reformulate. A blocked command is never silently swallowed.",
-   decision:"exploit / metasploit / sqlmap / brute-force / off-scope → BLOCK · read-only enum on the target → ALLOW",
+  {id:"gate", n:"Scope & Objective Agent", kind:"guard",
+   role:"Keeps every agent aligned with the engagement — blocks out-of-scope targets and off-track tangents, and steers effort toward the objectives the assessment (its Jira ticket) actually asked for.",
+   system:"“You are the scope & objective keeper. Read the engagement's directions (the Jira ticket: in-scope hosts/nets, objectives, rules of engagement, success criteria, explicit out-of-scope list). Allow only work that is in scope AND advances a stated objective; block out-of-scope targets and off-track tangents; explain every block. Keep the swarm pointed at the assessment's intended direction.”",
+   llm:"Weighs each proposed action against the ticket's scope + objectives — is this target in scope, and does this move us toward a stated goal? It blocks drift, redirects effort, and tracks how much of the objective set is covered.",
+   recv:["engagement directions (Jira ticket: scope · objectives · RoE · out-of-scope)","every proposed command — from ANY agent"], emit:["verdict {allow | block / redirect, reason} → run, or return to caller","objective-coverage state → Critic"],
+   tools:["Jira / ticket loader","scope checker (in-scope allow-list)","objective tracker","audit log","state store"],
+   passes:"Sits inline on every command edge — including all nine specialists. Each request → a verdict against the ticket's scope + objectives; every verdict is logged, and objective coverage is tracked so the Critic knows when the engagement's goals are met.",
+   redundancy:"Defense in depth — the LLM judgment AND a deterministic in-scope allow-list must BOTH pass, and it's fail-closed: an out-of-scope target is blocked even if the LLM is unsure. Borderline calls trigger an N-of-M vote.",
+   errors:"LLM error / timeout → fall back to the deterministic scope list (block anything not explicitly in scope). Ambiguous objective → surface to the operator rather than guess. A blocked or redirected action always returns its reason — never silently dropped.",
+   decision:"out-of-scope host / off-objective tangent → BLOCK or redirect · in-scope + advances a stated objective → ALLOW",
    handoff:"allowed output → <b>Analysis Agent</b>",
-   note:"Cross-cutting guardrail. EVERY agent's commands pass here — the compliance guarantee holds no matter what an LLM proposes."},
+   note:"Cross-cutting guardrail. EVERY agent's commands pass here — it's what keeps a fast, autonomous swarm on the engagement's intended direction, and it feeds the Critic's “have we met the objectives?” decision."},
 
   {id:"analysis", n:"Analysis / Findings Agent", kind:"worker",
    role:"Structures raw output into findings and classifies each one CONSERVATIVELY.",
@@ -369,7 +399,7 @@ const AGENTS = [
    system:"“Adversarially verify every finding and proposed next step against the evidence in memory. Kill hallucinations — no claim without support. Then decide: iterate for deeper recon, or finalize.”",
    llm:"Asks of each claim “does the evidence actually support this?”, spots coverage gaps (a service enumerated too shallowly), and rules the run complete or not.",
    recv:["all Finding[] + correlations + graph"], emit:["VerifiedFinding[] + verdict {iterate | finalize, gaps, next_targets}"],
-   tools:["state store (the evidence)","an independent re-verification pass (can re-run a read-only check via the Gate)"],
+   tools:["state store (the evidence)","an independent re-verification pass (can re-run a read-only check via the Scope Gate)"],
    passes:"The ONE feedback edge in the system. On finalize it writes verified state to Reporting; on iterate it writes fresh work_items back to Routing (which re-fans-out).",
    redundancy:"N-of-M adversarial voting — several independent verifier passes; a finding survives only on a majority, which kills single-pass hallucination. The iteration count is capped, so the loop always converges.",
    errors:"Verifiers disagree → keep the finding but mark it unverified (never silently drop, never over-claim). Loop-guard: at the cap it finalizes with an explicit “gaps remain” note rather than spinning forever.",
@@ -509,10 +539,10 @@ AGENTS.forEach((a,i)=>{
     ghost.onclick=(ev)=>{ev.stopPropagation();document.getElementById("phase2").scrollIntoView({behavior:"smooth"});};
     grid.appendChild(ghost);
     band.appendChild(grid);
-    band.insertAdjacentHTML("beforeend",`<div class="fanin">⑂ every specialist's commands converge on the Safety Gate ▾</div>`);
+    band.insertAdjacentHTML("beforeend",`<div class="fanin">⑂ every specialist's commands converge on the Scope Gate ▾</div>`);
     node.appendChild(band);
     spine.appendChild(node);
-    return; // the fan-in label is the connector to the Gate — no extra arrow
+    return; // the fan-in label is the connector to the Scope Gate — no extra arrow
   }
   spine.appendChild(node);
   if(i<AGENTS.length-1){
@@ -547,10 +577,10 @@ function specDetail(s){
     +`<span class="glabel">Tools &amp; stack</span>${pills(s.tools,"tool")}`
     +`<span class="glabel">Receives (inbox)</span>${pills(s.recv,"io")}`
     +`<span class="glabel">Emits (outbox)</span>${pills(s.emit,"io")}`
-    +`<span class="glabel">How it passes info</span><p class="body">Writes namespaced output under its service folder; every command it proposes hits the Safety Gate first. It runs in parallel with the other specialists and coordinates only through shared memory.</p>`
+    +`<span class="glabel">How it passes info</span><p class="body">Writes namespaced output under its service folder; every command it proposes hits the Scope Gate first. It runs in parallel with the other specialists and coordinates only through shared memory.</p>`
     +`<span class="glabel rel">⟳ Redundancy</span><p class="body rel">${s.redundancy}</p>`
     +`<span class="glabel err">⚠ Error handling</span><p class="body err">${s.errors}</p>`
-    +`<span class="glabel">Hands off</span><p class="handoff">proposed commands → <b>Safety Gate</b> · allowed output → <b>Analysis</b></p>`
+    +`<span class="glabel">Hands off</span><p class="handoff">proposed commands → <b>Scope Gate</b> · allowed output → <b>Analysis</b></p>`
     +`<p class="note">Spawned only if its service is discovered. One of ${SPECIALISTS.length} parallel specialists — add a new service type and it slots in as a new agent.</p>`;
 }
 function select(id){
