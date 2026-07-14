@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
@@ -18,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
+from oscprecon.gui.widgets.banner import Banner
 from oscprecon.gui.widgets.dns_panel import DnsPanel
 from oscprecon.gui.widgets.ftp_panel import FtpPanel
 from oscprecon.gui.widgets.http_panel import HttpPanel
@@ -31,6 +34,21 @@ from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef, expand_hint
 
 _COMMAND_ROLE = Qt.ItemDataRole.UserRole
+
+# leading [tag] on a status line -> banner kind. Untagged lines (raw tool output) never touch the
+# banner. Only actionable/outcome tags surface; info chatter (running/dry-run) stays in the log.
+_TAG_RE = re.compile(r"^\[([a-z][a-z-]*)\]")
+_TAG_KIND = {
+    "blocked": "error",
+    "error": "error",
+    "missing": "warning",
+    "warning": "warning",
+    "drift": "warning",
+    "done": "success",
+    "restored": "success",
+    "exported": "success",
+    "imported": "success",
+}
 
 
 class ToolPanel(QWidget):
@@ -150,6 +168,7 @@ class ToolPanel(QWidget):
         QVBoxLayout(next_box).addWidget(self._next_steps)
         self.set_suggestions([])
 
+        self._banner = Banner()
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
 
@@ -157,7 +176,11 @@ class ToolPanel(QWidget):
         layout.addWidget(self._header)
         layout.addWidget(self._stack, stretch=2)
         layout.addWidget(next_box)
+        layout.addWidget(self._banner)
         layout.addWidget(self._output, stretch=1)
+
+    def set_theme(self, theme_name: str) -> None:
+        self._banner.restyle(theme_name)
 
     def set_target(self, target: str) -> None:
         self._target = target
@@ -295,6 +318,11 @@ class ToolPanel(QWidget):
 
     def append_output(self, text: str) -> None:
         self._output.appendPlainText(text)
+        match = _TAG_RE.match(text.strip())
+        if match is not None:
+            kind = _TAG_KIND.get(match.group(1))
+            if kind is not None:  # surface actionable outcomes; leave info-level chatter in the log
+                self._banner.show_message(kind, text.strip())
 
     def clear_output(self) -> None:
         self._output.clear()
