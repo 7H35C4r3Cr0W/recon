@@ -1,0 +1,7 @@
+Nmap scan report for 10.10.10.17
+Host is up (0.020s latency).
+
+PORT     STATE SERVICE    VERSION
+1521/tcp open  oracle-tns Oracle TNS Listener 11.2.0.2.0 (unauthorized)
+| oracle-tns-version:
+|_  Version: 11.2.0.2.0

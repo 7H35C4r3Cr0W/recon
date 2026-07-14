@@ -17,6 +17,7 @@ from oscprecon.modules import (
     netbios,
     nfs,
     ntp,
+    oracle,
     postgresql,
     rdp,
     redis,
@@ -118,6 +119,10 @@ def _ipmi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _sip_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in sip.SipModule().recon_steps(target, port)]
+
+
+def _oracle_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in oracle.OracleModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -307,5 +312,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(sip),
         sip.SipModule,
         _sip_steps,
+    ),
+    "oracle": SimpleReconSpec(
+        "oracle",
+        "Run full Oracle recon (TNS listener version)",
+        "Oracle recon — oracle-tns-version reads the TNS listener version (read-only, no login). "
+        "A valid SID is needed before auth; SID enumeration is a Tier-2 follow-up.",
+        _manual(oracle),
+        oracle.OracleModule,
+        _oracle_steps,
     ),
 }

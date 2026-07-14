@@ -1,0 +1,19 @@
+# Oracle recon next-steps (oracle-tns-version, read-only). A valid SID is the prerequisite for any
+# auth; SID enumeration is service-identifier discovery (Tier-2), never a credential brute here.
+- match:
+    service: oracle
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "Oracle listener reachable — enumerate SIDs (service identifiers) before any auth attempt"
+      command: "nmap -p 1521 --script oracle-sid-brute {target}"
+# source: HackTricks 1521-1522-1529-pentesting-oracle-listener (book.hacktricks.wiki)
+
+- match:
+    service: oracle
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "Match the TNS listener version against documented Oracle listener issues (reference only)"
+      command: "searchsploit oracle tns listener"
+# source: HackTricks 1521-1522-1529-pentesting-oracle-listener (book.hacktricks.wiki)

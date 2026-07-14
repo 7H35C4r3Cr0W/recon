@@ -1,0 +1,17 @@
+# Oracle manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. SID enumeration is service-identifier discovery (not credential brute);
+# a database LOGIN with a credential list is Tier-3 and never wrapped.
+- description: "TNS listener version"
+  why: "oracle-tns-version in isolation confirms the listener version — read-only, no login"
+  command: "nmap -p {port} --script oracle-tns-version {target}"
+# source: HackTricks 1521-1522-1529-pentesting-oracle-listener (book.hacktricks.wiki)
+
+- description: "Enumerate SIDs (Tier-2 — SID discovery, not a credential brute)"
+  why: "a valid SID is required before any auth; oracle-sid-brute discovers service identifiers"
+  command: "nmap -p {port} --script oracle-sid-brute {target}"
+# source: HackTricks 1521-1522-1529-pentesting-oracle-listener (book.hacktricks.wiki)
+
+- description: "Listener status / services (if TNS status is not blocked)"
+  why: "nmap oracle-tns-version + -sV reveal the listener services banner — read-only"
+  command: "nmap -sV -p {port} {target}"
+# source: HackTricks 1521-1522-1529-pentesting-oracle-listener (book.hacktricks.wiki)
