@@ -1,0 +1,16 @@
+# etcd manual follow-ups (Tier-2 — shown, never auto-run). Unauth read-only HTTP GETs; {target}/{port}
+# filled from the active profile. No key writes / no config changes.
+- description: "Read a key's value"
+  why: "/v2/keys/<key> returns a stored value — etcd often holds secrets / k8s service-account tokens"
+  command: "curl -s http://{target}:{port}/v2/keys/"
+# source: HackTricks 2379-2380-pentesting-etcd (book.hacktricks.wiki) — standard OSCP etcd recon
+
+- description: "Recursive key dump (bounded)"
+  why: "?recursive=true walks the whole keyspace read-only (keep it bounded)"
+  command: "curl -s http://{target}:{port}/v2/keys/?recursive=true"
+# source: HackTricks 2379-2380-pentesting-etcd (book.hacktricks.wiki) — standard OSCP etcd recon
+
+- description: "HTTPS / mTLS variant"
+  why: "many clusters wrap 2379 in TLS; -k tests whether a client cert is enforced — read-only"
+  command: "curl -sk https://{target}:{port}/version"
+# source: HackTricks 2379-2380-pentesting-etcd (book.hacktricks.wiki) — standard OSCP etcd recon

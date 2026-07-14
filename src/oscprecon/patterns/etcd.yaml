@@ -1,0 +1,19 @@
+# etcd recon next-steps (unauth read-only HTTP GETs). Reading keys/values is recon; no key writes and
+# no config changes are ever suggested here.
+- match:
+    service: etcd
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "etcd answers unauthenticated — dump the keyspace read-only (it often holds k8s tokens)"
+      command: "curl -s http://{target}:2379/v2/keys/?recursive=true"
+# source: HackTricks 2379-2380-pentesting-etcd (book.hacktricks.wiki) — standard OSCP etcd recon
+
+- match:
+    service: etcd
+    field: kind
+    value: "^key$"
+  suggest:
+    - text: "Read a discovered key's value read-only (secrets / certs are commonly stored here)"
+      command: "curl -s http://{target}:2379/v2/keys/"
+# source: HackTricks 2379-2380-pentesting-etcd (book.hacktricks.wiki) — standard OSCP etcd recon
