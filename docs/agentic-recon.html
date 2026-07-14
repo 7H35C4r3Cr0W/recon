@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nabu — Agentic Recon Architecture</title>
+<style>
+  :root{
+    /* dark by default — deterministic, matches the deck. Toggle flips to light. */
+    --ink:#0e1420; --surface:#161d2b; --surface-2:#1b2434; --border:#28344a; --text:#e6e9ef;
+    --muted:#8a94a6; --gold:#c9a227; --gold-soft:rgba(201,162,39,.14); --teal:#5b8a8f;
+    --llm:#a888f0; --llm-soft:rgba(168,136,240,.16);   /* the AI/LLM layer accent */
+    --control:#c9a227; --worker:#5b8a8f; --decision:#e0a34a; --guard:#c0564b;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono:"JetBrains Mono","SF Mono","DejaVu Sans Mono",Consolas,monospace;
+    --shadow:0 12px 34px rgba(0,0,0,.4); --maxw:1200px;
+  }
+  :root[data-theme="light"]{
+    --ink:#f2ede1; --surface:#fbf8f0; --surface-2:#f4efe2; --border:#ddd3bf; --text:#1f2633;
+    --muted:#6b6656; --gold:#9a7415; --gold-soft:rgba(154,116,21,.12); --teal:#3f6f74;
+    --llm:#6f4fc0; --llm-soft:rgba(111,79,192,.12);
+    --control:#9a7415; --worker:#3f6f74; --decision:#b26b1e; --guard:#a5342a;
+    --shadow:0 12px 34px rgba(60,50,20,.14);
+  }
+  *{box-sizing:border-box}
+  body{margin:0}
+  .wrap{font-family:var(--sans);background:var(--ink);color:var(--text);min-height:100vh;line-height:1.55;
+    background-image:radial-gradient(1200px 620px at 90% -10%,var(--llm-soft),transparent 60%);}
+  .shell{max-width:var(--maxw);margin:0 auto;padding:0 22px 80px}
+
+  header.top{padding:38px 0 6px;display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:13px}
+  .brand svg{width:44px;height:44px;flex:0 0 auto}
+  .brand .name{font-family:var(--serif);font-size:25px;font-weight:600}
+  .brand .tag{color:var(--muted);font-size:12px;letter-spacing:2.2px;text-transform:uppercase}
+  .top .sp{flex:1}
+  .btns{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .btn{font-family:var(--sans);font-size:13px;color:var(--text);background:var(--surface);
+    border:1px solid var(--border);border-radius:9px;padding:8px 13px;cursor:pointer;text-decoration:none}
+  .btn:hover{border-color:var(--llm)}.btn:focus-visible{outline:2px solid var(--llm);outline-offset:2px}
+  .btn.cta{background:var(--llm);color:#0d0a18;border-color:var(--llm);font-weight:600}
+
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,5vw,50px);line-height:1.05;
+    text-wrap:balance;margin:22px 0 10px;max-width:20ch}
+  h1 em{font-style:normal;color:var(--llm)}
+  .lead{font-size:clamp(15px,1.7vw,18px);color:var(--text);max-width:70ch;margin:0 0 18px}
+  .lead b{color:var(--llm)}
+  .chips{display:flex;flex-wrap:wrap;gap:9px;margin:2px 0 26px}
+  .chip{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);
+    border-radius:999px;padding:6px 13px;font-size:12.5px;color:var(--muted)}
+  .chip b{color:var(--llm);font-weight:600}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--llm)}
+
+  .grid{display:grid;grid-template-columns:1fr 400px;gap:26px;align-items:start}
+  @media(max-width:940px){.grid{grid-template-columns:1fr}}
+
+  .flowhint{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+  kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:5px;padding:1px 6px}
+
+  /* the vertical agent spine */
+  .spine{position:relative;padding-left:34px}
+  .spine::before{content:"";position:absolute;left:9px;top:8px;bottom:44px;width:2px;
+    background:linear-gradient(var(--border),var(--border));}
+  .node{position:relative;margin:0 0 8px}
+  .node .dot{position:absolute;left:-33px;top:20px;width:20px;height:20px;border-radius:50%;
+    background:var(--surface);border:2px solid var(--kc);display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:10px;color:var(--kc);z-index:2}
+  .card{width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);
+    border-left:3px solid var(--kc);border-radius:12px;padding:14px 16px;cursor:pointer;color:inherit;
+    font-family:inherit;transition:border-color .15s,transform .15s,box-shadow .15s}
+  .card:hover{border-color:var(--kc);transform:translateX(2px)}
+  .card:focus-visible{outline:2px solid var(--llm);outline-offset:2px}
+  .card.on{border-color:var(--kc);box-shadow:var(--shadow)}
+  .card .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card h3{font-family:var(--serif);font-weight:600;font-size:18px;margin:0}
+  .card .role{color:var(--muted);font-size:13.5px;margin:5px 0 0}
+  .kind{font-family:var(--mono);font-size:10.5px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--kc);border:1px solid var(--kc);border-radius:6px;padding:1px 7px}
+  .llmbadge{font-family:var(--mono);font-size:10.5px;color:var(--llm);border:1px solid var(--llm);
+    border-radius:6px;padding:1px 7px;display:inline-flex;align-items:center;gap:5px}
+  .arrow{color:var(--muted);font-family:var(--mono);font-size:11.5px;text-align:center;padding:5px 0 3px;
+    display:flex;align-items:center;gap:8px;justify-content:center}
+  .arrow::before,.arrow::after{content:"";height:1px;width:34px;background:var(--border)}
+  .loopnote{color:var(--decision);font-family:var(--mono);font-size:11.5px;text-align:center;
+    padding:2px 0 8px;font-style:italic}
+
+  /* detail panel */
+  .detail{position:sticky;top:18px;background:var(--surface);border:1px solid var(--border);
+    border-radius:14px;padding:20px;min-height:340px}
+  .detail .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--kc);margin:0}
+  .detail h2{font-family:var(--serif);font-weight:600;font-size:24px;margin:6px 0 3px}
+  .detail .sub{color:var(--muted);font-size:12.5px;font-family:var(--mono);margin:0 0 14px}
+  .detail .llmline{background:var(--llm-soft);border:1px solid var(--llm);border-radius:10px;
+    padding:11px 13px;font-size:13.5px;margin:0 0 15px}
+  .detail .llmline b{color:var(--llm)}
+  .detail .glabel{display:block;color:var(--muted);font-family:var(--mono);font-size:11px;
+    letter-spacing:1px;text-transform:uppercase;margin:14px 0 7px;border-top:1px solid var(--border);padding-top:12px}
+  .detail .glabel:first-of-type{border-top:none;padding-top:0}
+  .pill{display:inline-block;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;
+    padding:3px 9px;margin:0 6px 6px 0;font-family:var(--mono);font-size:12px;color:var(--text)}
+  .pill.tool{border-color:var(--worker);color:var(--worker)}
+  .decision{font-size:13px;color:var(--text);margin:0}
+  .handoff{font-size:13.5px;color:var(--text);margin:0}
+  .handoff b{color:var(--kc)}
+  .note{color:var(--muted);font-size:12.5px;font-style:italic;margin:12px 0 0}
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 20px;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:12px;height:12px;border-radius:3px;border:2px solid currentColor}
+
+  section.notes{margin-top:40px;border-top:1px solid var(--border);padding-top:26px}
+  section.notes h2{font-family:var(--serif);font-weight:600;font-size:24px;margin:0 0 6px}
+  .notecards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:16px}
+  .nc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .nc h3{font-size:15px;margin:0 0 6px;color:var(--llm)}
+  .nc p{font-size:13.5px;color:var(--muted);margin:0}
+  footer{color:var(--muted);font-size:12.5px;margin-top:34px;text-align:center}
+  .brand .m-tile{fill:var(--surface);stroke:var(--gold);stroke-opacity:.45;stroke-width:2}
+  .brand .m-gold{fill:var(--gold)}.brand .m-teal-f{fill:var(--teal)}.brand .m-teal-s{stroke:var(--teal);fill:none}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="shell">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 256 256" aria-hidden="true">
+        <rect class="m-tile" x="8" y="8" width="240" height="240" rx="52"/>
+        <path class="m-gold" d="M128 40 L142 66 L128 60 L114 66 Z"/><rect class="m-gold" x="125" y="60" width="6" height="20" rx="3"/>
+        <g class="m-teal-s" stroke-width="7" stroke-linecap="round"><line x1="128" y1="140" x2="76" y2="100"/>
+        <line x1="128" y1="140" x2="188" y2="108"/><line x1="128" y1="140" x2="112" y2="200"/><line x1="188" y1="108" x2="112" y2="200"/></g>
+        <circle class="m-gold" cx="128" cy="140" r="17"/><circle class="m-teal-f" cx="76" cy="100" r="11"/>
+        <circle class="m-teal-f" cx="188" cy="108" r="11"/><circle class="m-teal-f" cx="112" cy="200" r="11"/>
+      </svg>
+      <div><div class="name">Nabu</div><div class="tag">Agentic Recon</div></div>
+    </div>
+    <div class="sp"></div>
+    <div class="btns">
+      <a class="btn" href="how-nabu-works.html">← How Nabu works today</a>
+      <button class="btn" id="themeBtn" type="button">◐ Theme</button>
+    </div>
+  </header>
+
+  <h1>From one tool to an <em>agent&nbsp;swarm</em></h1>
+  <p class="lead">Today Nabu is a single desktop app that runs a fixed recon pipeline. This is the
+  blueprint for the next step: <b>decompose that pipeline into small, single-purpose agents</b> — each
+  one an <b>LLM (Opus)</b> that reasons about its own job — and wire them into a chronological,
+  top-down, agent-to-agent workflow. Every agent reads and writes one shared memory; every command it
+  wants to run passes a safety gate; a critic decides whether to go deeper or finish.</p>
+
+  <div class="chips">
+    <span class="chip"><span class="dot"></span> An <b>LLM (Opus)</b> drives every agent</span>
+    <span class="chip"><span class="dot"></span> Chronological, <b>top-down</b> hand-offs</span>
+    <span class="chip"><span class="dot"></span> One <b>shared memory</b> (project state)</span>
+    <span class="chip"><span class="dot"></span> A <b>safety gate</b> on every command</span>
+    <span class="chip"><span class="dot"></span> A <b>critic loop</b> — go deeper, or finish</span>
+  </div>
+
+  <div class="legend">
+    <span style="color:var(--control)"><span class="sw"></span> Control</span>
+    <span style="color:var(--worker)"><span class="sw"></span> Worker</span>
+    <span style="color:var(--decision)"><span class="sw"></span> Decision</span>
+    <span style="color:var(--guard)"><span class="sw"></span> Guardrail</span>
+    <span style="color:var(--llm)"><span class="sw"></span> 🧠 = LLM (Opus) attached</span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <p class="flowhint">Read it top to bottom — the flow runs in order, each arrow labelled with the
+      data one agent hands the next. Click any agent for detail. <kbd>Tab</kbd> + <kbd>Enter</kbd> to explore by keyboard.</p>
+      <div class="spine" id="spine"></div>
+    </div>
+    <aside><div class="detail" id="detail"></div></aside>
+  </div>
+
+  <section class="notes">
+    <h2>How the architecture works</h2>
+    <p class="lead" style="margin-top:8px">Five ideas turn a chain of prompts into a dependable system.</p>
+    <div class="notecards">
+      <div class="nc"><h3>An LLM per agent</h3><p>Each agent is a focused Opus instance with one job, its own system prompt, and only the tools it needs. Small scope = reliable reasoning and easy debugging.</p></div>
+      <div class="nc"><h3>Shared memory</h3><p>The project folder is the blackboard. Agents don't talk directly — they read and write structured state (services, findings, creds, graph), so any agent can be retried or replaced.</p></div>
+      <div class="nc"><h3>Hand-off, not free-for-all</h3><p>Control passes in a defined order, and each edge carries a typed payload (target → services → raw output → findings → report). Deterministic flow, inspectable at every step.</p></div>
+      <div class="nc"><h3>A guardrail agent</h3><p>The Safety Gate sits between every agent and the shell. Nothing runs until it's judged exam-legal — the compliance guarantee holds no matter what an LLM proposes.</p></div>
+      <div class="nc"><h3>A critic loop</h3><p>The Critic verifies claims against evidence and decides go-deeper-or-finish. That single feedback edge is what makes this a workflow that converges, not a one-shot pipeline.</p></div>
+    </div>
+  </section>
+
+  <footer>Nabu · agent-to-agent recon architecture — a design blueprint. The shipping tool is the
+  single-app pipeline shown in <a class="btn" style="padding:2px 8px" href="how-nabu-works.html">How Nabu works</a>.</footer>
+</div></div>
+
+<script>
+const AGENTS = [
+  {id:"orchestrator", n:"Orchestrator Agent", kind:"control",
+   role:"Reads the goal, sets scope + rules, plans the run, and supervises every downstream agent.",
+   llm:"Turns a one-line goal (“recon 10.10.10.5, OSCP-legal”) into a plan: which phases, in what order, when to stop.",
+   reads:["engagement goal + scope","rules of engagement"], writes:["run plan","shared memory (initial state)"],
+   tools:["— (coordinator)"], handoff:"Target + plan → <b>Discovery Agent</b>",
+   note:"The conductor. It owns the shared memory that every other agent reads and writes."},
+  {id:"discovery", n:"Discovery Agent", kind:"worker",
+   role:"Chooses the scan strategy for this target and parses the results into structured services.",
+   llm:"Decides scan depth/profile (quick vs full, which UDP) from the target and plan, then reads nmap output into clean service records.",
+   reads:["target IP / host","run plan"], writes:["discovered_services (ports, products, versions)"],
+   tools:["nmap — staged: top-1000 → full → UDP top-100 → -sCV"], handoff:"discovered_services → <b>Routing Agent</b>"},
+  {id:"router", n:"Routing / Dispatch Agent", kind:"decision",
+   role:"For each open service, decides which specialist agent owns it — a decision tree on port + product.",
+   llm:"Matches each discovered service to the right specialist (even on non-standard ports) and writes one work item per service.",
+   reads:["discovered_services"], writes:["a job per service (which specialist + why)"],
+   tools:["service → specialist map"], handoff:"Fans out one job per service → the <b>Specialist swarm</b>",
+   decision:"22 → SSH · 80/443 → Web · 445 → SMB/AD · 389 → LDAP · 161 → SNMP · 1433/3306/5432 → DB · …"},
+  {id:"specialists", n:"Service-Specialist Agents (swarm)", kind:"worker",
+   role:"One LLM agent per service type, each reasoning about its own read-only enumeration — running in parallel.",
+   llm:"Each specialist reasons about ITS service: what safe enumeration is worth running, in what order, given what's already known. N agents work concurrently.",
+   reads:["its assigned service","shared memory (creds found so far)"], writes:["raw tool output per service"],
+   tools:["Web: feroxbuster / ffuf / nikto / whatweb","SMB/AD: netexec / enum4linux-ng / smbclient","FTP·SSH·DNS·LDAP·SNMP·DB: read-only enum"],
+   handoff:"Every proposed command → <b>Safety Gate</b> (before it runs)",
+   note:"Fan-out: specialists are blind to each other and coordinate only through shared memory — so any one can be retried in isolation."},
+  {id:"gate", n:"Safety / Compliance Agent", kind:"guard",
+   role:"Judges every command any agent wants to run against the exam rules. Allows, or blocks with a reason.",
+   llm:"The one place that can say no. Reads each proposed command and rules it recon-legal or blocks it — no exploitation, no brute/spray unless explicitly authorized.",
+   reads:["every proposed command (from any agent)"], writes:["allowed command → runs · or a blocked notice"],
+   tools:["policy engine (allow-list + rules)"], handoff:"Allowed output → <b>Analysis Agent</b>",
+   decision:"exploit / metasploit / sqlmap / brute-force → BLOCK · read-only enum → ALLOW",
+   note:"Cross-cutting guardrail: EVERY agent's commands pass through here. This is the compliance guarantee — it holds no matter what an LLM dreams up."},
+  {id:"analysis", n:"Analysis / Findings Agent", kind:"worker",
+   role:"Structures raw output into findings and classifies each one CONSERVATIVELY.",
+   llm:"Reads messy tool output into structured findings, then judges severity cautiously — an open port / version / Exploit-DB match is never a vuln; only real weak postures (anon access, null session, signing off) are flagged notable.",
+   reads:["allowed raw output from every specialist"], writes:["classified findings (conservative category each)"],
+   tools:["parsers + conservative classifier"], handoff:"Findings → <b>Enrichment Agent</b>"},
+  {id:"enrichment", n:"Enrichment / Reference Agent", kind:"worker",
+   role:"Adds HackTricks + Exploit-DB context to each finding — reference only, never runs anything.",
+   llm:"For each service + finding, pulls the relevant HackTricks section and Exploit-DB matches and summarises WHY they matter and what to read next.",
+   reads:["findings","service + version"], writes:["findings + reference context (links, the right sections)"],
+   tools:["HackTricks (offline + live)","searchsploit (lookup only)"], handoff:"Enriched findings → <b>Correlation Agent</b>"},
+  {id:"graph", n:"Correlation / Graph Agent", kind:"worker",
+   role:"Builds the attack-surface graph and reasons about relationships across services.",
+   llm:"Connects target → services → findings → credentials and spots cross-service links — e.g. “the credential in this SMB share unlocks that WinRM host.”",
+   reads:["enriched findings","credentials"], writes:["attack-surface graph + correlations"],
+   tools:["graph builder"], handoff:"Graph + correlations → <b>Critic Agent</b>"},
+  {id:"critic", n:"Critic / Verifier Agent", kind:"decision",
+   role:"Adversarially checks findings + next steps for accuracy, then decides: go deeper, or finish.",
+   llm:"Asks of every claim “does the evidence actually support this?”, kills hallucinations, and rules the run complete or not.",
+   reads:["all findings + correlations"], writes:["verified findings","a verdict: iterate or finalize"],
+   tools:["— (adversarial review)"], handoff:"iterate → back to <b>Routing Agent</b> · finalize → <b>Reporting Agent</b>",
+   decision:"evidence weak / gaps remain → ITERATE (loop) · confident + complete → FINALIZE",
+   note:"The quality gate AND the loop. This single feedback edge is what makes the whole thing a convergent workflow instead of a one-shot chain."},
+  {id:"report", n:"Reporting Agent", kind:"worker",
+   role:"Writes the human-facing, Obsidian-ready report — the narrative, generated.",
+   llm:"Synthesises the whole verified state into a report: open ports, per-service findings, next steps with citations, and the full command log.",
+   reads:["the whole shared memory (verified)"], writes:["report.md (+ vault export)"],
+   tools:["report renderer"], handoff:"Done — hand the report to the operator",
+   note:"Terminal node. Everything the swarm learned, written up for a human."},
+];
+
+const KIND = {control:"var(--control)", worker:"var(--worker)", decision:"var(--decision)", guard:"var(--guard)"};
+const KLABEL = {control:"Control", worker:"Worker", decision:"Decision", guard:"Guardrail"};
+const spine = document.getElementById("spine");
+const detail = document.getElementById("detail");
+let active = 0;
+
+AGENTS.forEach((a,i)=>{
+  const node=document.createElement("div"); node.className="node"; node.style.setProperty("--kc",KIND[a.kind]);
+  const btn=document.createElement("button"); btn.className="card"; btn.type="button"; btn.id="card-"+i;
+  btn.innerHTML=`<span class="dot">${i+1}</span>`
+    +`<div class="row"><h3>${a.n}</h3><span class="kind">${KLABEL[a.kind]}</span><span class="llmbadge">🧠 Opus</span></div>`
+    +`<p class="role">${a.role}</p>`;
+  btn.onclick=()=>select(i);
+  node.appendChild(btn); spine.appendChild(node);
+  // data-flow arrow to the next agent (from this agent's handoff)
+  if(i<AGENTS.length-1){
+    const arr=document.createElement("div"); arr.className="arrow";
+    arr.textContent=flowLabel(a.id); spine.appendChild(arr);
+  }
+  if(a.id==="critic"){ const l=document.createElement("div"); l.className="loopnote";
+    l.textContent="↺  or ITERATE — loop back up to Routing for deeper recon"; spine.appendChild(l); }
+});
+
+function flowLabel(id){
+  const m={orchestrator:"target + plan", discovery:"discovered_services", router:"one job per service",
+    specialists:"proposed commands → gated", gate:"allowed raw output", analysis:"classified findings",
+    enrichment:"enriched findings", graph:"graph + correlations", critic:"✓ finalize → verified state"};
+  return "▾  "+(m[id]||"");
+}
+
+function esc(s){return (s||"").toString();}
+function pills(arr,cls){return arr.map(x=>`<span class="pill ${cls||''}">${esc(x)}</span>`).join("");}
+
+function select(i){
+  active=i; const a=AGENTS[i];
+  detail.style.setProperty("--kc",KIND[a.kind]);
+  [...spine.querySelectorAll(".card")].forEach((c,n)=>c.classList.toggle("on",n===i));
+  let html=`<p class="eyebrow">Step ${i+1} of ${AGENTS.length} · ${KLABEL[a.kind]}</p>`
+    +`<h2>${a.n}</h2><p class="sub">🧠 powered by an LLM (Opus)</p>`
+    +`<div class="llmline"><b>What the LLM does:</b> ${a.llm}</div>`
+    +`<span class="glabel">Reads</span>${pills(a.reads)}`
+    +`<span class="glabel">Writes / produces</span>${pills(a.writes)}`
+    +`<span class="glabel">Tools</span>${pills(a.tools,"tool")}`;
+  if(a.decision) html+=`<span class="glabel">Decision</span><p class="decision">${a.decision}</p>`;
+  html+=`<span class="glabel">Hands off</span><p class="handoff">${a.handoff}</p>`;
+  if(a.note) html+=`<p class="note">${a.note}</p>`;
+  detail.innerHTML=html;
+}
+
+addEventListener("keydown",e=>{
+  if(e.key==="ArrowDown"||e.key==="PageDown"){e.preventDefault();select(Math.min(AGENTS.length-1,active+1));document.getElementById("card-"+active).focus();}
+  else if(e.key==="ArrowUp"||e.key==="PageUp"){e.preventDefault();select(Math.max(0,active-1));document.getElementById("card-"+active).focus();}
+});
+
+const root=document.documentElement;
+root.setAttribute("data-theme","dark");  // dark by default; button flips to light
+document.getElementById("themeBtn").addEventListener("click",()=>{
+  const cur=root.getAttribute("data-theme")==="light"?"light":"dark";
+  root.setAttribute("data-theme",cur==="dark"?"light":"dark");
+});
+select(0);
+</script>
+</body>
+</html>
