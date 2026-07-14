@@ -1,0 +1,16 @@
+# Java RMI manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. Invoking a remote method / deserialization exploitation is NOT wrapped.
+- description: "Dump the RMI registry (re-run)"
+  why: "rmi-dumpregistry in isolation re-lists the bound objects + endpoints — read-only"
+  command: "nmap -sV -p {port} --script rmi-dumpregistry {target}"
+# source: HackTricks 1099-pentesting-java-rmi (book.hacktricks.wiki) — standard OSCP RMI recon
+
+- description: "Confirm the RMI/registry banner (-sV)"
+  why: "a plain -sV confirms the RMI registry / JMX product + Java version — read-only"
+  command: "nmap -sV -p {port} {target}"
+# source: HackTricks 1099-pentesting-java-rmi (book.hacktricks.wiki) — standard OSCP RMI recon
+
+- description: "Look up references for the RMI/JMX service (searchsploit, display-only)"
+  why: "surfaces documented Java RMI/JMX issues to read — lookup only, never executed"
+  command: "searchsploit java rmi"
+# source: HackTricks 1099-pentesting-java-rmi (book.hacktricks.wiki) — standard OSCP RMI recon

@@ -1,0 +1,19 @@
+# Java RMI recon next-steps (registry dump, read-only). Recording bound objects/endpoints is recon;
+# invoking a method / deserialization exploitation is out of scope and never suggested here.
+- match:
+    service: rmi
+    field: kind
+    value: "^object$"
+  suggest:
+    - text: "An object is bound in the RMI registry — note its name/endpoint (method calls are out of scope)"
+      command: "nmap -sV -p 1099 --script rmi-dumpregistry {target}"
+# source: HackTricks 1099-pentesting-java-rmi (book.hacktricks.wiki) — standard OSCP RMI recon
+
+- match:
+    service: rmi
+    field: kind
+    value: "^endpoint$"
+  suggest:
+    - text: "A dynamic RMI endpoint port was disclosed — confirm it is open with a targeted scan"
+      command: "nmap -sV -p {port} {target}"
+# source: HackTricks 1099-pentesting-java-rmi (book.hacktricks.wiki) — standard OSCP RMI recon

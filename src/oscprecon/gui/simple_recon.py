@@ -33,6 +33,7 @@ from oscprecon.modules import (
     postgresql,
     rdp,
     redis,
+    rmi,
     rsync,
     sip,
     smtp,
@@ -210,6 +211,10 @@ def _mdns_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _upnp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in upnp.UpnpModule().recon_steps(target, port)]
+
+
+def _rmi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in rmi.RmiModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -561,5 +566,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(upnp),
         upnp.UpnpModule,
         _upnp_steps,
+    ),
+    "rmi": SimpleReconSpec(
+        "rmi",
+        "Run full Java RMI recon (registry dump)",
+        "Java RMI recon — nmap rmi-dumpregistry lists the objects bound in the RMI registry + "
+        "their dynamic endpoints (read-only). Method invocation / deserialization is out of scope.",
+        _manual(rmi),
+        rmi.RmiModule,
+        _rmi_steps,
     ),
 }
