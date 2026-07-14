@@ -17,6 +17,7 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 6 | Preignition | 10.129.32.196 | http/80 (nginx 1.14.2) | dir-bust found `/admin.php` (admin/admin manual) | "Wide net" (60+ ext) ON by default → dir-bust never finished | `31a746c` |
 | 7 | Mongod | 10.129.32.198 | mongodb/27017 (+22 ssh) | nmap NSE listed DBs incl. `sensitive_information` | Tier-1 needed mongosh (not on stock Kali) | `ac9fc75` |
 | 8 | Synced | 10.129.228.37 | rsync/873 | `rsync --list-only` found anonymous `public` module (access=unauth) | nmap parenthetical banner `(protocol version 31)` mangled product/version | `ab1a809` |
+| 9 | Appointment | 10.129.32.201 | http/80 (Apache 2.4.38, login form) | nmap clean; whatweb fingerprint now surfaces the login form (`PasswordField`, `Title[Login]`); SQLi bypass is manual | `whatweb` emitted a coloured summary the JSON-only parser silently dropped → 0 findings on every http box | _this commit_ |
 
 ## Per-box notes
 
@@ -65,6 +66,19 @@ version-token split mangled it into product=`(protocol version`/version=`31)`.
 Fix: a leading `(` means no product — leave both empty. 873 *is* in top-1000, so
 `quick` finds it.
 
+**9 · Appointment — http.** Apache 2.4.38 (Debian), title "Login". nmap parsed it
+cleanly. **Bug:** the http module emitted `whatweb <url>`, whose default output is a
+coloured summary line — but `parse_whatweb` only understood `--log-json` JSON, so
+whatweb (the primary web fingerprint) produced **zero** findings on *every* http box,
+and the saved `whatweb.txt` was full of ANSI escapes. Fix: emit
+`whatweb --colour=never <url>` (clean file) and teach the parser the plain summary as
+a fallback — with a bracket-depth-aware split so a `Title[Hello, world]` comma doesn't
+shred plugin names. The fingerprint now surfaces, including `PasswordField` /
+`Title[Login]`: the login form itself. The SQL-injection login bypass (`admin'#`) is
+manual exploitation the tool deliberately leaves to the user (recon-only, §2).
+**Lesson:** validate against a live http box, not just a JSON fixture — the fixture
+encoded a format the emitted command never produces.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
@@ -81,3 +95,7 @@ Fix: a leading `(` means no product — leave both empty. 873 *is* in top-1000, 
 - **This Kali runs nmap privileged**, so UDP scans work without sudo here.
 - **Parser hygiene:** anchor on structural columns (share Type, version token,
   NSE block scoping), not "first word" / greedy line matching.
+- **The emitted command and its parser must speak the same format.** whatweb's
+  default coloured summary ≠ its `--log-json` output; a JSON-only parser dropped
+  every real run. Pin the command to a deterministic, parseable form (and force
+  `--colour=never` for tools that colour even when piped).
