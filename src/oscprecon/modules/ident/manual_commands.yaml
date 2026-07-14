@@ -1,0 +1,16 @@
+# Ident manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. ident-user-enum (wordlist port sweep) stays out — this is targeted mapping.
+- description: "Map all open ports to owners"
+  why: "run auth-owners across a full -p- scan so every service's owning user is disclosed — read-only"
+  command: "nmap -sV -p- --script auth-owners {target}"
+# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon
+
+- description: "Confirm the ident daemon banner"
+  why: "a plain -sV on 113 confirms the identd product/version — read-only"
+  command: "nmap -sV -p {port} {target}"
+# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon
+
+- description: "Owner of a specific service port"
+  why: "auth-owners scoped to one interesting port reveals just that service's user — read-only"
+  command: "nmap -sV -p 22,{port} --script auth-owners {target}"
+# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon

@@ -11,6 +11,7 @@ from oscprecon.modules import (
     docker,
     elasticsearch,
     finger,
+    ident,
     ike,
     imap,
     ipmi,
@@ -195,6 +196,10 @@ def _iscsi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _svn_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in svn.SvnModule().recon_steps(target, port)]
+
+
+def _ident_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in ident.IdentModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -519,5 +524,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(svn),
         svn.SvnModule,
         _svn_steps,
+    ),
+    "ident": SimpleReconSpec(
+        "ident",
+        "Run full Ident recon (service owners)",
+        "Ident recon — nmap auth-owners asks the ident daemon which local user owns each open "
+        "port, mapping services to usernames (read-only). No password guessing.",
+        _manual(ident),
+        ident.IdentModule,
+        _ident_steps,
     ),
 }

@@ -1,0 +1,19 @@
+# Ident recon next-steps (auth-owners, read-only). Disclosed service owners become target accounts for
+# later authorized enumeration; no password guessing is ever suggested here.
+- match:
+    service: ident
+    field: kind
+    value: "^user$"
+  suggest:
+    - text: "ident disclosed a service owner — map every port's owner across a full scan"
+      command: "nmap -sV -p- --script auth-owners {target}"
+# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon
+
+- match:
+    service: ident
+    field: kind
+    value: "^user$"
+  suggest:
+    - text: "Treat a named service owner as a candidate account for SSH / SMB / Kerberos enumeration"
+      command: "nmap -p 22 --script ssh-auth-methods --script-args ssh.user={user} {target}"
+# source: HackTricks 113-pentesting-ident (book.hacktricks.wiki) — standard OSCP ident recon
