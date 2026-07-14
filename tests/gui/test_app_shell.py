@@ -81,6 +81,31 @@ def test_findings_view_uses_conservative_categories(qtbot: QtBot, tmp_path: Path
     assert "1 notable" in view._summary.text()
 
 
+def test_findings_view_search_and_category_filter(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    findings_mod.add_findings(
+        prof.directory,
+        [
+            {"module": "smb", "kind": "signing", "value": "disabled", "discovered_at": "t"},
+            {"module": "ssh", "kind": "product", "value": "OpenSSH 8.4", "discovered_at": "t"},
+            {"module": "ftp", "kind": "auth", "value": "anonymous", "discovered_at": "t"},
+        ],
+    )
+    view = FindingsView()
+    qtbot.addWidget(view)
+    view.set_profile(prof)
+    assert view._table.rowCount() == 3  # all shown by default
+
+    view._filter.setText("ssh")  # text search narrows to the ssh finding
+    assert view._table.rowCount() == 1
+    assert "of 3" in view._summary.text()  # count reflects the filter
+
+    view._filter.setText("")
+    view._category.setCurrentText("Notable only")  # info (product) drops out
+    kinds = {view._table.item(r, 2).text() for r in range(view._table.rowCount())}
+    assert kinds == {"signing", "auth"}  # both notable; the version banner is filtered away
+
+
 def test_activity_view_lists_audit_events(qtbot: QtBot, tmp_path: Path) -> None:
     prof = _profile(tmp_path)
     audit.record(prof.directory, prof.profile_name, "run-command", details={"module": "nmap"})
