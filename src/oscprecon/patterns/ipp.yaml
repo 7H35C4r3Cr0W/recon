@@ -1,0 +1,19 @@
+# IPP/CUPS recon next-steps (server info + printer list, read-only). Reading printer attributes/jobs
+# is recon; submitting jobs or changing CUPS config are never suggested here.
+- match:
+    service: ipp
+    field: kind
+    value: "^printer$"
+  suggest:
+    - text: "A CUPS printer is exposed — read its attributes/jobs (read-only, no job submission)"
+      command: "curl -s 'http://{target}:631/printers/{printer}?op=get-printer-attributes'"
+# source: HackTricks 631-internet-printing-protocol-ipp (book.hacktricks.wiki)
+
+- match:
+    service: ipp
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "Match the CUPS version against documented issues for reference (searchsploit, display-only)"
+      command: "searchsploit cups"
+# source: HackTricks 631-internet-printing-protocol-ipp (book.hacktricks.wiki)

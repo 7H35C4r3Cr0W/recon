@@ -14,6 +14,7 @@ from oscprecon.modules import (
     ike,
     imap,
     ipmi,
+    ipp,
     kerberos,
     kubernetes,
     memcached,
@@ -180,6 +181,10 @@ def _pop3_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _telnet_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in telnet.TelnetModule().recon_steps(target, port)]
+
+
+def _ipp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in ipp.IppModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -477,5 +482,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(telnet),
         telnet.TelnetModule,
         _telnet_steps,
+    ),
+    "ipp": SimpleReconSpec(
+        "ipp",
+        "Run full IPP/CUPS recon (version · printers)",
+        "IPP/CUPS recon — nmap cups-info/cups-queue-info + curl /printers/; read-only. Reads the "
+        "server version and configured printers; no job is submitted.",
+        _manual(ipp),
+        ipp.IppModule,
+        _ipp_steps,
     ),
 }

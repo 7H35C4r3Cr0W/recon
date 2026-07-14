@@ -1,0 +1,16 @@
+# IPP/CUPS manual follow-ups (Tier-2 — shown, never auto-run). Read-only GETs; {target}/{port}/{printer}
+# filled from the active profile. No print jobs are submitted and no CUPS config is changed.
+- description: "Read a printer's attributes"
+  why: "get-printer-attributes returns a printer's config/state — read-only"
+  command: "curl -s 'http://{target}:{port}/printers/{printer}?op=get-printer-attributes'"
+# source: HackTricks 631-internet-printing-protocol-ipp (book.hacktricks.wiki)
+
+- description: "CUPS server + queue info (nmap NSE)"
+  why: "cups-info + cups-queue-info re-run confirm the server version and queued jobs — read-only"
+  command: "nmap -p {port} --script cups-info,cups-queue-info {target}"
+# source: HackTricks 631-internet-printing-protocol-ipp (book.hacktricks.wiki)
+
+- description: "CUPS admin page presence"
+  why: "a 200 on /admin confirms the CUPS admin console is exposed — read-only"
+  command: "curl -s -o /dev/null -w '%{http_code}' http://{target}:{port}/admin"
+# source: HackTricks 631-internet-printing-protocol-ipp (book.hacktricks.wiki)
