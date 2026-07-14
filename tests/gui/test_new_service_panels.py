@@ -38,6 +38,7 @@ _NEW_SERVICES = [
     ("openvpn", 1194, Proto.UDP, "openvpn"),
     ("rpcbind", 111, Proto.TCP, "rpcbind"),
     ("etcd", 2379, Proto.TCP, "etcd"),
+    ("jetdirect", 9100, Proto.TCP, "jetdirect"),
 ]
 
 

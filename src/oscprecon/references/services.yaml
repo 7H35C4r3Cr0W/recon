@@ -363,6 +363,7 @@
 - { match: { service_name: X11 },            label: X11,   module: x11,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/6000-pentesting-x11.html" }
 - { match: { service_name: kube-apiserver }, label: Kubernetes API, module: kubernetes, hacktricks: "https://book.hacktricks.wiki/en/pentesting-web/pentesting-kubernetes/index.html" }
 - { match: { service_name: etcd },           label: etcd,  module: etcd,  hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/2379-2380-pentesting-etcd.html" }
+- { match: { service_name: pdl-datastream }, label: JetDirect, module: jetdirect, hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/9100-pjl.html" }
 
 # --- Product-specific overrides ---
 # Order matters: on an equal-specificity tie the first match wins, so list SPECIFIC apps
@@ -416,6 +417,14 @@
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/8009-pentesting-apache-jserv-protocol-ajp.html
   tools:
     - { name: "nmap --script ajp-methods -p {port} {target}", purpose: "list HTTP methods on the AJP13 connector" }
+
+- match: { port: 9100, proto: tcp }
+  label: JetDirect
+  module: jetdirect
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/9100-pjl.html
+  tools:
+    - { name: "nmap -sV -p {port} {target}", purpose: "printer model/firmware (9100 has no enum protocol)" }
+    - { name: "whatweb http://{target}/", purpose: "the printer web admin often leaks creds + address book" }
 
 - match: { port: 6443, proto: tcp }
   label: Kubernetes API

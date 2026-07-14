@@ -1,0 +1,16 @@
+# JetDirect manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. Sending raw PJL/PostScript (PRET) is device interaction, not recon.
+- description: "Printer version banner (-sV)"
+  why: "nmap -sV on 9100 identifies the printer model/firmware — read-only"
+  command: "nmap -sV -p {port} {target}"
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (9100 – JetDirect)
+
+- description: "Enumerate the printer web admin"
+  why: "the printer's web UI (80/443/8080) commonly leaks address books + stored SMB/LDAP/email creds"
+  command: "whatweb http://{target}/"
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (9100 – JetDirect)
+
+- description: "IPP / CUPS side (631)"
+  why: "many printers also expose IPP on 631 with queue/attribute info — read-only"
+  command: "nmap -sV -p 631 --script cups-info,cups-queue-info {target}"
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (9100 – JetDirect)

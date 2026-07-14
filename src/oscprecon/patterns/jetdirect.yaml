@@ -1,0 +1,19 @@
+# JetDirect recon next-steps (9100 raw print port). 9100 has no enum protocol; the recon value is the
+# banner + pivoting to the printer's web admin / IPP. Raw PJL/PostScript (PRET) is never suggested.
+- match:
+    service: jetdirect
+    field: kind
+    value: "^product$"
+  suggest:
+    - text: "Printer on 9100 — enumerate its web admin (address book + stored SMB/LDAP/email creds)"
+      command: "whatweb http://{target}/"
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (9100 – JetDirect)
+
+- match:
+    service: jetdirect
+    field: kind
+    value: "^version$"
+  suggest:
+    - text: "Match the printer firmware against documented issues for reference (searchsploit)"
+      command: "searchsploit printer"
+# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (9100 – JetDirect)

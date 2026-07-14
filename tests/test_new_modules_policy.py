@@ -42,6 +42,7 @@ _NEW_MODULES = [
     "openvpn",
     "rpcbind",
     "etcd",
+    "jetdirect",
 ]
 
 

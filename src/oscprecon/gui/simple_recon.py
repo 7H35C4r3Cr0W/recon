@@ -18,6 +18,7 @@ from oscprecon.modules import (
     ipmi,
     ipp,
     iscsi,
+    jetdirect,
     kerberos,
     kubernetes,
     mdns,
@@ -202,6 +203,10 @@ def _ipp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _iscsi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in iscsi.IscsiModule().recon_steps(target, port)]
+
+
+def _jetdirect_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in jetdirect.JetdirectModule().recon_steps(target, port)]
 
 
 def _svn_steps(target: Target, port: int) -> list[tuple[Command, str]]:
@@ -554,6 +559,15 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(iscsi),
         iscsi.IscsiModule,
         _iscsi_steps,
+    ),
+    "jetdirect": SimpleReconSpec(
+        "jetdirect",
+        "Run full JetDirect recon (printer banner)",
+        "JetDirect recon — nmap -sV identifies the printer model/firmware on the raw 9100 port "
+        "(read-only). The loot is its web admin (80/443) + IPP (631); PRET is out of scope.",
+        _manual(jetdirect),
+        jetdirect.JetdirectModule,
+        _jetdirect_steps,
     ),
     "svn": SimpleReconSpec(
         "svn",
