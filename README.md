@@ -109,9 +109,12 @@ with profile`, or `nabu-cli scan --scan-profile <name>`.
   and output folders.
 - **Per-service modules** — HTTP (granular feroxbuster/gobuster/ffuf/dirsearch builder), vhost, SMB
   (tiered null/guest auto-recon), FTP, SSH, DNS, LDAP, SMTP, NFS, SNMP, TFTP, NetBIOS, IKE, NTP,
-  **Kerberos/AD** (KDC confirm + enum-only AS-REP/SPN follow-ups, no cracking), and read-only DB modules
-  (Redis, MongoDB, MSSQL, MySQL, PostgreSQL). Each ships Tier-1 auto recon, Tier-2 manual follow-ups, a
-  parser, and pattern-library "recon next steps".
+  **Kerberos/AD** (KDC confirm + enum-only AS-REP/SPN follow-ups, no cracking), read-only DB modules
+  (Redis, MongoDB, MSSQL, MySQL, PostgreSQL, **Oracle**), Windows/remote-access services (**RDP**,
+  **WinRM**, **VNC**, **MSRPC/WMI**), mail (**IMAP**, **POP3**), HTTP-API data stores
+  (**Elasticsearch**, **CouchDB**, **Docker API**, **Kubernetes**, **Memcached**), and
+  **rsync**, **AJP/Tomcat**, **IPMI**, **SIP/VoIP**, **Finger**, and **X11**. Each ships Tier-1 auto
+  recon, Tier-2 manual follow-ups, a parser, and pattern-library "recon next steps".
 - **Findings & credentials** persist to `findings.json` / `creds.json` (mode `0600`); anonymous / null
   enum auto-records a credential entry that later modules consume.
 - **Reports** — `report.md` (Obsidian-friendly frontmatter + callouts, prior versions archived) with a
