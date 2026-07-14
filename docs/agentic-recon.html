@@ -55,6 +55,8 @@
     display:block;margin-top:8px;white-space:pre-wrap;line-height:1.7;color:var(--text)}
   .envelope code em{color:var(--muted);font-style:normal}
   .grid{display:grid;grid-template-columns:1fr 430px;gap:26px;align-items:start}
+  /* the aside must span the full spine height so its sticky child can stay pinned the whole scroll */
+  .grid>aside{align-self:stretch}
   @media(max-width:960px){.grid{grid-template-columns:1fr}}
   .flowhint{color:var(--muted);font-size:13.5px;margin:0 0 14px}
   kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
@@ -589,6 +591,10 @@ function select(id){
   document.querySelectorAll(".card,.spcard").forEach(c=>c.classList.toggle("on", c.id==="card-"+id));
   detail.innerHTML = it._kind==="spec" ? specDetail(it) : agentDetail(it);
   detail.scrollTop=0;
+  // near the page foot the sticky panel can outrun its column and clip above the fold — lift the
+  // page just enough to bring its title back to the sticky offset (the clicked card stays visible)
+  requestAnimationFrame(()=>{ const r=detail.getBoundingClientRect();
+    if(r.top < 4) window.scrollBy({top:r.top-18, left:0, behavior:"smooth"}); });
 }
 addEventListener("keydown",e=>{
   const i=ORDER.indexOf(active);
