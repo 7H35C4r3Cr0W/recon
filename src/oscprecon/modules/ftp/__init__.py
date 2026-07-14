@@ -11,6 +11,7 @@ from oscprecon.modules.base import Module
 from oscprecon.modules.ftp.parsers import (
     FtpEntry,
     FtpFinding,
+    dedup_ftp_findings,
     nmap_anon_ok,
     parse_ftp_listing,
     parse_ftp_tool,
@@ -29,6 +30,7 @@ __all__ = [
     "FtpModule",
     "FtpStep",
     "anon_credential",
+    "dedup_ftp_findings",
     "ftp_base_url",
     "ftp_dir_url",
     "ftp_file_url",
@@ -167,18 +169,18 @@ class FtpModule(Module):
         return [step.command for step in steps]
 
     def parse(self, raw_outputs: dict[str, str]) -> list[Finding]:
-        findings: list[Finding] = []
+        raw: list[FtpFinding] = []
         for tool, text in raw_outputs.items():
-            for ff in parse_ftp_tool(tool, text):
-                findings.append(
-                    Finding(
-                        service="ftp",
-                        title=f"{ff.kind}: {ff.value}",
-                        detail=ff.detail,
-                        fields={"kind": ff.kind, "value": ff.value, "detail": ff.detail},
-                    )
-                )
-        return findings
+            raw += parse_ftp_tool(tool, text)
+        return [
+            Finding(
+                service="ftp",
+                title=f"{ff.kind}: {ff.value}",
+                detail=ff.detail,
+                fields={"kind": ff.kind, "value": ff.value, "detail": ff.detail},
+            )
+            for ff in dedup_ftp_findings(raw)  # nmap + curl both list root — collapse the overlap
+        ]
 
     def suggest(self, findings: list[Finding]) -> list[str]:
         out: list[str] = []

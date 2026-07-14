@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from oscprecon.modules.ftp.parsers import (
+    FtpFinding,
+    dedup_ftp_findings,
     nmap_anon_ok,
     parse_curl_list,
     parse_ftp_listing,
@@ -93,6 +95,22 @@ def test_dispatch_and_garbage() -> None:
     assert parse_ftp_tool("unknown", "x") == []
     assert parse_ftp_tool("curl-list", _read("curl-list-unix.txt"))
     assert parse_ftp_listing("total 8\nnot a listing line") == []
+
+
+def test_dedup_collapses_nmap_and_curl_root_overlap() -> None:
+    # Crocodile: nmap ftp-anon AND the curl walk both list the root, so each file arrived twice.
+    findings = [
+        FtpFinding("auth", "anonymous", "Anonymous FTP login allowed"),
+        FtpFinding("file", "/allowed.userlist", "33 bytes"),  # from nmap ftp-anon (thinner detail)
+        FtpFinding("file", "/allowed.userlist.passwd", "62 bytes"),
+        FtpFinding("file", "/allowed.userlist", "33 bytes (no ext)"),  # from the walk (richer)
+        FtpFinding("file", "/allowed.userlist.passwd", "62 bytes (passwd)"),
+    ]
+    deduped = dedup_ftp_findings(findings)
+    values = [f.value for f in deduped]
+    assert values == ["anonymous", "/allowed.userlist", "/allowed.userlist.passwd"]  # once each
+    by_val = {f.value: f.detail for f in deduped}
+    assert by_val["/allowed.userlist"] == "33 bytes (no ext)"  # richer detail kept
 
 
 def test_ftp_entry_extension() -> None:

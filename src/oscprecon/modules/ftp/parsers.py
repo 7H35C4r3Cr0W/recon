@@ -139,6 +139,22 @@ def parse_nmap_ftp(text: str) -> list[FtpFinding]:
     return findings
 
 
+def dedup_ftp_findings(findings: list[FtpFinding]) -> list[FtpFinding]:
+    # the nmap ftp-anon block and the curl walk both enumerate the root dir, so the same file is
+    # reported twice. Collapse each (kind, value) to one, keeping the richer detail (the walk adds
+    # size + extension), and preserve first-seen order.
+    best: dict[tuple[str, str], FtpFinding] = {}
+    order: list[tuple[str, str]] = []
+    for finding in findings:
+        key = (finding.kind, finding.value)
+        if key not in best:
+            best[key] = finding
+            order.append(key)
+        elif len(finding.detail) > len(best[key].detail):
+            best[key] = finding
+    return [best[key] for key in order]
+
+
 _PARSERS = {
     "nmap-ftp": parse_nmap_ftp,
     "curl-list": parse_curl_list,

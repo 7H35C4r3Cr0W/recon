@@ -13,6 +13,7 @@ from oscprecon.modules.dns import DnsFinding, DnsModule, parse_dns_tool
 from oscprecon.modules.ftp import (
     FtpFinding,
     FtpModule,
+    dedup_ftp_findings,
     is_peekable,
     nmap_anon_ok,
     parse_ftp_listing,
@@ -268,6 +269,9 @@ class FtpReconWorker(CancellableThread):
         if any(f.kind in ("file", "dir") for f in walk):
             anon = True  # a non-empty anonymous listing confirms anon even if nmap was inconclusive
 
+        # nmap ftp-anon and the curl walk both list the root dir — collapse the overlap so a file
+        # isn't reported (and persisted) twice; the walk's richer size+ext detail wins.
+        collected = dedup_ftp_findings(collected)
         creds = [ftp_anon_credential(target)] if anon else []
         self._write_findings(collected)
         return FtpReconResult(self._summarize(collected, anon), creds)
