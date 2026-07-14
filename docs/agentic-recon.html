@@ -95,7 +95,19 @@
   .spcard .spn{font-weight:600;font-size:14px}
   .spcard .spp{font-family:var(--mono);font-size:10.5px;color:var(--worker);margin:3px 0 5px}
   .spcard .spt{color:var(--muted);font-size:11.5px;line-height:1.4}
+  .spcard.ghost{border:1px dashed var(--muted);border-top:2px dashed var(--muted);background:transparent;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;color:var(--muted);min-height:82px}
+  .spcard.ghost:hover{border-color:var(--llm);color:var(--llm);transform:translateY(-2px)}
+  .spcard.ghost .pl{font-size:22px;line-height:1;margin-bottom:5px;font-family:var(--mono)}
+  .spcard.ghost .pt{font-size:11px;font-family:var(--mono);line-height:1.5}
   .fanin{color:var(--worker);font-family:var(--mono);font-size:11.5px;text-align:center;padding:9px 0 3px;letter-spacing:.3px}
+  section.phase2 .nc{border-left:3px solid var(--llm)}
+  .p2where{font-family:var(--mono);font-size:11px;color:var(--llm);letter-spacing:.5px;text-transform:uppercase;display:block;margin:0 0 5px}
+  .p2ex{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
+  .p2ex span{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:6px;padding:2px 7px;color:var(--text)}
+  .p2note{background:var(--llm-soft);border:1px solid var(--llm);border-radius:12px;padding:13px 16px;
+    margin-top:16px;font-size:13.5px;color:var(--text)} .p2note b{color:var(--llm)}
 
   .detail{position:sticky;top:18px;background:var(--surface);border:1px solid var(--border);
     border-radius:14px;padding:20px;max-height:calc(100vh - 36px);overflow:auto}
@@ -218,6 +230,39 @@
       <div class="nc err"><h3>⚠ Circuit breakers</h3><p>A tool that keeps failing (or a host that's down) trips a breaker — the swarm stops hammering it, marks that branch <code>degraded</code>, and routes around it.</p></div>
       <div class="nc err"><h3>⚠ Checkpoint · bounded loops</h3><p>The blackboard is checkpointed to disk after each step, so a crashed run resumes where it stopped. The Critic loop has a hard iteration cap, so the workflow always converges to a report.</p></div>
     </div>
+  </section>
+
+  <section class="notes phase2" id="phase2">
+    <h2>Phase 2 — where new agents plug in</h2>
+    <p class="lead" style="margin-top:8px">The bus + blackboard design exists so you add capability by
+    adding an agent, never by rewiring. There are exactly three plug-in points — and the Safety Gate
+    still governs every one of them, so recon-only-by-default holds however the swarm grows.</p>
+    <div class="notecards">
+      <div class="nc">
+        <span class="p2where">➊ into the swarm ⑃</span>
+        <h3>A new specialist — one per service</h3>
+        <p>Register a <code>port → agent</code> mapping and Routing spawns it (the <b>＋</b> slot in the
+        swarm grid above). It enumerates its service read-only and hands output to the same Gate —
+        nothing upstream or downstream changes.</p>
+        <div class="p2ex"><span>WinRM</span><span>RDP</span><span>VNC</span><span>Kerberos</span><span>NFS</span><span>rsync</span><span>Mail (SMTP/IMAP/POP3)</span><span>Redis / Memcached</span><span>Elastic / CouchDB</span><span>IPMI</span><span>Docker / K8s API</span><span>IKE / VPN</span></div>
+      </div>
+      <div class="nc">
+        <span class="p2where">➋ into the chain ▾</span>
+        <h3>A new phase</h3>
+        <p>Insert a phase between two existing ones; it reads and writes the blackboard like any agent,
+        behind the same Gate. The edges either side just re-point.</p>
+        <div class="p2ex"><span>Passive / OSINT — before Discovery</span><span>Credential-Spray — opt-in, OFF by default, after the Gate</span><span>Pivot / Lateral planner — after Correlation</span><span>Human-in-the-loop checkpoint</span></div>
+      </div>
+      <div class="nc">
+        <span class="p2where">➌ cross-cutting ⟟</span>
+        <h3>A background service agent</h3>
+        <p>Subscribe to the bus; no edges change at all. It observes or assists every agent in the run.</p>
+        <div class="p2ex"><span>Memory / RAG — learn from past boxes + writeups</span><span>Model-Router — Opus to reason · Haiku to parse</span><span>Budget / cost governor</span><span>Live audit &amp; telemetry</span></div>
+      </div>
+    </div>
+    <div class="p2note"><b>The boundary doesn't move.</b> Every Phase-2 agent — new specialist, new
+    phase, or background service — still routes its commands through the <b>Safety Gate</b> and writes
+    to the same audited blackboard. Growth adds capability, never a way around the compliance guarantee.</div>
   </section>
 
   <footer>Nabu · agent-to-agent recon architecture — a design blueprint. The shipping tool is the
@@ -459,6 +504,10 @@ AGENTS.forEach((a,i)=>{
       sc.onclick=(ev)=>{ev.stopPropagation();select(s.id);};
       grid.appendChild(sc);
     });
+    const ghost=document.createElement("button"); ghost.className="spcard ghost"; ghost.type="button";
+    ghost.innerHTML=`<div class="pl">＋</div><div class="pt">new specialist<br>plugs in here → Phase 2</div>`;
+    ghost.onclick=(ev)=>{ev.stopPropagation();document.getElementById("phase2").scrollIntoView({behavior:"smooth"});};
+    grid.appendChild(ghost);
     band.appendChild(grid);
     band.insertAdjacentHTML("beforeend",`<div class="fanin">⑂ every specialist's commands converge on the Safety Gate ▾</div>`);
     node.appendChild(band);
