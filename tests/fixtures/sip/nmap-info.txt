@@ -1,0 +1,9 @@
+Nmap scan report for 10.10.10.15
+Host is up (0.020s latency).
+
+PORT     STATE SERVICE VERSION
+5060/udp open  sip     Asterisk PBX
+| sip-methods:
+|_  INVITE, ACK, CANCEL, BYE, OPTIONS, MESSAGE, SUBSCRIBE, NOTIFY, REFER, UPDATE, INFO
+| sip-call-spoof:
+|_  Server: Asterisk PBX 16.2.1

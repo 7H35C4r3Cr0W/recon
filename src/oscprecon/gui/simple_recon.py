@@ -20,6 +20,7 @@ from oscprecon.modules import (
     postgresql,
     rdp,
     redis,
+    sip,
     smtp,
     snmp,
     tftp,
@@ -113,6 +114,10 @@ def _ajp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _ipmi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in ipmi.IpmiModule().recon_steps(target, port)]
+
+
+def _sip_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in sip.SipModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -293,5 +298,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(ipmi),
         ipmi.IpmiModule,
         _ipmi_steps,
+    ),
+    "sip": SimpleReconSpec(
+        "sip",
+        "Run full SIP recon (methods · server banner)",
+        "SIP recon (UDP) — sip-methods (accepted verbs) + Server/User-Agent banner; read-only. "
+        "Extension enumeration (svwar) is list-based and out of scope.",
+        _manual(sip),
+        sip.SipModule,
+        _sip_steps,
     ),
 }

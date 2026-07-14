@@ -1,0 +1,19 @@
+# SIP recon next-steps (sip-methods + banner, read-only). Extension enumeration / registration brute
+# are list-based (Tier-3) and never suggested; the next move is fingerprinting the PBX product.
+- match:
+    service: sip
+    field: kind
+    value: "^server$"
+  suggest:
+    - text: "Note the SIP server / User-Agent (Asterisk / FreePBX / etc.) for version-matched research"
+      command: "nmap -sU -sV -p 5060 --script sip-methods {target}"
+# source: HackTricks pentesting-sip (book.hacktricks.wiki) — standard OSCP SIP recon
+
+- match:
+    service: sip
+    field: kind
+    value: "^methods$"
+  suggest:
+    - text: "Record the accepted SIP methods; extension enumeration is list-based and out of scope"
+      command: "nmap -sU -p 5060 --script sip-methods {target}"
+# source: HackTricks pentesting-sip (book.hacktricks.wiki) — standard OSCP SIP recon

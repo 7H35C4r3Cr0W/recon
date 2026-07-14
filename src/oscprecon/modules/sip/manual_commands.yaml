@@ -1,0 +1,16 @@
+# SIP manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled from
+# the active profile. Extension enumeration (svwar) and registration brute are Tier-3 — not wrapped.
+- description: "Accepted SIP methods (UDP)"
+  why: "sip-methods in isolation confirms the accepted verbs — read-only"
+  command: "nmap -sU -p {port} --script sip-methods {target}"
+# source: HackTricks pentesting-sip (book.hacktricks.wiki) — standard OSCP SIP recon
+
+- description: "SIP over TCP (some PBXs)"
+  why: "a few PBXs run SIP on TCP; a targeted -sV confirms the server product read-only"
+  command: "nmap -sV -p {port} --script sip-methods {target}"
+# source: HackTricks pentesting-sip (book.hacktricks.wiki) — standard OSCP SIP recon
+
+- description: "Confirm the UDP port (retry — UDP is lossy)"
+  why: "a single UDP probe can be dropped; re-scan confirms 5060/udp is really open"
+  command: "nmap -sU -p {port} --host-timeout 60s {target}"
+# source: HackTricks pentesting-sip (book.hacktricks.wiki) — standard OSCP SIP recon
