@@ -2,6 +2,8 @@
 
 *Local Recon Workspace* — internal package `oscprecon`; installs as `oscp-recon`.
 
+> Screenshots (generated demo data): [`docs/screenshots/`](docs/screenshots/).
+
 A **recon-first**, OSCP-exam-legal desktop GUI that orchestrates standard enumeration tools
 (nmap, feroxbuster/gobuster/ffuf, nikto/whatweb, smbclient/netexec, …), links each service to
 HackTricks and Exploit-DB, and produces Obsidian-friendly reports. It does **not** exploit, chain
