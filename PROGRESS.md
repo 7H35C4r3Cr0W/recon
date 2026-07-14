@@ -97,8 +97,20 @@ Renaming the product to **Nabu** and lifting it toward a polished desktop produc
   references → graph → report; click a stage → detail + downstream pulse; Nabu identity, light+dark).
   Also published as a shareable Claude artifact. Linked from README.
 
-**Nabu rebrand + UI/UX pass: COMPLETE** (16 commits `f581bea`..`27fb414`; 970 tests, four gates green,
-wheel verified out-of-checkout). All planned chunks done.
+- **Max-effort code review + fixes** (`60123f9`) — 40-agent workflow review of the Nabu diff (10
+  finder angles → verify → sweep). Fixed the confirmed real issues: findings "N notable" counted over
+  the unfiltered set (correctness); Ctrl+F focusing the reference pane on graph/report/activity;
+  reference pane's false "OFFLINE" badge for no-offline-page services on live-fail; the create-project
+  label unified to "New Project…"; button `:disabled` state theme-neutral (was DARK-navy in the light
+  default); http/vhost primary buttons ranked; banner reuses `styles.status_color` + restyle repaints;
+  nav_rail redundant icon-set dropped. +3 regression tests. **Deferred (noted, not bugs):** broader
+  theme-adaptiveness of the findings/dashboard/activity/reference-badge category+status colours (they
+  hardcode DARK tokens but are legible on both grounds), and a few DRY nits (12 `primary_button` call
+  sites, central-page boilerplate, graph-legend hex duplication).
+
+**Nabu rebrand + UI/UX pass: COMPLETE** (18 commits `f581bea`..`60123f9`; 971 tests, four gates green,
+wheel verified out-of-checkout; adversarially reviewed + fixed). Also: interactive Overview + System
+map at `docs/how-nabu-works.html`.
 
 ### Pre-live-testing polish (owner-requested)
 A run of owner-requested improvements before live-box testing:
