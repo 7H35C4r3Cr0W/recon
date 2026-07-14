@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Nabu Works — the recon pipeline</title>
+</head>
+<body>
+<style>
+  :root {
+    --ink: #0f1420; --surface: #161d2b; --surface-2: #1b2434; --border: #2a3446;
+    --text: #e6e9ef; --muted: #8a94a6; --gold: #c9a227; --gold-soft: rgba(201,162,39,.14);
+    --teal: #5b8a8f; --present: #7c9cc9;
+    --auto: #5b8a8f; --shown: #c9a227; --optin: #d08a3e; --gate: #c0564b;
+    --shadow: 0 10px 30px rgba(0,0,0,.35);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", "DejaVu Sans Mono", Consolas, monospace;
+    --maxw: 1180px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ink: #f2ede1; --surface: #fbf8f0; --surface-2: #f4efe2; --border: #ddd3bf;
+      --text: #1f2633; --muted: #6b6656; --gold: #9a7415; --gold-soft: rgba(154,116,21,.12);
+      --teal: #3f6f74; --present: #3f5f8c;
+      --auto: #3f6f74; --shown: #9a7415; --optin: #b26b1e; --gate: #a5342a;
+      --shadow: 0 10px 30px rgba(60,50,20,.12);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #0f1420; --surface: #161d2b; --surface-2: #1b2434; --border: #2a3446;
+    --text: #e6e9ef; --muted: #8a94a6; --gold: #c9a227; --gold-soft: rgba(201,162,39,.14);
+    --teal: #5b8a8f; --present: #7c9cc9; --auto: #5b8a8f; --shown: #c9a227;
+    --optin: #d08a3e; --gate: #c0564b; --shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --ink: #f2ede1; --surface: #fbf8f0; --surface-2: #f4efe2; --border: #ddd3bf;
+    --text: #1f2633; --muted: #6b6656; --gold: #9a7415; --gold-soft: rgba(154,116,21,.12);
+    --teal: #3f6f74; --present: #3f5f8c; --auto: #3f6f74; --shown: #9a7415;
+    --optin: #b26b1e; --gate: #a5342a; --shadow: 0 10px 30px rgba(60,50,20,.12);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .wrap {
+    font-family: var(--sans); background: var(--ink); color: var(--text);
+    min-height: 100vh; line-height: 1.55;
+    background-image: radial-gradient(1200px 600px at 88% -8%, var(--gold-soft), transparent 60%);
+  }
+  .shell { max-width: var(--maxw); margin: 0 auto; padding: 0 22px 72px; }
+
+  /* ---------- header ---------- */
+  header.top { padding: 40px 0 8px; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand svg { width: 46px; height: 46px; flex: 0 0 auto; }
+  .brand .name { font-family: var(--serif); font-size: 27px; font-weight: 600; letter-spacing: .3px; }
+  .brand .tag { color: var(--muted); font-size: 12.5px; letter-spacing: 2.4px; text-transform: uppercase; }
+  h1 {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(30px, 5vw, 50px);
+    line-height: 1.06; margin: 26px 0 10px; text-wrap: balance; max-width: 16ch;
+  }
+  h1 em { color: var(--gold); font-style: normal; }
+  .lede { color: var(--muted); font-size: 18px; max-width: 62ch; margin: 0 0 22px; }
+
+  .guarantee { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 6px; }
+  .g-pill {
+    font-size: 12.5px; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 7px;
+  }
+  .g-pill b { color: var(--gold); font-weight: 600; }
+  .g-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: end; gap: 16px;
+    margin-top: 30px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 14px; }
+  .toolbar .hint { color: var(--muted); font-size: 13.5px; }
+  .toolbar .hint kbd { font-family: var(--mono); font-size: 11.5px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; color: var(--text); }
+  .theme-btn { font-family: var(--sans); font-size: 13px; color: var(--text); cursor: pointer;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px; }
+  .theme-btn:hover { border-color: var(--gold); }
+  .theme-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ---------- phase chips ---------- */
+  .phases { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 4px; }
+  .phase-chip { font-size: 12.5px; letter-spacing: .4px; color: var(--muted); cursor: pointer;
+    background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-family: var(--sans); }
+  .phase-chip:hover { color: var(--text); border-color: var(--muted); }
+  .phase-chip[aria-current="true"] { color: var(--ink); background: var(--gold); border-color: var(--gold); font-weight: 600; }
+  .phase-chip:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ---------- main grid ---------- */
+  .grid { display: grid; grid-template-columns: 1fr 400px; gap: 30px; margin-top: 26px; align-items: start; }
+  @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } .detail { position: static !important; } }
+
+  .phase-group { margin: 0 0 6px; }
+  .phase-head { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 12px; }
+  .phase-head .idx { font-family: var(--mono); font-size: 12px; color: var(--gold); letter-spacing: 1px; }
+  .phase-head .lbl { font-family: var(--serif); font-size: 20px; }
+  .phase-head .sub { color: var(--muted); font-size: 13px; }
+
+  .spine { position: relative; padding-left: 34px; }
+  .spine::before { content: ""; position: absolute; left: 11px; top: 4px; bottom: 4px; width: 2px;
+    background: linear-gradient(var(--gold), var(--teal)); opacity: .5; }
+
+  .node { position: relative; width: 100%; text-align: left; cursor: pointer; font-family: var(--sans);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 13px 15px; margin: 0 0 12px; color: var(--text); transition: border-color .18s, transform .18s, box-shadow .18s; }
+  .node:hover { border-color: var(--gold); transform: translateX(2px); }
+  .node:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .node .dot { position: absolute; left: -28px; top: 16px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--ink); border: 2px solid var(--teal); display: grid; place-items: center;
+    font-family: var(--mono); font-size: 8px; color: var(--muted); }
+  .node[data-tier="shown"] .dot { border-color: var(--shown); }
+  .node[data-tier="optin"] .dot { border-color: var(--optin); }
+  .node[data-tier="gate"] .dot { border-color: var(--gate); }
+  .node .n-title { font-weight: 600; font-size: 15.5px; display: flex; align-items: center; gap: 9px; }
+  .node .n-blurb { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .node.active { border-color: var(--gold); box-shadow: var(--shadow), 0 0 0 1px var(--gold); background: var(--surface-2); }
+  .node.active .dot { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+  .node.target { animation: pulse 1.1s ease; border-color: var(--gold); }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 transparent; } 30% { box-shadow: 0 0 0 4px var(--gold-soft); } }
+  @media (prefers-reduced-motion: reduce) { .node, .node:hover { transition: none; transform: none; } .node.target { animation: none; } }
+
+  .tier { font-size: 10.5px; letter-spacing: .6px; text-transform: uppercase; font-weight: 700;
+    padding: 2px 7px; border-radius: 5px; border: 1px solid; }
+  .tier.auto { color: var(--auto); border-color: var(--auto); }
+  .tier.shown { color: var(--shown); border-color: var(--shown); }
+  .tier.optin { color: var(--optin); border-color: var(--optin); }
+  .tier.gate { color: var(--gate); border-color: var(--gate); }
+
+  /* ---------- detail panel ---------- */
+  .detail { position: sticky; top: 18px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 22px; box-shadow: var(--shadow); }
+  .detail .d-step { font-family: var(--mono); font-size: 12px; color: var(--gold); letter-spacing: 1px; }
+  .detail h2 { font-family: var(--serif); font-size: 24px; margin: 4px 0 2px; text-wrap: balance; }
+  .detail .d-phase { color: var(--muted); font-size: 12.5px; letter-spacing: 1.4px; text-transform: uppercase; }
+  .detail .d-blurb { font-size: 15px; margin: 14px 0 4px; }
+  .detail .d-tier { margin: 12px 0 4px; }
+  .io { margin-top: 18px; }
+  .io h3 { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted);
+    margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+  .io h3::before { content: ""; width: 14px; height: 2px; background: var(--teal); }
+  .io.produces h3::before { background: var(--gold); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 4px 9px; color: var(--text); }
+  .chip.mono { font-family: var(--mono); font-size: 11.5px; color: var(--gold); }
+  .chip.next { cursor: pointer; font-family: var(--sans); }
+  .chip.next:hover { border-color: var(--gold); color: var(--gold); }
+  .chip.next::after { content: " →"; color: var(--muted); }
+  .chip.next:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .d-end { color: var(--muted); font-size: 13px; margin-top: 16px; font-style: italic; }
+
+  /* ---------- legend ---------- */
+  .legend { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 20px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px,1fr)); gap: 14px; }
+  .legend .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .legend .card .tier { margin-bottom: 8px; display: inline-block; }
+  .legend .card p { margin: 0; color: var(--muted); font-size: 13px; }
+  footer { color: var(--muted); font-size: 12.5px; margin-top: 34px; text-align: center; }
+  footer b { color: var(--text); font-weight: 600; }
+
+  /* brand mark — CSS vars resolve in rules, not in SVG presentation attributes */
+  .brand svg .m-tile { fill: var(--surface); stroke: var(--gold); stroke-opacity: .4; stroke-width: 2; }
+  .brand svg .m-gold { fill: var(--gold); }
+  .brand svg .m-teal-f { fill: var(--teal); }
+  .brand svg .m-teal-s { stroke: var(--teal); fill: none; }
+</style>
+
+<div class="wrap"><div class="shell">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 256 256" aria-hidden="true">
+        <rect class="m-tile" x="8" y="8" width="240" height="240" rx="52"/>
+        <path class="m-gold" d="M128 40 L142 66 L128 60 L114 66 Z"/>
+        <rect class="m-gold" x="125" y="60" width="6" height="20" rx="3"/>
+        <g class="m-teal-s" stroke-width="7" stroke-linecap="round">
+          <line x1="128" y1="140" x2="76" y2="100"/><line x1="128" y1="140" x2="188" y2="108"/>
+          <line x1="128" y1="140" x2="112" y2="200"/><line x1="188" y1="108" x2="112" y2="200"/>
+        </g>
+        <circle class="m-gold" cx="128" cy="140" r="17"/>
+        <circle class="m-teal-f" cx="76" cy="100" r="11"/><circle class="m-teal-f" cx="188" cy="108" r="11"/>
+        <circle class="m-teal-f" cx="112" cy="200" r="11"/>
+      </svg>
+      <div>
+        <div class="name">Nabu</div>
+        <div class="tag">Local Recon Workspace</div>
+      </div>
+    </div>
+
+    <h1>How Nabu works, <em>end to end</em></h1>
+    <p class="lede">From the moment you open the app to the finished report — every stage of the
+      reconnaissance pipeline, what feeds it, and what it hands to the next step. Click any stage to see the detail.</p>
+
+    <div class="guarantee">
+      <span class="g-pill"><span class="g-dot"></span>Recon-only by default — <b>no exploitation</b></span>
+      <span class="g-pill"><span class="g-dot"></span>Runs <b>offline</b>, no AI at runtime</span>
+      <span class="g-pill"><span class="g-dot"></span>Every command passes a <b>compliance gate</b></span>
+      <span class="g-pill"><span class="g-dot"></span>Credentials stay <b>masked & local</b></span>
+    </div>
+
+    <div class="toolbar">
+      <div class="hint">Click a stage on the pipeline, or press <kbd>Tab</kbd> then <kbd>Enter</kbd>. Downstream steps pulse to show where the flow goes.</div>
+      <button class="theme-btn" id="themeBtn" type="button">◐ Theme</button>
+    </div>
+  </header>
+
+  <nav class="phases" id="phases" aria-label="Jump to phase"></nav>
+
+  <div class="grid">
+    <div id="flow" aria-label="Recon pipeline"></div>
+    <aside class="detail" id="detail" aria-live="polite"></aside>
+  </div>
+
+  <section class="legend" aria-label="What the tiers mean">
+    <div class="card"><span class="tier auto">Auto</span><p>Runs on one click. Read-only enumeration only — anonymous checks, banners, listings.</p></div>
+    <div class="card"><span class="tier shown">Shown</span><p>Pre-filled for you and surfaced, but <b>you</b> click Run. Single default-credential checks — never a list.</p></div>
+    <div class="card"><span class="tier optin">Opt-in</span><p>Password spraying against your own authorized target. <b>Off by default</b>; you enable it explicitly.</p></div>
+    <div class="card"><span class="tier gate">Gate</span><p>The safety checkpoint every command passes. Blocks exploitation and brute-force unless opt-in Spray mode is on.</p></div>
+  </section>
+
+  <footer>
+    <b>Nabu</b> — reconnaissance workspace for OSCP prep and exam day. Wraps standard enumeration tools;
+    surfaces findings, references, a graph, and an Obsidian-ready report. Recon-first, exam-legal, offline.
+  </footer>
+</div></div>
+
+<script>
+  "use strict";
+  const PHASES = [
+    { id: "launch",    label: "Launch",    sub: "open the app, pick a target" },
+    { id: "discover",  label: "Discover",  sub: "find ports & services" },
+    { id: "enumerate", label: "Enumerate", sub: "safe recon, per service" },
+    { id: "analyze",   label: "Analyze",   sub: "parse, classify, enrich" },
+    { id: "present",   label: "Present",   sub: "graph & report" },
+  ];
+  const STAGES = [
+    { id: "open", phase: "launch", tier: "auto", title: "Open Nabu",
+      blurb: "The app starts offline (no network, no login), shows a brief splash, and lands on the Workspace dashboard. Your last project reopens automatically.",
+      reads: ["recent projects"], writes: ["Workspace dashboard"], next: ["project"],
+      end: "Nothing runs against a target yet — this is your home base." },
+    { id: "project", phase: "launch", tier: "auto", title: "Create a project",
+      blurb: "You type the target’s IP (and optional hostname / box name). Nabu creates a self-contained project folder that will hold everything for this box — services, findings, credentials, notes, graph, and report.",
+      reads: ["target IP / hostname"], writes: ["project folder ~/oscprecon/<name>/"], next: ["nmap"],
+      end: "One folder per box — open it later and the whole state comes back." },
+    { id: "nmap", phase: "discover", tier: "auto", title: "Port & service discovery (nmap)",
+      blurb: "One click runs nmap in stages: a fast top-1000 TCP sweep, then a full all-ports sweep, then a version + default-script scan on whatever’s open, plus a top-100 UDP pass. Nothing invasive — just discovery.",
+      reads: ["the target"], writes: ["discovered services (open ports + versions)"], next: ["dispatch"],
+      end: "The result is the map of what’s listening — the input to everything after." },
+    { id: "dispatch", phase: "enumerate", tier: "auto", title: "Service dispatch",
+      blurb: "Each open port is matched to the module that knows how to enumerate it — web, SMB, FTP, SSH, DNS, LDAP, SMTP, databases, and more — using Nabu’s service map. Non-standard ports are matched too.",
+      reads: ["discovered services"], writes: ["a work plan per service"], next: ["modules", "refs"],
+      end: "Routing only — it decides who does the work, then hands off." },
+    { id: "modules", phase: "enumerate", tier: "shown", title: "Service recon (per module)",
+      blurb: "Each module runs safe, read-only checks automatically (anonymous / guest access, shares, banners, listings). It also shows single default-credential checks for you to click, and — only if you opt in — password spraying from your vault.",
+      reads: ["the service", "credential vault"], writes: ["raw tool output"], next: ["gate", "parse"],
+      end: "Three tiers, clearly separated: Auto runs, Shown waits for your click, Opt-in stays off until you enable it." },
+    { id: "gate", phase: "enumerate", tier: "gate", title: "Command safety gate",
+      blurb: "Every single command — automatic or manual — passes through one checkpoint that enforces the exam rules. It blocks exploitation frameworks, brute-force, and anything off-limits. Brute/spray is refused unless you’ve explicitly turned on Spray mode against your own target.",
+      reads: ["every command"], writes: ["allowed output — or a blocked notice"], next: ["parse"],
+      end: "This is the compliance guarantee: exam-legal by default, provably." },
+    { id: "parse", phase: "analyze", tier: "auto", title: "Parsing",
+      blurb: "Tool output is turned into structured findings — users, shares, misconfigurations, versions, protocols. Parsers are resilient: if a tool’s output changes and nothing parses, Nabu says so instead of silently dropping it.",
+      reads: ["raw tool output"], writes: ["findings.json"], next: ["classify", "suggest"],
+      end: "From here on, Nabu works with clean structured facts, not raw text." },
+    { id: "classify", phase: "analyze", tier: "auto", title: "Conservative risk classing",
+      blurb: "Each finding is framed cautiously in one place. An open port, a product, a version, or an Exploit-DB match is never called a vulnerability. Only real weak postures — anonymous access, null sessions, SMB signing disabled — are flagged as notable.",
+      reads: ["findings"], writes: ["a conservative category per finding"], next: ["graph", "report"],
+      end: "It never over-claims. A reference is a pointer to read, not a confirmed hole." },
+    { id: "suggest", phase: "analyze", tier: "shown", title: "Next-step suggestions",
+      blurb: "A pattern library reads the findings and proposes sensible next recon steps, each sourced from real boxes. They’re pre-filled for you to review and click — Nabu never runs them for you.",
+      reads: ["findings"], writes: ["suggested commands (pre-fill only)"], next: ["modules"],
+      end: "Guidance, not automation — you stay in control of what runs." },
+    { id: "refs", phase: "analyze", tier: "auto", title: "References",
+      blurb: "For each service Nabu shows the matching HackTricks page — bundled offline so it always works, with an optional live copy — and looks up Exploit-DB by product and version. Exploit-DB is reference only: never downloaded, never run.",
+      reads: ["service + version"], writes: ["reference links, offline-first"], next: ["report"],
+      end: "Everything you need to read is one pane away, even with no internet." },
+    { id: "graph", phase: "present", tier: "auto", title: "Attack-surface graph",
+      blurb: "A BloodHound-style map connects the target → services → findings → credentials. Notable / weak items are ringed, Exploit-DB references are coloured apart from danger, and credential secrets are never searchable. You can drill in, annotate, and lay it out.",
+      reads: ["services", "findings", "credentials"], writes: ["interactive graph"], next: ["report"],
+      end: "The whole discovery story on one canvas." },
+    { id: "report", phase: "present", tier: "auto", title: "Report",
+      blurb: "Everything becomes an Obsidian-friendly markdown report: open ports, per-service findings, suggested next steps with sources, and the full command log with timings. Exportable to a vault; nothing about what ran is hidden.",
+      reads: ["the whole project"], writes: ["report.md + vault export"], next: [],
+      end: "Drop it into your notes and the write-up is already half done." },
+  ];
+  const CROSS = [
+    { title: "Credential vault", text: "Durable, project-local, file-permission-locked, and masked (length only). Feeds spraying — but only when you opt in and pick the credentials." },
+    { title: "Audit trail", text: "Every action is recorded to an append-only log, so you have a complete, exam-ready record of exactly what was done and when." },
+  ];
+
+  const byId = Object.fromEntries(STAGES.map(s => [s.id, s]));
+  const phaseLabel = Object.fromEntries(PHASES.map(p => [p.id, p.label]));
+  const flow = document.getElementById("flow");
+  const detail = document.getElementById("detail");
+  const phasesNav = document.getElementById("phases");
+  let active = "open";
+
+  // phase chips
+  PHASES.forEach(p => {
+    const b = document.createElement("button");
+    b.className = "phase-chip"; b.type = "button"; b.textContent = p.label;
+    b.dataset.phase = p.id;
+    b.addEventListener("click", () => {
+      const first = STAGES.find(s => s.phase === p.id);
+      if (first) select(first.id, true);
+    });
+    phasesNav.appendChild(b);
+  });
+
+  // pipeline spine grouped by phase
+  PHASES.forEach((p, i) => {
+    const group = document.createElement("div");
+    group.className = "phase-group";
+    const head = document.createElement("div");
+    head.className = "phase-head";
+    head.innerHTML = `<span class="idx">0${i + 1}</span><span class="lbl">${p.label}</span><span class="sub">${p.sub}</span>`;
+    group.appendChild(head);
+    const spine = document.createElement("div");
+    spine.className = "spine";
+    STAGES.filter(s => s.phase === p.id).forEach(s => {
+      const n = document.createElement("button");
+      n.className = "node"; n.type = "button"; n.id = "node-" + s.id; n.dataset.tier = s.tier;
+      const num = STAGES.indexOf(s) + 1;
+      const tierLbl = { auto: "Auto", shown: "Shown", optin: "Opt-in", gate: "Gate" }[s.tier];
+      n.innerHTML = `<span class="dot">${num}</span>
+        <span class="n-title">${s.title}<span class="tier ${s.tier}">${tierLbl}</span></span>
+        <span class="n-blurb">${s.blurb.split(". ")[0]}.</span>`;
+      n.addEventListener("click", () => select(s.id));
+      spine.appendChild(n);
+    });
+    group.appendChild(spine);
+    flow.appendChild(group);
+  });
+
+  function chip(text, cls) { return `<span class="chip ${cls || ""}">${text}</span>`; }
+
+  function select(id, scroll) {
+    active = id;
+    const s = byId[id];
+    document.querySelectorAll(".node").forEach(n => n.classList.remove("active", "target"));
+    const node = document.getElementById("node-" + id);
+    if (node) node.classList.add("active");
+    document.querySelectorAll(".phase-chip").forEach(c =>
+      c.setAttribute("aria-current", c.dataset.phase === s.phase ? "true" : "false"));
+
+    // pulse the downstream targets so "what goes where" is visible on the map
+    s.next.forEach(nid => {
+      const t = document.getElementById("node-" + nid);
+      if (t) { t.classList.remove("target"); void t.offsetWidth; t.classList.add("target"); }
+    });
+
+    const step = STAGES.indexOf(s) + 1;
+    const nextChips = s.next.length
+      ? s.next.map(nid => `<button class="chip next" type="button" data-go="${nid}">${byId[nid].title}</button>`).join("")
+      : `<span class="chip">This is the finish line</span>`;
+    detail.innerHTML = `
+      <div class="d-step">STAGE ${step} OF ${STAGES.length}</div>
+      <h2>${s.title}</h2>
+      <div class="d-phase">${phaseLabel[s.phase]}</div>
+      <div class="d-tier"><span class="tier ${s.tier}">${{auto:"Auto — runs on click",shown:"Shown — you click Run",optin:"Opt-in — off by default",gate:"Gate — compliance checkpoint"}[s.tier]}</span></div>
+      <p class="d-blurb">${s.blurb}</p>
+      <div class="io reads"><h3>Reads</h3><div class="chips">${s.reads.map(r => chip(r, "mono")).join("")}</div></div>
+      <div class="io produces"><h3>Produces</h3><div class="chips">${s.writes.map(w => chip(w, "mono")).join("")}</div></div>
+      <div class="io"><h3>Hands off to</h3><div class="chips">${nextChips}</div></div>
+      <p class="d-end">${s.end}</p>`;
+    detail.querySelectorAll(".chip.next").forEach(c =>
+      c.addEventListener("click", () => select(c.dataset.go, true)));
+    if (scroll && node) node.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  // theme toggle — resolve the effective theme first (OS preference until the user overrides)
+  const root = document.documentElement;
+  document.getElementById("themeBtn").addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme")
+      || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    root.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+  });
+
+  select("open");
+</script>
+
+</body>
+</html>

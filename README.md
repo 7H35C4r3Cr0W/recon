@@ -3,7 +3,8 @@
 *Local Recon Workspace* — internal package `oscprecon`; installs as `oscp-recon`.
 
 > Screenshots (generated demo data): [`docs/screenshots/`](docs/screenshots/) ·
-> Keyboard shortcuts: [`docs/keyboard-shortcuts.md`](docs/keyboard-shortcuts.md).
+> Keyboard shortcuts: [`docs/keyboard-shortcuts.md`](docs/keyboard-shortcuts.md) ·
+> **How it works** (interactive, offline): [`docs/how-nabu-works.html`](docs/how-nabu-works.html).
 
 A **recon-first**, OSCP-exam-legal desktop GUI that orchestrates standard enumeration tools
 (nmap, feroxbuster/gobuster/ffuf, nikto/whatweb, smbclient/netexec, …), links each service to
