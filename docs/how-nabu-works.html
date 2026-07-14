@@ -80,6 +80,9 @@
     background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px; }
   .theme-btn:hover { border-color: var(--gold); }
   .theme-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  a.demo-cta { text-decoration: none; display: inline-block; color: var(--ink);
+    background: var(--gold); border-color: var(--gold); font-weight: 600; }
+  a.demo-cta:hover { filter: brightness(1.08); border-color: var(--gold); }
   .hint { color: var(--muted); font-size: 13.5px; margin: 16px 0 0; border-top: 1px solid var(--border); padding-top: 14px; }
   .hint kbd { font-family: var(--mono); font-size: 11.5px; background: var(--surface-2);
     border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; color: var(--text); }
@@ -225,7 +228,10 @@
         <button id="tab-overview" role="tab" aria-selected="true" type="button">Overview</button>
         <button id="tab-system" role="tab" aria-selected="false" type="button">System map</button>
       </div>
-      <button class="theme-btn" id="themeBtn" type="button">◐ Theme</button>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <a class="theme-btn demo-cta" href="nabu-demo.html">▶ Watch the demo</a>
+        <button class="theme-btn" id="themeBtn" type="button">◐ Theme</button>
+      </div>
     </div>
     <p class="hint" id="hint">Click a stage on the pipeline. Downstream steps pulse to show where the flow goes. Press <kbd>Tab</kbd> then <kbd>Enter</kbd> to explore by keyboard.</p>
   </header>

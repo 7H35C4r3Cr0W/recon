@@ -282,8 +282,8 @@ body{font-family:var(--sans);background:var(--ink);color:var(--text);overflow:hi
 .tbtn{font-family:var(--sans);font-size:12.5px;color:var(--text);background:var(--surface);
  border:1px solid var(--border);border-radius:8px;padding:6px 11px;cursor:pointer;margin-left:10px}
 .tbtn:hover{border-color:var(--gold)}.tbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.stage{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 40px;overflow:hidden}
-.slide{width:100%;max-width:1080px;animation:fade .35s ease}
+.stage{flex:1;display:flex;padding:16px 26px;overflow:hidden}
+.slide{width:100%;max-width:1600px;margin:auto;height:100%;min-height:0;display:flex;flex-direction:column;justify-content:center;animation:fade .35s ease}
 @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.slide{animation:none}}
 .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin:0 0 10px}
@@ -297,14 +297,18 @@ li::before{content:"";position:absolute;left:2px;top:8px;width:8px;height:8px;bo
 .title-slide h1{font-size:clamp(40px,7vw,74px)}.title-slide .lead{margin:0 auto 18px}
 .title-slide ul{align-items:center}.title-slide li{padding-left:0}.title-slide li::before{display:none}
 .title-slide li{color:var(--muted);font-family:var(--mono);font-size:13px}
-.imgwrap{display:grid;grid-template-columns:1.35fr 1fr;gap:30px;align-items:center}
-.imgwrap.split{grid-template-columns:1fr}
-figure{margin:0;background:var(--surface);border:1px solid var(--border);border-radius:14px;
- padding:12px;box-shadow:0 16px 44px rgba(0,0,0,.28)}
-figure img{width:100%;display:block;border-radius:8px;border:1px solid var(--border)}
-figcaption{color:var(--muted);font-size:12px;margin-top:9px;text-align:center;font-family:var(--mono)}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media (max-width:860px){.imgwrap{grid-template-columns:1fr}.two{grid-template-columns:1fr}}
+.imgslide{display:flex;flex-direction:column;height:100%;min-height:0;gap:12px}
+.imgslide .cap{flex:0 0 auto}
+.imgslide h1{font-size:clamp(20px,2.6vw,32px);margin:0 0 6px}
+.imgslide .lead{font-size:clamp(14px,1.4vw,16px);margin:0;max-width:92ch}
+.hero{flex:1 1 auto;min-height:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px}
+.hero img{max-width:100%;max-height:100%;width:auto;object-fit:contain;border-radius:10px;border:1px solid var(--border);box-shadow:0 18px 50px rgba(0,0,0,.32);cursor:zoom-in}
+.hero figcaption{color:var(--muted);font-size:12.5px;font-family:var(--mono);flex:0 0 auto;text-align:center}
+.hero .two{display:flex;gap:14px;min-height:0;max-height:100%;justify-content:center}
+.hero .two img{max-height:100%}
+#lb{position:fixed;inset:0;background:rgba(6,9,14,.93);display:none;align-items:center;justify-content:center;z-index:99;cursor:zoom-out;padding:22px}
+#lb.on{display:flex}
+#lb img{max-width:97vw;max-height:93vh;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .foot{display:flex;align-items:center;gap:14px;padding:14px 26px;border-top:1px solid var(--border)}
 .dots{display:flex;gap:6px;flex:1;flex-wrap:wrap}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--border);border:none;padding:0;cursor:pointer}
@@ -342,6 +346,7 @@ figcaption{color:var(--muted);font-size:12px;margin-top:9px;text-align:center;fo
   <button class="nav primary" id="next" type="button">Next →</button>
  </div>
 </div>
+<div id="lb" role="dialog" aria-label="Enlarged screenshot"></div>
 <script>
 const IMAGES=__IMAGES__;
 const SLIDES=__SLIDES__;
@@ -356,18 +361,18 @@ function render(){
  let html='';
  const head=(s.eyebrow?'<p class="eyebrow">'+esc(s.eyebrow)+'</p>':'')+(s.title?'<h1>'+esc(s.title)+'</h1>':'')
    +(s.body?'<p class="lead">'+esc(s.body)+'</p>':'');
+ const cap=s.caption?esc(s.caption)+' · click to enlarge':'click to enlarge';
  if(s.kind==='title'){slide.innerHTML='<div class="title-slide">'+head+bullets(s.bullets)+'</div>';}
  else if(s.kind==='text'){slide.innerHTML='<div>'+head+bullets(s.bullets)+'</div>';}
  else if(s.kind==='split'){
-  html='<div class="imgwrap split"><div>'+head+'</div><figure><div class="two">'
-   +'<img src="'+IMAGES[s.image]+'" alt=""><img src="'+IMAGES[s.image2]+'" alt="">'
-   +'</div><figcaption>'+esc(s.caption||'')+'</figcaption></figure></div>';
-  slide.innerHTML=html;
+  slide.innerHTML='<div class="imgslide"><div class="cap">'+head+'</div>'
+   +'<figure class="hero"><div class="two"><img src="'+IMAGES[s.image]+'" alt=""><img src="'+IMAGES[s.image2]+'" alt=""></div>'
+   +'<figcaption>'+cap+'</figcaption></figure></div>';
  } else {
-  html='<div class="imgwrap"><div>'+head+bullets(s.bullets)+'</div>'
-   +'<figure><img src="'+IMAGES[s.image]+'" alt=""><figcaption>'+esc(s.caption||'')+'</figcaption></figure></div>';
-  slide.innerHTML=html;
+  slide.innerHTML='<div class="imgslide"><div class="cap">'+head+'</div>'
+   +'<figure class="hero"><img src="'+IMAGES[s.image]+'" alt="'+esc(s.title||'')+'"><figcaption>'+cap+'</figcaption></figure></div>';
  }
+ slide.querySelectorAll('.hero img').forEach(im=>{im.onclick=()=>openLB(im.src);});
  count.textContent=(i+1)+' / '+SLIDES.length;
  [...dots.children].forEach((d,n)=>d.setAttribute('aria-current',n===i));
  document.getElementById('prev').disabled=i===0;
@@ -378,7 +383,11 @@ SLIDES.forEach((_,n)=>{const b=document.createElement('button');b.className='dot
  b.setAttribute('aria-label','Slide '+(n+1));b.onclick=()=>go(n);dots.appendChild(b);});
 document.getElementById('prev').onclick=()=>go(i-1);
 document.getElementById('next').onclick=()=>go(i+1);
+const lb=document.getElementById('lb');
+function openLB(src){lb.innerHTML='<img src="'+src+'" alt="Enlarged screenshot">';lb.classList.add('on');}
+lb.onclick=()=>lb.classList.remove('on');
 addEventListener('keydown',e=>{
+ if(lb.classList.contains('on')){if(e.key==='Escape'||e.key===' '){e.preventDefault();lb.classList.remove('on');}return;}
  if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();go(i+1);}
  else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(i-1);}
  else if(e.key==='Home'){go(0);}else if(e.key==='End'){go(SLIDES.length-1);}

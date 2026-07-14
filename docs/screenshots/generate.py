@@ -16,6 +16,7 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("OSCPRECON_DISABLE_WEBVIEW", "1")
+os.environ.setdefault("QT_SCALE_FACTOR", "2")  # 2x device pixels -> crisp screenshots when enlarged
 
 from PySide6.QtWidgets import QApplication, QWidget  # noqa: E402
 
