@@ -109,5 +109,7 @@ class EtcdModule(Module):
                 "(`curl -s {target}:2379/v2/keys/<key>`); etcd often stores secrets / k8s tokens."
             ]
         if "version" in kinds:
-            return ["etcd reachable — the v2 keys API is disabled or secured; note the version only."]
+            return [
+                "etcd reachable — the v2 keys API is disabled or secured; note the version only."
+            ]
         return []

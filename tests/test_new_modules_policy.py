@@ -41,6 +41,7 @@ _NEW_MODULES = [
     "rmi",
     "openvpn",
     "rpcbind",
+    "etcd",
 ]
 
 

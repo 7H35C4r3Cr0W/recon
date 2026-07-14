@@ -362,6 +362,7 @@
 - { match: { service_name: ntp },            label: NTP,   module: ntp,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-ntp.html" }
 - { match: { service_name: X11 },            label: X11,   module: x11,   hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/6000-pentesting-x11.html" }
 - { match: { service_name: kube-apiserver }, label: Kubernetes API, module: kubernetes, hacktricks: "https://book.hacktricks.wiki/en/pentesting-web/pentesting-kubernetes/index.html" }
+- { match: { service_name: etcd },           label: etcd,  module: etcd,  hacktricks: "https://book.hacktricks.wiki/en/network-services-pentesting/2379-2380-pentesting-etcd.html" }
 
 # --- Product-specific overrides ---
 # Order matters: on an equal-specificity tie the first match wins, so list SPECIFIC apps
@@ -478,6 +479,22 @@
     - { name: "curl -s http://{target}:{port}/version", purpose: "Docker engine version (if unauth)" }
     - { name: "curl -s http://{target}:{port}/info", purpose: "host + container/image counts" }
     - { name: "curl -s http://{target}:{port}/containers/json", purpose: "list running containers" }
+
+- match: { port: 2379, proto: tcp }
+  label: etcd
+  module: etcd
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/2379-2380-pentesting-etcd.html
+  tools:
+    - { name: "curl -s http://{target}:{port}/version", purpose: "etcd server + cluster version (if unauth)" }
+    - { name: "curl -s http://{target}:{port}/v2/keys", purpose: "list v2 keys (etcd < 3.4 / v2 enabled)" }
+    - { name: "curl -s http://{target}:{port}/v2/members", purpose: "cluster members + client URLs" }
+
+- match: { port: 2380, proto: tcp }
+  label: etcd (peer)
+  module: etcd
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/2379-2380-pentesting-etcd.html
+  tools:
+    - { name: "curl -s http://{target}:2379/version", purpose: "query the client API (2379) for the version" }
 
 # --- second-pass additions: mail-TLS, Oracle, ident, MSSQL-browser, SIP (recon-only) ---
 - match: { port: 113, proto: tcp }

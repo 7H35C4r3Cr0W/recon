@@ -37,6 +37,7 @@ _NEW_SERVICES = [
     ("rmi", 1099, Proto.TCP, "java-rmi"),
     ("openvpn", 1194, Proto.UDP, "openvpn"),
     ("rpcbind", 111, Proto.TCP, "rpcbind"),
+    ("etcd", 2379, Proto.TCP, "etcd"),
 ]
 
 

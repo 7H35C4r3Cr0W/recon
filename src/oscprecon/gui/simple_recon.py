@@ -10,6 +10,7 @@ from oscprecon.modules import (
     couchdb,
     docker,
     elasticsearch,
+    etcd,
     finger,
     ident,
     ike,
@@ -153,6 +154,10 @@ def _elasticsearch_steps(target: Target, port: int) -> list[tuple[Command, str]]
 
 def _couchdb_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in couchdb.CouchdbModule().recon_steps(target, port)]
+
+
+def _etcd_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in etcd.EtcdModule().recon_steps(target, port)]
 
 
 def _docker_steps(target: Target, port: int) -> list[tuple[Command, str]]:
@@ -441,6 +446,15 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(couchdb),
         couchdb.CouchdbModule,
         _couchdb_steps,
+    ),
+    "etcd": SimpleReconSpec(
+        "etcd",
+        "Run full etcd recon (version · members · keys)",
+        "etcd recon — unauth curl of /version, /v2/members, /v2/keys; read-only. etcd often stores "
+        "k8s secrets/tokens; the v2 keys API is disabled by default on etcd >= 3.4.",
+        _manual(etcd),
+        etcd.EtcdModule,
+        _etcd_steps,
     ),
     "docker": SimpleReconSpec(
         "docker",
