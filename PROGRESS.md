@@ -91,8 +91,14 @@ Renaming the product to **Nabu** and lifting it toward a polished desktop produc
   entry points), `docs/keyboard-shortcuts.md`, `packaging/ACCEPTANCE.md` Nabu-identity section,
   README screenshot + shortcuts links. Wheel re-verified out-of-checkout (all new widgets import).
 
-**Remaining Nabu chunk:** **(do LAST) the interactive HTML module-flow mind-map for management**
-([[final-flowchart-deliverable]]) — then the final report.
+- **Interactive module-flow map for management** — `docs/how-nabu-works.html`: a self-contained,
+  offline, interactive HTML pipeline walkthrough (app launch → target → nmap → dispatch → per-service
+  recon w/ Auto/Shown/Opt-in tiers + safety gate → parse → conservative classing → suggestions →
+  references → graph → report; click a stage → detail + downstream pulse; Nabu identity, light+dark).
+  Also published as a shareable Claude artifact. Linked from README.
+
+**Nabu rebrand + UI/UX pass: COMPLETE** (16 commits `f581bea`..`27fb414`; 970 tests, four gates green,
+wheel verified out-of-checkout). All planned chunks done.
 
 ### Pre-live-testing polish (owner-requested)
 A run of owner-requested improvements before live-box testing:
