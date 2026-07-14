@@ -3,6 +3,15 @@
 Code-based inventory (the GUI runs only headless/offscreen here, so this is from reading the widgets,
 not a live click-through). Drives the Nabu UI/UX pass. Concise by design.
 
+> **Status — superseded (historical baseline).** This is the *before* snapshot that drove the Nabu
+> UI/UX pass; every gap listed below was subsequently addressed (compact header, dashboard empty
+> state + illustration, dedicated Findings view, graph legend, feedback banner, accessibility sweep,
+> and the Nabu + owl-furby brand mark). Kept as a record of what the pass fixed. For the **current**
+> UI see the [README](../README.md), [`how-nabu-works.html`](how-nabu-works.html), and
+> [`PROJECT_MAP.md`](../PROJECT_MAP.md). Shipped nav: Workspace · Recon · Graph · Findings ·
+> Credentials · Notes · Report · Activity; the header carries the brand mark, and
+> **Help → View Diagnostics Log** opens the crash/error log (§ 19a).
+
 ## Product identity
 - **Name is inconsistent / unbranded.** Window title, status footer, and splash all say `oscp-recon`;
   the splash paints an "OSCP RECON" ASCII wordmark. No About dialog. No cohesive mark or palette.

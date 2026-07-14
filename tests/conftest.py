@@ -13,7 +13,9 @@ def _isolate_oscprecon_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     # why: keep tests from reading/writing the real ~/.config/oscprecon (recent.json etc.),
     # so GUI startup restore is deterministic and never touches the user's state. Also point the
     # workspace root at an empty tmp dir so the workspace dashboard scan never reads real profiles.
+    # XDG_STATE_HOME keeps the diagnostics log (config.state_dir) out of the real ~/.local/state.
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     from oscprecon import config
 
     workspace = tmp_path / "workspace"

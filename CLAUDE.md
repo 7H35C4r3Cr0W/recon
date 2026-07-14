@@ -8,7 +8,7 @@ Companion files in this repo elaborate specific slices — `ROADMAP.md` for phas
 
 ## 1. What this project is
 
-**The product is named "Nabu"** (*Local Recon Workspace*) — the user-facing brand. The **internal Python package stays `oscprecon`** and the distribution/wheel name stays `oscp-recon` (renaming either buys nothing and breaks installs/imports/data paths). Preferred entry points are `nabu` (GUI) and `nabu-cli` (headless); `oscp-recon` / `oscprecon` / `oscprecon-cli` remain as legacy aliases. Data paths are unchanged: workspace `~/oscprecon/`, config `~/.config/oscprecon/`, cache `~/.cache/oscprecon/`. See `docs/OWNER_DECISIONS.md`.
+**The product is named "Nabu"** (*Local Recon Workspace*) — the user-facing brand. The **internal Python package stays `oscprecon`** and the distribution/wheel name stays `oscp-recon` (renaming either buys nothing and breaks installs/imports/data paths). Preferred entry points are `nabu` (GUI) and `nabu-cli` (headless); `oscp-recon` / `oscprecon` / `oscprecon-cli` remain as legacy aliases. Data paths are unchanged: workspace `~/oscprecon/`, config `~/.config/oscprecon/`, cache `~/.cache/oscprecon/`, diagnostics logs `~/.local/state/oscprecon/` (XDG state; see § 19a). See `docs/OWNER_DECISIONS.md`.
 
 A **PySide6 desktop GUI recon orchestrator** for OSCP exam prep and exam day, built in Python. It runs on Kali Linux. Two goals in parallel:
 
@@ -1007,7 +1007,21 @@ credentials, findings, and graph layout. The three File-menu actions above forma
 - **Edit** — Add Note / Add Credential / Add Manual Finding
 - **Scan** — Run Quick Recon / Run Full Recon / Custom Command / Stop All
 - **View** — Service Tree / Graph (Ctrl+G) / Notes / Report Preview / Theme
-- **Help** — About / OSCP Constraints / Doctor
+- **Help** — About / OSCP Constraints / Doctor / **View Diagnostics Log**
+
+### 19a. Brand mark & diagnostics log — BUILT
+
+- **Brand mark** — the header's top-right carries the Nabu wordmark with the **owl-furby mascot**
+  (`gui/assets/furby.svg`, `AppHeader._brand`), the maintainer's mark; the CLI prints an owl-furby
+  ASCII banner (`branding.cli_banner()`) to **stderr on a TTY only**, so it never pollutes piped
+  output or tests. Purely cosmetic; on-brand palette (teal/gold), no external artwork.
+- **Diagnostics log** — a robust, best-effort local crash/error log (`src/oscprecon/diagnostics.py`),
+  distinct from the per-profile audit log (§ 6a). A rotating file at
+  `~/.local/state/oscprecon/logs/nabu.log` (XDG state, `config.state_dir()`), a chained
+  `sys.excepthook`, and a Qt message handler — installed at GUI (`gui/app.py`) and CLI (`cli.py`)
+  startup. **Help → View Diagnostics Log** (`LogViewerDialog`) shows the tail with reveal-folder /
+  clear; the CLI prints the log path to stderr on a crash. Setup is best-effort (never blocks the
+  app). Offline, no telemetry; the log is diagnostic and **non-authoritative — never project data**.
 
 ### Preferences
 
