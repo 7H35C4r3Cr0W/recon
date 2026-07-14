@@ -1,0 +1,19 @@
+# OpenVPN recon next-steps (version scan, read-only). OpenVPN rejects unauthenticated probes, so the
+# only recon is confirming the service + transport; connecting needs a client config, never suggested.
+- match:
+    service: openvpn
+    field: kind
+    value: "^service$"
+  suggest:
+    - text: "OpenVPN confirmed — check the TCP 443 variant too; interacting needs a client .ovpn config"
+      command: "nmap -sV -p 443 {target}"
+# source: HackTricks pentesting OpenVPN (book.hacktricks.wiki) — standard OSCP OpenVPN recon
+
+- match:
+    service: openvpn
+    field: kind
+    value: "^transport$"
+  suggest:
+    - text: "Read the TLS certificate on a TCP/TLS OpenVPN endpoint for the CA/CN identity (read-only)"
+      command: "nmap -p 443 --script ssl-cert {target}"
+# source: HackTricks pentesting OpenVPN (book.hacktricks.wiki) — standard OSCP OpenVPN recon

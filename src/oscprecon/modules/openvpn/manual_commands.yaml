@@ -1,0 +1,16 @@
+# OpenVPN manual follow-ups (Tier-2 — shown, never auto-run). Read-only enum; {target}/{port} filled
+# from the active profile. Connecting requires a client .ovpn config and is an explicit action.
+- description: "TCP variant (OpenVPN on 443/tcp)"
+  why: "many deployments run OpenVPN over TCP 443; a -sV confirms the service there — read-only"
+  command: "nmap -sV -p 443 {target}"
+# source: HackTricks pentesting OpenVPN (book.hacktricks.wiki) — standard OSCP OpenVPN recon
+
+- description: "TLS certificate (TCP/TLS deployments)"
+  why: "when OpenVPN runs over TLS, ssl-cert leaks the CA/CN identity — read-only"
+  command: "nmap -p {port} --script ssl-cert {target}"
+# source: HackTricks pentesting OpenVPN (book.hacktricks.wiki) — standard OSCP OpenVPN recon
+
+- description: "UDP re-scan (confirm the port — UDP is lossy)"
+  why: "a single UDP probe can be dropped; a targeted re-scan confirms 1194/udp is really open"
+  command: "nmap -sU -p {port} --host-timeout 60s {target}"
+# source: HackTricks pentesting OpenVPN (book.hacktricks.wiki) — standard OSCP OpenVPN recon

@@ -28,6 +28,7 @@ from oscprecon.modules import (
     netbios,
     nfs,
     ntp,
+    openvpn,
     oracle,
     pop3,
     postgresql,
@@ -215,6 +216,10 @@ def _upnp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _rmi_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in rmi.RmiModule().recon_steps(target, port)]
+
+
+def _openvpn_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in openvpn.OpenvpnModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -575,5 +580,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(rmi),
         rmi.RmiModule,
         _rmi_steps,
+    ),
+    "openvpn": SimpleReconSpec(
+        "openvpn",
+        "Run full OpenVPN recon (service · transport)",
+        "OpenVPN recon — nmap -sUV confirms the service and its transport (UDP 1194 / TCP 443); "
+        "read-only. OpenVPN rejects unauthenticated probes, so there is no unauth enumeration.",
+        _manual(openvpn),
+        openvpn.OpenvpnModule,
+        _openvpn_steps,
     ),
 }

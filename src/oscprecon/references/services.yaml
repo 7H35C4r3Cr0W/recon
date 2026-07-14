@@ -211,6 +211,9 @@
   label: OpenVPN
   module: openvpn
   hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+  tools:
+    - { name: "nmap -sV -sU -p {port} {target}", purpose: "confirm the OpenVPN service + transport (UDP)" }
+    - { name: "nmap -sV -p 443 {target}", purpose: "check the TCP/443 OpenVPN variant" }
 
 - match: { port: 1433, proto: tcp }
   label: MSSQL
