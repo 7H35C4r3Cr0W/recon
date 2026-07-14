@@ -7,6 +7,7 @@ from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QSplashScreen
 
+from oscprecon import diagnostics
 from oscprecon.branding import APP_NAME
 from oscprecon.gui.assets import ICON, asset_path
 from oscprecon.gui.main_window import MainWindow
@@ -14,6 +15,10 @@ from oscprecon.gui.splash import make_splash
 
 
 def main() -> int:
+    # why: capture crashes + Qt warnings to a log file early, before anything can fail (Help → View
+    # Diagnostics Log surfaces it). Best-effort — never blocks startup.
+    diagnostics.install("gui")
+    diagnostics.install_qt_message_handler()
     # why: QtWebEngine needs shared GL contexts set before the QApplication, and lab boxes often
     # have no GPU/sandbox — disable both so the embedded HackTricks browser initialises.
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")

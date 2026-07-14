@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Nabu the owl-furby mascot">
+  <!-- why: Nabu's cute owl-furby mascot — the maintainer's mark. On-brand palette (teal body, gold
+       accents, cream belly), no external/copyrighted artwork. Reads well down to ~24px. -->
+  <defs>
+    <linearGradient id="furbyBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6fa3a8"/>
+      <stop offset="1" stop-color="#4a777c"/>
+    </linearGradient>
+  </defs>
+  <!-- feet -->
+  <ellipse cx="38" cy="91" rx="9" ry="6" fill="#c9a227"/>
+  <ellipse cx="62" cy="91" rx="9" ry="6" fill="#c9a227"/>
+  <!-- ears -->
+  <path d="M30 28 Q23 5 42 21 Z" fill="#4a777c"/>
+  <path d="M70 28 Q77 5 58 21 Z" fill="#4a777c"/>
+  <!-- tuft -->
+  <path d="M50 18 q-5 -13 4 -17 q-3 9 5 11 q-6 1 -9 6 Z" fill="#c9a227"/>
+  <!-- body -->
+  <ellipse cx="50" cy="55" rx="34" ry="36" fill="url(#furbyBody)"/>
+  <!-- belly -->
+  <ellipse cx="50" cy="65" rx="20" ry="22" fill="#efe7d2"/>
+  <!-- cheeks -->
+  <circle cx="29" cy="59" r="4.5" fill="#e79aa0" opacity="0.65"/>
+  <circle cx="71" cy="59" r="4.5" fill="#e79aa0" opacity="0.65"/>
+  <!-- eyes (whites) -->
+  <circle cx="39" cy="47" r="11.5" fill="#ffffff" stroke="#3c5f63" stroke-width="1.6"/>
+  <circle cx="61" cy="47" r="11.5" fill="#ffffff" stroke="#3c5f63" stroke-width="1.6"/>
+  <!-- pupils -->
+  <circle cx="41" cy="49" r="5.6" fill="#1b2430"/>
+  <circle cx="59" cy="49" r="5.6" fill="#1b2430"/>
+  <!-- eye highlights -->
+  <circle cx="38.4" cy="45.6" r="2" fill="#ffffff"/>
+  <circle cx="56.4" cy="45.6" r="2" fill="#ffffff"/>
+  <!-- beak -->
+  <path d="M50 57 l-6 7 h12 Z" fill="#c9a227" stroke="#a9861d" stroke-width="1"/>
+</svg>

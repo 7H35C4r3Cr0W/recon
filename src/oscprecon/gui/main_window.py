@@ -37,6 +37,7 @@ from oscprecon.gui.dialogs import (
     AddCredentialDialog,
     CredentialVaultDialog,
     DoctorDialog,
+    LogViewerDialog,
     NewProfileDialog,
     SettingsDialog,
     SprayDialog,
@@ -425,6 +426,9 @@ class MainWindow(QMainWindow):
         doctor_action = QAction("Doctor (tool status)...", self)
         doctor_action.triggered.connect(self._on_doctor)
         help_menu.addAction(doctor_action)
+        log_action = QAction("View Diagnostics Log...", self)
+        log_action.triggered.connect(self._on_view_log)
+        help_menu.addAction(log_action)
         help_menu.addSeparator()
         about_action = QAction(f"About {APP_NAME}...", self)
         about_action.triggered.connect(self._on_about)
@@ -432,6 +436,9 @@ class MainWindow(QMainWindow):
 
     def _on_doctor(self) -> None:
         DoctorDialog(self).exec()
+
+    def _on_view_log(self) -> None:
+        LogViewerDialog(self).exec()
 
     def _on_about(self) -> None:
         QMessageBox.about(

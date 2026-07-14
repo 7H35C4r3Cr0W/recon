@@ -41,6 +41,7 @@ from oscprecon.profile import Profile  # noqa: E402
 from oscprecon.references import ServiceRef  # noqa: E402
 
 OUT = Path(__file__).parent
+SHOT_THEME = "dark"  # the deck presents dark by default; capture the GUI shots to match
 _SMB_URL = "https://book.hacktricks.wiki/en/network-services-pentesting/pentesting-smb/index.html"
 
 
@@ -112,6 +113,14 @@ def _save(widget: QWidget, name: str, size: tuple[int, int]) -> None:
     print("wrote", name)
 
 
+def _save_dark(widget: QWidget, name: str, size: tuple[int, int]) -> None:
+    # why: MainWindow.__init__ re-applies the saved (light) theme, resetting the app palette.
+    # Standalone view grabs rely on that palette for their base background, so re-assert dark right
+    # before grab() — otherwise they render light inside the dark deck.
+    theme.apply_theme(SHOT_THEME)
+    _save(widget, name, size)
+
+
 def _save_svg(svg_name: str, png_name: str, size: tuple[int, int]) -> None:
     # render a static illustration (e.g. the graph, which needs Chromium to screenshot live) at 2x
     renderer = QSvgRenderer(str(OUT / svg_name))
@@ -136,39 +145,42 @@ def main() -> int:
         window._tool_panel.append_output("[done] nmap: 4 services discovered")
         _save(window, f"shell-{name}.png", (1180, 720))
         window._dashboard.shutdown()
-    theme.apply_theme("light")
+    # why: the demo deck presents in dark by default, so the standalone view shots are captured dark
+    # to match (light stays available via shell-light.png for the "Light & dark" split slide).
+    theme.apply_theme(SHOT_THEME)
 
     empty = MainWindow()
     empty._show_workspace()
-    _save(empty, "dashboard-empty.png", (1180, 720))
+    empty._restyle_shell(SHOT_THEME)
+    _save_dark(empty, "dashboard-empty.png", (1180, 720))
     empty._dashboard.shutdown()
 
     prof = _demo_profile(tmp / "views")
-    fv = FindingsView("light")  # match the light Qt palette applied above
+    fv = FindingsView(SHOT_THEME)  # match the Qt palette applied above
     fv.set_profile(prof)
-    _save(fv, "findings.png", (820, 360))
+    _save_dark(fv, "findings.png", (820, 360))
 
     vault = CredentialVaultDialog(prof)
     vault._table.selectRow(0)
-    _save(vault, "credential-vault.png", (700, 360))
+    _save_dark(vault, "credential-vault.png", (700, 360))
 
     smb = SmbPanel()
     smb.set_profile(prof)
     smb.configure(DiscoveredService(445, Proto.TCP, "microsoft-ds"))
-    _save(smb, "smb-tool-panel.png", (600, 440))
+    _save_dark(smb, "smb-tool-panel.png", (600, 440))
 
-    ref = ReferencePane("light")
+    ref = ReferencePane(SHOT_THEME)
     ref.show_service(
         DiscoveredService(445, Proto.TCP, "microsoft-ds", "Samba", "4.9"),
         ServiceRef(label="SMB", hacktricks=_SMB_URL, module="smb", tools=[]),
         [{"module": "smb", "kind": "auth", "value": "null session"}],
     )
-    _save(ref, "reference-offline.png", (400, 620))
+    _save_dark(ref, "reference-offline.png", (400, 620))
 
     dlg = NewProfileDialog()
     dlg._name.setText("htb-active")
     dlg._ip.setText("10.10.10.100")
-    _save(dlg, "new-project.png", (440, 220))
+    _save_dark(dlg, "new-project.png", (440, 220))
 
     http = HttpPanel()
     http.set_profile(prof)
@@ -176,26 +188,26 @@ def main() -> int:
         DiscoveredService(80, Proto.TCP, "http", "nginx", "1.18"),
         ServiceRef(label="HTTP", hacktricks="", module="http", tools=[]),
     )
-    _save(http, "http-panel.png", (620, 560))
+    _save_dark(http, "http-panel.png", (620, 560))
 
     spray = SprayDialog(prof, spray_enabled=True)
     for key in ("smb", "ftp"):
         if key in spray._checks:
             spray._checks[key].setChecked(True)
-    _save(spray, "spray-dialog.png", (620, 460))
+    _save_dark(spray, "spray-dialog.png", (620, 460))
 
     audit.record(prof.directory, prof.profile_name, "run-command", details={"module": "nmap"})
     audit.record(prof.directory, prof.profile_name, "credential-added", details={"source": "smb"})
     audit.record(prof.directory, prof.profile_name, "reference-visited", details={"service": "smb"})
-    act = ActivityView("light")
+    act = ActivityView(SHOT_THEME)
     act.set_profile(prof)
-    _save(act, "activity.png", (820, 300))
+    _save_dark(act, "activity.png", (820, 300))
 
     report = ReportView()
     report.set_profile(prof)
-    _save(report, "report.png", (820, 620))
+    _save_dark(report, "report.png", (820, 620))
 
-    _save_svg("graph-demo.svg", "graph.png", (940, 560))
+    _save_svg("graph-demo.svg", "graph.png", (940, 560))  # graph-demo.svg is dark-themed
     return 0
 
 

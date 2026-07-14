@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import typer
 
-from oscprecon import config, vault_export
+from oscprecon import branding, config, diagnostics, vault_export
 from oscprecon import doctor as doctor_mod
 from oscprecon.models import Target
 from oscprecon.orchestrator import Orchestrator
@@ -21,7 +22,10 @@ app = typer.Typer(
 def _root() -> None:
     # why: a callback keeps `scan` an explicit subcommand — Typer otherwise collapses a
     # single-command app and drops the subcommand name (`oscprecon-cli scan <ip>` would break).
-    pass
+    diagnostics.install("cli")  # capture uncaught crashes to the log; best-effort, never blocks
+    # cosmetic owl-furby banner — stderr + TTY only, so it never pollutes piped stdout or tests
+    if sys.stderr.isatty():
+        sys.stderr.write("\n" + branding.cli_banner() + "\n")
 
 
 @app.command()

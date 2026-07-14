@@ -54,6 +54,15 @@ def cache_dir() -> Path:
     return directory
 
 
+def state_dir() -> Path:
+    # why: XDG state home — the spec's log location (diagnostic, non-authoritative).
+    raw = os.environ.get("XDG_STATE_HOME")
+    base = Path(raw) if raw else Path.home() / ".local" / "state"
+    directory = base / APP_NAME
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
 def _prefs_path() -> Path:
     return config_dir() / "prefs.json"
 

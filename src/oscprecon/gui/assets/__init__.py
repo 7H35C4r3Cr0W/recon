@@ -12,6 +12,7 @@ ICON_LIGHT = "icon-light.svg"
 ICON_MONO = "icon-mono.svg"
 SPLASH = "splash.svg"
 EMPTY_WORKSPACE = "empty-workspace.svg"
+FURBY = "furby.svg"  # the Nabu owl-furby mascot (header brand mark)
 
 
 def asset_path(name: str) -> Path:

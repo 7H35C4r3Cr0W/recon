@@ -88,7 +88,7 @@ SLIDES: list[dict] = [
         "body": "A primary nav rail on the left (Workspace · Recon · Graph · Findings · Credentials · "
         "Notes · Report · Activity), a compact header showing the project and target, and the "
         "three-pane recon view: services, tools, and references.",
-        "image": "shell-light.png",
+        "image": "shell-dark.png",
         "caption": "The main application shell",
     },
     {
@@ -97,7 +97,7 @@ SLIDES: list[dict] = [
         "title": "Ports & services (nmap)",
         "body": "One click runs nmap in stages — fast top-1000 TCP, full sweep, versioned scan on what's "
         "open, and a UDP pass. Discovered services fill the tree; TCP reads blue, UDP green.",
-        "image": "shell-light.png",
+        "image": "shell-dark.png",
         "caption": "Discovered services in the tree (left pane)",
     },
     {
@@ -234,7 +234,7 @@ SLIDES: list[dict] = [
         "body": "From the moment you enter an IP to the finished report — discovery, enumeration, "
         "findings, references, graph, and write-up, in one calm, exam-legal desktop tool.",
         "bullets": [
-            "Explore the interactive flow: docs/how-nabu-works.html",
+            "See the interactive flow + system map — the companion “How Nabu works” page",
             "Every stage is user-driven — nothing runs itself",
         ],
     },
@@ -251,14 +251,13 @@ TEMPLATE = """<!DOCTYPE html>
 <title>Nabu — a guided tour</title>
 <style>
 :root{
+ /* why: dark is the default so the deck and the dark GUI screenshots present easy on the eyes,
+    not scalding white in a dim room; the theme button flips to light. Not OS-driven -> deterministic. */
  --ink:#0f1420;--surface:#161d2b;--surface-2:#1b2434;--border:#2a3446;--text:#e6e9ef;
  --muted:#8a94a6;--gold:#c9a227;--gold-soft:rgba(201,162,39,.14);--teal:#5b8a8f;
  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
  --mono:"JetBrains Mono","SF Mono","DejaVu Sans Mono",Consolas,monospace;}
-@media (prefers-color-scheme:light){:root{
- --ink:#f2ede1;--surface:#fbf8f0;--surface-2:#f4efe2;--border:#ddd3bf;--text:#1f2633;
- --muted:#6b6656;--gold:#9a7415;--gold-soft:rgba(154,116,21,.12);--teal:#3f6f74;}}
 :root[data-theme="dark"]{--ink:#0f1420;--surface:#161d2b;--surface-2:#1b2434;--border:#2a3446;
  --text:#e6e9ef;--muted:#8a94a6;--gold:#c9a227;--gold-soft:rgba(201,162,39,.14);--teal:#5b8a8f;}
 :root[data-theme="light"]{--ink:#f2ede1;--surface:#fbf8f0;--surface-2:#f4efe2;--border:#ddd3bf;
@@ -298,7 +297,8 @@ li::before{content:"";position:absolute;left:2px;top:8px;width:8px;height:8px;bo
 .imgslide .lead{font-size:clamp(12.5px,1.15vw,14.5px);line-height:1.4;margin:3px 0 0;max-width:120ch}
 .hero{flex:1 1 auto;min-height:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
 .hero img{max-width:100%;max-height:100%;width:auto;object-fit:contain;border-radius:8px;border:1px solid var(--border);box-shadow:0 14px 44px rgba(0,0,0,.34);cursor:zoom-in}
-.hero figcaption{color:var(--muted);font-size:11.5px;font-family:var(--mono);flex:0 0 auto;text-align:center}
+.hero figcaption{color:var(--muted);font-size:13.5px;line-height:1.4;flex:0 0 auto;text-align:center;max-width:120ch;margin:0 auto}
+.hero figcaption b{color:var(--gold)}.hero figcaption i{color:var(--text);font-style:normal}
 .hero .two{display:flex;gap:14px;min-height:0;max-height:100%;justify-content:center}
 .hero .two img{max-height:100%}
 #lb{position:fixed;inset:0;background:rgba(6,9,14,.93);display:none;align-items:center;justify-content:center;z-index:99;cursor:zoom-out;padding:22px}
@@ -314,6 +314,7 @@ li::before{content:"";position:absolute;left:2px;top:8px;width:8px;height:8px;bo
 .nav:hover{border-color:var(--gold)}.nav:disabled{opacity:.4;cursor:default}
 .nav:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .nav.primary{background:var(--gold);color:var(--ink);border-color:var(--gold);font-weight:600}
+.nav.on{border-color:var(--gold);color:var(--gold);font-weight:600}
 .brand .m-tile{fill:var(--surface);stroke:var(--gold);stroke-opacity:.4;stroke-width:2}
 .brand .m-gold{fill:var(--gold)}.brand .m-teal-f{fill:var(--teal)}.brand .m-teal-s{stroke:var(--teal);fill:none}
 </style>
@@ -337,6 +338,7 @@ li::before{content:"";position:absolute;left:2px;top:8px;width:8px;height:8px;bo
  <div class="stage"><div class="slide" id="slide"></div></div>
  <div class="foot">
   <div class="dots" id="dots"></div>
+  <button class="nav" id="play" type="button" aria-pressed="false" aria-label="Play the tour automatically">▶ Play</button>
   <button class="nav" id="prev" type="button">← Back</button>
   <button class="nav primary" id="next" type="button">Next →</button>
  </div>
@@ -348,7 +350,8 @@ const SLIDES=__SLIDES__;
 const slide=document.getElementById('slide');
 const dots=document.getElementById('dots');
 const count=document.getElementById('count');
-let i=0;
+let i=0, timer=null;
+const AUTOPLAY_MS=6000;
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
 function bullets(b){return b&&b.length?('<ul>'+b.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'):'';}
 function render(){
@@ -357,15 +360,18 @@ function render(){
  let html='';
  const head=(s.eyebrow?'<p class="eyebrow">'+esc(s.eyebrow)+'</p>':'')+(s.title?'<h1>'+esc(s.title)+'</h1>':'')
    +(s.body?'<p class="lead">'+esc(s.body)+'</p>':'');
- const cap=s.caption?esc(s.caption)+' · click to enlarge':'click to enlarge';
+ // image slides: only the eyebrow+title on top (image gets the room); the explanation is the caption
+ const htop=(s.eyebrow?'<p class="eyebrow">'+esc(s.eyebrow)+'</p>':'')+(s.title?'<h1>'+esc(s.title)+'</h1>':'');
+ const cap=(s.body?esc(s.body):'')+(s.caption?(s.body?'  ·  ':'')+'<i>'+esc(s.caption)+'</i>':'')
+   +'  ·  <b>click to enlarge</b>';
  if(s.kind==='title'){slide.innerHTML='<div class="title-slide">'+head+bullets(s.bullets)+'</div>';}
  else if(s.kind==='text'){slide.innerHTML='<div>'+head+bullets(s.bullets)+'</div>';}
  else if(s.kind==='split'){
-  slide.innerHTML='<div class="imgslide"><div class="cap">'+head+'</div>'
+  slide.innerHTML='<div class="imgslide"><div class="cap">'+htop+'</div>'
    +'<figure class="hero"><div class="two"><img src="'+IMAGES[s.image]+'" alt=""><img src="'+IMAGES[s.image2]+'" alt=""></div>'
    +'<figcaption>'+cap+'</figcaption></figure></div>';
  } else {
-  slide.innerHTML='<div class="imgslide"><div class="cap">'+head+'</div>'
+  slide.innerHTML='<div class="imgslide"><div class="cap">'+htop+'</div>'
    +'<figure class="hero"><img src="'+IMAGES[s.image]+'" alt="'+esc(s.title||'')+'"><figcaption>'+cap+'</figcaption></figure></div>';
  }
  slide.querySelectorAll('.hero img').forEach(im=>{im.onclick=()=>openLB(im.src);});
@@ -374,23 +380,36 @@ function render(){
  document.getElementById('prev').disabled=i===0;
  document.getElementById('next').disabled=i===SLIDES.length-1;
 }
-function go(n){i=Math.max(0,Math.min(SLIDES.length-1,n));render();}
+function show(n){i=Math.max(0,Math.min(SLIDES.length-1,n));render();}
+function go(n){stopPlay();show(n);}                       // any manual nav halts autoplay
+function tick(){show(i>=SLIDES.length-1?0:i+1);}          // autoplay: advance, wrap at the end
+const playBtn=document.getElementById('play');
+function syncPlay(){const on=timer!==null;playBtn.textContent=on?'⏸ Pause':'▶ Play';
+ playBtn.setAttribute('aria-pressed',on);playBtn.setAttribute('aria-label',on?'Pause the automatic tour':'Play the tour automatically');playBtn.classList.toggle('on',on);}
+function startPlay(){if(timer!==null)return;timer=setInterval(tick,AUTOPLAY_MS);syncPlay();}
+function stopPlay(){if(timer!==null){clearInterval(timer);timer=null;syncPlay();}}
+function togglePlay(){timer!==null?stopPlay():startPlay();}
+playBtn.onclick=togglePlay;
 SLIDES.forEach((_,n)=>{const b=document.createElement('button');b.className='dot';b.type='button';
  b.setAttribute('aria-label','Slide '+(n+1));b.onclick=()=>go(n);dots.appendChild(b);});
 document.getElementById('prev').onclick=()=>go(i-1);
 document.getElementById('next').onclick=()=>go(i+1);
 const lb=document.getElementById('lb');
-function openLB(src){lb.innerHTML='<img src="'+src+'" alt="Enlarged screenshot">';lb.classList.add('on');}
+function openLB(src){stopPlay();lb.innerHTML='<img src="'+src+'" alt="Enlarged screenshot">';lb.classList.add('on');}
 lb.onclick=()=>lb.classList.remove('on');
 addEventListener('keydown',e=>{
  if(lb.classList.contains('on')){if(e.key==='Escape'||e.key===' '){e.preventDefault();lb.classList.remove('on');}return;}
- if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();go(i+1);}
+ if(e.ctrlKey||e.metaKey||e.altKey)return;                          // leave browser shortcuts (Ctrl+P etc.) alone
+ const onBtn=e.target&&e.target.closest&&e.target.closest('button');// don't hijack Space activating a focused control
+ if(e.key==='ArrowRight'||e.key==='PageDown'||(e.key===' '&&!onBtn)){e.preventDefault();go(i+1);}
  else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(i-1);}
- else if(e.key==='Home'){go(0);}else if(e.key==='End'){go(SLIDES.length-1);}
+ else if(e.key==='Home'){e.preventDefault();go(0);}else if(e.key==='End'){e.preventDefault();go(SLIDES.length-1);}
+ else if(e.key==='p'||e.key==='P'){e.preventDefault();togglePlay();}
 });
 const root=document.documentElement;
+root.setAttribute('data-theme','dark');   // present dark by default (easy on the eyes); the button flips to light
 document.getElementById('theme').onclick=()=>{
- const cur=root.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+ const cur=root.getAttribute('data-theme')==='dark'?'dark':'light';
  root.setAttribute('data-theme',cur==='dark'?'light':'dark');
 };
 render();

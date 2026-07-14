@@ -61,6 +61,10 @@ class WorkspaceDashboard(QWidget):
 
     def __init__(self, theme_name: str = "dark") -> None:
         super().__init__()
+        self.setObjectName("dashboardView")
+        self.setAttribute(
+            Qt.WidgetAttribute.WA_StyledBackground, True
+        )  # so the themed bg actually paints
         self._summaries: list[ProfileSummary] = []
         self._index_worker: WorkspaceIndexWorker | None = None
         self._theme = theme_name
@@ -114,6 +118,7 @@ class WorkspaceDashboard(QWidget):
         layout.addWidget(self._stack, stretch=1)
 
         self._reload_views()
+        self.set_theme(theme_name)  # paint themed surface + recolour cells (views now populated)
 
     def _build_empty_state(self) -> QWidget:
         wrap = QWidget()
@@ -156,7 +161,11 @@ class WorkspaceDashboard(QWidget):
 
     def set_theme(self, theme_name: str) -> None:
         self._theme = theme_name
-        self._empty_subtitle.setStyleSheet(f"color:{tokens.palette(theme_name).text_muted};")
+        pal = tokens.palette(theme_name)
+        # why: own the surface colour rather than leaning on QPalette alone — the empty-state pane
+        # otherwise renders with the stale window palette after a theme switch.
+        self.setStyleSheet(f"#dashboardView {{ background:{pal.bg}; }}")
+        self._empty_subtitle.setStyleSheet(f"color:{pal.text_muted};")
         self._apply_filters()  # recolour the status cells from memory (no rescan)
 
     # --- data loading (off-thread) ---

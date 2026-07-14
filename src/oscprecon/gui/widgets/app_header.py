@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QToolButton, QWidget
+from PySide6.QtSvgWidgets import QSvgWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
 
+from oscprecon.gui.assets import FURBY, asset_path
 from oscprecon.gui.theme import icons, tokens
 from oscprecon.gui.theme.tokens import Palette
 
@@ -44,12 +46,30 @@ class AppHeader(QWidget):
         self._tasks = QLabel("")
         self._tasks.setObjectName("hdrTasks")
 
+        # brand mark (top-right): the Nabu wordmark with the owl-furby mascot below it — the
+        # maintainer's mark. Purely decorative; carries a tooltip, excluded from tab focus.
+        self._brand = QWidget()
+        self._brand.setObjectName("hdrBrand")
+        self._brand.setToolTip("Nabu — Local Recon Workspace")
+        brand_col = QVBoxLayout(self._brand)
+        brand_col.setContentsMargins(0, 0, 0, 0)
+        brand_col.setSpacing(0)
+        self._brand_name = QLabel("Nabu")
+        self._brand_name.setObjectName("hdrBrandName")
+        self._brand_name.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self._furby = QSvgWidget(str(asset_path(FURBY)))
+        self._furby.setFixedSize(30, 30)
+        self._furby.setAccessibleName("Nabu mascot")
+        brand_col.addWidget(self._brand_name, alignment=Qt.AlignmentFlag.AlignHCenter)
+        brand_col.addWidget(self._furby, alignment=Qt.AlignmentFlag.AlignHCenter)
+
         layout.addWidget(self._home)
         layout.addWidget(self._project)
         layout.addWidget(self._target)
         layout.addWidget(self._read_only)
         layout.addStretch(1)
         layout.addWidget(self._tasks)
+        layout.addWidget(self._brand)
         self.restyle(theme_name)
 
     def restyle(self, theme_name: str) -> None:
@@ -62,6 +82,8 @@ class AppHeader(QWidget):
             f"#hdrReadOnly {{ color:{pal.warning}; border:1px solid {pal.warning};"
             f" border-radius:{tokens.RADIUS_SM}px; padding:0 {tokens.SPACE_SM}px; }}"
             f"#hdrTasks {{ color:{pal.accent}; }}"
+            f"#hdrBrandName {{ color:{pal.accent}; font-weight:700;"
+            f" font-size:{tokens.FONT_SIZE_SM}px; letter-spacing:1px; }}"
             "#hdrHome {"
             f" color:{pal.text}; background:transparent; border:1px solid {pal.border};"
             f" border-radius:{tokens.RADIUS_SM}px; padding:3px {tokens.SPACE_MD}px; }}"
