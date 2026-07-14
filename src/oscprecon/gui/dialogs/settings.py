@@ -32,6 +32,7 @@ from oscprecon.config import (
     THEMES,
     Settings,
 )
+from oscprecon.gui.theme import label as theme_label
 from oscprecon.references import live_hacktricks
 
 # Mandatory, non-negotiable protections (CLAUDE.md §2) surfaced in the Privacy tab as locked-on
@@ -108,7 +109,7 @@ class SettingsDialog(QDialog):
         form = QFormLayout(page)
         self._theme_combo = QComboBox()
         for name in THEMES:
-            self._theme_combo.addItem(name.capitalize(), name)
+            self._theme_combo.addItem(theme_label(name), name)
         form.addRow("Theme:", self._theme_combo)
 
         self._font_override = QCheckBox("Override application font size")

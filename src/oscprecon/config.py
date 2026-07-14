@@ -19,7 +19,7 @@ DEFAULT_WORDLIST_PATHS: tuple[Path, ...] = (
 )
 
 # Settings validation bounds + enums (config stays GUI-free; theme.py owns the palette application).
-THEMES = ("light", "dark")
+THEMES = ("light", "dark", "htb")
 DEFAULT_THEME = "light"
 # Scan profiles govern the nmap discovery battery (see modules/nmap.py):
 #   quick   — top-1000 TCP only (fast triage, no full -p-, no UDP)

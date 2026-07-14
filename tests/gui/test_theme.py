@@ -24,7 +24,26 @@ def test_apply_dark_then_light_changes_window_color(qtbot: QtBot) -> None:
 
 def test_normalize_falls_back_to_default() -> None:
     assert theme.normalize("dark") == "dark"
+    assert theme.normalize("htb") == "htb"
     assert theme.normalize("nonsense") == theme.DEFAULT_THEME
+
+
+def test_htb_theme_is_dark_with_green_highlight(qtbot: QtBot) -> None:
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    assert app is not None
+    theme.apply_theme("htb")
+    window = app.palette().color(QPalette.ColorRole.Window)
+    highlight = app.palette().color(QPalette.ColorRole.Highlight)
+    theme.apply_theme("light")  # restore for other tests
+    assert window.lightness() < 60  # a deep navy ground
+    assert (highlight.green(), highlight.red(), highlight.blue()) == (239, 159, 0)  # #9fef00
+
+
+def test_theme_label_is_friendly() -> None:
+    assert theme.label("htb") == "HTB"
+    assert theme.label("dark") == "Dark"
 
 
 def test_set_theme_persists_pref(qtbot: QtBot, tmp_path: Path) -> None:
@@ -36,8 +55,8 @@ def test_set_theme_persists_pref(qtbot: QtBot, tmp_path: Path) -> None:
     assert config.load_prefs().get("theme") == "light"
 
 
-def test_theme_group_has_both_options(qtbot: QtBot) -> None:
+def test_theme_group_has_all_options(qtbot: QtBot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
     labels = {a.text().lower() for a in window._theme_group.actions()}
-    assert labels == {"light", "dark"}
+    assert labels == {"light", "dark", "htb"}

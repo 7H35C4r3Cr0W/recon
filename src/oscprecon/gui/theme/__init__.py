@@ -5,8 +5,14 @@ from PySide6.QtWidgets import QApplication
 
 # why: §19/§23 — a dark/light toggle for exam-day comfort. Fusion + a dark QPalette is the robust
 # Qt way (complete coverage of every widget role, no fragile per-widget QSS to maintain).
-THEMES = ("light", "dark")
+THEMES = ("light", "dark", "htb")
 DEFAULT_THEME = "light"
+_LABELS = {"light": "Light", "dark": "Dark", "htb": "HTB"}
+
+
+def label(name: str) -> str:
+    """Human display name for a theme (so 'htb' shows as 'HTB', not 'Htb')."""
+    return _LABELS.get(name, name.capitalize())
 
 
 def _dark_palette() -> QPalette:
@@ -38,6 +44,37 @@ def _dark_palette() -> QPalette:
     return p
 
 
+def _htb_palette() -> QPalette:
+    # Hack The Box flavour — deep navy ground, acid-green highlight. Mirrors _dark_palette's roles
+    # so every Fusion-drawn widget (tables, inputs) reads correctly on the navy.
+    bg = QColor("#111927")
+    base = QColor("#1a2432")
+    text = QColor("#e6edf6")
+    green = QColor("#9fef00")
+    disabled = QColor("#6b7688")
+    p = QPalette()
+    p.setColor(QPalette.ColorRole.Window, bg)
+    p.setColor(QPalette.ColorRole.WindowText, text)
+    p.setColor(QPalette.ColorRole.Base, base)
+    p.setColor(QPalette.ColorRole.AlternateBase, QColor("#202c3d"))
+    p.setColor(QPalette.ColorRole.ToolTipBase, base)
+    p.setColor(QPalette.ColorRole.ToolTipText, text)
+    p.setColor(QPalette.ColorRole.Text, text)
+    p.setColor(QPalette.ColorRole.Button, base)
+    p.setColor(QPalette.ColorRole.ButtonText, text)
+    p.setColor(QPalette.ColorRole.BrightText, QColor("#ff5c7a"))
+    p.setColor(QPalette.ColorRole.Link, QColor("#5cb8ff"))
+    p.setColor(QPalette.ColorRole.Highlight, green)
+    p.setColor(QPalette.ColorRole.HighlightedText, QColor("#0a1200"))
+    for role in (
+        QPalette.ColorRole.Text,
+        QPalette.ColorRole.ButtonText,
+        QPalette.ColorRole.WindowText,
+    ):
+        p.setColor(QPalette.ColorGroup.Disabled, role, disabled)
+    return p
+
+
 def normalize(name: str) -> str:
     return name if name in THEMES else DEFAULT_THEME
 
@@ -46,9 +83,13 @@ def apply_theme(name: str) -> None:
     app = QApplication.instance()
     if not isinstance(app, QApplication):
         return
-    if normalize(name) == "dark":
+    normalized = normalize(name)
+    if normalized == "dark":
         app.setStyle("Fusion")
         app.setPalette(_dark_palette())
+    elif normalized == "htb":
+        app.setStyle("Fusion")
+        app.setPalette(_htb_palette())
     else:
         app.setPalette(app.style().standardPalette())
 

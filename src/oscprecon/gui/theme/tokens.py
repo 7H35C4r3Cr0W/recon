@@ -64,8 +64,32 @@ LIGHT = Palette(
 )
 
 
+# HTB — a Hack The Box-flavoured dark theme: deep navy ground with the signature acid-green accent.
+# Green carries active nav / focus / selection / links; gold-ish warnings and a hot-pink error stay
+# legible on the navy so state never rides on the green alone.
+HTB = Palette(
+    bg="#111927",
+    surface="#1a2432",
+    surface_alt="#202c3d",
+    border="#2b3a52",
+    text="#e6edf6",
+    text_muted="#8698b3",
+    accent="#9fef00",  # the Hack The Box green
+    accent_text="#0a1200",
+    secondary="#5cb8ff",
+    focus="#9fef00",
+    selection="#1d3a26",  # green-tinted selected row
+    success="#3ddc84",
+    warning="#f5c518",
+    error="#ff5c7a",
+    info="#5cb8ff",
+)
+
+_PALETTES = {"dark": DARK, "light": LIGHT, "htb": HTB}
+
+
 def palette(theme: str) -> Palette:
-    return DARK if theme == "dark" else LIGHT
+    return _PALETTES.get(theme, LIGHT)
 
 
 # spacing scale (px) — use these, not magic margins

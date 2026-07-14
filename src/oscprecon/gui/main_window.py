@@ -412,7 +412,7 @@ class MainWindow(QMainWindow):
         self._theme_group = QActionGroup(self)
         current_theme = theme.normalize(config.load_settings().theme)
         for name in theme.THEMES:
-            action = QAction(name.capitalize(), self, checkable=True)
+            action = QAction(theme.label(name), self, checkable=True)
             action.setChecked(name == current_theme)
             action.triggered.connect(lambda _checked=False, n=name: self._set_theme(n))
             self._theme_group.addAction(action)
