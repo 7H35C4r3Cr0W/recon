@@ -83,9 +83,12 @@ class ToolPanel(QWidget):
         QVBoxLayout(hints_box).addWidget(self._hints)
         self._command = QLineEdit()
         self._command.setPlaceholderText("select a tool hint above, or type a command")
+        self._command.setAccessibleName("Command to run")
         self._run_button = QPushButton("Run")
+        self._run_button.setAccessibleName("Run the command")
         self._run_button.clicked.connect(self._emit_run)
         self._copy_button = QPushButton("Copy")
+        self._copy_button.setAccessibleName("Copy the command")
         self._copy_button.clicked.connect(self._copy_command)
         command_row = QHBoxLayout()
         command_row.addWidget(self._command, stretch=1)
@@ -171,6 +174,7 @@ class ToolPanel(QWidget):
         self._banner = Banner()
         self._output = QPlainTextEdit()
         self._output.setReadOnly(True)
+        self._output.setAccessibleName("Command output")
 
         layout = QVBoxLayout(self)
         layout.addWidget(self._header)
@@ -181,6 +185,9 @@ class ToolPanel(QWidget):
 
     def set_theme(self, theme_name: str) -> None:
         self._banner.restyle(theme_name)
+
+    def clear_banner(self) -> None:
+        self._banner.clear()
 
     def set_target(self, target: str) -> None:
         self._target = target

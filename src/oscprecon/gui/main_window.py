@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt, QThread
-from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QIcon
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QDialog,
     QDockWidget,
@@ -159,6 +159,7 @@ class MainWindow(QMainWindow):
         self._target_label = QLabel("No profile loaded.")
         self._run_button = QPushButton("Run Full Recon")
         self._run_button.setStyleSheet(styles.primary_button(tokens.DARK))  # primary recon action
+        self._run_button.setAccessibleName("Run full recon")
         self._run_button.setEnabled(False)
         self._run_button.clicked.connect(self._on_run)
 
@@ -269,7 +270,26 @@ class MainWindow(QMainWindow):
         self._update_status_footer()
 
         self._build_menus()
+        # context-aware Find + Escape-to-dismiss (menu items already cover N/O/S/W/,/0/G/R)
+        find_sc = QShortcut(QKeySequence.StandardKey.Find, self)  # Ctrl+F
+        find_sc.activated.connect(self._on_find)
+        esc_sc = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        esc_sc.activated.connect(self._on_escape)
         self._load_last_profile()
+
+    def _on_find(self) -> None:
+        # focus the search box of whatever view is showing (workspace filter / findings search /
+        # otherwise the reference-pane find)
+        current = self._central_stack.currentWidget()
+        if current is self._dashboard:
+            self._dashboard.focus_filter()
+        elif current is self._findings_view:
+            self._findings_view.focus_search()
+        else:
+            self._reference_pane.focus_find()
+
+    def _on_escape(self) -> None:
+        self._tool_panel.clear_banner()
 
     def _update_status_footer(self) -> None:
         name = self._profile.profile_name if self._profile is not None else "no profile loaded"

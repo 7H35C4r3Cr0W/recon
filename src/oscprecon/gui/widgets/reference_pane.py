@@ -345,6 +345,10 @@ class ReferencePane(QWidget):
             self._offline.moveCursor(QTextCursor.MoveOperation.Start)
             self._offline.find(text)
 
+    def focus_find(self) -> None:
+        self._find.setFocus()
+        self._find.selectAll()
+
     def offline_text(self) -> str:
         """The rendered offline page as plain text (for tests / search)."""
         return self._offline.toPlainText()

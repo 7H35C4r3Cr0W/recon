@@ -148,6 +148,10 @@ class WorkspaceDashboard(QWidget):
         outer.addStretch(1)
         return wrap
 
+    def focus_filter(self) -> None:
+        self._filter.setFocus()
+        self._filter.selectAll()
+
     # --- data loading (off-thread) ---
     def refresh(self) -> None:
         if self._index_worker is not None and self._index_worker.isRunning():

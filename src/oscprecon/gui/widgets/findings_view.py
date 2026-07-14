@@ -87,6 +87,10 @@ class FindingsView(QWidget):
         self._table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self._table)
 
+    def focus_search(self) -> None:
+        self._filter.setFocus()
+        self._filter.selectAll()
+
     def set_profile(self, profile: Profile | None) -> None:
         self._profile = profile
         self.reload()

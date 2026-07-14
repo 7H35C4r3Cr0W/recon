@@ -20,6 +20,7 @@ class ServiceTree(QTreeWidget):
     def __init__(self) -> None:
         super().__init__()
         self._signature: tuple[tuple[int, str, str, str, str], ...] = ()
+        self.setAccessibleName("Discovered services")
         self.setHeaderLabels(["Port", "Service", "Product"])
         self.setColumnWidth(0, 110)
         self.setColumnWidth(1, 120)
