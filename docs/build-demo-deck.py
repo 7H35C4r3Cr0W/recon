@@ -234,7 +234,7 @@ SLIDES: list[dict] = [
         "body": "From the moment you enter an IP to the finished report — discovery, enumeration, "
         "findings, references, graph, and write-up, in one calm, exam-legal desktop tool.",
         "bullets": [
-            "Explore the interactive flow: docs/how-nabu-works.html",
+            "See the interactive flow + system map — the companion “How Nabu works” page",
             "Every stage is user-driven — nothing runs itself",
         ],
     },
@@ -298,7 +298,8 @@ li::before{content:"";position:absolute;left:2px;top:8px;width:8px;height:8px;bo
 .imgslide .lead{font-size:clamp(12.5px,1.15vw,14.5px);line-height:1.4;margin:3px 0 0;max-width:120ch}
 .hero{flex:1 1 auto;min-height:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
 .hero img{max-width:100%;max-height:100%;width:auto;object-fit:contain;border-radius:8px;border:1px solid var(--border);box-shadow:0 14px 44px rgba(0,0,0,.34);cursor:zoom-in}
-.hero figcaption{color:var(--muted);font-size:11.5px;font-family:var(--mono);flex:0 0 auto;text-align:center}
+.hero figcaption{color:var(--muted);font-size:13.5px;line-height:1.4;flex:0 0 auto;text-align:center;max-width:120ch;margin:0 auto}
+.hero figcaption b{color:var(--gold)}.hero figcaption i{color:var(--text);font-style:normal}
 .hero .two{display:flex;gap:14px;min-height:0;max-height:100%;justify-content:center}
 .hero .two img{max-height:100%}
 #lb{position:fixed;inset:0;background:rgba(6,9,14,.93);display:none;align-items:center;justify-content:center;z-index:99;cursor:zoom-out;padding:22px}
@@ -357,15 +358,18 @@ function render(){
  let html='';
  const head=(s.eyebrow?'<p class="eyebrow">'+esc(s.eyebrow)+'</p>':'')+(s.title?'<h1>'+esc(s.title)+'</h1>':'')
    +(s.body?'<p class="lead">'+esc(s.body)+'</p>':'');
- const cap=s.caption?esc(s.caption)+' · click to enlarge':'click to enlarge';
+ // image slides: only the eyebrow+title on top (image gets the room); the explanation is the caption
+ const htop=(s.eyebrow?'<p class="eyebrow">'+esc(s.eyebrow)+'</p>':'')+(s.title?'<h1>'+esc(s.title)+'</h1>':'');
+ const cap=(s.body?esc(s.body):'')+(s.caption?(s.body?'  ·  ':'')+'<i>'+esc(s.caption)+'</i>':'')
+   +'  ·  <b>click to enlarge</b>';
  if(s.kind==='title'){slide.innerHTML='<div class="title-slide">'+head+bullets(s.bullets)+'</div>';}
  else if(s.kind==='text'){slide.innerHTML='<div>'+head+bullets(s.bullets)+'</div>';}
  else if(s.kind==='split'){
-  slide.innerHTML='<div class="imgslide"><div class="cap">'+head+'</div>'
+  slide.innerHTML='<div class="imgslide"><div class="cap">'+htop+'</div>'
    +'<figure class="hero"><div class="two"><img src="'+IMAGES[s.image]+'" alt=""><img src="'+IMAGES[s.image2]+'" alt=""></div>'
    +'<figcaption>'+cap+'</figcaption></figure></div>';
  } else {
-  slide.innerHTML='<div class="imgslide"><div class="cap">'+head+'</div>'
+  slide.innerHTML='<div class="imgslide"><div class="cap">'+htop+'</div>'
    +'<figure class="hero"><img src="'+IMAGES[s.image]+'" alt="'+esc(s.title||'')+'"><figcaption>'+cap+'</figcaption></figure></div>';
  }
  slide.querySelectorAll('.hero img').forEach(im=>{im.onclick=()=>openLB(im.src);});
