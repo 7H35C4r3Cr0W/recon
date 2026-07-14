@@ -5,6 +5,7 @@ import re
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QStackedWidget,
     QTabWidget,
     QVBoxLayout,
@@ -176,9 +178,18 @@ class ToolPanel(QWidget):
         self._output.setReadOnly(True)
         self._output.setAccessibleName("Command output")
 
+        # why: a QStackedWidget's minimum is the MAX over all pages, and wide builder pages (long
+        # SimpleRecon intros, SMB/SSH forms) pushed that to ~1250px — which pinned the whole window
+        # wide and unresizable. Scrolling the stack decouples that minimum; the window now shrinks
+        # freely and the output/next-steps below stay always-visible.
+        stack_scroll = QScrollArea()
+        stack_scroll.setWidgetResizable(True)
+        stack_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        stack_scroll.setWidget(self._stack)
+
         layout = QVBoxLayout(self)
         layout.addWidget(self._header)
-        layout.addWidget(self._stack, stretch=2)
+        layout.addWidget(stack_scroll, stretch=2)
         layout.addWidget(next_box)
         layout.addWidget(self._banner)
         layout.addWidget(self._output, stretch=1)

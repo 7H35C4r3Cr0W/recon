@@ -16,6 +16,7 @@ class Palette:
     border: str
     text: str
     text_muted: str
+    nav_label: str  # left nav-rail label/icon — brighter than text_muted for legibility
     accent: str  # gold/bronze — primary action, active nav, selection
     accent_text: str  # legible text on top of `accent`
     secondary: str  # muted teal — secondary emphasis
@@ -34,6 +35,7 @@ DARK = Palette(
     border="#2a3446",
     text="#e6e9ef",
     text_muted="#8a94a6",
+    nav_label="#f0c94b",  # bright warm gold — readable at a glance on the dark rail
     accent="#c9a227",
     accent_text="#0f1420",
     secondary="#5b8a8f",
@@ -52,6 +54,7 @@ LIGHT = Palette(
     border="#d8d2c4",
     text="#1b2230",
     text_muted="#5c6675",
+    nav_label="#7a5c0f",  # dark goldenrod — warm but readable on the light cream rail
     accent="#b3891f",
     accent_text="#ffffff",
     secondary="#3f6f74",
@@ -75,6 +78,7 @@ HTB = Palette(
     border="#29373f",
     text="#e3edf2",
     text_muted="#8098a3",
+    nav_label="#f5c518",  # bright yellow — pops on the teal rail, distinct from the cyan accent
     accent="#15e4f1",  # Parrot Security cyan-green
     accent_text="#04181c",
     secondary="#5cc8ff",

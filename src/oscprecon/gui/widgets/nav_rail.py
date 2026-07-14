@@ -68,7 +68,7 @@ class NavRail(QWidget):
         self.setStyleSheet(
             f"#navRail {{ background:{pal.surface}; border-right:1px solid {pal.border}; }}"
             "QToolButton {"
-            f" color:{pal.text_muted}; background:transparent; border:none; text-align:left;"
+            f" color:{pal.nav_label}; background:transparent; border:none; text-align:left;"
             f" padding:{tokens.SPACE_SM}px {tokens.SPACE_MD}px; border-radius:{tokens.RADIUS_SM}px;"
             f" min-height:{tokens.CONTROL_HEIGHT}px; }}"
             f" QToolButton:hover {{ color:{pal.text}; background:{pal.surface_alt}; }}"
@@ -78,7 +78,7 @@ class NavRail(QWidget):
             f" QToolButton:disabled {{ color:{pal.border}; }}"
         )
         for key, _, icon, _, _ in _ITEMS:
-            self._buttons[key].setIcon(icons.get_icon(icon, pal.text_muted, tokens.ICON_MD))
+            self._buttons[key].setIcon(icons.get_icon(icon, pal.nav_label, tokens.ICON_MD))
 
     def set_current(self, key: str) -> None:
         # reflect the active page WITHOUT re-emitting navigate (used to sync after a view change, or

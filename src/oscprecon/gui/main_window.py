@@ -147,6 +147,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_NAME)
         self.setWindowIcon(QIcon(str(asset_path(ICON))))
         self.resize(1200, 720)
+        # why: summed pane minimums used to pin the window larger than a laptop screen, so it
+        # couldn't be resized ('all or nothing'). Keep a modest floor; panes scroll/collapse below.
+        self.setMinimumSize(800, 560)
         self._profile: Profile | None = None
         self._auditor: Auditor | None = None
         self._locked_dir: Path | None = None  # the profile dir we currently hold an edit-lock on
@@ -1260,12 +1263,37 @@ class MainWindow(QMainWindow):
 
     def _start_recon(self, scan_profile: str | None) -> None:
         # scan_profile=None → the configured default; a submenu passes an explicit override for
-        # this one run without changing the saved preference.
-        if self._profile is None or not self._tasks.can_start(exclusive=True):
+        # this one run without changing the saved preference. Every early-out tells the user WHY
+        # (§24 — no silent failures); the Scan-menu action reaches here with no profile loaded too.
+        if self._profile is None:
+            QMessageBox.information(
+                self,
+                APP_NAME,
+                "No project is loaded.\n\nCreate one with File → New Project (Ctrl+N), or open an "
+                "existing project, then press Run Full Recon.",
+            )
+            return
+        if self._profile.read_only:
+            QMessageBox.information(
+                self,
+                APP_NAME,
+                "This project is open read-only (another window holds the edit lock), so recon is "
+                "disabled. Close the other window, or open a fresh copy, to run scans.",
+            )
+            return
+        self._show_recon()  # surface the streaming output pane before anything runs
+        if not self._tasks.can_start(exclusive=True):
+            self._tool_panel.append_output(
+                "[busy] a scan is already running — wait for it to finish, or Stop it, "
+                "before starting a full recon."
+            )
             return
         settings = config.load_settings()
         profile_name = scan_profile or settings.scan_profile
-        self._tool_panel.append_output(f"[nmap] starting… (scan profile: {profile_name})")
+        self._tool_panel.append_output(
+            f"[nmap] starting… (scan profile: {profile_name}) — port discovery can take a few "
+            "minutes; live output streams below."
+        )
         worker = NmapWorker(
             self._profile, udp_full=settings.nmap_udp_full, scan_profile=profile_name
         )

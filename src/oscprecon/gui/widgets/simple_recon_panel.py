@@ -61,8 +61,10 @@ class SimpleReconPanel(QWidget):
         top.addLayout(left, stretch=1)
         top.addWidget(manual_box, stretch=1)
 
+        intro = QLabel(spec.intro)
+        intro.setWordWrap(True)  # long intros must not force a wide minimum on the whole tool panel
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(spec.intro))
+        layout.addWidget(intro)
         layout.addLayout(top, stretch=1)
 
     def set_profile(self, profile: Profile) -> None:
