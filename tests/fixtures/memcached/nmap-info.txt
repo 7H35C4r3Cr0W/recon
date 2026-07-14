@@ -1,0 +1,14 @@
+Nmap scan report for 10.10.10.19
+Host is up (0.020s latency).
+
+PORT      STATE SERVICE   VERSION
+11211/tcp open  memcached Memcached 1.6.9
+| memcached-info:
+|   Process ID: 1234
+|   Uptime: 5000 seconds
+|   Server version: 1.6.9
+|   Architecture: 64-bit
+|   Curr connections: 5
+|   Curr items: 42
+|   Total items: 100
+|_  Bytes: 40960

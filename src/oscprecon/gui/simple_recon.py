@@ -15,6 +15,7 @@ from oscprecon.modules import (
     ipmi,
     kerberos,
     kubernetes,
+    memcached,
     mongodb,
     mssql,
     mysql,
@@ -145,6 +146,10 @@ def _docker_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _kubernetes_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in kubernetes.KubernetesModule().recon_steps(target, port)]
+
+
+def _memcached_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in memcached.MemcachedModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -379,5 +384,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(kubernetes),
         kubernetes.KubernetesModule,
         _kubernetes_steps,
+    ),
+    "memcached": SimpleReconSpec(
+        "memcached",
+        "Run full Memcached recon (version · items · stats)",
+        "Memcached recon — nmap memcached-info dumps version + slab/item stats over the text "
+        "protocol (unauth read-only). No SET/DELETE/FLUSH is ever issued.",
+        _manual(memcached),
+        memcached.MemcachedModule,
+        _memcached_steps,
     ),
 }

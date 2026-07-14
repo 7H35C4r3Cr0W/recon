@@ -1,0 +1,19 @@
+# Memcached recon next-steps (unauth read-only stats). Reading slabs/keys is recon; no SET/DELETE/
+# FLUSH and no key writes are ever suggested here.
+- match:
+    service: memcached
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "Memcached is unauthenticated — enumerate slabs and cached keys read-only (may hold secrets)"
+      command: "nmap -p 11211 --script memcached-info {target}"
+# source: HackTricks 11211-memcache (book.hacktricks.wiki) — standard OSCP memcached recon
+
+- match:
+    service: memcached
+    field: kind
+    value: "^items$"
+  suggest:
+    - text: "Cached items are present — read the slab/key metadata read-only for interesting data"
+      command: "nmap -sU -p 11211 --script memcached-info {target}"
+# source: HackTricks 11211-memcache (book.hacktricks.wiki) — standard OSCP memcached recon

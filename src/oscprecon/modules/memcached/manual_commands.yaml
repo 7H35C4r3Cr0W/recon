@@ -1,0 +1,16 @@
+# Memcached manual follow-ups (Tier-2 — shown, never auto-run). Unauth read-only stats over the text
+# protocol; {target}/{port} filled from the active profile. No SET/DELETE/FLUSH — read-only only.
+- description: "Full server stats + slab detail"
+  why: "memcached-info dumps stats, stats items, and stats slabs — read-only"
+  command: "nmap -p {port} --script memcached-info {target}"
+# source: HackTricks 11211-memcache (book.hacktricks.wiki) — standard OSCP memcached recon
+
+- description: "UDP variant"
+  why: "memcached also listens on 11211/udp (amplification port); confirm it read-only"
+  command: "nmap -sU -p {port} --script memcached-info {target}"
+# source: HackTricks 11211-memcache (book.hacktricks.wiki) — standard OSCP memcached recon
+
+- description: "Version banner (-sV)"
+  why: "a plain -sV confirms the memcached version when the stats block is trimmed"
+  command: "nmap -sV -p {port} {target}"
+# source: HackTricks 11211-memcache (book.hacktricks.wiki) — standard OSCP memcached recon
