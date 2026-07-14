@@ -113,7 +113,7 @@ SLIDES: list[dict] = [
     {
         "kind": "image",
         "eyebrow": "Coverage",
-        "title": "48 service modules, TCP & UDP",
+        "title": "49 service modules, TCP & UDP",
         "body": "Every service the scanner maps has a dedicated read-only module — the AD/web core "
         "(HTTP, SMB, LDAP, Kerberos, RDP, WinRM, MSRPC), databases (MSSQL/MySQL/Postgres/Oracle/"
         "Redis/Mongo), HTTP-API stores (Elasticsearch, CouchDB, Docker, Kubernetes, etcd), and the "

@@ -70,7 +70,7 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 
 ## 3. Recon modules — ✅ (core) · 🚧 (breadth)
 
-- **Status:** ✅ — **48 service modules** (every `services.yaml`-mapped service has a backing module).
+- **Status:** ✅ — **49 service modules** (every `services.yaml`-mapped service has a backing module).
 - **Files:** `modules/base.py` (ABC) + `modules/nmap.py` + `modules/<svc>/{__init__.py,parsers.py,
   manual_commands.yaml}` for: **http, vhost, smb, ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios,
   ike, ntp, kerberos**, read-only DB modules **redis, mongodb, mssql, mysql, postgresql, oracle**, the
@@ -82,7 +82,7 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
   SMB is tiered (null/guest, never list-driven); **kerberos** confirms the KDC (Tier-1 `nmap -sV`) and
   offers enum-only AD follow-ups (single-user AS-REP, GetADUsers/GetUserSPNs) — **no cracking, and the
   parser records principals/SPNs but never the AS-REP/TGS hash**.
-- **Complete:** all 48 modules ship engine + parser tests + fixtures + `manual_commands.yaml` +
+- **Complete:** all 49 modules ship engine + parser tests + fixtures + `manual_commands.yaml` +
   `services.yaml` hints + `patterns/*.yaml`. The read-only service modules share one `SimpleReconPanel`
   + `SimpleReconWorker` via `SIMPLE_SPECS` (42 specs); http/smb/ftp/ssh/dns/ldap keep bespoke panels.
   Guard tests: `test_new_modules_policy` (every Tier-1 passes `shell.policy_violation`; every Tier-2
@@ -252,7 +252,7 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 
 ## 14. Completed features (roll-up) — ✅
 
-Phases 0–5 (scaffold, GUI shell + wordlists + references, 48 service modules — 14 core + 6 DB + the
+Phases 0–5 (scaffold, GUI shell + wordlists + references, 49 service modules — 14 core + 6 DB + the
 §12 extended set, pattern
 library + suggestion engine, graph view, resume + Obsidian output, dark/light theme, status footer,
 audit log §6a, concurrent-copy lock §6b) and the full Workspace Dashboard & Organization upgrade
@@ -356,7 +356,7 @@ flowchart TD
 |---|---|---|---|---|
 | Shell & command policy | ✅ | High (`test_shell_policy`, `test_shell_cancel`) | Any new module bypassing the chokepoint | Keep it the only exec path |
 | Task lifecycle | ✅ | High (`test_task_lifecycle/manager`, `test_workers`) | Cancellation under profile switch | None — stable |
-| Service modules | ✅ (48) | High (per-module + parser tests + patterns; policy + panel guard tests) | Tier-2 drift toward brute | None — every module has patterns; kerberos enum-only |
+| Service modules | ✅ (49) | High (per-module + parser tests + patterns; policy + panel guard tests) | Tier-2 drift toward brute | None — every module has patterns; kerberos enum-only |
 | PostgreSQL | ✅ | High (`test_postgresql_*`) | DB-primitive backstop coverage | None — hardened |
 | GUI architecture | ✅ | High (`tests/gui/*`) | Worker lifecycle regressions | None — refactor landed |
 | Profiles | ✅ | High (`test_config/organization`) | Future schema migrations | Keep schema backward-compatible |
