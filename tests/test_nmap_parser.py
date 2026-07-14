@@ -13,6 +13,15 @@ def _raw() -> dict[str, str]:
     }
 
 
+def test_parenthetical_banner_has_no_product_or_version() -> None:
+    # rsync reports just "(protocol version 31)" — no product name, pure extrainfo. It must not be
+    # split into product="(protocol version" / version="31)".
+    raw = {"x": "873/tcp open  rsync   (protocol version 31)\n"}
+    svc = NmapModule().discovered_services(raw)[0]
+    assert svc.service == "rsync"
+    assert svc.product == "" and svc.version == ""
+
+
 def test_parses_open_tcp_ports() -> None:
     services = {(s.port, s.proto): s for s in NmapModule().discovered_services(_raw())}
 

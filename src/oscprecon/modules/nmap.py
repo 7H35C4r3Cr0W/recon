@@ -166,7 +166,9 @@ class NmapModule(Module):
             rest = match.group("rest") or ""
             product = ""
             version = ""
-            if rest:
+            # a leading "(" means nmap detected no product name, just parenthetical extrainfo
+            # (rsync's "(protocol version 31)"); leave product/version empty rather than mangle it.
+            if rest and not rest.startswith("("):
                 # nmap's version column is "<product> [version] [extrainfo]" with a free-text,
                 # often multi-word product ("Redis key-value store", "Samba smbd", "Linux telnetd").
                 # Split on the first version-looking token (starts with a digit) so product and
