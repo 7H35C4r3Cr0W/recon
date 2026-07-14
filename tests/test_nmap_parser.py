@@ -24,6 +24,11 @@ def test_parses_open_tcp_ports() -> None:
     assert services[(80, Proto.TCP)].product == "nginx"
     assert services[(80, Proto.TCP)].version == "1.18.0"
 
+    # multi-word product must stay intact, version must be just the number (extrainfo dropped)
+    assert services[(22, Proto.TCP)].version == "8.4p1"
+    assert services[(139, Proto.TCP)].product == "Samba smbd"
+    assert services[(139, Proto.TCP)].version == "4.6.2"
+
     assert services[(445, Proto.TCP)].service == "microsoft-ds"
 
 

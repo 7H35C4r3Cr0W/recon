@@ -167,9 +167,19 @@ class NmapModule(Module):
             product = ""
             version = ""
             if rest:
-                parts = rest.split(None, 1)
-                product = parts[0]
-                version = parts[1].strip() if len(parts) > 1 else ""
+                # nmap's version column is "<product> [version] [extrainfo]" with a free-text,
+                # often multi-word product ("Redis key-value store", "Samba smbd", "Linux telnetd").
+                # Split on the first version-looking token (starts with a digit) so product and
+                # version are clean and extrainfo noise is dropped; with no version token the whole
+                # banner is the product. Splitting on the first word instead mangled both fields
+                # (product "Redis", version "key-value store 5.0.7").
+                tokens = rest.split()
+                vi = next((i for i, tok in enumerate(tokens) if tok[:1].isdigit()), None)
+                if vi is None:
+                    product = " ".join(tokens)
+                else:
+                    product = " ".join(tokens[:vi])
+                    version = tokens[vi]
             services.append(
                 DiscoveredService(
                     port=int(match.group("port")),
