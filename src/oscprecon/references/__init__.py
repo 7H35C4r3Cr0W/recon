@@ -179,10 +179,17 @@ class ExploitHit:
 class EdbSearch:
     # scope: "version" = product+major.minor produced hits; "product" = version-wide fallback;
     # "none" = no searchable product term. The GUI shows the scope so a fallback isn't mistaken for
-    # a version-specific match.
+    # a version-specific match. `hits` is capped to the top _EDB_MAX_HITS (version-matched first);
+    # `total` is the full match count, so the UI can say "showing top N of M".
     hits: list[ExploitHit]
     query: str
     scope: str
+    total: int = 0
+
+
+# cap what one lookup shows so a broad product (e.g. `apache 2.4` -> 31) doesn't flood the pane or
+# the report; the top slice keeps the version-matched hits (they sort first).
+_EDB_MAX_HITS = 15
 
 
 _CVE_RE = re.compile(r"CVE-\d{4}-\d{4,}", re.IGNORECASE)
@@ -322,12 +329,16 @@ def search_exploits(
     # is an injection seam for tests; production runs searchsploit once per tier.
     core, short = normalize_product(product, version)
     if not core:
-        return EdbSearch([], "", "none")
+        return EdbSearch([], "", "none", 0)
     run = runner if runner is not None else (lambda q: _run_searchsploit(q, output_file))
+
+    def _capped(ranked: list[ExploitHit], query: str, scope: str) -> EdbSearch:
+        return EdbSearch(ranked[:_EDB_MAX_HITS], query, scope, len(ranked))
+
     if short:
         primary = f"{core} {short}"
         hits = run(primary)
         if hits:
-            return EdbSearch(_rank_hits(hits, version, short), primary, "version")
-        return EdbSearch(_rank_hits(run(core), version, short), core, "product")
-    return EdbSearch(_rank_hits(run(core), version, short), core, "product")
+            return _capped(_rank_hits(hits, version, short), primary, "version")
+        return _capped(_rank_hits(run(core), version, short), core, "product")
+    return _capped(_rank_hits(run(core), version, short), core, "product")

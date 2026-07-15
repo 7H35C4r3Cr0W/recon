@@ -220,7 +220,15 @@ def test_search_exploits_version_scope_ranks_matches_first() -> None:
 
 def test_search_exploits_no_product_is_none_scope() -> None:
     result = references.search_exploits("", "", Path("/unused"), runner=lambda q: [])
-    assert result.scope == "none" and result.hits == []
+    assert result.scope == "none" and result.hits == [] and result.total == 0
+
+
+def test_search_exploits_caps_display_but_reports_total() -> None:
+    # a broad product must not flood the pane: cap the shown hits, keep the true total for "top N".
+    many = [references.ExploitHit(str(i), f"Apache 2.4 bug {i}", "u", "p") for i in range(40)]
+    result = references.search_exploits("Apache httpd", "2.4.41", Path("/x"), runner=lambda q: many)
+    assert result.total == 40  # full count preserved
+    assert len(result.hits) == references._EDB_MAX_HITS <= 15  # display capped
 
 
 def test_safe_query_strips_shell_hostile_chars() -> None:

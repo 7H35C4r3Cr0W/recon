@@ -277,16 +277,19 @@ class ReferencePane(QWidget):
 
     @staticmethod
     def _edb_summary_text(search: EdbSearch) -> str:
-        count = len(search.hits)
-        plural = "s" if count != 1 else ""
+        shown = len(search.hits)
+        total = max(search.total, shown)
+        plural = "s" if total != 1 else ""
         query = html.escape(search.query)
+        # when capped, say so plainly so the operator knows more exist on exploit-db.com
+        more = f" — showing top {shown}" if total > shown else ""
         if search.scope == "version":
             matched = sum(1 for h in search.hits if h.version_match)
             note = f"{matched} version-matched (★)" if matched else "version query"
-            return f"<b>{count}</b> result{plural} for <code>{query}</code> — {note}"
+            return f"<b>{total}</b> result{plural} for <code>{query}</code> — {note}{more}"
         return (
-            f"<b>{count}</b> result{plural} for <code>{query}</code> — "
-            "product-wide (no version-specific match)"
+            f"<b>{total}</b> result{plural} for <code>{query}</code> — "
+            f"product-wide (no version-specific match){more}"
         )
 
     @staticmethod
