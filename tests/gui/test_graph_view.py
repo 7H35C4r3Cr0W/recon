@@ -350,6 +350,16 @@ def test_corner_glyph_badges_are_wired_and_secret_safe() -> None:
     assert "Corner glyphs" in index_html  # documented in the legend
 
 
+def test_graph_render_reapplies_filter_and_preserves_view() -> None:
+    # a rebuild starts every node visible; render() must re-apply the declutter filter + search, and
+    # preserve prior node positions + camera so a streamed-host refresh doesn't teleport/snap.
+    app_js = (_GRAPH_HTML / "app.js").read_text()
+    render = app_js.split("function render", 1)[1].split("function refresh", 1)[0]
+    assert "applyFilter()" in render  # re-apply the node-type declutter after rebuild
+    assert "applySearch(search.value)" in render  # re-apply the search highlight
+    assert "prevPos" in render and "prevPan" in render  # keep positions + camera across a refresh
+
+
 def test_fcose_layout_is_vendored_offline_and_wired() -> None:
     # the compound-aware pivot layout must ship offline (no runtime CDN) and be loaded in dep order.
     for name in ("layout-base.js", "cose-base.js", "cytoscape-fcose.js"):

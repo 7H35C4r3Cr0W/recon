@@ -134,6 +134,54 @@ def test_remove_host_and_subnet(tmp_path: Path) -> None:
     assert [h.ip for h in Profile.load(prof.directory).discovered_hosts] == ["172.16.8.10"]
 
 
+def test_remove_prunes_stale_graph_overrides(tmp_path: Path) -> None:
+    # a removed host must not resurrect its old status/note when the range is re-scanned
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.0.0.1"))
+    prof.add_hosts(
+        [
+            DiscoveredHost(
+                ip="10.10.5.10",
+                pivot_source="10.0.0.1",
+                services=[DiscoveredService(445, Proto.TCP, "smb")],
+            ),
+            DiscoveredHost(ip="10.10.5.11", pivot_source="10.0.0.1"),
+        ]
+    )
+    graph = prof.load_graph()
+    graph["node_overrides"]["host-10.10.5.10"] = {"status": "dead-end", "note": "old"}
+    graph["node_overrides"]["hostservice-10.10.5.10-445-tcp"] = {"status": "done"}
+    graph["node_overrides"]["host-10.10.5.11"] = {"status": "investigating"}  # a kept host
+    prof.save_graph(graph)
+
+    prof.remove_host("10.10.5.10")
+    overrides = prof.load_graph()["node_overrides"]
+    assert "host-10.10.5.10" not in overrides  # pruned
+    assert "hostservice-10.10.5.10-445-tcp" not in overrides  # its service pruned too
+    assert "host-10.10.5.11" in overrides  # the kept host's override is untouched
+
+    # re-scan re-adds the host WITHOUT the stale dead-end status
+    prof.add_hosts([DiscoveredHost(ip="10.10.5.10", pivot_source="10.0.0.1")])
+    assert "host-10.10.5.10" not in prof.load_graph()["node_overrides"]
+
+
+def test_remove_subnet_prunes_its_hosts_overrides(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.0.0.1"))
+    prof.add_hosts(
+        [
+            DiscoveredHost(ip="10.10.5.10", pivot_source="10.0.0.1"),
+            DiscoveredHost(ip="172.16.8.10", pivot_source="10.0.0.1"),
+        ]
+    )
+    graph = prof.load_graph()
+    graph["node_overrides"]["host-10.10.5.10"] = {"status": "done"}
+    graph["node_overrides"]["host-172.16.8.10"] = {"status": "done"}
+    prof.save_graph(graph)
+    prof.remove_subnet("10.10.5.0/24")
+    overrides = prof.load_graph()["node_overrides"]
+    assert "host-10.10.5.10" not in overrides  # removed subnet's host pruned
+    assert "host-172.16.8.10" in overrides  # the other subnet's host kept
+
+
 def test_known_host_ips(tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "ctf", Target(ip="10.10.10.5"))
     prof.add_hosts([DiscoveredHost(ip="10.10.5.23"), DiscoveredHost(ip="172.16.8.10")])

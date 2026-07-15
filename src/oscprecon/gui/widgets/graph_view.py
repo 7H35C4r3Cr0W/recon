@@ -464,19 +464,18 @@ class GraphView(QWidget):
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
         self._bridge.set_profile(profile)
-        self._summary.set_profile(profile)
         self.reload()
 
     def clear_profile(self) -> None:
         # drop the profile so a deleted/closed project leaves no ghost in the canvas or summary
         self._profile = None
         self._bridge.set_profile(None)
-        self._summary.set_profile(None)
         self.reload()
 
     def reload(self) -> None:
-        # keep the native summary in sync no matter what the canvas does
-        self._summary.reload()
+        # keep the native summary in sync no matter what the canvas does — a single reload here (not
+        # also in set_profile) so a streamed-host refresh doesn't rebuild the tree twice.
+        self._summary.set_profile(self._profile)
         if self._web is None:
             return
         # push fresh data into the live page rather than reloading the whole page — a full reload

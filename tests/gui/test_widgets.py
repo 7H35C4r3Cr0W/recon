@@ -136,6 +136,16 @@ def test_service_tree_emits_host_selected(qtbot: QtBot) -> None:
     assert isinstance(got[-1], DiscoveredHost) and got[-1].ip == "10.10.5.10"
 
 
+def test_service_tree_reset_view_state_clears_collapse(qtbot: QtBot) -> None:
+    tree = ServiceTree()
+    qtbot.addWidget(tree)
+    tree.populate([], _pivot_hosts())
+    _find(tree, "10.10.5.0/24").setExpanded(False)  # type: ignore[attr-defined]
+    assert tree._collapsed  # a subnet is remembered as collapsed
+    tree.reset_view_state()  # a new project must not inherit the prior one's collapse state
+    assert tree._collapsed == set()
+
+
 def test_service_tree_host_and_subnet_roles(qtbot: QtBot) -> None:
     from oscprecon.gui.widgets.service_tree import _HOST_ROLE, _SUBNET_ROLE
 

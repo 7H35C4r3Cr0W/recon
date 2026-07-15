@@ -11,7 +11,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, QThread
+from PySide6.QtCore import Qt, QThread, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QDialog,
@@ -181,6 +181,10 @@ class MainWindow(QMainWindow):
         self._service_tree.scan_host_requested.connect(self._on_scan_host_requested)
         self._service_tree.remove_host_requested.connect(self._on_remove_host)
         self._service_tree.remove_subnet_requested.connect(self._on_remove_subnet)
+        # coalesces streamed-host UI refreshes (see _schedule_topology_refresh)
+        self._topology_refresh_timer = QTimer(self)
+        self._topology_refresh_timer.setSingleShot(True)
+        self._topology_refresh_timer.timeout.connect(self._refresh_topology_views)
         self._tool_panel = ToolPanel()
         self._tool_panel.run_requested.connect(self._on_run_command)
         self._tool_panel.http_run_requested.connect(self._on_http_run)
@@ -580,6 +584,7 @@ class MainWindow(QMainWindow):
                 self._service_tree.set_empty_message(
                     f"No services yet.\nClick “Run Full Recon” to scan {target.ip}."
                 )
+        self._service_tree.reset_view_state()  # don't carry the prior project's collapse state
         self._service_tree.populate(
             profile.discovered_services, profile.discovered_hosts, force=True
         )
@@ -1229,6 +1234,11 @@ class MainWindow(QMainWindow):
         self._audit_action("pivot-network-added", hosts=len(hosts), subnets=len(subnets))
         self._refresh_topology_views()
 
+    def _schedule_topology_refresh(self) -> None:
+        # coalesce a burst of streamed hosts (a /24 fires ~10-30 host_found signals in seconds) into
+        # ONE tree+graph rebuild — rebuilding per host is O(n^2) and thrashes the canvas at scale.
+        self._topology_refresh_timer.start(250)
+
     def _refresh_topology_views(self) -> None:
         # after hosts change: redraw the recon-tab tree AND the graph spider-web / native summary
         if self._profile is None:
@@ -1363,7 +1373,7 @@ class MainWindow(QMainWindow):
             svc = len(host.services)
             plural = "s" if svc != 1 else ""
             self._tool_panel.append_output(f"[scan] + {host.ip} ({svc} service{plural})")
-            self._refresh_topology_views()
+            self._schedule_topology_refresh()  # coalesced — one rebuild per burst, not per host
 
     def _on_custom_scan_done(
         self, exit_code: int, profile: Profile, is_entry: bool, output_file: Path
@@ -1382,6 +1392,7 @@ class MainWindow(QMainWindow):
                 )
                 profile.save()
         if profile is self._profile:
+            self._topology_refresh_timer.stop()  # this is the final, authoritative refresh
             self._service_tree.populate(
                 profile.discovered_services, profile.discovered_hosts, force=True
             )

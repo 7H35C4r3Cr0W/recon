@@ -270,21 +270,66 @@ class Profile:
         # pivot_source string, but the graph simply omits the now-dangling pivot edge — no crash.
         before = len(self.discovered_hosts)
         self.discovered_hosts = [h for h in self.discovered_hosts if h.ip != ip]
-        if len(self.discovered_hosts) != before:
-            self.touch()
-            return True
-        return False
+        if len(self.discovered_hosts) == before:
+            return False
+        self._prune_graph_for_hosts([ip])
+        self.touch()
+        return True
 
     def remove_subnet(self, subnet: str) -> int:
         # drop a whole /24 (every host in it) from the topology. Returns the number removed.
-        before = len(self.discovered_hosts)
-        self.discovered_hosts = [
-            h for h in self.discovered_hosts if (h.subnet or subnet_of(h.ip)) != subnet
-        ]
-        removed = before - len(self.discovered_hosts)
-        if removed:
+        def in_subnet(h: DiscoveredHost) -> bool:
+            return (h.subnet or subnet_of(h.ip)) == subnet
+
+        removed_ips = [h.ip for h in self.discovered_hosts if in_subnet(h)]
+        self.discovered_hosts = [h for h in self.discovered_hosts if not in_subnet(h)]
+        if removed_ips:
+            self._prune_graph_for_hosts(removed_ips)
             self.touch()
-        return removed
+        return len(removed_ips)
+
+    def _prune_graph_for_hosts(self, ips: list[str]) -> None:
+        # drop graph.json overrides (status / note / position) + user-edges tied to removed hosts,
+        # so re-scanning the same range doesn't resurrect a host pre-marked with stale state, and
+        # orphan overrides don't pile up. Node ids: host-<ip>, hostservice-<ip>-*, subnet-<cidr>.
+        if not ips or self.read_only:
+            return
+        graph = self.load_graph()
+        dead = {f"host-{ip}" for ip in ips}
+        hs_prefixes = tuple(f"hostservice-{ip}-" for ip in ips)
+        live_subnets = {f"subnet-{h.subnet}" for h in self.discovered_hosts if h.subnet}
+        overrides = graph.get("node_overrides", {})
+        changed = False
+        if isinstance(overrides, dict):
+            for key in list(overrides):
+                gone = (
+                    key in dead
+                    or key.startswith(hs_prefixes)
+                    or (key.startswith("subnet-") and key not in live_subnets)
+                )
+                if gone:
+                    del overrides[key]
+                    changed = True
+        edges = graph.get("user_edges", [])
+        if isinstance(edges, list):
+            kept = [
+                e
+                for e in edges
+                if not (
+                    isinstance(e, dict)
+                    and (
+                        str(e.get("from", "")) in dead
+                        or str(e.get("to", "")) in dead
+                        or str(e.get("from", "")).startswith(hs_prefixes)
+                        or str(e.get("to", "")).startswith(hs_prefixes)
+                    )
+                )
+            ]
+            if len(kept) != len(edges):
+                graph["user_edges"] = kept
+                changed = True
+        if changed:
+            self.save_graph(graph)
 
     def set_hostname(self, hostname: str | None) -> None:
         # the vhost name is usually learned AFTER the first scan (a redirect, a cert CN, a contact

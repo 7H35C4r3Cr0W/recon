@@ -542,11 +542,23 @@
 
   function render(elements) {
     registerExtensions();
-    // rebuild from scratch each refresh — destroy the old instance so handlers/state don't stack up
+    // rebuild from scratch each refresh — destroy the old instance so handlers/state don't stack up.
+    // BUT first capture the current node positions + camera so a refresh (e.g. a host streaming in)
+    // doesn't teleport existing nodes or snap the viewport back to fit — only genuinely-new nodes
+    // need laying out.
+    var prevPos = {};
+    var prevPan = null;
+    var prevZoom = null;
     if (cy) {
+      cy.nodes().forEach(function (n) {
+        prevPos[n.id()] = { x: n.position("x"), y: n.position("y") };
+      });
+      prevPan = cy.pan();
+      prevZoom = cy.zoom();
       cy.destroy();
       cy = null;
     }
+    var hadPrev = Object.keys(prevPos).length > 0;
     var nodeCount = (elements && elements.nodes ? elements.nodes.length : 0);
     // a lone target node (no services yet) is effectively empty — tell the user how to populate it
     var serviceCount = 0;
@@ -572,11 +584,35 @@
     window.cy = cy; // exposed for the web inspector / render checks
     cy.nodes().forEach(applyGlyphs); // corner badges (danger / OS / status / note)
 
+    // restore prior positions to nodes we've seen before; a node with no prior position is new
+    var newNodes = 0;
+    if (hadPrev) {
+      cy.nodes().forEach(function (n) {
+        var p = prevPos[n.id()];
+        if (p) n.position(p);
+        else newNodes++;
+      });
+    }
+
     var hasSaved = (elements.nodes || []).some(function (n) {
       return n.position;
     });
-    if (hasSaved) cy.fit(undefined, 40);
-    else runLayout("hier");
+    if (!hadPrev) {
+      // first render of this graph: full layout (or fit if graph.json has saved positions)
+      if (hasSaved) cy.fit(undefined, 40);
+      else runLayout("hier");
+    } else if (newNodes > 0) {
+      // refresh with new nodes (a streamed host): re-layout so they get placed, then keep the camera
+      runLayout("hier");
+      if (prevPan && prevZoom) {
+        cy.zoom(prevZoom);
+        cy.pan(prevPan);
+      }
+    } else if (prevPan && prevZoom) {
+      // pure refresh (status/note edit, no new node): keep positions AND camera exactly as they were
+      cy.zoom(prevZoom);
+      cy.pan(prevPan);
+    }
 
     cy.on("tap", "node", function (evt) {
       var id = evt.target.id();
@@ -651,6 +687,10 @@
       };
 
     buildMinimap(elements);
+    // a rebuild starts every node visible + unhighlighted; re-apply the user's declutter (a hidden
+    // node type) and search so unchecking "services" or a search term survives a refresh.
+    applyFilter();
+    if (search && search.value) applySearch(search.value);
   }
 
   // (Re)fetch the current profile's elements from Qt and render them in place. Exposed to Qt so a

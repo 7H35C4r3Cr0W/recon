@@ -231,20 +231,24 @@ def test_scan_host_found_adds_host_and_shows_in_recon_tree(
         services=[DiscoveredService(445, Proto.TCP, "smb")],
     )
     window._on_scan_host_found(host, prof)  # streamed host from a range scan
-    assert [h.ip for h in window._profile.discovered_hosts] == ["10.10.5.23"]
-    # it shows in the recon-tab tree under a Pivoted networks branch
-    labels = []
-
-    def walk(item: object) -> None:
-        labels.append(item.text(0))  # type: ignore[attr-defined]
-        for i in range(item.childCount()):  # type: ignore[attr-defined]
-            walk(item.child(i))  # type: ignore[attr-defined]
-
+    assert [h.ip for h in window._profile.discovered_hosts] == ["10.10.5.23"]  # data is immediate
+    # the tree refresh is COALESCED (a single-shot timer) so a burst of hosts is one rebuild — wait
     tree = window._service_tree
-    for i in range(tree.topLevelItemCount()):
-        walk(tree.topLevelItem(i))
-    assert any("Pivoted networks" in x for x in labels)
-    assert any("10.10.5.23" in x for x in labels)
+
+    def _labels() -> list[str]:
+        out: list[str] = []
+
+        def walk(item: object) -> None:
+            out.append(item.text(0))  # type: ignore[attr-defined]
+            for i in range(item.childCount()):  # type: ignore[attr-defined]
+                walk(item.child(i))  # type: ignore[attr-defined]
+
+        for i in range(tree.topLevelItemCount()):
+            walk(tree.topLevelItem(i))
+        return out
+
+    qtbot.waitUntil(lambda: any("10.10.5.23" in x for x in _labels()), timeout=2000)
+    assert any("Pivoted networks" in x for x in _labels())
     window.close()
 
 

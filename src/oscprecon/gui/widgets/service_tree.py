@@ -53,6 +53,11 @@ class ServiceTree(QTreeWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
 
+    def reset_view_state(self) -> None:
+        # a fresh project: forget the previous one's collapse state so a subnet folded shut in
+        # project A doesn't come up folded in project B just because it shares a CIDR.
+        self._collapsed.clear()
+
     def set_empty_message(self, text: str) -> None:
         self._empty_message = text
         viewport = self.viewport()
