@@ -101,13 +101,6 @@ class NmapModule(Module):
             "1-5 min",
             "nmap/udp-top100.txt",
         )
-        udp_full = Command(
-            "nmap",
-            f"nmap -sU -p- {host}",
-            "Full UDP sweep — very slow, opt-in only.",
-            "slow",
-            "nmap/udp-full.txt",
-        )
         if self.scan_profile == "quick":
             return [top1000_fast]  # fast triage: no full -p-, no UDP
         if self.scan_profile == "exam":
@@ -135,10 +128,28 @@ class NmapModule(Module):
                 ),
                 udp_top100,
             ]
-        # `full` always adds the slow UDP sweep; others only on the explicit udp_full opt-in.
-        if self.udp_full or self.scan_profile == "full":
-            cmds.append(udp_full)
         return cmds
+
+    def _udp_full_command(self, host: str) -> Command:
+        return Command(
+            "nmap",
+            f"nmap -sU -p- {host}",
+            "Full 65535-port UDP sweep — very slow; deferred to run after the versioned scan.",
+            "slow",
+            "nmap/udp-full.txt",
+        )
+
+    def deferred_commands(self, target: Target) -> list[Command]:
+        # why: UDP -p- is hours-slow and low-yield, so it must never block the high-value versioned
+        # TCP scan. The orchestrator runs these LAST (after -sV -sC) so the useful results land
+        # first and the sweep can be cancelled once you have them. `full` includes it (what makes
+        # `full` more than `default`); others only on the --udp-full opt-in (CLAUDE.md §8). `quick`
+        # is TCP-only triage and never runs UDP, even with --udp-full.
+        if self.scan_profile == "quick":
+            return []
+        if self.udp_full or self.scan_profile == "full":
+            return [self._udp_full_command(target.ip)]
+        return []
 
     def discovered_services(self, raw_outputs: dict[str, str]) -> list[DiscoveredService]:
         merged: dict[tuple[int, Proto], DiscoveredService] = {}

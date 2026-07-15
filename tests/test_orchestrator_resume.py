@@ -186,6 +186,30 @@ def test_reusable_reruns_when_command_args_changed(tmp_path: Path) -> None:
     assert Orchestrator(prof, resume=True)._reusable(cmd) is False
 
 
+def test_full_profile_runs_udp_full_after_versioned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # the `full` profile's slow UDP -p- sweep must run LAST — after the versioned -sV -sC scan — so
+    # the high-value TCP service versions land before the hours-slow UDP sweep starts.
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    calls: list[str] = []
+    monkeypatch.setattr(shell, "run", _counting_run(calls))
+    Orchestrator(prof, scan_profile="full").run_nmap()
+    versioned = next(i for i, c in enumerate(calls) if "-sV -sC" in c)
+    udp_full = next(i for i, c in enumerate(calls) if "-sU -p-" in c)
+    assert udp_full > versioned  # UDP -p- is deferred to run after the versioned scan
+
+
+def test_default_profile_never_runs_udp_full(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+    calls: list[str] = []
+    monkeypatch.setattr(shell, "run", _counting_run(calls))
+    Orchestrator(prof, scan_profile="default").run_nmap()
+    assert not any("-sU -p-" in c for c in calls)  # default never runs the full UDP sweep
+
+
 def test_orchestrator_stops_when_precancelled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

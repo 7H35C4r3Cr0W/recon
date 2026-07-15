@@ -161,6 +161,19 @@ class Orchestrator:
             self.profile.set_services(self.nmap.discovered_services(raw))
             self.profile.save()
 
+        # why: the slow full UDP sweep (`full` profile / --udp-full opt-in) runs LAST — after the
+        # versioned TCP scan — so it never blocks the high-value service versions and can be
+        # cancelled once those have landed.
+        if not self._cancelled():
+            deferred = self.nmap.deferred_commands(target)
+            if deferred:
+                for cmd in deferred:
+                    if self._cancelled():
+                        break
+                    raw[cmd.output_file] = self._run(cmd)
+                self.profile.set_services(self.nmap.discovered_services(raw))
+                self.profile.save()
+
         self._handle_redirect_vhosts(raw)
 
         Reporter(self.profile).write()

@@ -23,9 +23,14 @@ def test_default_profile_matches_bare_default() -> None:
     ]
 
 
-def test_udp_full_is_opt_in() -> None:
-    cmds = NmapModule(udp_full=True).commands(_TARGET, [])
-    assert any(c.output_file == "nmap/udp-full.txt" for c in cmds)
+def test_udp_full_is_opt_in_and_deferred() -> None:
+    module = NmapModule(udp_full=True)
+    # udp -p- is NOT in the discovery battery (it must not block the versioned scan)...
+    assert all(c.output_file != "nmap/udp-full.txt" for c in module.commands(_TARGET, []))
+    # ...it is a deferred command the orchestrator runs LAST, after -sV -sC
+    assert [c.output_file for c in module.deferred_commands(_TARGET)] == ["nmap/udp-full.txt"]
+    # without the opt-in and not the `full` profile, there is no udp-full at all
+    assert NmapModule().deferred_commands(_TARGET) == []
 
 
 def test_quick_profile_is_top1000_only() -> None:
@@ -49,9 +54,21 @@ def test_exam_profile_is_tight_fast_and_exam_legal() -> None:
     assert "--script vuln" not in lines  # exam-legal: no vuln NSE in the auto battery
 
 
-def test_full_profile_always_includes_udp_full() -> None:
-    cmds = NmapModule(scan_profile="full").commands(_TARGET, [])  # no udp_full flag
-    assert any(c.output_file == "nmap/udp-full.txt" for c in cmds)
+def test_full_profile_defers_udp_full_after_versioned() -> None:
+    module = NmapModule(scan_profile="full")  # no udp_full flag
+    # `full`'s discovery battery is the same fast TCP + UDP-top100 as default — no blocking udp -p-
+    assert [c.output_file for c in module.commands(_TARGET, [])] == [
+        "nmap/tcp-top1000.txt",
+        "nmap/tcp-full.txt",
+        "nmap/udp-top100.txt",
+    ]
+    # what makes `full` more than `default`: it defers the full UDP sweep to run after the versioned
+    assert [c.output_file for c in module.deferred_commands(_TARGET)] == ["nmap/udp-full.txt"]
+
+
+def test_quick_never_runs_udp_even_deferred() -> None:
+    # quick is TCP-only triage — no UDP anywhere, even with the --udp-full opt-in
+    assert NmapModule(scan_profile="quick", udp_full=True).deferred_commands(_TARGET) == []
 
 
 def test_unknown_profile_falls_back_to_default() -> None:
@@ -64,8 +81,10 @@ def test_every_profile_battery_passes_the_exec_policy() -> None:
     # every generated nmap line must clear the §2 allow/deny policy — recon-only, no brute/spray
     for profile in ("quick", "default", "full", "exam"):
         module = NmapModule(udp_full=True, scan_profile=profile)
-        cmds = module.commands(_TARGET, []) + module.commands(
-            _TARGET, [Port(number=445, proto=Proto.TCP)]
+        cmds = (
+            module.commands(_TARGET, [])
+            + module.commands(_TARGET, [Port(number=445, proto=Proto.TCP)])
+            + module.deferred_commands(_TARGET)
         )
         for cmd in cmds:
             assert shell.policy_violation(shlex.split(cmd.shell_line)) is None, cmd.shell_line
