@@ -3,10 +3,44 @@ from pathlib import Path
 from oscprecon import audit
 from oscprecon import edb as edb_mod
 from oscprecon import findings as findings_mod
-from oscprecon.models import DiscoveredService, Proto, Target
+from oscprecon.models import DiscoveredHost, DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 from oscprecon.references import ExploitHit
 from oscprecon.reporter import Reporter, _finding_line
+
+
+def test_report_pivot_topology_section(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.129.33.39", hostname="ignition.htb"))
+    prof.add_hosts(
+        [
+            DiscoveredHost(
+                ip="10.10.5.10",
+                hostname="dc01.corp.local",
+                pivot_source="10.129.33.39",
+                os_guess="Windows",
+                services=[
+                    DiscoveredService(445, Proto.TCP, "smb", product="Windows", version="10")
+                ],
+            ),
+            DiscoveredHost(ip="172.16.8.10", pivot_source="10.10.5.10"),
+        ]
+    )
+    report = Reporter(prof).render()
+    assert "## Pivot topology" in report
+    assert "### 10.10.5.0/24 — 1 host(s)" in report
+    assert "### 172.16.8.0/24 — 1 host(s)" in report
+    assert "**10.10.5.10** (dc01.corp.local) — Windows — via `10.129.33.39`" in report
+    # the service bullet is on its own indented line (not glued to the host line)
+    assert "\n  - 445/tcp smb — Windows 10" in report
+    assert "**172.16.8.10** — via `10.10.5.10`" in report
+    assert "_no services enumerated_" in report  # host with 0 services
+
+
+def test_report_pivot_topology_empty(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "solo", Target(ip="10.0.0.1"))
+    report = Reporter(prof).render()
+    assert "## Pivot topology" in report
+    assert "No pivoted hosts recorded" in report
 
 
 def test_finding_line_kind_value_detail_shape() -> None:

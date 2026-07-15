@@ -70,6 +70,28 @@ _No Exploit-DB matches recorded — select a versioned service to run searchsplo
 _No service findings yet — run the service modules._
 {% endfor %}
 
+## Pivot topology
+{% if pivot_networks %}
+
+Hosts reached across a pivot from the entry host `{{ entry_ip }}` — {{ pivot_host_count }} host(s) across {{ pivot_networks | length }} subnet(s). Grouped by subnet; `via` names the host each was reached through.
+{% for net in pivot_networks %}
+
+### {{ net.subnet }} — {{ net.host_count }} host(s)
+{% for h in net.hosts %}
+- {{ h.header }}
+{% for s in h.services %}
+  - {{ s.port }}/{{ s.proto }} {{ s.service }}{{ " — %s" % s.detail if s.detail else "" }}
+{% endfor %}
+{% if not h.services %}
+  - _no services enumerated_
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% else %}
+
+_No pivoted hosts recorded — use **Edit → Add Pivoted Network** to import an internal scan run across your tunnel._
+{% endif %}
+
 ## Suggested next steps
 {% for s in suggestions %}
 

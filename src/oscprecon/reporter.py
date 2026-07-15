@@ -9,6 +9,7 @@ from jinja2 import Environment, FileSystemLoader
 from oscprecon import audit, references
 from oscprecon import edb as edb_mod
 from oscprecon import findings as findings_mod
+from oscprecon.models import DiscoveredHost
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
 
@@ -105,6 +106,20 @@ def _group_edb(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{"service": service, "hits": groups[service]} for service in groups]
 
 
+def _host_header(host: DiscoveredHost) -> str:
+    # build the pivoted-host bullet header in Python so the template line ends in content (Jinja
+    # trim_blocks would otherwise eat the newline after a line-ending {% endif %} and glue the first
+    # service bullet onto this line).
+    header = f"**{host.ip}**"
+    if host.hostname:
+        header += f" ({host.hostname})"
+    if host.os_guess:
+        header += f" — {host.os_guess}"
+    if host.pivot_source:
+        header += f" — via `{host.pivot_source}`"
+    return header
+
+
 class Reporter:
     def __init__(self, profile: Profile) -> None:
         self.profile = profile
@@ -156,6 +171,31 @@ class Reporter:
             domain=profile.target.hostname or "",
             has_credential=bool(profile.credentials()),
         )
+        subnets: dict[str, list[Any]] = {}
+        for host in profile.discovered_hosts:
+            subnets.setdefault(host.subnet or "unknown", []).append(host)
+        pivot_networks = [
+            {
+                "subnet": subnet,
+                "host_count": len(subnets[subnet]),
+                "hosts": [
+                    {
+                        "header": _host_header(host),
+                        "services": [
+                            {
+                                "port": s.port,
+                                "proto": s.proto.value,
+                                "service": s.service,
+                                "detail": " ".join(p for p in (s.product, s.version) if p),
+                            }
+                            for s in sorted(host.services, key=lambda s: (s.port, s.proto.value))
+                        ],
+                    }
+                    for host in sorted(subnets[subnet], key=lambda h: h.ip)
+                ],
+            }
+            for subnet in sorted(subnets)
+        ]
         return {
             "profile_name": profile.profile_name,
             "target": {
@@ -173,6 +213,9 @@ class Reporter:
             "command_history": profile.command_history,
             "tags": profile.tags,
             "notes": notes,
+            "entry_ip": profile.target.ip,
+            "pivot_networks": pivot_networks,
+            "pivot_host_count": len(profile.discovered_hosts),
             "suggestions": [
                 {
                     "text": s.text,
