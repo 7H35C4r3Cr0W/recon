@@ -319,6 +319,21 @@ def test_graph_app_js_exposes_refresh_and_overlay() -> None:
     assert 'id="cy-overlay"' in index_html
 
 
+def test_icon_nodes_and_hover_are_wired_and_secret_safe() -> None:
+    app_js = (_GRAPH_HTML / "app.js").read_text()
+    index_html = (_GRAPH_HTML / "index.html").read_text()
+    # BloodHound-style icon nodes: an ICON map + per-type background-image (inline SVG data URIs)
+    assert "var ICON" in app_js
+    assert "background-image" in app_js and "data:image/svg+xml" in app_js
+    for glyph in ("target", "host", "service", "finding", "credential"):
+        assert f"{glyph}:" in app_js.split("var ICON", 1)[1].split("];", 1)[0]
+    # hover peek exists and is built safely (textContent, never innerHTML)
+    assert 'id="node-tip"' in index_html
+    tip = app_js.split("function showTip", 1)[1].split("function hideTip", 1)[0]
+    assert "innerHTML" not in tip  # no HTML injection from banner text
+    assert "secret" not in tip.lower()  # the tooltip must never surface a credential secret
+
+
 def test_fcose_layout_is_vendored_offline_and_wired() -> None:
     # the compound-aware pivot layout must ship offline (no runtime CDN) and be loaded in dep order.
     for name in ("layout-base.js", "cose-base.js", "cytoscape-fcose.js"):

@@ -16,33 +16,93 @@
   var linkSource = null;
   var svgReady = false;
 
-  var DEFAULT_HINT = "search · red ring = notable · dbl-click a service to collapse · drag (saved) · click for detail";
+  var DEFAULT_HINT = "search · hover for detail · red ring = notable · dbl-click a service to collapse · drag (saved) · click to select";
+
+  // BloodHound-style icon nodes: a coloured disc with a white/dark glyph and the label below. Icons
+  // are inline SVGs (no network) encoded as data URIs. `#c` is the placeholder colour so one template
+  // serves a light glyph (on the dark target) or a dark glyph (on the pale service/finding discs).
+  function icon(svg, color) {
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg.replace(/#c/g, color));
+  }
+  var TPL = {
+    target:
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='9' fill='none' stroke='#c' stroke-width='2'/><circle cx='12' cy='12' r='4.5' fill='none' stroke='#c' stroke-width='2'/><circle cx='12' cy='12' r='1.5' fill='#c'/></svg>",
+    host: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='3' y='4' width='18' height='12' rx='1.5' fill='none' stroke='#c' stroke-width='2'/><line x1='9' y1='20' x2='15' y2='20' stroke='#c' stroke-width='2'/><line x1='12' y1='16' x2='12' y2='20' stroke='#c' stroke-width='2'/></svg>",
+    service:
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='4' y='5' width='16' height='4' rx='1' fill='#c'/><rect x='4' y='11' width='16' height='4' rx='1' fill='#c'/><rect x='4' y='17' width='16' height='2.6' rx='1' fill='#c'/></svg>",
+    finding:
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='10' cy='10' r='6' fill='none' stroke='#c' stroke-width='2'/><line x1='14.5' y1='14.5' x2='20' y2='20' stroke='#c' stroke-width='2.6'/></svg>",
+    credential:
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='8' cy='8' r='4.5' fill='none' stroke='#c' stroke-width='2'/><path d='M11 11 L20 20 M18 18 l2 -2 M16 20 l2 -2' stroke='#c' stroke-width='2' fill='none'/></svg>",
+    reference:
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 4 h9 a2 2 0 0 1 2 2 v14 H8 a2 2 0 0 1 -2 -2 z' fill='none' stroke='#c' stroke-width='2'/><line x1='6' y1='16' x2='15' y2='16' stroke='#c' stroke-width='2'/></svg>",
+    artifact:
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 3 h8 l4 4 v14 H6 z' fill='none' stroke='#c' stroke-width='2'/><path d='M14 3 v4 h4' fill='none' stroke='#c' stroke-width='2'/></svg>",
+    note: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M4 20 l1-4 L16 5 l3 3 L8 19 z' fill='none' stroke='#c' stroke-width='2'/></svg>",
+  };
+  var DARK = "#11111b";
+  var LIGHT = "#e6edf3";
+  var ICON = {
+    target: icon(TPL.target, LIGHT),
+    host: icon(TPL.host, DARK),
+    service: icon(TPL.service, DARK),
+    finding: icon(TPL.finding, DARK),
+    credential: icon(TPL.credential, LIGHT),
+    reference: icon(TPL.reference, DARK),
+    artifact: icon(TPL.artifact, DARK),
+    note: icon(TPL.note, DARK),
+  };
 
   var STYLE = [
     {
       selector: "node",
       style: {
+        // icon disc + label below (BloodHound-style). Label sits on the dark canvas, so it is light
+        // with an outline for legibility over edges. Default glyph is the service icon.
         label: "data(label)",
         "text-wrap": "wrap",
-        "text-valign": "center",
+        "text-valign": "bottom",
         "text-halign": "center",
-        "text-max-width": 150,
-        color: "#11111b",
-        "font-size": 11,
-        width: "label",
-        height: "label",
-        padding: "8px",
-        shape: "round-rectangle",
+        "text-margin-y": 4,
+        "text-max-width": 130,
+        color: "#cdd6f4",
+        "text-outline-width": 2,
+        "text-outline-color": "#181825",
+        "font-size": 10,
+        width: 34,
+        height: 34,
+        shape: "ellipse",
         "background-color": "#89b4fa",
+        "background-image": ICON.service,
+        "background-width": "56%",
+        "background-height": "56%",
+        "border-width": 2,
+        "border-color": "#11111b",
+        "border-opacity": 0.55,
       },
     },
     {
       selector: 'node[type="target"]',
-      style: { "background-color": "#1e3a8a", color: "#e0e7ff", shape: "ellipse", "font-size": 14 },
+      style: {
+        "background-color": "#1e3a8a",
+        "background-image": ICON.target,
+        width: 52,
+        height: 52,
+        "font-size": 12,
+      },
     },
-    { selector: 'node[type="service"][proto="tcp"]', style: { "background-color": "#89b4fa" } },
-    { selector: 'node[type="service"][proto="udp"]', style: { "background-color": "#a6e3a1" } },
-    { selector: 'node[type="finding"]', style: { "background-color": "#f9e2af" } },
+    {
+      selector: 'node[type="service"][proto="tcp"]',
+      style: { "background-color": "#89b4fa", "background-image": ICON.service },
+    },
+    {
+      selector: 'node[type="service"][proto="udp"]',
+      style: { "background-color": "#a6e3a1", "background-image": ICON.service },
+    },
+    {
+      selector: 'node[type="finding"]',
+      style: { "background-color": "#f9e2af", "background-image": ICON.finding },
+    },
     // pivot topology: a subnet is a compound box that visually contains its hosts; a host is a node
     // reached across a pivot; the pivots-into edge shows which host we tunnelled through.
     {
@@ -50,30 +110,47 @@
       style: {
         "background-color": "#585b70",
         "background-opacity": 0.12,
+        "background-image": "none", // a compound box, not an icon node
         "border-width": 1,
         "border-color": "#9399b2",
         "border-style": "dashed",
         shape: "round-rectangle",
         "text-valign": "top",
         "text-halign": "center",
+        "text-margin-y": 0,
         "font-size": 13,
         color: "#bac2de",
-        padding: "18px",
+        padding: "20px",
       },
     },
     {
       selector: 'node[type="host"]',
-      style: { "background-color": "#74c7ec", color: "#11111b", shape: "round-rectangle", "font-size": 12 },
+      style: {
+        "background-color": "#74c7ec",
+        "background-image": ICON.host,
+        width: 44,
+        height: 44,
+        "font-size": 11,
+      },
     },
     // exploit-db / searchsploit hits are references to READ, not confirmed vulns — colour them
     // distinctly (lavender) and never with the notable ring, so they don't read as danger.
-    { selector: 'node[category="reference"]', style: { "background-color": "#cba6f7" } },
-    { selector: 'node[type="artifact"]', style: { "background-color": "#fab387" } },
+    {
+      selector: 'node[category="reference"]',
+      style: { "background-color": "#cba6f7", "background-image": ICON.reference },
+    },
+    {
+      selector: 'node[type="artifact"]',
+      style: { "background-color": "#fab387", "background-image": ICON.artifact },
+    },
     {
       selector: 'node[type="credential"]',
-      style: { "background-color": "#f38ba8", color: "#e0e7ff" },
+      style: { "background-color": "#f38ba8", "background-image": ICON.credential, width: 40, height: 40 },
     },
-    { selector: 'node[type="note"]', style: { "background-color": "#9399b2" } },
+    {
+      selector: 'node[type="note"]',
+      style: { "background-color": "#9399b2", "background-image": ICON.note },
+    },
     { selector: "node[status]", style: { "border-width": 3, "border-color": "#f9e2af" } },
     { selector: 'node[status="done"]', style: { "border-color": "#a6e3a1" } },
     { selector: 'node[status="dead-end"]', style: { opacity: 0.45 } },
@@ -324,6 +401,40 @@
     updateViewportRect();
   }
 
+  // hover peek (BloodHound-style). Built with textContent per line — never innerHTML — so a banner
+  // with HTML in it can't inject, and it NEVER reads data('secret'): creds show only user@domain.
+  function showTip(node) {
+    var tip = document.getElementById("node-tip");
+    if (!tip || !cy) return;
+    var d = node.data();
+    var rows = [["", String(d.label || d.id || "")]];
+    if (d.type) rows.push(["type", d.type]);
+    if (d.port) rows.push(["port", d.port + "/" + (d.proto || "")]);
+    if (d.cidr) rows.push(["subnet", d.cidr]);
+    if (d.module) rows.push(["module", d.module]);
+    if (d.source) rows.push(["source", d.source]);
+    if (d.category) rows.push(["category", d.category]);
+    if (d.status) rows.push(["status", d.status]);
+    if (d.note) rows.push(["note", d.note]);
+    tip.textContent = "";
+    rows.forEach(function (r) {
+      var line = document.createElement("div");
+      line.textContent = r[0] ? r[0] + ": " + r[1] : r[1];
+      if (!r[0]) line.style.fontWeight = "bold";
+      tip.appendChild(line);
+    });
+    var rect = document.getElementById("cy").getBoundingClientRect();
+    var rp = node.renderedPosition();
+    var bb = node.renderedBoundingBox();
+    tip.style.left = rect.left + rp.x + 14 + "px";
+    tip.style.top = rect.top + bb.y1 - 6 + "px";
+    tip.style.display = "block";
+  }
+  function hideTip() {
+    var tip = document.getElementById("node-tip");
+    if (tip) tip.style.display = "none";
+  }
+
   function render(elements) {
     registerExtensions();
     // rebuild from scratch each refresh — destroy the old instance so handlers/state don't stack up
@@ -401,6 +512,11 @@
     });
 
     cy.on("pan zoom resize", updateViewportRect);
+    cy.on("mouseover", "node", function (evt) {
+      showTip(evt.target);
+    });
+    cy.on("mouseout", "node", hideTip);
+    cy.on("pan zoom drag", hideTip);
 
     document.getElementById("layout-hier").onclick = function () {
       runLayout("hier");

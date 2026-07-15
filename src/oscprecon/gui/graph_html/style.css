@@ -55,6 +55,23 @@ body {
   position: relative;
 }
 
+#node-tip {
+  position: fixed;
+  display: none;
+  z-index: 60;
+  max-width: 280px;
+  padding: 6px 9px;
+  background: rgba(17, 17, 27, 0.96);
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  color: #cdd6f4;
+  font-size: 11px;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  word-break: break-word;
+}
+
 #cy-overlay {
   position: fixed;
   top: 33px;
