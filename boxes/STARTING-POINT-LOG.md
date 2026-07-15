@@ -24,7 +24,8 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 13 | Three | 10.129.227.248 | ssh/22 (OpenSSH 7.6p1) + http/80 (Apache 2.4.29, vhost thetoppers.htb → s3.thetoppers.htb) | feature box, drove GUI **and** CLI: hostname wires HTTP→thetoppers.htb; searchsploit capped (apache 2.4→31, top 15); new read-only S3 module from the `s3.*` vhost; failed steps flagged | (feature work, not a parser bug) new: hostname setting, EDB cap, S3 recon, step-failure visibility | `8fc2f43` |
 | 14 | Funnel | 10.129.228.195 | ftp/21 (vsftpd 3.0.3, anon) + ssh/22 (OpenSSH 8.2p1) | anon FTP walked into `mail_backup/`, peeked the 713B text email (surfaced 5 `@funnel.htb` usernames), skipped the 58KB PDF; searchsploit vsftpd→1★, openssh 29→top 15; spray + SSH-tunnel→psql is manual | none (clean — validated the FTP subdir walk/peek + EDB cap live) | `a05ae6b` |
 | 15 | Bike | 10.129.32.229 | ssh/22 (OpenSSH 8.2p1) + http/80 (Node.js Express) | nmap parsed the `Node.js (Express middleware)` banner (no version) cleanly; whatweb caught `X-Powered-By[Express]`+jQuery+`Title[Bike]` despite no `Server:` header; searchsploit node.js→4 (not blasting), openssh 29→top 15; Handlebars SSTI is manual | none (clean — mid-banner parenthetical + no-version product parse validated) | `b999c26` |
-| 16 | Ignition | 10.129.32.240 | http/80 (nginx 1.14.2, 302→ignition.htb) | nmap's http-title redirect now **auto-sets** hostname=ignition.htb → http recon targets the vhost (serves Magento 200 + /admin 200); whatweb also surfaces it from the 302 `RedirectLocation`; Magento default-cred login is manual | nmap-redirect vhost wasn't surfaced until whatweb ran → now auto-wired at scan time | _this commit_ |
+| 16 | Ignition | 10.129.32.240 | http/80 (nginx 1.14.2, 302→ignition.htb) | nmap's http-title redirect now **auto-sets** hostname=ignition.htb → http recon targets the vhost (serves Magento 200 + /admin 200); whatweb also surfaces it from the 302 `RedirectLocation`; Magento default-cred login is manual | nmap-redirect vhost wasn't surfaced until whatweb ran → now auto-wired at scan time | `b62ecc9` |
+| 17 | Pennyworth | 10.129.33.62 | http/8080 (Jetty 9.4.39 → Jenkins) + 68/udp (dhcpc) | **feature-validation box**: 8080→http module + HackTricks; EDB version-matched Jetty 9.4 → **EDB-50438 (CVE-2021-28164)**; recon tree + graph (icon nodes/glyphs/legend) clean; **custom-scan dialog + the merge fix + streaming range** all validated live; weak-cred Jenkins login + Groovy RCE is manual | none (clean — validated this session's scan/topology features on a live box) | _this commit_ |
 
 ## Per-box notes
 
@@ -191,6 +192,31 @@ the CLI scan auto-set `ignition.htb`, and `Host: ignition.htb` serves Magento (r
 Magento default-cred guess (`admin:qwerty123`, anti-brute — no spray) is manual.
 **Lesson:** if nmap already knows the vhost, wire it in at scan time — don't wait for
 a later tool; two independent sources (nmap http-title + whatweb redirect) now cover it.
+
+**17 · Pennyworth — http (Jetty 9.4.39 / Jenkins on 8080) — feature-validation box.**
+Single TCP service on a non-standard port (`8080/tcp http-proxy → Jetty 9.4.39.v20210325`,
+i.e. Jenkins) plus `68/udp dhcpc` from the UDP top-100 sweep. Drove this box to smoke-test
+**everything built this session** on a live target, not to find a new bug:
+- **Recon tab clean:** `TCP (1)` → 8080 Jetty, `UDP (1)` → 68/udp — single-host layout, no
+  stray "Pivoted networks" branch (correct — no pivots).
+- **8080 routes to the http module** (services.yaml `http-proxy`/alt-port match) with the
+  offline HackTricks page; **EDB is version-matched** — `search_exploits('Jetty','9.4.39…')`
+  normalises to `jetty 9.4` (product + major.minor) and returns **EDB-50438 "Jetty 9.4.37 -
+  Information Disclosure" (CVE-2021-28164)**, the right 9.4.x hit, not a product-wide flood.
+- **Graph clean:** target bullseye → the 8080 (blue TCP) + 68/udp (green UDP) icon-disc nodes,
+  legend + corner-glyph guide rendered.
+- **Custom-scan dialog validated LIVE:** a `-sT -Pn -p 8080 -sV` entry re-scan through
+  `CustomScanWorker` **merged** into `discovered_services` — 8080 refreshed AND `68/udp` was
+  **preserved**, confirming the review's HIGH merge-fix on a real box (a narrower TCP re-scan
+  must never wipe a prior UDP find). Streaming range + collapsible/removable topology tree were
+  validated with synthetic /24 data (no pivot box available).
+- Foothold (weak-cred `root:password` Jenkins login → Groovy Script-Console reverse shell) is
+  **manual** — credential guessing is Tier-2/3 and the reverse shell is exploitation; the tool
+  stops at surfacing the service + version + EDB reference.
+
+**Lesson:** a live single-service box is the cleanest way to smoke-test cross-cutting features
+(scan-flag control, EDB version-matching, merge-not-replace, graph render) end-to-end without a
+box-specific parser in the way — the "no bug found" run still proves the pipeline holds on real data.
 
 ## Trends & lessons (adapt going forward)
 
