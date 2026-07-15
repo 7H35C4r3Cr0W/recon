@@ -218,7 +218,9 @@ class MainWindow(QMainWindow):
         splitter.addWidget(left)
         splitter.addWidget(self._tool_panel)
         splitter.addWidget(self._reference_pane)
-        splitter.setSizes([320, 520, 360])
+        # the left pane holds the service + pivot-topology tree — give it room so a host's
+        # ip/name/pivot-source reads without scrolling on a multi-/24 engagement.
+        splitter.setSizes([380, 500, 340])
 
         self._graph_view = GraphView()
         self._graph_view.service_open_requested.connect(self._on_graph_service_open)

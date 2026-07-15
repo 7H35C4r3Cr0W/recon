@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPaintEvent
-from PySide6.QtWidgets import QMenu, QTreeWidget, QTreeWidgetItem
+from PySide6.QtWidgets import QHeaderView, QMenu, QTreeWidget, QTreeWidgetItem
 
 from oscprecon.models import DiscoveredHost, DiscoveredService, Proto
 
@@ -27,9 +27,15 @@ class ServiceTree(QTreeWidget):
         # over the empty viewport and the MainWindow updates it as the scan state changes.
         self._empty_message = "No services yet.\nClick “Run Full Recon” to scan the target."
         self.setAccessibleName("Discovered services")
-        self.setHeaderLabels(["Port", "Service", "Product"])
-        self.setColumnWidth(0, 110)
-        self.setColumnWidth(1, 120)
+        self.setHeaderLabels(["Port / host", "Service", "Product"])
+        # size every column to its content so a host's ip/name (col 0, indented 3 levels under
+        # subnet → host) never truncates to "10.10…"; the tree scrolls horizontally if the sum
+        # exceeds a narrow pane, which never hides text the way a clipped fixed column does.
+        header = self.header()
+        if header is not None:
+            for col in range(3):
+                header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+            header.setStretchLastSection(False)
         self.currentItemChanged.connect(self._on_current_changed)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
@@ -128,9 +134,11 @@ class ServiceTree(QTreeWidget):
             subnet_item = QTreeWidgetItem(root, [f"{subnet} ({len(members)})", "", ""])
             subnet_item.setForeground(0, QBrush(_SUBNET_COLOR))
             for host in members:
-                via = f"via {host.pivot_source}" if host.pivot_source else ""
-                label = f"{host.ip} ({host.hostname})" if host.hostname else host.ip
-                host_item = QTreeWidgetItem(subnet_item, [label, via, host.os_guess])
+                # col 0 = ip/name (kept short so it doesn't crowd out the entry services' names);
+                # os in col 1, the pivot source in col 2 (the host's otherwise-empty Product column).
+                name = f"{host.ip} ({host.hostname})" if host.hostname else host.ip
+                via = f"← {host.pivot_source}" if host.pivot_source else ""
+                host_item = QTreeWidgetItem(subnet_item, [name, host.os_guess, via])
                 host_item.setForeground(0, QBrush(_HOST_COLOR))
                 for service in sorted(host.services, key=lambda s: (s.proto.value, s.port)):
                     product = f"{service.product} {service.version}".strip()
