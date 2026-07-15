@@ -112,9 +112,11 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
     for host in profile.discovered_hosts:
         sn = host.subnet or subnet_of(host.ip) or "unknown"
         subnet_host_count[sn] = subnet_host_count.get(sn, 0) + 1
-        if sn not in subnet_via and host.pivot_source:
+        if sn not in subnet_via:
+            # pivot_source "" = entry-reachable; treat it (and the entry ip) as via=target so the
+            # /24 wires to the entry and folds when the entry collapses (never floats loose).
             src = host.pivot_source
-            subnet_via[sn] = "target" if src == target.ip else f"host-{src}"
+            subnet_via[sn] = f"host-{src}" if (src and src != target.ip) else "target"
 
     for host in profile.discovered_hosts:
         subnet = host.subnet or subnet_of(host.ip) or "unknown"
@@ -166,15 +168,17 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
     pivot_seen: set[tuple[str, str]] = set()
     for host in profile.discovered_hosts:
         src = host.pivot_source
-        if not src:
-            continue
-        src_id = "target" if src == target.ip else f"host-{src}"
+        # entry-reachable ("") and the entry's own ip both wire to the target, so an entry-reachable
+        # /24 gets a target -> subnet line (breadthfirst can place it; it never floats).
+        src_id = f"host-{src}" if (src and src != target.ip) else "target"
         subnet_id = f"subnet-{host.subnet or subnet_of(host.ip) or 'unknown'}"
         key = (src_id, subnet_id)
         if key in pivot_seen or src_id not in node_ids or subnet_id not in node_ids:
             continue
         pivot_seen.add(key)
-        edges.append(_edge(src_id, subnet_id, "pivots-into", f"e-pivot-{src}-{subnet_id}", "pivot"))
+        edges.append(
+            _edge(src_id, subnet_id, "pivots-into", f"e-pivot-{src_id}-{subnet_id}", "pivot")
+        )
 
     # user-drawn relates-to edges — skip any whose endpoints no longer exist (a finding was removed)
     user_edges = graph.get("user_edges", [])

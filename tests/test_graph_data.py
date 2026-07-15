@@ -84,6 +84,23 @@ def test_target_and_host_nodes_carry_os_for_glyphs(tmp_path: Path) -> None:
     assert by_id["host-10.10.5.40"]["os"] == "Ubuntu 20.04"
 
 
+def test_entry_reachable_subnet_wires_to_target(tmp_path: Path) -> None:
+    # a host with pivot_source="" (entry-reachable, the documented-normal state) must wire its /24
+    # to the target: via="target" so it folds when the entry collapses, plus a target->subnet edge
+    # so it is connected (breadthfirst can place it; it never floats).
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.10.10.5"))
+    prof.add_hosts([DiscoveredHost(ip="172.16.1.5")])  # pivot_source="" by default
+    els = build_elements(prof)
+    by_id = {n["data"]["id"]: n["data"] for n in els["nodes"]}
+    assert by_id["subnet-172.16.1.0/24"]["via"] == "target"
+    pivots = {
+        (e["data"]["source"], e["data"]["target"])
+        for e in els["edges"]
+        if e["data"]["type"] == "pivots-into"
+    }
+    assert ("target", "subnet-172.16.1.0/24") in pivots
+
+
 def test_pivot_edge_skipped_when_source_host_unknown(tmp_path: Path) -> None:
     # a pivot_source that isn't the target and isn't a known host must not create a dangling edge
     prof = Profile.create(tmp_path, "ctf", Target(ip="10.10.10.5"))

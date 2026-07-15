@@ -15,11 +15,13 @@
   var linkMode = false;
   var linkSource = null;
   var svgReady = false;
-  // drill-down: which compound nodes (subnet /24 boxes, host nodes) are collapsed. Persists across
-  // refreshes so a streamed host doesn't re-expand what the user collapsed. subnet-id / host-id -> true.
+  // drill-down: which nodes (target, /24s, hosts) are collapsed. Persists across refreshes of the SAME
+  // profile (so a streamed host doesn't re-expand what you folded) but is RESET on a profile switch —
+  // node ids like "target" / "subnet-<cidr>" collide across profiles, so lastProfileKey guards that.
   var collapseState = {};
+  var lastProfileKey = "";
 
-  var DEFAULT_HINT = "click the entry to expand · click a /24 for its hosts · click a host for its services · drag the canvas to pan · drag a node to move it";
+  var DEFAULT_HINT = "double-click the entry to expand (again to fold all) · double-click a /24 for its hosts · a host for its services · single-click selects · drag canvas to pan";
 
   // BloodHound-style icon nodes: a coloured disc with a white/dark glyph and the label below. Icons
   // are inline SVGs (no network) encoded as data URIs. `#c` is the placeholder colour so one template
@@ -223,10 +225,15 @@
     { selector: ".hidden", style: { display: "none" } },
     { selector: ".collapsed-child", style: { display: "none" } }, // double-click drill-down
     { selector: ".ec-hidden", style: { display: "none" } }, // drill-down: an ancestor /24 or host is collapsed
-    // a host with its services collapsed gets a subtle gold ring to say "click to reveal services"
+    // a host with its services collapsed gets a subtle gold ring to say "double-click to reveal"
     {
       selector: 'node[type="host"].ec-collapsed',
       style: { "border-width": 2, "border-color": "#f9e2af", "border-style": "solid" },
+    },
+    // the entry when collapsed (whole engagement folded into it) gets a gold ring cue too
+    {
+      selector: 'node[type="target"].ec-collapsed',
+      style: { "border-width": 3, "border-color": "#f9e2af" },
     },
     // search: bright ring on matches, dim everything else
     {
@@ -359,6 +366,11 @@
   }
 
   function setCompoundLabels() {
+    // the entry node gets a ▸/▾ too so it's obviously expandable (double-click to open / fold all)
+    cy.nodes('[type="target"]').forEach(function (n) {
+      if (n.data("baseLabel") == null) n.data("baseLabel", n.data("label"));
+      n.data("label", n.data("baseLabel") + (collapseState[n.id()] ? "  ▸" : "  ▾"));
+    });
     cy.nodes('[type="subnet"]').forEach(function (n) {
       var base = n.data("cidr") || n.id().replace(/^subnet-/, "");
       var c = n.data("childCount");
@@ -421,24 +433,35 @@
     });
   }
 
-  // re-lay-out just what's visible as a clean top-down tree rooted at the entry. Running this on every
-  // expand is what SPREADS the newly-revealed nodes (BloodHound-style) instead of stacking them.
+  // re-lay-out just what's VISIBLE, so revealing nodes spreads them (BloodHound-style) rather than
+  // stacking. fcose with randomize:false is INCREMENTAL — it starts from current positions and settles,
+  // so already-placed nodes barely move (no full reshuffle) and newly-revealed ones flow into place.
   function relayoutVisible() {
     if (!cy) return;
     var vis = elementsVisible();
     if (!vis.length) return;
-    vis
-      .layout({
-        name: "breadthfirst",
-        directed: true,
-        roots: "#target",
-        padding: 30,
-        spacingFactor: 1.5,
-        animate: true,
-        animationDuration: 250,
-        fit: true,
-      })
-      .run();
+    var opts = fcoseReady
+      ? {
+          name: "fcose",
+          quality: "default",
+          randomize: false,
+          animate: true,
+          animationDuration: 300,
+          padding: 40,
+          nodeSeparation: 120,
+          fit: true,
+        }
+      : {
+          name: "breadthfirst",
+          directed: true,
+          roots: "#target",
+          padding: 30,
+          spacingFactor: 1.5,
+          animate: true,
+          animationDuration: 250,
+          fit: true,
+        };
+    vis.layout(opts).run();
   }
 
   function toggleCollapse(node) {
@@ -746,9 +769,18 @@
     });
     var isPivot = isPivotGraph();
     if (isPivot) {
-      // drill-down graph: collapse to the entry node, then reveal + spread on click. The initial
-      // layout is just the visible set (one node), NOT the whole mostly-hidden tree — so nothing
-      // stacks. Streamed hosts on a refresh stay hidden under their collapsed /24 until you expand it.
+      // RESET the fold state on a profile SWITCH — ids like "target" / "subnet-<cidr>" collide across
+      // profiles, so a stale collapseState would break "opens on ONE node" for the next box. Keep it
+      // across refreshes of the SAME profile (target ip unchanged) so a streamed host / status edit
+      // doesn't re-expand what you folded.
+      var tnode = cy.getElementById("target");
+      var pkey = tnode.nonempty() ? tnode.data("ip") || tnode.id() : "";
+      if (pkey !== lastProfileKey) {
+        collapseState = {};
+        lastProfileKey = pkey;
+      }
+      // drill-down graph: collapse to the entry node, then reveal + spread on double-click. The
+      // initial layout is just the visible set (one node), NOT the whole mostly-hidden tree.
       defaultCollapse();
       applyExpandCollapse();
     }
@@ -786,10 +818,15 @@
         }
         return; // link mode swallows the tap — no detail sidebar
       }
-      // a /24 box or a host node drills down (collapse/expand); everything else just selects
-      var ttype = evt.target.data("type");
-      if (ttype === "subnet" || ttype === "host" || ttype === "target") toggleCollapse(evt.target);
+      // single click = SELECT (show detail). Expand/collapse is a DOUBLE-click (see below) so
+      // clicking to inspect a node never also folds it, and BloodHound muscle memory works.
       if (bridge) bridge.node_clicked(id, JSON.stringify(evt.target.data()));
+    });
+
+    // double-click the entry / a /24 / a host to drill down (reveal or fold its children). Only in a
+    // pivot graph — on a simple box there is nothing to drill, so a dbltap there just does nothing.
+    cy.on("dbltap", 'node[type="target"], node[type="subnet"], node[type="host"]', function (evt) {
+      if (isPivotGraph()) toggleCollapse(evt.target);
     });
 
     // double-click a service to drill down: collapse/expand its findings & artifacts. Uses its own
@@ -849,6 +886,10 @@
     // node type) and search so unchecking "services" or a search term survives a refresh.
     applyFilter();
     if (search && search.value) applySearch(search.value);
+    // surface the interaction model (how to drill down / pan) — the static placeholder never told the
+    // user the graph is a double-click drill-down.
+    var hintEl = document.getElementById("hint");
+    if (hintEl && !linkMode) hintEl.textContent = DEFAULT_HINT;
     // (the pivot drill-down collapse + initial spread happens in the layout block above, before the
     // canvas is first painted, so nothing ever flashes stacked)
   }
