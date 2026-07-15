@@ -211,3 +211,65 @@ def test_add_pivot_network_wires_into_profile_and_graph(
     reloaded = Profile.load(window._profile.directory)
     assert [h.ip for h in reloaded.discovered_hosts] == ["10.10.5.23"]
     window.close()
+
+
+# ---- custom scan (Scan → Scan a host / range) ------------------------------------------------
+
+
+def test_scan_host_found_adds_host_and_shows_in_recon_tree(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from oscprecon.models import DiscoveredHost, DiscoveredService, Proto
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "ctf", Target(ip="10.129.33.39"))
+    window._set_profile(prof)
+    host = DiscoveredHost(
+        ip="10.10.5.23",
+        pivot_source="10.129.33.39",
+        services=[DiscoveredService(445, Proto.TCP, "smb")],
+    )
+    window._on_scan_host_found(host, prof)  # streamed host from a range scan
+    assert [h.ip for h in window._profile.discovered_hosts] == ["10.10.5.23"]
+    # it shows in the recon-tab tree under a Pivoted networks branch
+    labels = []
+
+    def walk(item: object) -> None:
+        labels.append(item.text(0))  # type: ignore[attr-defined]
+        for i in range(item.childCount()):  # type: ignore[attr-defined]
+            walk(item.child(i))  # type: ignore[attr-defined]
+
+    tree = window._service_tree
+    for i in range(tree.topLevelItemCount()):
+        walk(tree.topLevelItem(i))
+    assert any("Pivoted networks" in x for x in labels)
+    assert any("10.10.5.23" in x for x in labels)
+    window.close()
+
+
+def test_custom_scan_done_entry_parses_services(qtbot: QtBot) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "entry", Target(ip="10.129.33.39"))
+    window._set_profile(prof)
+    out = prof.directory / "nmap" / "tcp-versioned.txt"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        "Nmap scan report for 10.129.33.39\n80/tcp open http nginx 1.14.2\n", encoding="utf-8"
+    )
+    window._on_custom_scan_done(0, prof, is_entry=True, output_file=out)
+    ports = [s.port for s in window._profile.discovered_services]
+    assert 80 in ports  # the entry scan's services were parsed into discovered_services
+    window.close()
+
+
+def test_custom_scan_no_profile_is_safe(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    from PySide6.QtWidgets import QMessageBox
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: QMessageBox.StandardButton.Ok)
+    window._on_custom_scan()  # no project loaded -> info dialog, no crash
+    assert window._profile is None
+    window.close()

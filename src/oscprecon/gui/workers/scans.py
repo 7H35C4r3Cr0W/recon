@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
-from oscprecon import references, shell
+from oscprecon import pivot, references, shell
 from oscprecon.gui.workers.base import CancellableThread
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
@@ -38,6 +38,57 @@ class NmapWorker(CancellableThread):
             self.failed.emit(str(exc))
             return
         self.done.emit(len(self._profile.discovered_services))
+
+
+class CustomScanWorker(CancellableThread):
+    """Run a user-configured nmap command (custom flags / range) and, in host mode, STREAM each
+    discovered host as its block completes so a /24 fills the tree + graph progressively. Entry-host
+    mode just runs + returns; the caller parses services from the output file on done."""
+
+    line = Signal(str)
+    host_found = Signal(object)  # DiscoveredHost, emitted live as the scan runs
+    done = Signal(int)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        shell_line: str,
+        output_file: Path,
+        cwd: Path,
+        *,
+        stream_hosts: bool,
+        pivot_source: str = "",
+    ) -> None:
+        super().__init__()
+        self._shell_line = shell_line
+        self._output_file = output_file
+        self._cwd = cwd
+        self._stream = pivot.NmapHostStream(pivot_source) if stream_hosts else None
+
+    def _on_line(self, line: str) -> None:
+        self.line.emit(line)
+        if self._stream is not None:
+            host = self._stream.feed_line(line)
+            if host is not None:
+                self.host_found.emit(host)
+
+    def run(self) -> None:
+        try:
+            result = shell.run(
+                self._shell_line,
+                self._output_file,
+                cwd=self._cwd,
+                cancel=self._cancel,
+                on_line=self._on_line,
+            )
+        except Exception as exc:  # boundary: surface worker failures to the UI thread
+            self.failed.emit(str(exc))
+            return
+        if self._stream is not None:
+            last = self._stream.finish()  # the final host, completed at EOF
+            if last is not None:
+                self.host_found.emit(last)
+        self.done.emit(result.exit_code)
 
 
 class CommandWorker(CancellableThread):

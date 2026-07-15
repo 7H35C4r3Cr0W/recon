@@ -88,6 +88,49 @@ def parse_nmap_hosts(text: str, pivot_source: str = "") -> list[DiscoveredHost]:
     return hosts
 
 
+class NmapHostStream:
+    """Incremental version of parse_nmap_hosts: feed it stdout lines as a range scan runs and it
+    yields each host the moment its block is complete (the next report line, or Nmap done / EOF),
+    so a big /24 fills the tree + graph progressively instead of all-at-once at the end."""
+
+    def __init__(self, pivot_source: str = "") -> None:
+        self._pivot_source = pivot_source
+        self._current: DiscoveredHost | None = None
+
+    def feed_line(self, raw: str) -> DiscoveredHost | None:
+        # returns the PREVIOUS host when this line completes it (a new report line / Nmap done);
+        # its services have all arrived by then. None otherwise.
+        line = raw.strip()
+        report = _REPORT_RE.match(line)
+        if report is not None:
+            completed = self._current  # the previous host's block just ended
+            ip, hostname = _split_report_target(report.group("who"))
+            self._current = _make_host(ip, hostname, self._pivot_source) or _make_host(
+                ip, "", self._pivot_source
+            )
+            return completed
+        if self._current is None:
+            return None
+        lowered = line.lower()
+        if lowered.startswith("host seems down") or lowered.startswith("host is down"):
+            self._current = None
+            return None
+        if line.startswith("Nmap done"):  # scan finished — the last host's block is complete
+            completed = self._current
+            self._current = None
+            return completed
+        service = parse_port_line(line)
+        if service is not None:
+            self._current.services.append(service)
+        return None
+
+    def finish(self) -> DiscoveredHost | None:
+        # the final host, completed at EOF (if "Nmap done" wasn't seen)
+        completed = self._current
+        self._current = None
+        return completed
+
+
 def parse_host_lines(text: str, pivot_source: str = "") -> list[DiscoveredHost]:
     """A plain list of IPs (one per line, first token) → hosts. IP-validated, so prose lines like
     'Host is up' can never become a bogus host. For pasting a bare ligolo host-discovery list."""

@@ -54,6 +54,35 @@ def test_parse_nmap_hosts_rejects_injection_in_host_tokens() -> None:
         assert " " not in h.ip and not h.ip.startswith("-")
 
 
+def test_nmap_host_stream_emits_hosts_incrementally() -> None:
+    stream = pivot.NmapHostStream(pivot_source="10.129.33.39")
+    emitted = []
+    for line in _NMAP.splitlines():
+        host = stream.feed_line(line)
+        if host is not None:
+            emitted.append(host)
+    last = stream.finish()
+    if last is not None:
+        emitted.append(last)
+    ips = [h.ip for h in emitted]
+    assert ips == ["10.10.5.23", "10.10.5.40", "172.16.8.10"]  # .99 down never emitted
+    first = next(h for h in emitted if h.ip == "10.10.5.23")
+    assert sorted(s.port for s in first.services) == [445, 3389]  # its services arrived before emit
+    assert all(h.pivot_source == "10.129.33.39" for h in emitted)
+
+
+def test_nmap_host_stream_emits_current_host_at_eof_without_nmap_done() -> None:
+    stream = pivot.NmapHostStream()
+    out = []
+    for line in "Nmap scan report for 10.0.0.7\n22/tcp open ssh\n".splitlines():
+        host = stream.feed_line(line)
+        if host is not None:
+            out.append(host)
+    assert out == []  # not completed until finish() (no next report / Nmap done line)
+    last = stream.finish()
+    assert last is not None and last.ip == "10.0.0.7"
+
+
 def test_parse_host_lines_only_accepts_real_ips() -> None:
     text = "10.10.5.23\nHost is up\n10.10.5.40  # a comment\ngarbage\n10.10.5.23\n"
     hosts = pivot.parse_host_lines(text, pivot_source="10.0.0.1")

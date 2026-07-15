@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import config, edb, findings, references, spray, vault_export
+from oscprecon import config, edb, findings, nmap_scan, references, spray, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.branding import APP_NAME, APP_SUBTITLE, APP_TAGLINE
 from oscprecon.gui import theme
@@ -42,6 +42,7 @@ from oscprecon.gui.dialogs import (
     DoctorDialog,
     LogViewerDialog,
     NewProfileDialog,
+    NmapScanDialog,
     SettingsDialog,
     SprayDialog,
 )
@@ -63,6 +64,7 @@ from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.gui.workers import (
     CancellableThread,
     CommandWorker,
+    CustomScanWorker,
     DnsReconResult,
     DnsReconWorker,
     FtpReconResult,
@@ -81,8 +83,9 @@ from oscprecon.gui.workers import (
 )
 from oscprecon.gui.workspace import WorkspaceDashboard
 from oscprecon.manual_commands import expand, load_manual_commands
-from oscprecon.models import Credential, DiscoveredService, Target
+from oscprecon.models import Credential, DiscoveredHost, DiscoveredService, Target
 from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
+from oscprecon.modules.nmap import NmapModule
 from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.parsing import run_parser
 from oscprecon.patterns.engine import suggest_for
@@ -95,6 +98,7 @@ __all__ = [
     "AddCredentialDialog",
     "CancellableThread",
     "CommandWorker",
+    "CustomScanWorker",
     "DnsReconResult",
     "DnsReconWorker",
     "FtpReconResult",
@@ -363,6 +367,12 @@ class MainWindow(QMainWindow):
         run_action = QAction("Run Full Recon", self)
         run_action.triggered.connect(self._on_run)
         scan_menu.addAction(run_action)
+        custom_scan_action = QAction("Scan a host / range...", self)
+        custom_scan_action.setStatusTip(
+            "Configure nmap flags, or scan a whole /24 across your pivot into the topology"
+        )
+        custom_scan_action.triggered.connect(self._on_custom_scan)
+        scan_menu.addAction(custom_scan_action)
 
         profile_menu = scan_menu.addMenu("Run recon with profile")
         _PROFILE_HINTS = {
@@ -1211,7 +1221,96 @@ class MainWindow(QMainWindow):
             f"{', '.join(subnets) or 'n/a'} — see the Graph (Ctrl+G)."
         )
         self._audit_action("pivot-network-added", hosts=len(hosts), subnets=len(subnets))
-        self._graph_view.set_profile(self._profile)  # redraw the spider-web + native summary
+        self._refresh_topology_views()
+
+    def _refresh_topology_views(self) -> None:
+        # after hosts change: redraw the recon-tab tree AND the graph spider-web / native summary
+        if self._profile is None:
+            return
+        self._service_tree.populate(
+            self._profile.discovered_services, self._profile.discovered_hosts
+        )
+        self._graph_view.set_profile(self._profile)
+
+    def _on_custom_scan(self) -> None:
+        if self._profile is None:
+            QMessageBox.information(
+                self, APP_NAME, "Open or create a project first, then Scan a host / range."
+            )
+            return
+        if self._profile.read_only:
+            QMessageBox.information(self, "Read-only", "This project is open read-only.")
+            return
+        if not self._tasks.can_start(exclusive=True):
+            self._tool_panel.append_output("[busy] a scan is already running — wait or Stop it.")
+            return
+        profile = self._profile
+        dialog = NmapScanDialog(
+            profile.target.ip, profile.known_host_ips(), profile.target.ip, self
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        command = dialog.command()
+        target = dialog.target()
+        is_entry = target == profile.target.ip
+        stream_hosts = not is_entry  # entry -> discovered_services; else -> pivoted hosts
+        out_dir = profile.directory / "nmap"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_name = "tcp-versioned.txt" if is_entry else f"scan-{_slug(target)}.txt"
+        output_file = out_dir / out_name
+        self._show_recon()
+        self._tool_panel.append_output(f"[scan] {command}")
+        if stream_hosts and nmap_scan.is_range(target):
+            self._tool_panel.append_output(
+                f"[scan] scanning range {target} — hosts stream into the tree + graph as found."
+            )
+        worker = CustomScanWorker(
+            command,
+            output_file,
+            profile.directory,
+            stream_hosts=stream_hosts,
+            pivot_source=dialog.pivot_source(),
+        )
+        worker.host_found.connect(lambda host: self._on_scan_host_found(host, profile))
+        self._start(
+            worker,
+            f"scan:{target}",
+            lambda code: self._on_custom_scan_done(code, profile, is_entry, output_file),
+            exclusive=True,
+        )
+        self._audit_action("custom-scan", target=target, command=command)
+
+    def _on_scan_host_found(self, host: object, profile: Profile) -> None:
+        # a range/host scan discovered a host (streamed live). Add it, then refresh the UI only when
+        # this is still the active profile (a background scan can outlive a profile switch).
+        if not isinstance(host, DiscoveredHost):
+            return
+        profile.add_hosts([host])
+        if profile is self._profile:
+            profile.save()
+            svc = len(host.services)
+            plural = "s" if svc != 1 else ""
+            self._tool_panel.append_output(f"[scan] + {host.ip} ({svc} service{plural})")
+            self._refresh_topology_views()
+
+    def _on_custom_scan_done(
+        self, exit_code: int, profile: Profile, is_entry: bool, output_file: Path
+    ) -> None:
+        if is_entry:
+            try:
+                text = output_file.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                text = ""
+            services = NmapModule().discovered_services({output_file.name: text})
+            if services:
+                profile.set_services(services)
+                profile.save()
+        if profile is self._profile:
+            self._service_tree.populate(
+                profile.discovered_services, profile.discovered_hosts, force=True
+            )
+            self._graph_view.set_profile(profile)
+            self._tool_panel.append_output(f"[scan] done (exit {exit_code}).")
 
     def _on_credential_spray(self) -> None:
         if self._profile is None:
