@@ -26,6 +26,7 @@ def test_parse_nmap_nse_auth_required() -> None:
     findings = parse_mongo_nmap(text)
     assert [(f.kind, f.value) for f in findings] == [("access", "auth-required")]
 
+
 # `print()`-wrapped --eval yields identical text from mongosh and the legacy `mongo` shell.
 _DBS_UNAUTH = """DB admin
 DB config
