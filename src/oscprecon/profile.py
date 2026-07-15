@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -191,6 +191,13 @@ class Profile:
     def set_services(self, services: list[DiscoveredService]) -> None:
         self.discovered_services = services
         self.touch()
+
+    def set_hostname(self, hostname: str | None) -> None:
+        # the vhost name is usually learned AFTER the first scan (a redirect, a cert CN, a contact
+        # email) — let it be set later; host-based recon then targets the name instead of the IP.
+        cleaned = (hostname or "").strip() or None
+        self.target = replace(self.target, hostname=cleaned)  # Target is frozen — replace + resave
+        self.save()
 
     def add_command(self, record: dict[str, Any]) -> None:
         self.command_history.append(record)

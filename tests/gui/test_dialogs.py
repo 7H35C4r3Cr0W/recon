@@ -17,13 +17,14 @@ def test_new_profile_returns_trimmed_values(qtbot: QtBot) -> None:
     qtbot.addWidget(dialog)
     dialog._name.setText("  htb-active  ")
     dialog._ip.setText(" 10.10.10.5 ")
-    assert dialog.values() == ("htb-active", "10.10.10.5")
+    dialog._hostname.setText("  active.htb ")
+    assert dialog.values() == ("htb-active", "10.10.10.5", "active.htb")
 
 
 def test_new_profile_empty_values(qtbot: QtBot) -> None:
     dialog = NewProfileDialog()
     qtbot.addWidget(dialog)
-    assert dialog.values() == ("", "")  # caller (MainWindow._on_new) rejects empties
+    assert dialog.values() == ("", "", "")  # caller (MainWindow._on_new) rejects empties
 
 
 def test_credential_dialog_builds_credential(qtbot: QtBot) -> None:

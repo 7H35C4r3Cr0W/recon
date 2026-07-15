@@ -28,4 +28,4 @@ def test_new_profile_dialog_values(qtbot: QtBot) -> None:
     qtbot.addWidget(dialog)
     dialog._name.setText("  htb-active  ")
     dialog._ip.setText(" 10.10.10.100 ")
-    assert dialog.values() == ("htb-active", "10.10.10.100")
+    assert dialog.values() == ("htb-active", "10.10.10.100", "")

@@ -44,6 +44,12 @@ class Target:
         if self.hostname:
             validate_host(self.hostname)
 
+    @property
+    def host(self) -> str:
+        # host-based recon (HTTP, vhost, S3) prefers the vhost name when set — many boxes serve the
+        # real content only by Host header (name-based virtual hosting). IP-only tools use .ip.
+        return self.hostname or self.ip
+
 
 @dataclass(frozen=True)
 class Port:

@@ -17,12 +17,15 @@ class NewProfileDialog(QDialog):
         self.setWindowTitle("New Project")
         self._name = QLineEdit()
         self._ip = QLineEdit()
+        self._hostname = QLineEdit()
+        self._hostname.setPlaceholderText("optional — e.g. thetoppers.htb (add to /etc/hosts)")
         self._box = QComboBox()
         self._box.addItem("(none)")
 
         form = QFormLayout()
         form.addRow("Profile name:", self._name)
-        form.addRow("Target IP / host:", self._ip)
+        form.addRow("Target IP:", self._ip)
+        form.addRow("Hostname / vhost:", self._hostname)
         form.addRow("Box (optional):", self._box)
 
         buttons = QDialogButtonBox(
@@ -35,5 +38,9 @@ class NewProfileDialog(QDialog):
         layout.addLayout(form)
         layout.addWidget(buttons)
 
-    def values(self) -> tuple[str, str]:
-        return self._name.text().strip(), self._ip.text().strip()
+    def values(self) -> tuple[str, str, str]:
+        return (
+            self._name.text().strip(),
+            self._ip.text().strip(),
+            self._hostname.text().strip(),
+        )

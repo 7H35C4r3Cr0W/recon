@@ -226,7 +226,9 @@ class HttpModule(Module):
         commands: list[Command] = []
         for port in ports:
             tls = is_tls(port.service, port.number)
-            url = default_url(target.ip, port.number, tls)
+            # target.host prefers the vhost name when set, so probes hit name-based virtual hosts
+            # (e.g. thetoppers.htb) that the bare IP won't serve — requires the /etc/hosts entry.
+            url = default_url(target.host, port.number, tls)
             base = f"http/{port.number}"
             commands += [
                 Command(

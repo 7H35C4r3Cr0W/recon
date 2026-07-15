@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import socket
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import partial
@@ -390,6 +391,10 @@ class MainWindow(QMainWindow):
         scan_menu.addAction(spray_action)
 
         edit_menu = self.menuBar().addMenu("&Edit")
+        set_hostname_action = QAction("Set Target Hostname...", self)
+        set_hostname_action.setStatusTip("Recon host-based services by vhost name (e.g. box.htb)")
+        set_hostname_action.triggered.connect(self._on_set_hostname)
+        edit_menu.addAction(set_hostname_action)
         add_cred_action = QAction("Add Credential...", self)
         add_cred_action.triggered.connect(self._on_add_credential)
         edit_menu.addAction(add_cred_action)
@@ -868,14 +873,16 @@ class MainWindow(QMainWindow):
         dialog = NewProfileDialog(self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        name, ip = dialog.values()
+        name, ip, hostname = dialog.values()
         if not name or not ip:
             QMessageBox.warning(
                 self, "Missing input", "Both a profile name and a target are required."
             )
             return
         try:
-            profile = Profile.create(config.workspace_root(), name, Target(ip=ip))
+            profile = Profile.create(
+                config.workspace_root(), name, Target(ip=ip, hostname=hostname or None)
+            )
         except ValueError as exc:
             QMessageBox.warning(self, "Invalid target", str(exc))
             return
@@ -883,6 +890,51 @@ class MainWindow(QMainWindow):
         self._set_profile(profile)
         self._audit_action("profile-created", target=profile.target.ip)
         self._tool_panel.append_output(f"[created] {profile.directory}")
+        if hostname:
+            self._announce_hostname(profile.target)
+
+    def _on_set_hostname(self) -> None:
+        if self._profile is None:
+            QMessageBox.information(self, "No project", "Open or create a project first.")
+            return
+        if self._profile.read_only:
+            QMessageBox.information(self, "Read-only", "This project is open read-only.")
+            return
+        current = self._profile.target.hostname or ""
+        text, ok = QInputDialog.getText(
+            self,
+            "Set Target Hostname",
+            "Hostname / vhost (e.g. thetoppers.htb) — blank to clear.\n"
+            "Host-based recon (HTTP, vhost) will then target the name, not the IP.",
+            text=current,
+        )
+        if not ok:
+            return
+        try:
+            self._profile.set_hostname(text.strip())
+        except ValueError as exc:
+            QMessageBox.warning(self, "Invalid hostname", str(exc))
+            return
+        self._audit_action("set-hostname", hostname=self._profile.target.hostname or "")
+        self._set_profile(self._profile)  # refresh label + panes to the new host
+        if self._profile.target.hostname:
+            self._announce_hostname(self._profile.target)
+        else:
+            self._tool_panel.append_output("[hostname] cleared — recon targets the IP again.")
+
+    def _announce_hostname(self, target: Target) -> None:
+        # the tool can't edit /etc/hosts (needs sudo); surface the exact line so the user can, and
+        # warn when the name doesn't resolve yet — otherwise host-based probes silently fail.
+        host = target.hostname or ""
+        self._tool_panel.append_output(f"[hostname] host-based recon now targets {host}")
+        self._tool_panel.append_output(f"[hostname] add to /etc/hosts:  {target.ip} {host}")
+        try:
+            socket.gethostbyname(host)
+        except OSError:
+            self._tool_panel.append_output(
+                f"[hostname] ⚠ {host} does not resolve yet — run: "
+                f'echo "{target.ip} {host}" | sudo tee -a /etc/hosts'
+            )
 
     def _on_open(self) -> None:
         chosen = QFileDialog.getExistingDirectory(
