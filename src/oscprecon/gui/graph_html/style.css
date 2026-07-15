@@ -132,6 +132,22 @@ body {
   border: 2px solid #f38ba8;
 }
 
+.legend-row .glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid #11111b;
+  color: #11111b;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  flex: 0 0 auto;
+  margin-right: 2px;
+}
+
 .legend-note {
   margin-top: 5px;
   color: #6c7086;

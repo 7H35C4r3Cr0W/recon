@@ -47,6 +47,15 @@ def test_pivot_topology_builds_subnets_hosts_and_pivot_edges(tmp_path: Path) -> 
     assert ("host-10.10.5.23", "subnet-172.16.8.0/24") in pivots
 
 
+def test_target_and_host_nodes_carry_os_for_glyphs(tmp_path: Path) -> None:
+    # the OS corner-glyph reads node data("os"); target + pivoted hosts must both carry it
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.0.0.1", os_guess="Windows"))
+    prof.add_hosts([DiscoveredHost(ip="10.10.5.40", os_guess="Ubuntu 20.04")])
+    by_id = {n["data"]["id"]: n["data"] for n in build_elements(prof)["nodes"]}
+    assert by_id["target"]["os"] == "Windows"
+    assert by_id["host-10.10.5.40"]["os"] == "Ubuntu 20.04"
+
+
 def test_pivot_edge_skipped_when_source_host_unknown(tmp_path: Path) -> None:
     # a pivot_source that isn't the target and isn't a known host must not create a dangling edge
     prof = Profile.create(tmp_path, "ctf", Target(ip="10.10.10.5"))

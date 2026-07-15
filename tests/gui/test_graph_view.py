@@ -334,6 +334,22 @@ def test_icon_nodes_and_hover_are_wired_and_secret_safe() -> None:
     assert "secret" not in tip.lower()  # the tooltip must never surface a credential secret
 
 
+def test_corner_glyph_badges_are_wired_and_secret_safe() -> None:
+    app_js = (_GRAPH_HTML / "app.js").read_text()
+    index_html = (_GRAPH_HTML / "index.html").read_text()
+    # BloodHound-style corner glyphs: a BADGE set + a compositor that layers them onto a node
+    assert "var BADGE" in app_js and "STATUS_BADGE" in app_js
+    assert "function applyGlyphs" in app_js
+    assert "cy.nodes().forEach(applyGlyphs)" in app_js
+    for kind in ("danger", "winOs", "nixOs", "done", "investigating", "dead-end", "note"):
+        assert kind in app_js
+    # layered via background-image arrays with per-corner positions (slice to the next top-level fn)
+    glyph = app_js.split("function applyGlyphs", 1)[1].split("function render", 1)[0]
+    assert "background-position-x" in glyph and "background-position-y" in glyph
+    assert "secret" not in glyph.lower()  # a glyph must never derive from a credential secret
+    assert "Corner glyphs" in index_html  # documented in the legend
+
+
 def test_fcose_layout_is_vendored_offline_and_wired() -> None:
     # the compound-aware pivot layout must ship offline (no runtime CDN) and be loaded in dep order.
     for name in ("layout-base.js", "cose-base.js", "cytoscape-fcose.js"):

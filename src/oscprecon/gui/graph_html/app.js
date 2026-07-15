@@ -53,6 +53,54 @@
     note: icon(TPL.note, DARK),
   };
 
+  // Corner glyphs (BloodHound "glyph node" analogue): small self-contained badges — a coloured disc
+  // + dark symbol — laid over a node corner via Cytoscape's layered background-image. Full-colour so
+  // they read on any node. Up to 4 (one per corner): danger, OS, status, note.
+  function badge(inner, bg) {
+    var svg =
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='12' r='11' fill='" +
+      bg +
+      "' stroke='#11111b' stroke-width='1.5'/>" +
+      inner +
+      "</svg>";
+    return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+  }
+  var BADGE = {
+    danger: badge(
+      "<rect x='10.5' y='5' width='3' height='9' rx='1.5' fill='#11111b'/><circle cx='12' cy='18' r='1.9' fill='#11111b'/>",
+      "#f38ba8",
+    ),
+    note: badge(
+      "<path d='M6 18 l1-3.5 L15 6 l2.5 2.5 L9 17 z' fill='none' stroke='#11111b' stroke-width='2'/>",
+      "#cba6f7",
+    ),
+    winOs: badge(
+      "<rect x='6' y='6' width='5' height='5' fill='#11111b'/><rect x='13' y='6' width='5' height='5' fill='#11111b'/><rect x='6' y='13' width='5' height='5' fill='#11111b'/><rect x='13' y='13' width='5' height='5' fill='#11111b'/>",
+      "#89b4fa",
+    ),
+    nixOs: badge(
+      "<path d='M7 8 l4 4 l-4 4 M13 16 h5' fill='none' stroke='#11111b' stroke-width='2'/>",
+      "#a6e3a1",
+    ),
+    done: badge(
+      "<path d='M6 12 l3.5 3.5 L18 7' fill='none' stroke='#11111b' stroke-width='2.6'/>",
+      "#a6e3a1",
+    ),
+    investigating: badge(
+      "<ellipse cx='12' cy='12' rx='7' ry='4.6' fill='none' stroke='#11111b' stroke-width='2'/><circle cx='12' cy='12' r='2.1' fill='#11111b'/>",
+      "#f9e2af",
+    ),
+    "dead-end": badge(
+      "<path d='M8 8 L16 16 M16 8 L8 16' stroke='#11111b' stroke-width='2.6'/>",
+      "#9399b2",
+    ),
+  };
+  var STATUS_BADGE = {
+    done: BADGE.done,
+    investigating: BADGE.investigating,
+    "dead-end": BADGE["dead-end"],
+  };
+
   var STYLE = [
     {
       selector: "node",
@@ -435,6 +483,63 @@
     if (tip) tip.style.display = "none";
   }
 
+  function mainIcon(d) {
+    if (d.type === "target") return ICON.target;
+    if (d.type === "host") return ICON.host;
+    if (d.category === "reference") return ICON.reference;
+    if (d.type === "finding") return ICON.finding;
+    if (d.type === "credential") return ICON.credential;
+    if (d.type === "artifact") return ICON.artifact;
+    if (d.type === "note") return ICON.note;
+    return ICON.service;
+  }
+  function osBadge(os) {
+    var s = (os || "").toLowerCase();
+    if (/win/.test(s)) return BADGE.winOs;
+    if (/linux|ubuntu|debian|unix|nix|centos|red ?hat|freebsd|solaris/.test(s)) return BADGE.nixOs;
+    return null;
+  }
+  // Composite corner badges onto a node via layered background-image. Corners: danger=TR, OS=TL,
+  // status=BR, note=BL — up to 4, BloodHound-style. A node with no badges keeps its plain STYLE icon.
+  function applyGlyphs(node) {
+    var d = node.data();
+    if (d.type === "subnet") return;
+    var glyphs = [];
+    if (d.notable) glyphs.push({ img: BADGE.danger, x: "100%", y: "0%" });
+    var os = d.type === "host" || d.type === "target" ? osBadge(d.os) : null;
+    if (os) glyphs.push({ img: os, x: "0%", y: "0%" });
+    if (d.status && STATUS_BADGE[d.status]) {
+      glyphs.push({ img: STATUS_BADGE[d.status], x: "100%", y: "100%" });
+    }
+    if (d.note) glyphs.push({ img: BADGE.note, x: "0%", y: "100%" });
+    if (!glyphs.length) return;
+    var imgs = [mainIcon(d)];
+    var xs = ["50%"];
+    var ys = ["50%"];
+    var ws = ["56%"];
+    var hs = ["56%"];
+    glyphs.forEach(function (g) {
+      imgs.push(g.img);
+      xs.push(g.x);
+      ys.push(g.y);
+      ws.push("40%");
+      hs.push("40%");
+    });
+    node.style({
+      "background-image": imgs,
+      "background-position-x": xs,
+      "background-position-y": ys,
+      "background-width": ws,
+      "background-height": hs,
+      "background-clip": imgs.map(function () {
+        return "none";
+      }),
+      "background-image-opacity": imgs.map(function () {
+        return 1;
+      }),
+    });
+  }
+
   function render(elements) {
     registerExtensions();
     // rebuild from scratch each refresh — destroy the old instance so handlers/state don't stack up
@@ -465,6 +570,7 @@
       style: STYLE,
     });
     window.cy = cy; // exposed for the web inspector / render checks
+    cy.nodes().forEach(applyGlyphs); // corner badges (danger / OS / status / note)
 
     var hasSaved = (elements.nodes || []).some(function (n) {
       return n.position;

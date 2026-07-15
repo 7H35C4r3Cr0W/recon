@@ -56,7 +56,7 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
 
     target = profile.target
     tlabel = f"{target.ip}\n{target.hostname}" if target.hostname else target.ip
-    add_node("target", "target", tlabel, {"ip": target.ip})
+    add_node("target", "target", tlabel, {"ip": target.ip, "os": target.os_guess or ""})
 
     module_service: dict[str, str] = {}  # module name -> first service node that owns it
     for svc in profile.discovered_services:
