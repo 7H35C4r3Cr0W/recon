@@ -113,3 +113,101 @@ def test_export_project_cancelled_confirm_writes_nothing(
     assert (
         not out.exists() and not saved
     )  # declining the creds warning aborts before the file picker
+
+
+# ---- project delete (dashboard right-click → confirm → host window removes the folder) --------
+
+
+def test_delete_non_active_project_removes_folder(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "gone", Target(ip="10.3.3.3"))
+    assert prof.directory.is_dir()
+    window._on_delete_requested([str(prof.directory)])
+    assert not prof.directory.exists()
+    window.close()  # closeEvent cancels + waits the dashboard/index/EDB threads
+
+
+def test_delete_active_project_closes_then_removes(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "active-gone", Target(ip="10.3.3.4"))
+    window._set_profile(prof)  # becomes the active, edit-locked profile
+    window._on_delete_requested([str(prof.directory)])
+    assert not prof.directory.exists()
+    assert window._profile is None  # the open project was closed before removal
+    window.close()  # closeEvent cancels + waits the dashboard/index/EDB threads
+
+
+def test_delete_refuses_project_locked_by_another_live_instance(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # defect regression: a project open read-only here while ANOTHER live instance holds the edit
+    # lock must never be deleted out from under that other instance — even though it is "active".
+    from oscprecon.workspace import locks
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "held-elsewhere", Target(ip="10.3.3.5"))
+    prof.read_only = True
+    window._profile = prof  # simulate: opened read-only because the lock is held by window A
+
+    foreign = locks.LockInfo(
+        pid=999_999, hostname="other-host", app_version="1", started_at="2026-01-01T00:00:00Z"
+    )
+    monkeypatch.setattr(locks, "read_lock", lambda directory: (foreign, False))
+    monkeypatch.setattr(locks, "is_stale", lambda info: False)  # the other instance is alive
+
+    window._on_delete_requested([str(prof.directory)])
+    assert prof.directory.is_dir()  # refused — the other instance's project is untouched
+    window.close()  # closeEvent cancels + waits the dashboard/index/EDB threads
+
+
+# ---- pivot topology (Edit → Add Pivoted Network) ---------------------------------------------
+
+
+def test_add_pivot_network_dialog_parses_and_returns_hosts(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from oscprecon.gui.dialogs.pivot_network import AddPivotNetworkDialog
+
+    dialog = AddPivotNetworkDialog(["10.10.10.5", "10.10.5.23"])
+    qtbot.addWidget(dialog)
+    dialog._pivot_source.setCurrentText("10.10.10.5")
+    dialog._text.setPlainText(
+        "Nmap scan report for 10.10.5.40\n445/tcp open microsoft-ds Windows Server 2019\n"
+    )
+    dialog._on_accept()
+    hosts = dialog.hosts()
+    assert [h.ip for h in hosts] == ["10.10.5.40"]
+    assert hosts[0].pivot_source == "10.10.10.5"  # picked source is stamped on the hosts
+
+
+def test_add_pivot_network_wires_into_profile_and_graph(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PySide6.QtWidgets import QDialog
+
+    from oscprecon.gui.dialogs.pivot_network import AddPivotNetworkDialog
+    from oscprecon.models import DiscoveredHost
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window._set_profile(Profile.create(config.workspace_root(), "ctf", Target(ip="10.10.10.5")))
+
+    def fake_exec(self: AddPivotNetworkDialog) -> int:
+        self._hosts = [DiscoveredHost(ip="10.10.5.23", pivot_source="10.10.10.5")]
+        return int(QDialog.DialogCode.Accepted)
+
+    monkeypatch.setattr(AddPivotNetworkDialog, "exec", fake_exec)
+    window._on_add_pivot_network()
+    assert window._profile is not None
+    assert [h.ip for h in window._profile.discovered_hosts] == ["10.10.5.23"]
+    # persisted to disk too
+    reloaded = Profile.load(window._profile.directory)
+    assert [h.ip for h in reloaded.discovered_hosts] == ["10.10.5.23"]
+    window.close()

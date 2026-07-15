@@ -45,6 +45,42 @@ def test_refresh_does_not_duplicate(
     _wait_rows(qtbot, dashboard, 1)  # second refresh -> still 1 row, no duplicate
 
 
+def test_confirmed_delete_emits_requested_paths(
+    tmp_path: Path, dashboard: WorkspaceDashboard, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "victim", Target(ip="10.0.0.9"))
+    from PySide6.QtWidgets import QMessageBox
+
+    # simulate the user clicking the destructive "Delete" button in the confirm dialog
+    def _accept(self: QMessageBox) -> int:
+        self.setResult(0)
+        # clickedButton() is read after exec(); force it to the DestructiveRole button
+        for btn in self.buttons():
+            if self.buttonRole(btn) == QMessageBox.ButtonRole.DestructiveRole:
+                self.setDefaultButton(btn)
+                monkeypatch.setattr(self, "clickedButton", lambda b=btn: b)
+        return 0
+
+    monkeypatch.setattr(QMessageBox, "exec", _accept)
+    captured: list[object] = []
+    dashboard.delete_requested.connect(captured.append)
+    dashboard._confirm_delete([prof.directory])
+    assert captured == [[str(prof.directory)]]
+
+
+def test_cancelled_delete_emits_nothing(
+    tmp_path: Path, dashboard: WorkspaceDashboard, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "keep", Target(ip="10.0.0.8"))
+    from PySide6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)  # clickedButton() stays None -> cancel
+    captured: list[object] = []
+    dashboard.delete_requested.connect(captured.append)
+    dashboard._confirm_delete([prof.directory])
+    assert captured == []
+
+
 def test_open_signal_on_activate(
     tmp_path: Path, dashboard: WorkspaceDashboard, qtbot: QtBot
 ) -> None:

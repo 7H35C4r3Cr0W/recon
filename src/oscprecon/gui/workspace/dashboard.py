@@ -57,6 +57,7 @@ class WorkspaceDashboard(QWidget):
     create_requested = Signal()
     details_requested = Signal(object)  # directory (Path)
     profile_mutated = Signal(object)  # directory (Path) — org metadata changed on disk
+    delete_requested = Signal(object)  # list[str] of directories to permanently delete
     status_message = Signal(str)
 
     def __init__(self, theme_name: str = "dark") -> None:
@@ -313,9 +314,13 @@ class WorkspaceDashboard(QWidget):
         act_archive = menu.addAction("Archive / restore")
         menu.addSeparator()
         act_folder = menu.addAction("Open folder")
+        act_delete = menu.addAction("Delete project…")  # destructive — confirmed before it runs
         viewport = self._table.viewport()
         chosen = menu.exec(viewport.mapToGlobal(pos)) if viewport is not None else None
         if chosen is None:
+            return
+        if chosen is act_delete:
+            self._confirm_delete(dirs)
             return
         if chosen is act_open:
             self.open_requested.emit(dirs[0])
@@ -337,6 +342,27 @@ class WorkspaceDashboard(QWidget):
             )
             if ok and status:
                 self._mutate(dirs, lambda p, s=status: p.set_status(s))
+
+    def _confirm_delete(self, dirs: list[Path]) -> None:
+        # permanent, irreversible removal of the whole project folder — always double-confirm, and
+        # spell out exactly what is lost. The host window (which owns the profile + edit locks) does
+        # the delete via delete_requested so it can close an open project first.
+        names = "\n".join(f"  • {d.name}" for d in dirs)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setTextFormat(Qt.TextFormat.PlainText)  # profile names are attacker-influenced
+        box.setWindowTitle("Delete project" + ("s" if len(dirs) > 1 else ""))
+        box.setText(
+            f"Permanently delete {len(dirs)} project{'s' if len(dirs) > 1 else ''}?\n\n{names}\n\n"
+            "This removes the entire folder from disk — scans, notes, findings, credentials, the "
+            "report and the graph. This cannot be undone."
+        )
+        delete_btn = box.addButton("Delete", QMessageBox.ButtonRole.DestructiveRole)
+        cancel_btn = box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(cancel_btn)  # default to Cancel — never delete on a stray Enter
+        box.exec()
+        if box.clickedButton() is delete_btn:
+            self.delete_requested.emit([str(d) for d in dirs])
 
     def _mutate(self, dirs: list[Path], op: object) -> None:
         changed = 0

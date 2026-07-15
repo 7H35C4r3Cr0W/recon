@@ -46,6 +46,51 @@ def test_export_then_import_roundtrips(tmp_path: Path) -> None:
     assert (dest / "notes.md").read_text(encoding="utf-8") == "recon notes\n"
 
 
+# ---- delete_project (guarded, irreversible) --------------------------------------------------
+
+
+def test_delete_project_removes_the_folder(tmp_path: Path) -> None:
+    prof = _make_profile(tmp_path, "htb-active", "10.10.10.100")
+    assert prof.directory.is_dir()
+    portability.delete_project(prof.directory, tmp_path)
+    assert not prof.directory.exists()
+
+
+def test_delete_project_deletes_corrupt_profile(tmp_path: Path) -> None:
+    # a folder with no profile.json (a broken project) must still be removable to clean up
+    broken = tmp_path / "broken"
+    broken.mkdir()
+    (broken / "notes.md").write_text("stub\n", encoding="utf-8")
+    portability.delete_project(broken, tmp_path)
+    assert not broken.exists()
+
+
+def test_delete_project_refuses_the_workspace_root(tmp_path: Path) -> None:
+    with pytest.raises(ProjectArchiveError):
+        portability.delete_project(tmp_path, tmp_path)
+    assert tmp_path.is_dir()  # the root is untouched
+
+
+def test_delete_project_refuses_paths_outside_the_root(tmp_path: Path) -> None:
+    outside = tmp_path.parent / "not-in-workspace"
+    outside.mkdir()
+    try:
+        with pytest.raises(ProjectArchiveError):
+            portability.delete_project(outside, tmp_path / "ws")
+        assert outside.is_dir()  # nothing outside the workspace is ever removed
+    finally:
+        outside.rmdir()
+
+
+def test_delete_project_refuses_nested_grandchild(tmp_path: Path) -> None:
+    # only a DIRECT child of the workspace root is a project — a deeper path is refused
+    nested = tmp_path / "htb-active" / "nmap"
+    nested.mkdir(parents=True)
+    with pytest.raises(ProjectArchiveError):
+        portability.delete_project(nested, tmp_path)
+    assert nested.is_dir()
+
+
 def test_export_to_explicit_archive_path(tmp_path: Path) -> None:
     prof = _make_profile(tmp_path / "ws", "box", "10.0.0.1")
     out = tmp_path / "backups" / "custom.tar.gz"

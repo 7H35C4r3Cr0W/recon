@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import socket
 from collections.abc import Callable
@@ -36,6 +37,7 @@ from oscprecon.gui import theme
 from oscprecon.gui.assets import ICON, asset_path
 from oscprecon.gui.dialogs import (
     AddCredentialDialog,
+    AddPivotNetworkDialog,
     CredentialVaultDialog,
     DoctorDialog,
     LogViewerDialog,
@@ -224,6 +226,7 @@ class MainWindow(QMainWindow):
         self._dashboard.create_requested.connect(self._on_new)
         self._dashboard.status_message.connect(self._tool_panel.append_output)
         self._dashboard.profile_mutated.connect(self._on_dashboard_mutated)
+        self._dashboard.delete_requested.connect(self._on_delete_requested)
         self._central_stack = QStackedWidget()
         # index order is load-bearing (graph/report toggles + tests key on 0/1/2/3) — append only
         self._central_stack.addWidget(splitter)  # 0: three-pane recon
@@ -401,6 +404,11 @@ class MainWindow(QMainWindow):
         vault_action = QAction("Credential Vault...", self)
         vault_action.triggered.connect(self._on_credential_vault)
         edit_menu.addAction(vault_action)
+        edit_menu.addSeparator()
+        pivot_action = QAction("Add Pivoted Network...", self)
+        pivot_action.setStatusTip("Import hosts found by scanning across a pivot (ligolo-ng etc.)")
+        pivot_action.triggered.connect(self._on_add_pivot_network)
+        edit_menu.addAction(pivot_action)
 
         view_menu = self.menuBar().addMenu("&View")
         workspace_action = QAction("Workspace Dashboard", self)
@@ -594,6 +602,70 @@ class MainWindow(QMainWindow):
                 return
             self._profile.organization = fresh.organization
             self._profile.tags = fresh.tags
+
+    def _on_delete_requested(self, payload: object) -> None:
+        # Permanently delete project folders picked in the dashboard (already double-confirmed).
+        # We — not the dashboard — do this because only the host window owns the edit lock and the
+        # in-memory profile: an open project must be closed first, and a project locked live by
+        # another instance must never be removed out from under it.
+        paths = [Path(str(p)) for p in payload] if isinstance(payload, list) else []
+        root = config.workspace_root()
+        deleted = 0
+        for directory in paths:
+            directory = directory.resolve()
+            is_active = self._profile is not None and directory == self._profile.directory.resolve()
+            if is_active and not self._tasks.can_start(exclusive=True):
+                self._tool_panel.append_output(
+                    f"[workspace] {directory.name}: a scan is running — stop it before deleting."
+                )
+                continue
+            info, _malformed = locks.read_lock(directory)
+            foreign = info is not None and not locks.is_stale(info) and info.pid != os.getpid()
+            # refuse whenever ANOTHER live instance holds the lock — even if this window has the
+            # same project open read-only (is_active). A self-delete carries this window's own PID
+            # so foreign is already False; an is_active+foreign case means another window is
+            # actively editing this project and deleting it would destroy its live data.
+            if foreign:
+                self._tool_panel.append_output(
+                    f"[workspace] {directory.name}: open in another window — not deleted."
+                )
+                continue
+            if is_active:
+                self._close_active_profile()  # drop lock + in-memory profile before rmtree
+            try:
+                portability.delete_project(directory, root)
+                deleted += 1
+            except (portability.ProjectArchiveError, OSError) as exc:
+                self._tool_panel.append_output(
+                    f"[workspace] {directory.name}: delete failed: {exc}"
+                )
+        if deleted:
+            self._tool_panel.append_output(f"[workspace] deleted {deleted} project(s).")
+        self._show_workspace()  # rescans the (now smaller) workspace and lands on the dashboard
+
+    def _close_active_profile(self) -> None:
+        # safe teardown so the folder can be removed: flush pending notes, stop any worker still
+        # writing into the folder, release the edit lock, and drop the profile so no later save()
+        # recreates what we deleted. The delete guard already refuses while a scan (self._tasks)
+        # runs, but EDB/live workers run outside self._tasks and write under the profile dir —
+        # cancel and wait them (as closeEvent does) so an in-flight searchsploit can't resurrect it.
+        if self._profile is None:
+            return
+        # detach the notes pane (flush final notes while the folder still exists, then point at no
+        # profile) so its autosave timer / a later closeEvent flush can't write to the deleted dir.
+        if not self._profile.read_only:
+            self._notes_pane.flush()
+        self._notes_pane.clear_profile()
+        for edb_worker in list(self._edb_workers):
+            self._tasks.cancel(edb_worker)
+        for worker in (*self._edb_workers, *self._live_workers):
+            if isinstance(worker, QThread) and worker.isRunning():
+                worker.wait()
+        self._release_lock()
+        self._profile = None
+        self._graph_view.clear_profile()  # no ghost of the deleted project in the graph/summary
+        self._header.clear_profile()
+        self._nav.set_enabled_keys(False)
 
     # central-stack index -> nav key, so the rail highlight always matches the visible view
     _INDEX_KEY = {0: "recon", 1: "graph", 2: "report", 3: "workspace", 4: "findings", 5: "activity"}
@@ -1112,6 +1184,32 @@ class MainWindow(QMainWindow):
         dialog.exec()
         self._audit_action("credential-vault-opened")
         self._refresh_suggestions()  # has_credential may have changed
+
+    def _on_add_pivot_network(self) -> None:
+        if self._profile is None:
+            QMessageBox.information(self, "No profile", "Open or create a profile first.")
+            return
+        if self._profile.read_only:
+            QMessageBox.information(self, "Read-only", "This profile is open read-only.")
+            return
+        dialog = AddPivotNetworkDialog(self._profile.known_host_ips(), self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        hosts = dialog.hosts()
+        if not hosts:
+            self._tool_panel.append_output(
+                "[pivot] nothing parsed — paste nmap output (or a plain IP list) and try again."
+            )
+            return
+        added = self._profile.add_hosts(hosts)
+        self._profile.save()
+        subnets = sorted({h.subnet for h in hosts if h.subnet})
+        self._tool_panel.append_output(
+            f"[pivot] added {added} new host(s) across {len(subnets)} subnet(s): "
+            f"{', '.join(subnets) or 'n/a'} — see the Graph (Ctrl+G)."
+        )
+        self._audit_action("pivot-network-added", hosts=len(hosts), subnets=len(subnets))
+        self._graph_view.set_profile(self._profile)  # redraw the spider-web + native summary
 
     def _on_credential_spray(self) -> None:
         if self._profile is None:

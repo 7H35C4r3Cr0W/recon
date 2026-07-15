@@ -53,6 +53,21 @@ def find_profiles_by_ip(workspace_root: Path, ip: str) -> list[Path]:
     return matches
 
 
+def delete_project(profile_dir: Path, workspace_root: Path) -> None:
+    # Permanently remove one <workspace_root>/<name>/ folder. Guarded: the target must be a direct
+    # child directory of workspace_root — never the root itself, a parent, an unrelated path, or a
+    # symlink pointing outside — so a wrong path can never rmtree the wrong tree. Destructive and
+    # irreversible; the caller confirms with the user first. A corrupt profile (no profile.json) is
+    # still deletable so the workspace can be cleaned up.
+    profile_dir = profile_dir.resolve()
+    workspace_root = workspace_root.resolve()
+    if profile_dir == workspace_root or profile_dir.parent != workspace_root:
+        raise ProjectArchiveError(f"{profile_dir} is not a project inside {workspace_root}")
+    if not profile_dir.is_dir():
+        raise ProjectArchiveError(f"{profile_dir} is not a directory")
+    shutil.rmtree(profile_dir)
+
+
 def export_project_archive(profile_dir: Path, dest: Path) -> Path:
     # pack <profile_dir> into <dest>/<name>.tar.gz (or into `dest` itself when it names a .tar.gz).
     # Includes creds.json verbatim — the caller is responsible for warning the user (§19).
