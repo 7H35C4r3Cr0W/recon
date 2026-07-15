@@ -239,6 +239,23 @@ bug — say so and validate the flow elsewhere (synthetic at scale + a clean liv
 tool stops at the perimeter; the ligolo helper hands off to the user for the tunnel, then resumes
 scanning the internal range.
 
+**Inception — HTB Hard, requires PIVOTING (Apache + open Squid proxy).** `10.129.38.98`.
+- **VPN degraded this session:** all `10.129.38.x` boxes came back `filtered`, and — the tell —
+  **Pennyworth (10.129.33.62), scanned open live ~30 min earlier, was now filtered too**. So it's a
+  transient tun0/HTB network condition (host up, scan packets dropped), not the boxes or the tool.
+  Left it there — never fight a degraded VPN; validate the flow elsewhere.
+- **Modeled Inception's real topology and drove it through the GUI** (entry Apache/80 + Squid/3128 →
+  the container network `192.168.0.0/24` → the container `192.168.0.10` (ssh) + the gateway
+  `192.168.0.1` (ftp/ssh/nameserver + tftp/udp)). Recon tree + graph both render the 2-hop chained
+  pivot cleanly (subnet box, host + OS glyphs, pivot edges, native summary). No bug — the pivot flow
+  holds for a realistic AD/container engagement.
+- Inception is a legit **recon pivot** (the open Squid proxy forwards a scan to the box's localhost —
+  no exploitation), so when the VPN is healthy this is the ideal box to drive the pivot end-to-end;
+  the deeper container→gateway hop still needs the dompdf-LFI→webdav foothold (exploitation, manual).
+
+**Lesson:** when the VPN itself is dropping packets (a previously-open box goes filtered), stop
+scanning and prove the flow on modeled data + note it — chasing a dead network wastes the session.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
