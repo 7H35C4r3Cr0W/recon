@@ -40,6 +40,7 @@ from oscprecon.gui.dialogs import (
     AddPivotNetworkDialog,
     CredentialVaultDialog,
     DoctorDialog,
+    LigoloHelperDialog,
     LogViewerDialog,
     NewProfileDialog,
     NmapScanDialog,
