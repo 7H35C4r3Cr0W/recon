@@ -21,7 +21,8 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 10 | Sequel | 10.129.32.202 | mysql/3306 (MariaDB 10.3.27) | validated the reworked Exploit-DB lookup live — nmap can't fingerprint (`mysql?`) so EDB now falls back to the mysql-info version → 7 MariaDB refs; passwordless root is manual | (EDB rework, not a box bug) `9a61cf2` | `9a61cf2` |
 | 11 | Crocodile | 10.129.32.203 | ftp/21 (vsftpd 3.0.3, anon) + http/80 (Apache 2.4.41) | anon FTP listed both cred files; whatweb + EDB (vsftpd 3.0.3 → EDB-49719 ★, apache 2.4 → 31) both clean; login.php foothold is manual | FTP files listed **twice** — nmap ftp-anon and the curl walk both enumerate root | `4ab92b9` |
 | 12 | Responder | 10.129.32.225 | http/80 (Apache 2.4.52 Win64) + winrm/5985 (MS HTTPAPI 2.0) | nmap clean, 5985→winrm panel; searchsploit apache 2.4→31★12 / HTTPAPI→0 clean; whatweb now surfaces the `unika.htb` vhost; LFI→Responder→NTLMv2 chain is manual | whatweb saw `Meta-Refresh-Redirect` but dropped the target host → the vhost pivot was invisible | `c14815d` |
-| 13 | Three | 10.129.227.248 | ssh/22 (OpenSSH 7.6p1) + http/80 (Apache 2.4.29, vhost thetoppers.htb → s3.thetoppers.htb) | feature box, drove GUI **and** CLI: hostname wires HTTP→thetoppers.htb; searchsploit capped (apache 2.4→31, top 15); new read-only S3 module from the `s3.*` vhost; failed steps flagged | (feature work, not a parser bug) new: hostname setting, EDB cap, S3 recon, step-failure visibility | _this commit_ |
+| 13 | Three | 10.129.227.248 | ssh/22 (OpenSSH 7.6p1) + http/80 (Apache 2.4.29, vhost thetoppers.htb → s3.thetoppers.htb) | feature box, drove GUI **and** CLI: hostname wires HTTP→thetoppers.htb; searchsploit capped (apache 2.4→31, top 15); new read-only S3 module from the `s3.*` vhost; failed steps flagged | (feature work, not a parser bug) new: hostname setting, EDB cap, S3 recon, step-failure visibility | `8fc2f43` |
+| 14 | Funnel | 10.129.228.195 | ftp/21 (vsftpd 3.0.3, anon) + ssh/22 (OpenSSH 8.2p1) | anon FTP walked into `mail_backup/`, peeked the 713B text email (surfaced 5 `@funnel.htb` usernames), skipped the 58KB PDF; searchsploit vsftpd→1★, openssh 29→top 15; spray + SSH-tunnel→psql is manual | none (clean — validated the FTP subdir walk/peek + EDB cap live) | _this commit_ |
 
 ## Per-box notes
 
@@ -143,6 +144,21 @@ GUI **and** CLI run-through:
 - **Verified end-to-end:** GUI (service tree, HTTP panel targeting the vhost,
   HackTricks + EDB panes, graph = 3 nodes/2 edges, report.md) and CLI
   (`nabu-cli scan --hostname`, profile + report written).
+
+**14 · Funnel — ftp + ssh.** vsftpd 3.0.3 (anonymous) + OpenSSH 8.2p1. **Clean run,
+no bug** — it validated the FTP module's bounded recursive walk + the peek gate on a
+live box: the anon walk descended into `mail_backup/`, listed both files, **peeked
+only the 713-byte text email** — surfacing all five `@funnel.htb` usernames
+(optimus/albert/andreas/christine/maria, i.e. the spray list) — and **correctly
+skipped the 58 KB `password_policy.pdf`** (binary/oversize peek gate). (The email's
+literal "Frome:" typo is the box author's, faithfully shown — not a parser bug.) The
+searchsploit cap held: OpenSSH's 29 hits show the **top 15** ("29 results … showing
+top 15"); vsftpd 3.0.3 → the single EDB-49719 ★. The password spray
+(`christine:funnel123#!#` via hydra) is Spray-mode (opt-in, off by default) and the
+SSH local-forward → PostgreSQL 5432 → psql tunnel is manual post-foothold — all
+correctly outside the recon-only tool. **Lesson:** the bounded walk + text-only peek
+is the right recon depth — it hands you the usernames without dragging down a binary,
+and the EDB cap keeps a big product (OpenSSH) readable.
 
 ## Trends & lessons (adapt going forward)
 
