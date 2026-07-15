@@ -19,7 +19,8 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 8 | Synced | 10.129.228.37 | rsync/873 | `rsync --list-only` found anonymous `public` module (access=unauth) | nmap parenthetical banner `(protocol version 31)` mangled product/version | `ab1a809` |
 | 9 | Appointment | 10.129.32.201 | http/80 (Apache 2.4.38, login form) | nmap clean; whatweb fingerprint now surfaces the login form (`PasswordField`, `Title[Login]`); SQLi bypass is manual | `whatweb` emitted a coloured summary the JSON-only parser silently dropped → 0 findings on every http box | `d868c6d` |
 | 10 | Sequel | 10.129.32.202 | mysql/3306 (MariaDB 10.3.27) | validated the reworked Exploit-DB lookup live — nmap can't fingerprint (`mysql?`) so EDB now falls back to the mysql-info version → 7 MariaDB refs; passwordless root is manual | (EDB rework, not a box bug) `9a61cf2` | `9a61cf2` |
-| 11 | Crocodile | 10.129.32.203 | ftp/21 (vsftpd 3.0.3, anon) + http/80 (Apache 2.4.41) | anon FTP listed both cred files; whatweb + EDB (vsftpd 3.0.3 → EDB-49719 ★, apache 2.4 → 31) both clean; login.php foothold is manual | FTP files listed **twice** — nmap ftp-anon and the curl walk both enumerate root | _this commit_ |
+| 11 | Crocodile | 10.129.32.203 | ftp/21 (vsftpd 3.0.3, anon) + http/80 (Apache 2.4.41) | anon FTP listed both cred files; whatweb + EDB (vsftpd 3.0.3 → EDB-49719 ★, apache 2.4 → 31) both clean; login.php foothold is manual | FTP files listed **twice** — nmap ftp-anon and the curl walk both enumerate root | `4ab92b9` |
+| 12 | Responder | 10.129.32.225 | http/80 (Apache 2.4.52 Win64) + winrm/5985 (MS HTTPAPI 2.0) | nmap clean, 5985→winrm panel; searchsploit apache 2.4→31★12 / HTTPAPI→0 clean; whatweb now surfaces the `unika.htb` vhost; LFI→Responder→NTLMv2 chain is manual | whatweb saw `Meta-Refresh-Redirect` but dropped the target host → the vhost pivot was invisible | _this commit_ |
 
 ## Per-box notes
 
@@ -103,6 +104,24 @@ walk's richer `size + extension` detail, applied in both `FtpModule.parse()` and
 the worker — nmap stays a fallback if curl ever fails, but never double-counts.
 The credential-list → `login.php` login is manual (recon-only).
 
+**12 · Responder — http + winrm.** Windows: Apache 2.4.52 (Win64) on 80, WinRM
+(Microsoft HTTPAPI httpd 2.0) on 5985 — 5985 correctly routes to the **winrm**
+panel (services.yaml port match beats the `http` service name nmap reports). Both
+of this session's features held up on a live box: whatweb parses cleanly (it even
+skips whatweb's own `ERROR Opening: http://unika.htb/` line, emitted when whatweb
+follows the redirect to the not-yet-resolvable vhost), and Exploit-DB resolves
+`apache 2.4` → 31 (12 ★) and shows a clean "no matches" for HTTPAPI. **Bug (recon
+gap):** the box's entire pivot is the name-based vhost `unika.htb`, served via an
+HTML `<meta http-equiv="refresh">` redirect. whatweb *detected* it
+(`Meta-Refresh-Redirect[http://unika.htb/]`) but the parser kept only plugin
+*names*, so the redirect **target** — the vhost to add to `/etc/hosts` — was
+invisible. Fix: `_parse_whatweb_plain` now emits a distinct finding for a redirect
+to a real hostname (`redirect_to=unika.htb`, note "add to /etc/hosts and enumerate
+as a vhost"), and the http `suggest()` echoes it into Recon-next-steps; a bare-IP
+or path redirect is ignored. The LFI → SMB → NetNTLMv2 → john → WinRM chain is
+manual exploitation (recon-only tool leaves it to the user). **Lesson:** a redirect
+to a *different hostname* is a recon signal (a vhost), not a fingerprint footnote.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
@@ -123,3 +142,10 @@ The credential-list → `login.php` login is manual (recon-only).
   default coloured summary ≠ its `--log-json` output; a JSON-only parser dropped
   every real run. Pin the command to a deterministic, parseable form (and force
   `--colour=never` for tools that colour even when piped).
+- **A redirect to a different hostname is recon, not a footnote.** A meta-refresh
+  or `Location` redirect to a *name* (unika.htb) is a vhost to enumerate — surface
+  the target host (and hint /etc/hosts + vhost enum), don't just note "a redirect
+  exists". Ignore redirects to a bare IP or a path.
+- **Overlapping enumerators duplicate findings.** When two tools list the same
+  thing (nmap ftp-anon + curl walk; nmap + NSE), dedup on a structural key and keep
+  the richer detail — one file is one finding, whatever surfaced it.
