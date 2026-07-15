@@ -22,7 +22,8 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 11 | Crocodile | 10.129.32.203 | ftp/21 (vsftpd 3.0.3, anon) + http/80 (Apache 2.4.41) | anon FTP listed both cred files; whatweb + EDB (vsftpd 3.0.3 → EDB-49719 ★, apache 2.4 → 31) both clean; login.php foothold is manual | FTP files listed **twice** — nmap ftp-anon and the curl walk both enumerate root | `4ab92b9` |
 | 12 | Responder | 10.129.32.225 | http/80 (Apache 2.4.52 Win64) + winrm/5985 (MS HTTPAPI 2.0) | nmap clean, 5985→winrm panel; searchsploit apache 2.4→31★12 / HTTPAPI→0 clean; whatweb now surfaces the `unika.htb` vhost; LFI→Responder→NTLMv2 chain is manual | whatweb saw `Meta-Refresh-Redirect` but dropped the target host → the vhost pivot was invisible | `c14815d` |
 | 13 | Three | 10.129.227.248 | ssh/22 (OpenSSH 7.6p1) + http/80 (Apache 2.4.29, vhost thetoppers.htb → s3.thetoppers.htb) | feature box, drove GUI **and** CLI: hostname wires HTTP→thetoppers.htb; searchsploit capped (apache 2.4→31, top 15); new read-only S3 module from the `s3.*` vhost; failed steps flagged | (feature work, not a parser bug) new: hostname setting, EDB cap, S3 recon, step-failure visibility | `8fc2f43` |
-| 14 | Funnel | 10.129.228.195 | ftp/21 (vsftpd 3.0.3, anon) + ssh/22 (OpenSSH 8.2p1) | anon FTP walked into `mail_backup/`, peeked the 713B text email (surfaced 5 `@funnel.htb` usernames), skipped the 58KB PDF; searchsploit vsftpd→1★, openssh 29→top 15; spray + SSH-tunnel→psql is manual | none (clean — validated the FTP subdir walk/peek + EDB cap live) | _this commit_ |
+| 14 | Funnel | 10.129.228.195 | ftp/21 (vsftpd 3.0.3, anon) + ssh/22 (OpenSSH 8.2p1) | anon FTP walked into `mail_backup/`, peeked the 713B text email (surfaced 5 `@funnel.htb` usernames), skipped the 58KB PDF; searchsploit vsftpd→1★, openssh 29→top 15; spray + SSH-tunnel→psql is manual | none (clean — validated the FTP subdir walk/peek + EDB cap live) | `a05ae6b` |
+| 15 | Bike | 10.129.32.229 | ssh/22 (OpenSSH 8.2p1) + http/80 (Node.js Express) | nmap parsed the `Node.js (Express middleware)` banner (no version) cleanly; whatweb caught `X-Powered-By[Express]`+jQuery+`Title[Bike]` despite no `Server:` header; searchsploit node.js→4 (not blasting), openssh 29→top 15; Handlebars SSTI is manual | none (clean — mid-banner parenthetical + no-version product parse validated) | _this commit_ |
 
 ## Per-box notes
 
@@ -159,6 +160,21 @@ SSH local-forward → PostgreSQL 5432 → psql tunnel is manual post-foothold �
 correctly outside the recon-only tool. **Lesson:** the bounded walk + text-only peek
 is the right recon depth — it hands you the usernames without dragging down a binary,
 and the EDB cap keeps a big product (OpenSSH) readable.
+
+**15 · Bike — ssh + http (Node.js).** OpenSSH 8.2p1 + a Node.js/Express web app on
+80 (title "Bike"). **Clean run, no bug.** nmap fingerprints port 80 as `Node.js
+(Express middleware)` with **no version** — the parser keeps the whole string as the
+product (the parenthetical is *mid*-banner, real product text, unlike Synced's
+*leading* `(protocol 31)`) and leaves version empty, so the summary + EDB are right.
+whatweb (Appointment fix) captures the stack from headers even with **no `Server:`
+header** (Node.js omits it): `X-Powered-By[Express]`, `JQuery[2.2.4]`, `Title[Bike]`.
+searchsploit normalizes `Node.js (Express middleware)` → `node.js` → **4** results
+(not the 104 a bare `express` query would blast); OpenSSH's 29 show the top 15.
+Routing: 80 → http HackTricks. The Handlebars SSTI (`{{#with "s" as |string|}} …
+require('child_process').execSync(…)`) is manual exploitation — the recon tool stops
+at fingerprinting the stack, correctly. **Lesson:** a *mid*-banner parenthetical is
+real product text (keep it); a *leading* `(` is a bare protocol note (drop it) — both
+nmap-banner rules coexist.
 
 ## Trends & lessons (adapt going forward)
 
