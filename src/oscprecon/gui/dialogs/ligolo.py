@@ -28,14 +28,16 @@ class LigoloHelperDialog(QDialog):
     Scan → "Scan a host / range" and Nabu scans it transparently. Docs: https://docs.ligolo.ng/
     """
 
-    def __init__(self, default_routes: list[str] | None = None, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, default_routes: list[str] | None = None, parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Pivot with Ligolo-ng")
         self.resize(680, 620)
 
         intro = QLabel(
-            "Reach an internal network from a foothold, then scan it in Nabu. Fill in your values — "
-            "the commands below update live. Nabu doesn't run ligolo; copy each command and run it "
+            "Reach an internal network from a foothold, then scan it in Nabu. Fill in your values "
+            "— the commands update live. Nabu doesn't run ligolo; copy each command and run it "
             'where it says. <a href="https://docs.ligolo.ng/">docs.ligolo.ng</a>'
         )
         intro.setWordWrap(True)
@@ -46,7 +48,9 @@ class LigoloHelperDialog(QDialog):
         self._port = QLineEdit("11601")
         self._iface = QLineEdit("ligolo")
         self._routes = QLineEdit()
-        self._routes.setPlaceholderText("internal /24(s), comma-separated — e.g. 172.16.1.0/24, 10.10.5.0/24")
+        self._routes.setPlaceholderText(
+            "internal /24(s), comma-separated — e.g. 172.16.1.0/24, 10.10.5.0/24"
+        )
 
         form = QFormLayout()
         form.addRow("Attacker (tun0) IP:", self._ip)
@@ -81,7 +85,7 @@ class LigoloHelperDialog(QDialog):
     def _rebuild(self) -> None:
         while self._steps_layout.count():
             item = self._steps_layout.takeAt(0)
-            widget = item.widget()
+            widget = item.widget() if item is not None else None
             if widget is not None:
                 widget.deleteLater()
         try:
@@ -104,15 +108,15 @@ class LigoloHelperDialog(QDialog):
         header.setWordWrap(True)
         outer.addWidget(header)
 
-        body = QPlainTextEdit("\n".join(step.commands))
+        cmd_text = "\n".join(step.commands)
+        body = QPlainTextEdit(cmd_text)
         body.setReadOnly(True)
         body.setFont(QFont("monospace"))
-        lines = len(step.commands)
-        body.setFixedHeight(22 + 18 * max(1, lines))
+        body.setFixedHeight(22 + 18 * max(1, len(step.commands)))
         row = QHBoxLayout()
         row.addWidget(body, stretch=1)
         copy = QPushButton("Copy")
-        copy.clicked.connect(lambda _=False, text="\n".join(step.commands): self._copy(text))
+        copy.clicked.connect(lambda _=False, text=cmd_text: self._copy(text))
         row.addWidget(copy)
         outer.addLayout(row)
 

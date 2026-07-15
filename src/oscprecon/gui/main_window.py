@@ -384,6 +384,10 @@ class MainWindow(QMainWindow):
         )
         custom_scan_action.triggered.connect(lambda: self._on_custom_scan())
         scan_menu.addAction(custom_scan_action)
+        ligolo_action = QAction("Pivot with Ligolo-ng...", self)
+        ligolo_action.setStatusTip("Guided ligolo-ng command-builder to reach an internal network")
+        ligolo_action.triggered.connect(self._on_ligolo_helper)
+        scan_menu.addAction(ligolo_action)
 
         profile_menu = scan_menu.addMenu("Run recon with profile")
         _PROFILE_HINTS = {
@@ -1265,6 +1269,16 @@ class MainWindow(QMainWindow):
 
     def _on_scan_host_requested(self, ip: str) -> None:
         self._on_custom_scan(default_target=ip)  # re-scan this pivoted host deeper
+
+    def _on_ligolo_helper(self) -> None:
+        # a guided ligolo-ng command-builder — pre-seed the route with known subnets so the scan
+        # step points at something concrete. Nabu never runs ligolo; the user copies + runs them.
+        subnets = (
+            sorted({h.subnet for h in self._profile.discovered_hosts if h.subnet})
+            if self._profile
+            else []
+        )
+        LigoloHelperDialog(subnets, self).exec()
 
     def _on_remove_host(self, ip: str) -> None:
         if self._profile is None or self._profile.read_only:

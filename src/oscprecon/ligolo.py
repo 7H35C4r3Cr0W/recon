@@ -8,9 +8,9 @@ from dataclasses import dataclass, field
 
 # Build the ligolo-ng pivot workflow as copy-paste command steps. Nabu does NOT run ligolo (it is a
 # tunnelling relay, not a recon tool, and setting up a tun / route needs root) — this is a guided
-# command-builder + reference, the same "shown, you run it" model as the Tier-2 manual commands. Once
-# the user brings the internal /24 up over the ligolo interface, Nabu's "Scan a host / range" scans it
-# transparently. Reference: https://docs.ligolo.ng/
+# command-builder + reference, the same "shown, you run it" model as the Tier-2 manual commands.
+# Once the internal /24 is routable over the ligolo interface, Nabu's "Scan a host / range" scans
+# it transparently. Reference: https://docs.ligolo.ng/
 
 _SIOCGIFADDR = 0x8915  # Linux ioctl: get an interface's IPv4 address
 
@@ -88,8 +88,8 @@ def build_ligolo_steps(
             "In the ligolo proxy console",
             "ligolo console",
             console,
-            "Pick the agent's session, create the tun, add the internal route(s), start the tunnel. "
-            "(Older ligolo: the interface auto-creates and you run `start` instead of `tunnel_start`.)",
+            "Pick the agent's session, create the tun, add the route(s), start the tunnel. "
+            "(Older ligolo: the interface auto-creates and you run `start`, not `tunnel_start`.)",
         )
     )
     if clean:
