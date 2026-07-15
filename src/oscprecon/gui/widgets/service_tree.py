@@ -4,7 +4,7 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPaintEvent
 from PySide6.QtWidgets import QHeaderView, QMenu, QTreeWidget, QTreeWidgetItem
 
-from oscprecon.models import DiscoveredHost, DiscoveredService, Proto
+from oscprecon.models import DiscoveredHost, DiscoveredService, Proto, Target
 
 _SERVICE_ROLE = Qt.ItemDataRole.UserRole
 _HOST_ROLE = Qt.ItemDataRole.UserRole + 1  # a pivoted-host row -> its DiscoveredHost
@@ -160,6 +160,7 @@ class ServiceTree(QTreeWidget):
         services: list[DiscoveredService],
         hosts: list[DiscoveredHost] | None = None,
         *,
+        target: Target | None = None,
         force: bool = False,
     ) -> None:
         # why: skip the clear()+rebuild when the service set is unchanged — a rebuild drops the
@@ -168,6 +169,7 @@ class ServiceTree(QTreeWidget):
         # coincidentally-identical signature must still rebind the items to the new profile.
         hosts = hosts or []
         signature: tuple[object, ...] = (
+            (target.ip, target.hostname) if target is not None else None,
             tuple((s.port, s.proto.value, s.service, s.product, s.version) for s in services),
             tuple(
                 (
@@ -184,11 +186,23 @@ class ServiceTree(QTreeWidget):
             return
         self._signature = signature
         self.clear()
+        # The entry host's services sit under an IP-labelled header (not a bare "TCP (n)"), so the
+        # target IP/hostname is always visible at the top — consistent with the pivoted-host rows.
+        entry_parent: QTreeWidget | QTreeWidgetItem = self
+        if target is not None and services:
+            name = f"{target.ip} ({target.hostname})" if target.hostname else target.ip
+            entry = QTreeWidgetItem(self, [name, target.os_guess or "", "entry / pivot"])
+            entry.setForeground(0, QBrush(_HOST_COLOR))
+            entry.setData(0, _KEY_ROLE, "entry")
+            entry_font = entry.font(0)
+            entry_font.setWeight(QFont.Weight.DemiBold)
+            entry.setFont(0, entry_font)
+            entry_parent = entry
         for proto in (Proto.TCP, Proto.UDP):
             members = sorted((s for s in services if s.proto == proto), key=lambda s: s.port)
             if not members:
                 continue
-            parent = QTreeWidgetItem(self, [f"{proto.value.upper()} ({len(members)})", "", ""])
+            parent = QTreeWidgetItem(entry_parent, [f"{proto.value.upper()} ({len(members)})", "", ""])
             parent.setData(0, _KEY_ROLE, f"g:{proto.value}")
             header_font = parent.font(0)
             header_font.setWeight(QFont.Weight.DemiBold)
