@@ -218,6 +218,27 @@ i.e. Jenkins) plus `68/udp dhcpc` from the UDP top-100 sweep. Drove this box to 
 (scan-flag control, EDB version-matching, merge-not-replace, graph render) end-to-end without a
 box-specific parser in the way — the "no bug found" run still proves the pipeline holds on real data.
 
+**Reel — HTB Hard AD box (not Starting Point) — pivot/ligolo direction.** `10.129.38.95`,
+Windows Server 2012 R2 (FTP/SSH/SMTP + AD). Used to exercise the pivot/recon direction, but:
+- **Blocks ping** and every service port came back `filtered` from my vantage (SYN and connect,
+  patient timing, high/variable latency) — a target/network condition, so no clean service data
+  this session. It DID confirm the `-Pn` custom-scan path is the right tool for a ping-blocking
+  Windows host (the "Scan a host / range" dialog exists for exactly this).
+- **Can't be pivoted by me:** the foothold is a client-side phishing exploit (CVE-2017-0199 → HTA
+  → Empire) — exploitation, out of scope — and there's no reachable internal network without it.
+  The pivot flow itself was validated separately at scale (synthetic 1-entry → 3×/24 × 10 hosts:
+  recon tree + graph render 109 nodes; delete a /24 or IPs then re-scan re-adds them; streaming
+  refresh coalesced 30→1).
+- **Built the Ligolo-ng helper** the box's write-up motivates: Scan → "Pivot with Ligolo-ng…" is a
+  guided command-builder (auto-detects tun0 IP, generates proxy/agent/interface_create+add_route+
+  tunnel_start, then points at "Scan a host / range"). Nabu never runs ligolo — it's a "shown, you
+  run it" builder (OSCP-friendly per owner), the bridge from a foothold to the pivot-scan feature.
+
+**Lesson:** a firewalled/filtered target that returns nothing is a target condition, not a tool
+bug — say so and validate the flow elsewhere (synthetic at scale + a clean live box). The recon
+tool stops at the perimeter; the ligolo helper hands off to the user for the tunnel, then resumes
+scanning the internal range.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
