@@ -27,7 +27,8 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 16 | Ignition | 10.129.32.240 | http/80 (nginx 1.14.2, 302→ignition.htb) | nmap's http-title redirect now **auto-sets** hostname=ignition.htb → http recon targets the vhost (serves Magento 200 + /admin 200); whatweb also surfaces it from the 302 `RedirectLocation`; Magento default-cred login is manual | nmap-redirect vhost wasn't surfaced until whatweb ran → now auto-wired at scan time | `b62ecc9` |
 | 17 | Pennyworth | 10.129.33.62 | http/8080 (Jetty 9.4.39 → Jenkins) + 68/udp (dhcpc) | **feature-validation box**: 8080→http module + HackTricks; EDB version-matched Jetty 9.4 → **EDB-50438 (CVE-2021-28164)**; recon tree + graph (icon nodes/glyphs/legend) clean; **custom-scan dialog + the merge fix + streaming range** all validated live; weak-cred Jenkins login + Groovy RCE is manual | none (clean — validated this session's scan/topology features on a live box) | `d0dc66d` |
 | 18 | Tactics | 10.129.33.82 | smb/445 (+135 msrpc, 139 netbios) — Windows Server 2019 (blocks ping) | **the -Pn box**: default scan finds 0 (ping-blocked) → the **custom scan dialog with -Pn** found 135/139/445 live; 445→SMB panel; Tier-1 correctly reports "null/guest denied" (not a false empty); the **Tier-2 `administrator:'' ` follow-up** (the foothold — I verified it gives `(Pwn3d!)`, ADMIN$/C$ R/W) is SHOWN pre-filled, never auto-run; HackTricks SMB page finding-jumped to "What is NTLM"; raw output saved to `smb/null-session/*.txt` etc. smbclient-C$/psexec is manual | none (clean — validated the -Pn custom scan + SMB Tier framing on a live ping-blocking Windows box) | `205f3b0` |
-| 19 | Vaccine | 10.129.33.84 | ftp/21 (vsFTPd 3.0.3, anon) + ssh/22 (OpenSSH 8.0p1) + http/80 (Apache 2.4.41, "MegaCorp Login") | live: FTP Tier-1 anon walk found **`/backup.zip`** + "Anonymous access: allowed" (read-only, **never auto-downloads**); the backup.zip **download is Tier-2** (`curl -s -O ftp://{t}/FILE`, shown/user-filled); HackTricks FTP page finding-jumped to "Anonymous login"; EDB version-matched vsFTPd 3.0.3 → **★ EDB-49719**; raw saved to `ftp/`. zip-crack→MD5→SQLi→os-shell→postgres/vi-GTFOBins root is all manual | none (clean — anon-FTP read-only enum + Tier-2 download boundary held live) | _this commit_ |
+| 19 | Vaccine | 10.129.33.84 | ftp/21 (vsFTPd 3.0.3, anon) + ssh/22 (OpenSSH 8.0p1) + http/80 (Apache 2.4.41, "MegaCorp Login") | live: FTP Tier-1 anon walk found **`/backup.zip`** + "Anonymous access: allowed" (read-only, **never auto-downloads**); the backup.zip **download is Tier-2** (`curl -s -O ftp://{t}/FILE`, shown/user-filled); HackTricks FTP page finding-jumped to "Anonymous login"; EDB version-matched vsFTPd 3.0.3 → **★ EDB-49719**; raw saved to `ftp/`. zip-crack→MD5→SQLi→os-shell→postgres/vi-GTFOBins root is all manual | none (clean — anon-FTP read-only enum + Tier-2 download boundary held live) | `a6c3aeb` |
+| 20 | **Dante** (HTB Pro Lab) | 10.10.110.100 entry → 172.16.1.0/24 (+172.16.2.0/24) | entry: ftp/21 vsFTPd 3.0.3 (anon, PASV leaks internal .100) + ssh/22 + http/65000 (WordPress); internal /24: **11 hosts live-scanned** (DC01 full-AD, SQL01 MSSQL+NFS, NIX02-04, WS01-03, NIX07 Jenkins, NIX03 Webmin, pfSense) | **first live MULTI-NETWORK PIVOT validation**: entry live-scanned; internal `172.16.1.0/24` **live-scanned through a real pivot** (SSH SOCKS unavailable headless → threaded Python connect-scan run *on* the dual-homed entry box); **delete-intel-then-rescan repopulated the graph from REAL banners** (OpenSSH 8.2p1/7.6p1, Apache 2.4.41/43/54, FileZilla 0.9.60, MariaDB, IIS 8.5); two-hop spider-web (entry→net1, NIX02→net2) renders in tree+graph+report; net2 confirmed firewalled from entry (double-pivot is real). All exploitation (WP RCE, SUID, MSSQL/JuicyPotato, MS17-010, AS-REP, DCSync, BOFs) stays manual/out-of-tool | `full`-profile welded `nmap -sU -p-` into the battery → it ran *before* the versioned scan and stalled the entry scan → deferred UDP-full to run last | `be3e73e` |
 
 ## Per-box notes
 
@@ -294,6 +295,40 @@ Tier-2 line is the whole point — surface the single-attempt `admin:'' ` footho
 
 **Lesson:** for anon FTP, listing is recon, downloading is a choice — the module walks + peeks
 bounded, and every actual byte-pull (backup.zip, a mirror) stays a Tier-2 click.
+
+**20 · Dante (HTB Pro Lab) — multi-network pivot — live.** Entry `10.10.110.100`
+(DANTE-WEB-NIX01), the first real validation of the CTF pivot topology against a live multi-network
+box. Recon-only line held under a full exploitation write-up: extracted **only** the network map
+(hosts/IPs/OS/open-ports/pivot links) — no creds, hashes, flags, exploit steps, or spray lists ever
+entered the tool.
+- **Entry live-scanned:** 21/vsFTPd 3.0.3 (anon; nmap caught the PASV internal-IP leak `172.16.1.100`),
+  22/OpenSSH 8.2p1, 65000/Apache 2.4.41 (WordPress via robots.txt). WordPress on 65000 sits outside
+  the top-1000 — the TCP-full sweep is what versions it.
+- **Real pivot, real scan.** The entry box is dual-homed (`eth0 172.16.1.100/24`). A root tunnel
+  (ligolo tun / sshuttle iptables) can't be held headless without sudo, and a backgrounded `ssh -D`
+  SOCKS kept getting signal-killed in the sandbox — so I ran a **threaded Python TCP connect-scan
+  *on* the entry box** (its own python3) over a valid SSH login you provided. No exploitation: an
+  existing cred → a shell → recon from the box. The tool's ligolo helper produces the same routed
+  `/24`; only the transport differed.
+- **Delete + rescan from live data.** To prove the flow end-to-end I `remove_subnet(172.16.1.0/24)`
+  (dropped the 11 intel-seeded hosts) then `add_hosts` from the **live scan** — 11 hosts / 69 services
+  repopulated the recon tree + graph + report's "Pivot topology" with genuine banners (OpenSSH
+  8.2p1/7.6p1, Apache 2.4.41/43/54, nginx, IIS 8.5, FileZilla 0.9.60, MariaDB, Webmin 10000, Jenkins
+  8080, DC01's full AD stack 88/389/445/3268…). Every host tags `← via 10.10.110.100`.
+- **The second hop is real.** `172.16.2.0/24` (DC02 + admin boxes) is **firewalled off from the entry
+  box** (probed `172.16.2.5:445` → refused) — it genuinely needs a second pivot through `172.16.1.10`
+  (NIX02), which would require exploiting NIX02 (out of scope). So net2 stays intel-seeded, wired
+  `← via 172.16.1.10`; the two-hop spider-web renders correctly (target→net1, host-172.16.1.10→net2).
+- **Bug fixed (`be3e73e`):** the `full` scan profile welded `nmap -sU -p-` into the discovery battery,
+  so it ran *before* the versioned `-sV -sC` scan and stalled the entry scan on a multi-hour UDP sweep.
+  Moved UDP-full into `NmapModule.deferred_commands`, run **last** (after versioned) so TCP versions
+  land first and the sweep is cancellable. `full` still includes it; `default`/`quick` unchanged.
+- Everything past enumeration — WordPress RCE, SUID `find`, MSSQL→JuicyPotato, MS17-010, AS-REP roast,
+  DCSync, the Linux/Windows BOFs — is **manual exploitation, never the tool**.
+
+**Lesson:** the pivot model holds with real multi-network data — seed from intel, then *upsert live
+scan over it* and the graph/tree/report stay one connected spider-web. And a "thorough" profile must
+never front-load a slow scan ahead of the high-value one: order recon by yield, defer the grind.
 
 ## Trends & lessons (adapt going forward)
 
