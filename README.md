@@ -42,10 +42,12 @@ or LLM calls at runtime**, and is **strictly recon-only by default**.
   found, grouped by subnet with the pivot source they were reached through. Right-click to remove a host
   or subnet, or re-scan a host deeper — the tree and graph stay in sync.
 - **BloodHound-style graph** (`Ctrl+G`) — icon nodes with corner glyphs (danger / OS / status / note),
-  a **drill-down** pivot topology (`target → /24 → host → service`, all connected by lines: click a `/24`
-  to reveal its hosts, click a host to reveal its services), and a native always-visible summary tree so
-  scan data shows even where QtWebEngine can't render. Plus a **credential vault** (masked, `0600`),
-  **audit trail**, and an **Obsidian-ready `report.md`** with a pivot-topology section.
+  a **progressive drill-down** pivot topology: it opens on one node (the entry) and expands on click
+  (`entry → /24 → host → service`, all connected by lines), re-laying-out so nodes spread instead of
+  stacking; click the entry to collapse it all back to one node. Drag the canvas to pan (hand cursor),
+  drag a node to move it. Plus a native always-visible summary tree so scan data shows even where
+  QtWebEngine can't render, a **credential vault** (masked, `0600`), **audit trail**, and an
+  **Obsidian-ready `report.md`** with a pivot-topology section.
 - **Workspace dashboard** — searchable/filterable table of every project, with locking, health checks,
   and portable `<name>.tar.gz` import/export.
 - **Light / dark theme**, offline splash, and a **diagnostics log** (Help → View Diagnostics Log).

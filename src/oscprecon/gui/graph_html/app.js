@@ -19,7 +19,7 @@
   // refreshes so a streamed host doesn't re-expand what the user collapsed. subnet-id / host-id -> true.
   var collapseState = {};
 
-  var DEFAULT_HINT = "click a /24 to reveal its hosts · click a host to reveal its services · hover for detail · red ring = notable · drag (saved)";
+  var DEFAULT_HINT = "click the entry to expand · click a /24 for its hosts · click a host for its services · drag the canvas to pan · drag a node to move it";
 
   // BloodHound-style icon nodes: a coloured disc with a white/dark glyph and the label below. Icons
   // are inline SVGs (no network) encoded as data URIs. `#c` is the placeholder colour so one template
@@ -335,9 +335,10 @@
     });
   }
 
-  // A host is hidden when its /24 is collapsed OR that /24 is itself hidden; a /24 is hidden when the
-  // host it was reached THROUGH (its `via`) is hidden — so folding net1 folds a second-hop net2 with
-  // it. Memoised recursion up the pivot chain (guards cycles).
+  // Visibility rolls DOWN the tree: collapsing the target folds the whole graph to one node; a /24 is
+  // hidden when its target is collapsed (via === "target") or the host it was reached THROUGH is hidden
+  // (a second-hop /24 folds with net1); a host is hidden when its /24 is collapsed or hidden. Memoised
+  // recursion up the chain (guards cycles).
   function hiddenMap() {
     var memo = {};
     function hostHidden(id) {
@@ -350,6 +351,7 @@
       if (id in memo) return memo[id];
       memo[id] = false;
       var via = cy.getElementById(id).data("via");
+      if (via === "target") return (memo[id] = !!collapseState["target"]);
       return (memo[id] = via && via.indexOf("host-") === 0 ? hostHidden(via) : false);
     }
     return { hostHidden: hostHidden, subnetHidden: subnetHidden };
@@ -388,6 +390,16 @@
             : !!collapseState[owner] || H.hostHidden(owner);
         n.toggleClass("ec-hidden", hid);
       });
+      // findings / credentials fold with the node they hang off (a hidden service, or a collapsed target)
+      cy.nodes('[type="finding"], [type="credential"]').forEach(function (n) {
+        var src = n.incomers("node");
+        var hid =
+          src.nonempty() &&
+          src.every(function (s) {
+            return s.hasClass("ec-hidden") || (s.data("type") === "target" && !!collapseState["target"]);
+          });
+        n.toggleClass("ec-hidden", hid);
+      });
       cy.edges().forEach(function (e) {
         e.toggleClass("ec-hidden", e.source().hasClass("ec-hidden") || e.target().hasClass("ec-hidden"));
       });
@@ -398,20 +410,40 @@
     setCompoundLabels();
   }
 
-  // first sight of a /24 or host → collapsed, so you land on the /24 chips and drill in. The target
-  // stays expanded (its few entry services anchor the view) but is still click-to-collapse. Any prior
-  // user toggle persists across refreshes / streamed hosts.
+  // start on ONE node — the entry "main circle": collapse the target (which folds its services AND the
+  // /24s under it) plus every /24 + host, so you drill down from a single node. Any prior user toggle
+  // persists across refreshes / streamed hosts.
   function defaultCollapse() {
+    if (!("target" in collapseState)) collapseState["target"] = true;
     cy.nodes('[type="subnet"], [type="host"]').forEach(function (n) {
       if (!(n.id() in collapseState)) collapseState[n.id()] = true;
     });
   }
 
+  // re-lay-out just what's visible as a clean top-down tree rooted at the entry. Running this on every
+  // expand is what SPREADS the newly-revealed nodes (BloodHound-style) instead of stacking them.
+  function relayoutVisible() {
+    if (!cy) return;
+    var vis = elementsVisible();
+    if (!vis.length) return;
+    vis
+      .layout({
+        name: "breadthfirst",
+        directed: true,
+        roots: "#target",
+        padding: 30,
+        spacingFactor: 1.5,
+        animate: true,
+        animationDuration: 250,
+        fit: true,
+      })
+      .run();
+  }
+
   function toggleCollapse(node) {
     collapseState[node.id()] = !collapseState[node.id()];
     applyExpandCollapse();
-    var vis = elementsVisible();
-    if (vis.length) cy.animate({ fit: { eles: vis, padding: 45 } }, { duration: 180 });
+    relayoutVisible();
   }
 
   function runLayout(name) {
@@ -711,19 +743,27 @@
     var hasSaved = (elements.nodes || []).some(function (n) {
       return n.position;
     });
+    var isPivot = isPivotGraph();
+    if (isPivot) {
+      // drill-down graph: collapse to the entry node, then reveal + spread on click. The initial
+      // layout is just the visible set (one node), NOT the whole mostly-hidden tree — so nothing
+      // stacks. Streamed hosts on a refresh stay hidden under their collapsed /24 until you expand it.
+      defaultCollapse();
+      applyExpandCollapse();
+    }
     if (!hadPrev) {
-      // first render of this graph: full layout (or fit if graph.json has saved positions)
-      if (hasSaved) cy.fit(undefined, 40);
+      if (isPivot) relayoutVisible();
+      else if (hasSaved) cy.fit(undefined, 40);
       else runLayout("hier");
-    } else if (newNodes > 0) {
-      // refresh with new nodes (a streamed host): re-layout so they get placed, then keep the camera
+    } else if (newNodes > 0 && !isPivot) {
+      // refresh with new nodes on a simple graph: re-layout so they get placed, then keep the camera
       runLayout("hier");
       if (prevPan && prevZoom) {
         cy.zoom(prevZoom);
         cy.pan(prevPan);
       }
     } else if (prevPan && prevZoom) {
-      // pure refresh (status/note edit, no new node): keep positions AND camera exactly as they were
+      // pure refresh (status/note edit, or a hidden streamed host): keep positions AND camera as-is
       cy.zoom(prevZoom);
       cy.pan(prevPan);
     }
@@ -808,16 +848,8 @@
     // node type) and search so unchecking "services" or a search term survives a refresh.
     applyFilter();
     if (search && search.value) applySearch(search.value);
-    // drill-down: default new /24s + hosts to collapsed, then hide their descendants. On the FIRST
-    // render fit to the collapsed chips so you land on the ranges; a refresh keeps the camera.
-    if (isPivotGraph()) {
-      defaultCollapse();
-      applyExpandCollapse();
-      if (!hadPrev) {
-        var vis = elementsVisible();
-        if (vis.length) cy.fit(vis, 45);
-      }
-    }
+    // (the pivot drill-down collapse + initial spread happens in the layout block above, before the
+    // canvas is first painted, so nothing ever flashes stacked)
   }
 
   // (Re)fetch the current profile's elements from Qt and render them in place. Exposed to Qt so a

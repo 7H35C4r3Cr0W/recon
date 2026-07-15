@@ -53,6 +53,15 @@ body {
   width: 100%;
   height: calc(100% - 33px);
   position: relative;
+  cursor: grab; /* BloodHound-style: the canvas is a hand you drag to pan */
+}
+
+#cy:active {
+  cursor: grabbing; /* mouse held down → closed hand while panning */
+}
+
+#cy canvas {
+  cursor: inherit;
 }
 
 #node-tip {
