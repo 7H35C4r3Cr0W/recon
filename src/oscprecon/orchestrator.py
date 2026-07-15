@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 from oscprecon import shell
 from oscprecon.models import Command, Port, Proto
-from oscprecon.modules.nmap import NmapModule
+from oscprecon.modules.nmap import NmapModule, redirect_vhosts
 from oscprecon.profile import Profile
 from oscprecon.reporter import Reporter
 
@@ -109,6 +109,30 @@ class Orchestrator:
         except OSError:
             return ""
 
+    def _handle_redirect_vhosts(self, raw: dict[str, str]) -> None:
+        # nmap's http-title revealed a vhost (e.g. ignition.htb) — on such boxes the hostname IS the
+        # recon. If none is set yet and there's exactly one, wire it in (announced, never silent) so
+        # host-based recon targets the name; otherwise surface it as an actionable hint.
+        hosts = redirect_vhosts(raw)
+        if not hosts:
+            return
+        if self.profile.target.hostname is None and len(hosts) == 1:
+            try:
+                self.profile.set_hostname(hosts[0])
+            except ValueError:
+                self._emit(f"[vhost] nmap redirects to '{hosts[0]}' — set via Set Target Hostname.")
+                return
+            self._emit(
+                f"[vhost] set target hostname = {hosts[0]} (from the nmap redirect) — host-based "
+                "recon now targets it. Add to /etc/hosts; change via Edit -> Set Target Hostname."
+            )
+            return
+        for host in hosts:
+            self._emit(
+                f"[vhost] nmap redirects to '{host}' — add to /etc/hosts and Set Target Hostname "
+                "to recon it as a vhost."
+            )
+
     def run_nmap(self) -> None:
         target = self.profile.target
         raw: dict[str, str] = {}
@@ -136,6 +160,8 @@ class Orchestrator:
                 raw[cmd.output_file] = self._run(cmd)
             self.profile.set_services(self.nmap.discovered_services(raw))
             self.profile.save()
+
+        self._handle_redirect_vhosts(raw)
 
         Reporter(self.profile).write()
         count = len(self.profile.discovered_services)

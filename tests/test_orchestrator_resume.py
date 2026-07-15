@@ -58,6 +58,43 @@ def test_zero_open_ports_emits_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert any(ln.startswith("[hint] no open ports") for ln in lines)
 
 
+def _redirect_run(host_line: str) -> Callable[..., object]:
+    def run(shell_line: str, output_file: Path, **_: object) -> object:
+        out = Path(output_file)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(f"80/tcp open  http nginx 1.14.2\n{host_line}\n", encoding="utf-8")
+        return shell.ShellResult(shell_line, 0, out, "", "", 0.0)
+
+    return run
+
+
+def test_nmap_redirect_autoset_hostname(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Ignition: nmap's http-title redirect auto-wires the vhost when none is set (announced).
+    prof = Profile.create(tmp_path, "ign", Target(ip="10.10.10.5"))
+    monkeypatch.setattr(
+        shell, "run", _redirect_run("|_http-title: Did not follow redirect to http://ignition.htb/")
+    )
+    lines: list[str] = []
+    Orchestrator(prof, on_line=lines.append).run_nmap()
+    assert prof.target.hostname == "ignition.htb"  # auto-set from the redirect
+    assert any("set target hostname = ignition.htb" in ln for ln in lines)  # announced, not silent
+
+
+def test_nmap_redirect_does_not_override_existing_hostname(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = Profile.create(tmp_path, "ign", Target(ip="10.10.10.5", hostname="chosen.htb"))
+    monkeypatch.setattr(
+        shell, "run", _redirect_run("|_http-title: Did not follow redirect to http://ignition.htb/")
+    )
+    lines: list[str] = []
+    Orchestrator(prof, on_line=lines.append).run_nmap()
+    assert prof.target.hostname == "chosen.htb"  # a user-set hostname is never overridden
+    assert any(
+        "nmap redirects to 'ignition.htb'" in ln for ln in lines
+    )  # surfaced as a hint instead
+
+
 def test_resume_skips_completed_commands(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     first: list[str] = []

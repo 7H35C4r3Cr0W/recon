@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from oscprecon.models import Proto
-from oscprecon.modules.nmap import NmapModule
+from oscprecon.modules.nmap import NmapModule, redirect_vhosts
 
 FIXTURES = Path(__file__).parent / "fixtures" / "nmap"
 
@@ -59,3 +59,24 @@ def test_findings_derived_from_services() -> None:
     titles = {f.title for f in findings}
     assert any("22/tcp" in t for t in titles)
     assert all(f.port is not None for f in findings)
+
+
+def test_redirect_vhosts_extracts_hostname_from_http_title() -> None:
+    # Ignition: nmap's http-title reveals the vhost the IP bounces to.
+    raw = {"tcp.txt": "|_http-title: Did not follow redirect to http://ignition.htb/"}
+    assert redirect_vhosts(raw) == ["ignition.htb"]
+    assert redirect_vhosts({"x": "followed redirect to https://shop.example.com/"}) == [
+        "shop.example.com"
+    ]
+
+
+def test_redirect_vhosts_ignores_ip_and_dedupes() -> None:
+    assert (
+        redirect_vhosts({"x": "Did not follow redirect to http://10.10.10.5/"}) == []
+    )  # a bare IP
+    raw = {
+        "a": "Did not follow redirect to http://ignition.htb/",
+        "b": "Did not follow redirect to http://ignition.htb/",  # same host, different file
+    }
+    assert redirect_vhosts(raw) == ["ignition.htb"]  # deduped
+    assert redirect_vhosts({"x": "80/tcp open http nginx"}) == []  # no redirect at all

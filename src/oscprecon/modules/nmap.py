@@ -20,6 +20,25 @@ _PORT_LINE = re.compile(
     r"(?P<service>\S+)(?:\s+(?P<rest>.*\S))?\s*$"
 )
 
+# nmap's http-title NSE prints "Did not follow redirect to http://ignition.htb/" when a name-based
+# vhost box bounces the IP to its hostname — that hostname is the whole recon on such boxes.
+_REDIRECT_TITLE_RE = re.compile(
+    r"follow(?:ed)?\s+redirect\s+to\s+https?://([A-Za-z0-9.-]+)", re.IGNORECASE
+)
+# a real vhost name: a letter + a dotted TLD, so a bare IP redirect is not mistaken for a vhost.
+_VHOST_HOST_RE = re.compile(r"^(?=.*[A-Za-z])[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+
+
+def redirect_vhosts(raw_outputs: dict[str, str]) -> list[str]:
+    """Vhost hostnames nmap saw the target redirect to (http-title 'Did not follow redirect …')."""
+    hosts: list[str] = []
+    for text in raw_outputs.values():
+        for match in _REDIRECT_TITLE_RE.finditer(text):
+            host = match.group(1).rstrip("/").lower()
+            if _VHOST_HOST_RE.match(host) and host not in hosts:
+                hosts.append(host)
+    return hosts
+
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
