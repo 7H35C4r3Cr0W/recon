@@ -2,8 +2,57 @@ from pathlib import Path
 
 from oscprecon import findings as findings_mod
 from oscprecon.gui.graph_data import build_elements
-from oscprecon.models import Credential, DiscoveredService, Proto, Target
+from oscprecon.models import Credential, DiscoveredHost, DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
+
+
+def test_pivot_topology_builds_subnets_hosts_and_pivot_edges(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.10.10.5"))
+    prof.set_services([DiscoveredService(80, Proto.TCP, "http")])
+    prof.add_hosts(
+        [
+            DiscoveredHost(
+                ip="10.10.5.23",
+                pivot_source="10.10.10.5",
+                services=[DiscoveredService(445, Proto.TCP, "smb")],
+            ),
+            DiscoveredHost(ip="10.10.5.40", pivot_source="10.10.10.5"),
+            DiscoveredHost(
+                ip="172.16.8.10",
+                pivot_source="10.10.5.23",  # a deeper pivot, reached THROUGH .23
+                services=[DiscoveredService(3389, Proto.TCP, "rdp")],
+            ),
+        ]
+    )
+    els = build_elements(prof)
+    by_id = {n["data"]["id"]: n["data"] for n in els["nodes"]}
+    # subnet compound boxes exist; hosts declare them as their Cytoscape parent
+    assert by_id["subnet-10.10.5.0/24"]["type"] == "subnet"
+    assert by_id["subnet-172.16.8.0/24"]["type"] == "subnet"
+    assert by_id["host-10.10.5.23"]["parent"] == "subnet-10.10.5.0/24"
+    assert by_id["host-172.16.8.10"]["parent"] == "subnet-172.16.8.0/24"
+    # host services hang off the host, not the entry target
+    assert by_id["hostservice-10.10.5.23-445-tcp"]["type"] == "service"
+    hs_edge = next(
+        e for e in els["edges"] if e["data"]["target"] == "hostservice-10.10.5.23-445-tcp"
+    )
+    assert hs_edge["data"]["source"] == "host-10.10.5.23"
+    # the chained spider-web: entry -> first subnet, and .23 -> the deeper subnet
+    pivots = {
+        (e["data"]["source"], e["data"]["target"])
+        for e in els["edges"]
+        if e["data"]["type"] == "pivots-into"
+    }
+    assert ("target", "subnet-10.10.5.0/24") in pivots
+    assert ("host-10.10.5.23", "subnet-172.16.8.0/24") in pivots
+
+
+def test_pivot_edge_skipped_when_source_host_unknown(tmp_path: Path) -> None:
+    # a pivot_source that isn't the target and isn't a known host must not create a dangling edge
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.10.10.5"))
+    prof.add_hosts([DiscoveredHost(ip="10.10.5.23", pivot_source="10.9.9.9")])
+    els = build_elements(prof)
+    assert not [e for e in els["edges"] if e["data"]["type"] == "pivots-into"]
 
 
 def _profile(tmp_path: Path) -> Profile:

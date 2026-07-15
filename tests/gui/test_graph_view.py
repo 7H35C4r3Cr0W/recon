@@ -6,8 +6,13 @@ from pytestqt.qtbot import QtBot
 
 from oscprecon import findings as findings_mod
 from oscprecon.gui.main_window import MainWindow
-from oscprecon.gui.widgets.graph_view import GraphBridge, GraphDetail, GraphView
-from oscprecon.models import DiscoveredService, Proto, Target
+from oscprecon.gui.widgets.graph_view import (
+    GraphBridge,
+    GraphDetail,
+    GraphView,
+    ReconSummaryTree,
+)
+from oscprecon.models import Credential, DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 
 
@@ -167,3 +172,148 @@ def test_graph_view_persists_status_and_note_via_detail(qtbot: QtBot, tmp_path: 
     override = prof.load_graph()["node_overrides"]["service-445-tcp"]
     assert override["status"] == "done"
     assert override["note"] == "note here"
+
+
+def _rich_profile(tmp_path: Path) -> Profile:
+    prof = Profile.create(tmp_path, "rich", Target(ip="10.10.10.5", hostname="box.htb"))
+    prof.set_services(
+        [
+            DiscoveredService(22, Proto.TCP, "ssh", product="OpenSSH", version="8.4p1"),
+            DiscoveredService(445, Proto.TCP, "microsoft-ds"),
+        ]
+    )
+    findings_mod.add_findings(
+        prof.directory,
+        [{"module": "smb", "kind": "share", "value": "IT", "detail": "READ", "discovered_at": "t"}],
+    )
+    prof.add_credential(
+        Credential(username="svc", secret="S3cret!", domain="box.htb", source="smb-anon-enum")
+    )
+    return prof
+
+
+def test_recon_summary_tree_lists_target_services_findings_creds(
+    qtbot: QtBot, tmp_path: Path
+) -> None:
+    tree = ReconSummaryTree()
+    qtbot.addWidget(tree)
+    tree.set_profile(_rich_profile(tmp_path))
+    texts: list[str] = []
+
+    def walk(item: object) -> None:
+        texts.append(item.text(0))  # type: ignore[attr-defined]
+        for i in range(item.childCount()):  # type: ignore[attr-defined]
+            walk(item.child(i))  # type: ignore[attr-defined]
+
+    root = tree._tree.topLevelItem(0)
+    walk(root)
+    blob = "\n".join(texts)
+    assert "10.10.10.5" in blob and "box.htb" in blob  # target ip + hostname shown
+    assert "22/tcp ssh" in blob and "OpenSSH 8.4p1" in blob  # product + version surfaced
+    assert "445/tcp microsoft-ds" in blob
+    assert "share: IT" in blob  # finding nested under its service
+    assert "svc@box.htb" in blob  # credential shown
+    assert "S3cret!" not in blob  # secret never reaches the tree
+
+
+def test_recon_summary_click_activates_node(qtbot: QtBot, tmp_path: Path) -> None:
+    tree = ReconSummaryTree()
+    qtbot.addWidget(tree)
+    tree.set_profile(_rich_profile(tmp_path))
+    got: list[tuple[str, object]] = []
+    tree.node_activated.connect(lambda nid, data: got.append((nid, data)))
+    # find the 445 service row and click it
+    root = tree._tree.topLevelItem(0)
+    svc = next(root.child(i) for i in range(root.childCount()) if "445" in root.child(i).text(0))
+    tree._on_item(svc, 0)
+    assert got and got[0][0] == "service-445-tcp"
+    assert isinstance(got[0][1], dict) and got[0][1]["type"] == "service"
+
+
+def test_graph_fallback_shows_native_summary_and_status_works(qtbot: QtBot, tmp_path: Path) -> None:
+    # conftest disables the webview -> the native summary IS the graph. Selecting a service there
+    # and setting a status must persist exactly as a canvas node click would (no WebEngine needed).
+    prof = _rich_profile(tmp_path)
+    view = GraphView()
+    qtbot.addWidget(view)
+    assert view._web is None
+    assert view._canvas_stack.currentWidget() is view._fallback
+    view.set_profile(prof)
+    root = view._summary._tree.topLevelItem(0)
+    svc = next(root.child(i) for i in range(root.childCount()) if "445" in root.child(i).text(0))
+    view._summary._on_item(svc, 0)  # drives the shared detail panel
+    view._on_status_changed("service-445-tcp", "investigating")
+    assert prof.load_graph()["node_overrides"]["service-445-tcp"]["status"] == "investigating"
+
+
+def _pivot_profile(tmp_path: Path) -> Profile:
+    from oscprecon.models import DiscoveredHost
+
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.10.10.5"))
+    prof.set_services([DiscoveredService(80, Proto.TCP, "http")])
+    prof.add_hosts(
+        [
+            DiscoveredHost(
+                ip="10.10.5.23",
+                hostname="dc01",
+                pivot_source="10.10.10.5",
+                services=[DiscoveredService(445, Proto.TCP, "smb", product="Windows")],
+            ),
+            DiscoveredHost(ip="172.16.8.10", pivot_source="10.10.5.23"),
+        ]
+    )
+    return prof
+
+
+def test_recon_summary_shows_pivot_topology(qtbot: QtBot, tmp_path: Path) -> None:
+    tree = ReconSummaryTree()
+    qtbot.addWidget(tree)
+    tree.set_profile(_pivot_profile(tmp_path))
+    texts: list[str] = []
+
+    def walk(item: object) -> None:
+        texts.append(item.text(0))  # type: ignore[attr-defined]
+        for i in range(item.childCount()):  # type: ignore[attr-defined]
+            walk(item.child(i))  # type: ignore[attr-defined]
+
+    for i in range(tree._tree.topLevelItemCount()):
+        walk(tree._tree.topLevelItem(i))
+    blob = "\n".join(texts)
+    assert "Pivoted networks (2 hosts)" in blob
+    assert "10.10.5.0/24" in blob and "172.16.8.0/24" in blob
+    assert "10.10.5.23 (dc01)  ← via 10.10.10.5" in blob  # host with pivot source + hostname
+    assert "445/tcp smb  Windows" in blob  # pivoted host's service with product
+
+
+def test_recon_summary_pivot_host_click_uses_host_node_id(qtbot: QtBot, tmp_path: Path) -> None:
+    tree = ReconSummaryTree()
+    qtbot.addWidget(tree)
+    tree.set_profile(_pivot_profile(tmp_path))
+    got: list[tuple[str, object]] = []
+    tree.node_activated.connect(lambda nid, data: got.append((nid, data)))
+
+    def find(item: object, needle: str) -> object:
+        if needle in item.text(0):  # type: ignore[attr-defined]
+            return item
+        for i in range(item.childCount()):  # type: ignore[attr-defined]
+            hit = find(item.child(i), needle)  # type: ignore[attr-defined]
+            if hit is not None:
+                return hit
+        return None
+
+    for i in range(tree._tree.topLevelItemCount()):
+        host_item = find(tree._tree.topLevelItem(i), "10.10.5.23")
+        if host_item is not None:
+            tree._on_item(host_item, 0)
+            break
+    assert got and got[0][0] == "host-10.10.5.23"  # status/notes persist to the host node id
+
+
+def test_graph_app_js_exposes_refresh_and_overlay() -> None:
+    # the refresh contract graph_view.py depends on: an in-place refresh hook (not a full reload)
+    # and a visible empty/error overlay so a blank canvas always explains itself.
+    app_js = (_GRAPH_HTML / "app.js").read_text()
+    index_html = (_GRAPH_HTML / "index.html").read_text()
+    assert "window.oscpRefresh" in app_js
+    assert "setOverlay" in app_js
+    assert 'id="cy-overlay"' in index_html

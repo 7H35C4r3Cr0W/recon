@@ -2,6 +2,11 @@
 // Node/edge colors follow CLAUDE.md §16. No network — cytoscape.min.js / cytoscape-svg.js are vendored,
 // qwebchannel.js is served by Qt from qrc://. The minimap is a second locked Cytoscape overview (no
 // jQuery-dependent navigator extension).
+//
+// Refresh model: after a scan, Qt re-pushes data by calling window.oscpRefresh() (see graph_view.py)
+// rather than reloading the whole page — a full reload reinitialises the Chromium page + bridge each
+// time and blanks the canvas on any hiccup. boot() retries until the QWebChannel transport is ready
+// and shows a visible message instead of silently failing, so an empty canvas always explains itself.
 (function () {
   "use strict";
   var cy = null;
@@ -38,6 +43,28 @@
     { selector: 'node[type="service"][proto="tcp"]', style: { "background-color": "#89b4fa" } },
     { selector: 'node[type="service"][proto="udp"]', style: { "background-color": "#a6e3a1" } },
     { selector: 'node[type="finding"]', style: { "background-color": "#f9e2af" } },
+    // pivot topology: a subnet is a compound box that visually contains its hosts; a host is a node
+    // reached across a pivot; the pivots-into edge shows which host we tunnelled through.
+    {
+      selector: 'node[type="subnet"]',
+      style: {
+        "background-color": "#585b70",
+        "background-opacity": 0.12,
+        "border-width": 1,
+        "border-color": "#9399b2",
+        "border-style": "dashed",
+        shape: "round-rectangle",
+        "text-valign": "top",
+        "text-halign": "center",
+        "font-size": 13,
+        color: "#bac2de",
+        padding: "18px",
+      },
+    },
+    {
+      selector: 'node[type="host"]',
+      style: { "background-color": "#74c7ec", color: "#11111b", shape: "round-rectangle", "font-size": 12 },
+    },
     // exploit-db / searchsploit hits are references to READ, not confirmed vulns — colour them
     // distinctly (lavender) and never with the notable ring, so they don't read as danger.
     { selector: 'node[category="reference"]', style: { "background-color": "#cba6f7" } },
@@ -100,7 +127,27 @@
       selector: 'edge[type="next-step"]',
       style: { "line-color": "#a6e3a1", "target-arrow-color": "#a6e3a1", "line-style": "dotted" },
     },
+    {
+      selector: 'edge[type="pivots-into"]',
+      style: {
+        "line-color": "#f9e2af",
+        "target-arrow-color": "#f9e2af",
+        "line-style": "dashed",
+        width: 2.5,
+        "font-size": 10,
+        color: "#f9e2af",
+      },
+    },
   ];
+
+  // A centered message over the canvas — used for "no services yet" and bridge/parse failures, so an
+  // empty graph is never a silent blank. Passing "" hides it.
+  function setOverlay(text) {
+    var el = document.getElementById("cy-overlay");
+    if (!el) return;
+    el.textContent = text || "";
+    el.style.display = text ? "flex" : "none";
+  }
 
   function registerExtensions() {
     if (!svgReady && window.cytoscapeSvg) {
@@ -192,7 +239,7 @@
 
   function updateViewportRect() {
     var rect = document.getElementById("minimap-viewport");
-    if (!mini || !rect) return;
+    if (!mini || !rect || !cy) return;
     var z = cy.zoom();
     var pan = cy.pan();
     var w = cy.width();
@@ -248,6 +295,28 @@
 
   function render(elements) {
     registerExtensions();
+    // rebuild from scratch each refresh — destroy the old instance so handlers/state don't stack up
+    if (cy) {
+      cy.destroy();
+      cy = null;
+    }
+    var nodeCount = (elements && elements.nodes ? elements.nodes.length : 0);
+    // a lone target node (no services yet) is effectively empty — tell the user how to populate it
+    var serviceCount = 0;
+    if (elements && elements.nodes) {
+      for (var k = 0; k < elements.nodes.length; k++) {
+        var d = elements.nodes[k].data || {};
+        if (d.type && d.type !== "target") serviceCount++;
+      }
+    }
+    if (!nodeCount) {
+      setOverlay("No project data yet. Open a project and run Full Recon to build the graph.");
+    } else if (!serviceCount) {
+      setOverlay("No services discovered yet — click “Run Full Recon” to scan the target.");
+    } else {
+      setOverlay("");
+    }
+
     cy = cytoscape({
       container: document.getElementById("cy"),
       elements: elements,
@@ -331,18 +400,45 @@
     buildMinimap(elements);
   }
 
-  function boot() {
+  // (Re)fetch the current profile's elements from Qt and render them in place. Exposed to Qt so a
+  // finished scan can refresh the canvas without a full page reload (graph_view.py calls this).
+  function refresh() {
+    if (!bridge) return;
+    bridge.get_data(function (json) {
+      var elements;
+      try {
+        elements = JSON.parse(json);
+      } catch (e) {
+        setOverlay("Graph data could not be read.");
+        return;
+      }
+      render(elements);
+    });
+  }
+  window.oscpRefresh = refresh;
+
+  function boot(attempt) {
+    attempt = attempt || 0;
     if (typeof QWebChannel === "undefined" || !window.qt || !qt.webChannelTransport) {
+      // the transport is injected slightly after DOM load — retry briefly before giving up
+      if (attempt < 40) {
+        setTimeout(function () {
+          boot(attempt + 1);
+        }, 50);
+        return;
+      }
+      setOverlay(
+        "Graph bridge unavailable in this environment. The recon summary on the left still lists " +
+          "every discovered service, and status / notes work there."
+      );
       return;
     }
     new QWebChannel(qt.webChannelTransport, function (channel) {
       bridge = channel.objects.bridge;
-      bridge.get_data(function (json) {
-        render(JSON.parse(json));
-      });
+      refresh();
     });
   }
 
-  if (window.qt && window.qt.webChannelTransport) boot();
-  else window.addEventListener("load", boot);
+  if (window.qt && window.qt.webChannelTransport) boot(0);
+  else window.addEventListener("load", function () { boot(0); });
 })();

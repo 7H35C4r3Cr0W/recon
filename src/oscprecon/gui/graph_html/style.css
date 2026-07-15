@@ -55,6 +55,26 @@ body {
   position: relative;
 }
 
+#cy-overlay {
+  position: fixed;
+  top: 33px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #a6adc8;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 24px;
+  max-width: 560px;
+  margin: 0 auto;
+  z-index: 40;
+  pointer-events: none;
+}
+
 #legend {
   position: fixed;
   top: 44px;

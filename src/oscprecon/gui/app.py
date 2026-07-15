@@ -19,9 +19,15 @@ def main() -> int:
     # Diagnostics Log surfaces it). Best-effort — never blocks startup.
     diagnostics.install("gui")
     diagnostics.install_qt_message_handler()
-    # why: QtWebEngine needs shared GL contexts set before the QApplication, and lab boxes often
-    # have no GPU/sandbox — disable both so the embedded HackTricks browser initialises.
-    os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
+    # why: QtWebEngine needs shared GL contexts set before the QApplication, and lab boxes / VMs
+    # often have no GPU, no sandbox, and a tiny /dev/shm. --no-sandbox + --disable-gpu let the
+    # embedded browser initialise; --disable-gpu-compositing avoids a blank canvas under software
+    # rendering; --disable-dev-shm-usage stops the Chromium render process from crashing (which
+    # shows as a blank graph) when /dev/shm is small — the common Kali-in-a-VM failure.
+    os.environ.setdefault(
+        "QTWEBENGINE_CHROMIUM_FLAGS",
+        "--no-sandbox --disable-gpu --disable-gpu-compositing --disable-dev-shm-usage",
+    )
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)

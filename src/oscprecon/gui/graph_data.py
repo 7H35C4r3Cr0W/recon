@@ -5,6 +5,7 @@ from typing import Any
 from oscprecon import finding_severity
 from oscprecon import findings as findings_mod
 from oscprecon.creds import redact
+from oscprecon.models import subnet_of
 from oscprecon.profile import Profile
 from oscprecon.references import match as ref_match
 
@@ -94,6 +95,43 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
             {"source": cred.source, "secret": redact(cred.secret)},
         )
         edges.append(_edge("target", cid, "references-credential", f"e-cred-{index}"))
+
+    # pivot topology (§CTF): the entry Target is the root; hosts found across a pivot are grouped
+    # into subnet compound boxes and wired back to the host they were reached through, so the whole
+    # engagement reads as one connected spider-web. Nodes first, then pivot edges (a pivot_source
+    # may be a host added later in the loop — only draw the edge once both endpoints exist).
+    for host in profile.discovered_hosts:
+        subnet = host.subnet or subnet_of(host.ip) or "unknown"
+        subnet_id = f"subnet-{subnet}"
+        if subnet_id not in node_ids:
+            add_node(subnet_id, "subnet", subnet, {"cidr": subnet})
+        host_id = f"host-{host.ip}"
+        if host_id in node_ids:
+            continue
+        hlabel = f"{host.ip}\n{host.hostname}" if host.hostname else host.ip
+        add_node(host_id, "host", hlabel, {"ip": host.ip, "parent": subnet_id, "os": host.os_guess})
+        for svc in host.services:
+            hsid = f"hostservice-{host.ip}-{svc.port}-{svc.proto.value}"
+            if hsid in node_ids:
+                continue
+            slabel = f"{svc.port}/{svc.proto.value} {svc.service}".strip()
+            add_node(hsid, "service", slabel, {"proto": svc.proto.value, "port": svc.port})
+            edges.append(
+                _edge(host_id, hsid, "has-service", f"e-hs-{host.ip}-{svc.port}-{svc.proto.value}")
+            )
+
+    pivot_seen: set[tuple[str, str]] = set()
+    for host in profile.discovered_hosts:
+        src = host.pivot_source
+        if not src:
+            continue
+        src_id = "target" if src == target.ip else f"host-{src}"
+        subnet_id = f"subnet-{host.subnet or subnet_of(host.ip) or 'unknown'}"
+        key = (src_id, subnet_id)
+        if key in pivot_seen or src_id not in node_ids or subnet_id not in node_ids:
+            continue
+        pivot_seen.add(key)
+        edges.append(_edge(src_id, subnet_id, "pivots-into", f"e-pivot-{src}-{subnet_id}", "pivot"))
 
     # user-drawn relates-to edges — skip any whose endpoints no longer exist (a finding was removed)
     user_edges = graph.get("user_edges", [])
