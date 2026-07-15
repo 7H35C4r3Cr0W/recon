@@ -135,7 +135,7 @@ class ServiceTree(QTreeWidget):
             subnet_item.setForeground(0, QBrush(_SUBNET_COLOR))
             for host in members:
                 # col 0 = ip/name (kept short so it doesn't crowd out the entry services' names);
-                # os in col 1, the pivot source in col 2 (the host's otherwise-empty Product column).
+                # os in col 1, pivot source in col 2 (the host's otherwise-empty Product column).
                 name = f"{host.ip} ({host.hostname})" if host.hostname else host.ip
                 via = f"← {host.pivot_source}" if host.pivot_source else ""
                 host_item = QTreeWidgetItem(subnet_item, [name, host.os_guess, via])
