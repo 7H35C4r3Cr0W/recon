@@ -30,6 +30,7 @@ class SimpleReconWorker(CancellableThread):
         self._profile = profile
         self._spec = SIMPLE_SPECS[module_name]
         self._port = port
+        self._issues: list[str] = []  # steps that couldn't run (missing tool / blocked)
 
     def run(self) -> None:
         try:
@@ -42,7 +43,13 @@ class SimpleReconWorker(CancellableThread):
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
+        result = shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
+        # record steps that could not run so the summary never passes a failure off as "empty" —
+        # a recon operator must not read "no findings" as "the service isn't there".
+        if result.missing_tool is not None:
+            self._issues.append(f"{result.missing_tool} not installed")
+        elif result.blocked is not None:
+            self._issues.append("a step was blocked by the recon-only policy")
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -88,13 +95,25 @@ class SimpleReconWorker(CancellableThread):
         )
 
     def _summarize(self, module: Module, found: list[Finding]) -> list[str]:
-        summary: list[str] = []
+        body: list[str] = []
         by_kind: dict[str, list[str]] = {}
         for f in found:
             by_kind.setdefault(f.fields.get("kind", "?"), []).append(f.fields.get("value", ""))
         for kind, values in by_kind.items():
             shown = ", ".join(v for v in values[:4] if v)
             more = " …" if len(values) > 4 else ""
-            summary.append(f"{kind} ({len(values)}): {shown}{more}")
-        summary.extend(f"→ {tip}" for tip in module.suggest(found))
-        return summary or [f"No {self._spec.module.upper()} findings."]
+            body.append(f"{kind} ({len(values)}): {shown}{more}")
+        body.extend(f"→ {tip}" for tip in module.suggest(found))
+
+        issues = list(dict.fromkeys(self._issues))  # dedupe, keep order
+        lines: list[str] = []
+        if issues:
+            lines.append(
+                f"⚠ {len(issues)} step(s) did not run — {'; '.join(issues)}. "
+                "Findings may be INCOMPLETE — this is not a confirmed empty result."
+            )
+        if body:
+            lines.extend(body)
+        elif not issues:
+            lines.append(f"No {self._spec.module.upper()} findings.")
+        return lines

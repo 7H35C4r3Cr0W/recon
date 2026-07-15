@@ -44,6 +44,25 @@ def _fake_run(fixture_map: dict[str, str]) -> Callable[..., object]:
     return run
 
 
+def test_missing_tool_is_flagged_not_reported_as_empty(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # the operator must never read a missing/blocked tool as "the service isn't there".
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
+
+    def run(shell_line: str, output_file: Path, **_: object) -> object:
+        out = Path(output_file)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("[missing] ntpq — install with: apt install ntpsec\n", encoding="utf-8")
+        return shell.ShellResult(shell_line, 127, out, "", "", 0.0, missing_tool="ntpq")
+
+    monkeypatch.setattr(shell, "run", run)
+    result = mw.SimpleReconWorker(prof, "ntp")._drive()
+    joined = " ".join(result.summary)
+    assert "⚠" in joined and "ntpq not installed" in joined  # failure surfaced explicitly
+    assert "No NTP findings." not in result.summary  # not passed off as a confirmed empty result
+
+
 def test_ntp_worker_parses_and_writes_findings(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
