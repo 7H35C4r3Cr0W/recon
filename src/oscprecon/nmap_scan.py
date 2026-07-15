@@ -3,7 +3,7 @@ from __future__ import annotations
 import ipaddress
 from dataclasses import dataclass
 
-from oscprecon.models import validate_host
+from oscprecon.models import DiscoveredService, Proto, validate_host
 
 # Build an nmap command from a structured spec (the "Scan…" dialog) so the user has real control
 # over the scan — connect vs SYN vs UDP vs ping-sweep, -Pn for hosts that drop the ping/handshake,
@@ -44,6 +44,47 @@ def validate_scan_target(target: str) -> str:
         return text
     validate_host(text)  # a plain IP or a strict hostname
     return text
+
+
+def is_entry_target(target: str, entry_ip: str, entry_hostname: str = "") -> bool:
+    # is this scan aimed at the profile's entry host (so results are discovered_services, not a
+    # pivoted host)? Accept the bare IP, the entry hostname, or the entry IP written as /32 — not
+    # just an exact string match, so re-spelling the entry doesn't misroute + drop the results.
+    text = target.strip()
+    if text == entry_ip or (entry_hostname and text == entry_hostname):
+        return True
+    if "/" in text:
+        try:
+            net = ipaddress.ip_network(text, strict=False)
+        except ValueError:
+            return False
+        return net.num_addresses == 1 and str(net.network_address) == entry_ip
+    return False
+
+
+def merge_services(
+    existing: list[DiscoveredService], new: list[DiscoveredService]
+) -> list[DiscoveredService]:
+    # union by (port, proto): a custom/narrower entry re-scan must ADD to, never REPLACE, prior
+    # discovery — else a top-1000 TCP re-scan would wipe UDP + high TCP ports found by an earlier
+    # full sweep. Mirrors NmapModule.discovered_services' merge: fill blank product/version/service
+    # from the newer scan, keep the older port when the new scan didn't cover it.
+    merged: dict[tuple[int, Proto], DiscoveredService] = {(s.port, s.proto): s for s in existing}
+    for svc in new:
+        key = (svc.port, svc.proto)
+        cur = merged.get(key)
+        if cur is None:
+            merged[key] = svc
+            continue
+        if svc.product and not cur.product:
+            cur.product = svc.product
+        if svc.version and not cur.version:
+            cur.version = svc.version
+        if svc.service and cur.service in ("", "unknown"):
+            cur.service = svc.service
+        if svc.nmap_scripts_output and not cur.nmap_scripts_output:
+            cur.nmap_scripts_output = svc.nmap_scripts_output
+    return sorted(merged.values(), key=lambda s: (s.proto.value, s.port))
 
 
 def is_range(target: str) -> bool:

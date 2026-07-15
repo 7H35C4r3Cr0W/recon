@@ -2,12 +2,54 @@ import ipaddress
 
 import pytest
 
+from oscprecon.models import DiscoveredService, Proto
 from oscprecon.nmap_scan import (
     ScanSpec,
     build_nmap_command,
+    is_entry_target,
     is_range,
+    merge_services,
     validate_scan_target,
 )
+
+
+def test_is_entry_target_accepts_ip_hostname_and_slash32() -> None:
+    assert is_entry_target("10.10.5.23", "10.10.5.23") is True
+    assert is_entry_target("10.10.5.23/32", "10.10.5.23") is True  # entry written as CIDR
+    assert is_entry_target("box.htb", "10.10.5.23", "box.htb") is True  # entry hostname
+    # NOT the entry: a real range (even one that contains the entry) or a different host
+    assert is_entry_target("10.10.5.0/24", "10.10.5.23") is False
+    assert is_entry_target("10.10.5.40", "10.10.5.23") is False
+
+
+def test_merge_services_unions_and_never_drops_prior_ports() -> None:
+    existing = [
+        DiscoveredService(22, Proto.TCP, "ssh", "OpenSSH", "8.4"),
+        DiscoveredService(161, Proto.UDP, "snmp"),
+        DiscoveredService(54321, Proto.TCP, "unknown"),  # found only by a prior -p- sweep
+    ]
+    new = [  # a narrower top-1000 TCP re-scan
+        DiscoveredService(
+            22, Proto.TCP, "ssh", "OpenSSH", "8.4p1"
+        ),  # richer version? blank-fill only
+        DiscoveredService(80, Proto.TCP, "http", "nginx", "1.14.2"),
+    ]
+    merged = merge_services(existing, new)
+    ports = {(s.port, s.proto) for s in merged}
+    assert (161, Proto.UDP) in ports  # prior UDP port preserved
+    assert (54321, Proto.TCP) in ports  # prior high TCP port preserved
+    assert (80, Proto.TCP) in ports  # the new port added
+    # existing non-blank version is not overwritten (blank-fill semantics)
+    ssh = next(s for s in merged if s.port == 22)
+    assert ssh.version == "8.4"
+
+
+def test_merge_fills_blank_fields_from_new_scan() -> None:
+    existing = [DiscoveredService(445, Proto.TCP, "microsoft-ds")]  # no product/version
+    new = [DiscoveredService(445, Proto.TCP, "microsoft-ds", "Windows Server", "2019")]
+    merged = merge_services(existing, new)
+    assert len(merged) == 1
+    assert merged[0].product == "Windows Server" and merged[0].version == "2019"
 
 
 def test_build_connect_scan_with_all_options() -> None:

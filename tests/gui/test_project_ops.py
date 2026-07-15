@@ -264,6 +264,45 @@ def test_custom_scan_done_entry_parses_services(qtbot: QtBot) -> None:
     window.close()
 
 
+def test_custom_entry_rescan_merges_and_preserves_prior_ports(qtbot: QtBot) -> None:
+    from oscprecon.models import DiscoveredService, Proto
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "entry", Target(ip="10.129.33.39"))
+    # a prior full recon found a UDP port + a high TCP port (only via -p-)
+    prof.set_services(
+        [DiscoveredService(161, Proto.UDP, "snmp"), DiscoveredService(54321, Proto.TCP, "unknown")]
+    )
+    window._set_profile(prof)
+    out = prof.directory / "nmap" / "tcp-versioned.txt"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        "Nmap scan report for 10.129.33.39\n80/tcp open http nginx 1.14.2\n", encoding="utf-8"
+    )
+    window._on_custom_scan_done(0, prof, is_entry=True, output_file=out)  # a narrower re-scan
+    ports = {(s.port, s.proto.value) for s in window._profile.discovered_services}
+    assert (80, "tcp") in ports  # new port added
+    assert (161, "udp") in ports  # prior UDP port NOT wiped
+    assert (54321, "tcp") in ports  # prior high TCP port NOT wiped
+    window.close()
+
+
+def test_scan_host_found_skips_the_entry_host(qtbot: QtBot) -> None:
+    from oscprecon.models import DiscoveredHost, DiscoveredService, Proto
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "ctf", Target(ip="10.10.5.23"))
+    window._set_profile(prof)
+    # a /24 range scan streams the entry host itself — it must not become a pivoted host
+    window._on_scan_host_found(
+        DiscoveredHost(ip="10.10.5.23", services=[DiscoveredService(445, Proto.TCP, "smb")]), prof
+    )
+    assert window._profile.discovered_hosts == []
+    window.close()
+
+
 def test_custom_scan_no_profile_is_safe(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
     from PySide6.QtWidgets import QMessageBox
 

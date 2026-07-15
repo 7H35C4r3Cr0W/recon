@@ -1254,7 +1254,9 @@ class MainWindow(QMainWindow):
             return
         command = dialog.command()
         target = dialog.target()
-        is_entry = target == profile.target.ip
+        is_entry = nmap_scan.is_entry_target(
+            target, profile.target.ip, profile.target.hostname or ""
+        )
         stream_hosts = not is_entry  # entry -> discovered_services; else -> pivoted hosts
         out_dir = profile.directory / "nmap"
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -1288,6 +1290,8 @@ class MainWindow(QMainWindow):
         # UI when that profile is still the active one.
         if not isinstance(host, DiscoveredHost):
             return
+        if host.ip == profile.target.ip:
+            return  # the entry host turned up in its own range scan — it's the target, not a pivot
         profile.add_hosts([host])
         profile.save()
         if profile is self._profile:
@@ -1306,7 +1310,11 @@ class MainWindow(QMainWindow):
                 text = ""
             services = NmapModule().discovered_services({output_file.name: text})
             if services:
-                profile.set_services(services)
+                # MERGE, never replace: a narrower/custom entry re-scan must not wipe ports found by
+                # a prior full sweep (UDP top-100, high TCP ports from -p-).
+                profile.set_services(
+                    nmap_scan.merge_services(profile.discovered_services, services)
+                )
                 profile.save()
         if profile is self._profile:
             self._service_tree.populate(
