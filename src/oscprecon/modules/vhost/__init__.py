@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from oscprecon.models import Command, Finding, Port, ScanResults, Target
 from oscprecon.modules.base import Module
 from oscprecon.modules.http import HTTP_SERVICE_NAMES
+from oscprecon.modules.s3 import is_s3_host
 from oscprecon.modules.vhost.parsers import VhostFinding, parse_vhost_tool
 
 __all__ = [
@@ -182,6 +183,14 @@ class VhostModule(Module):
 
     def suggest(self, findings: list[Finding]) -> list[str]:
         vhosts = [f.title for f in findings if f.service == "vhost"]
+        out: list[str] = []
         if vhosts:
-            return [f"Enumerate discovered vhost as a new HTTP target: {vhosts[0]}"]
-        return []
+            out.append(f"Enumerate discovered vhost as a new HTTP target: {vhosts[0]}")
+        # an s3.* vhost is an S3 endpoint (localstack/minio) — offer the read-only bucket listing.
+        for host in vhosts:
+            if is_s3_host(host):
+                out.append(
+                    f"'{host}' looks like an S3 endpoint — list buckets (read-only): "
+                    f"aws --endpoint=http://{host} s3 ls"
+                )
+        return out

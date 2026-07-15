@@ -83,6 +83,9 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
         "mongo",
         "mysql",
         "psql",
+        # awscli — read-only S3 bucket enumeration only (§12 cloud recon); write/transfer/other-
+        # service subcommands are blocked by _aws_violation. Never uploads/deletes/downloads.
+        "aws",
     }
 )
 
@@ -153,6 +156,52 @@ _SEARCHSPLOIT_FORBIDDEN: frozenset[str] = frozenset(
 # why: wpscan is enumeration-only (§9) — -P/--passwords + -U/--usernames drive a credential
 # brute. --passwords is also in _FORBIDDEN_FLAGS; the short -P alias must be blocked too.
 _WPSCAN_FORBIDDEN: frozenset[str] = frozenset({"-P", "--passwords", "-U", "--usernames"})
+
+# why: awscli is allow-listed for READ-ONLY S3 enumeration only (§12). Allow-list the safe verbs
+# rather than block-list the dangerous ones: `s3 ls` and `s3api list-*/head-*/get-bucket-*` LIST
+# metadata; everything else (cp/mv/rm/sync/website/presign, put-/create-/delete-*, get-object which
+# downloads, and every non-S3 service) can write, exfiltrate, or leave recon scope — refuse it.
+_AWS_S3_READONLY: frozenset[str] = frozenset({"ls"})
+_AWS_S3API_READONLY_PREFIXES: tuple[str, ...] = ("list-", "head-", "get-bucket-", "get-object-acl")
+# flags that take a following value, so that value is not mistaken for the service/operation token
+_AWS_VALUE_FLAGS: frozenset[str] = frozenset(
+    {"--endpoint", "--endpoint-url", "--region", "--profile", "--output", "--bucket", "--prefix"}
+)
+
+
+def _aws_positional(argv: list[str]) -> list[str]:
+    positional: list[str] = []
+    skip = False
+    for token in argv[1:]:
+        if skip:
+            skip = False
+            continue
+        if token.startswith("-"):
+            if token in _AWS_VALUE_FLAGS:  # `--endpoint http://x` (space form): skip its value too
+                skip = True
+            continue
+        positional.append(token)
+    return positional
+
+
+def _aws_violation(argv: list[str]) -> str | None:
+    positional = _aws_positional(argv)
+    if not positional:
+        return "aws needs a read-only S3 subcommand (s3 ls / s3api list-*)"
+    service = positional[0]
+    if service == "configure":
+        return None  # local credential setup only — touches ~/.aws, never the target
+    if service not in ("s3", "s3api"):
+        return f"aws {service} is not S3 read-only recon (only s3 / s3api enumeration)"
+    op = positional[1] if len(positional) > 1 else ""
+    if service == "s3":
+        if op not in _AWS_S3_READONLY:
+            return f"aws s3 {op or '<none>'} is not read-only (only `aws s3 ls`)"
+    elif not op.startswith(_AWS_S3API_READONLY_PREFIXES):
+        return (
+            f"aws s3api {op or '<none>'} is not read-only enumeration (list-*/head-*/get-bucket-*)"
+        )
+    return None
 
 
 # why: ike-scan is IKE/ISAKMP detection only (§12). -P/--pskcrack writes the aggressive-mode PSK
@@ -239,6 +288,7 @@ _INSTALL_HINTS: dict[str, str] = {
     "mongo": "apt install mongodb-clients",
     "mysql": "apt install default-mysql-client",
     "psql": "apt install postgresql-client",
+    "aws": "apt install awscli",
     "GetADUsers.py": "apt install python3-impacket",
     "GetNPUsers.py": "apt install python3-impacket",
     "GetUserSPNs.py": "apt install python3-impacket",
@@ -311,6 +361,10 @@ def policy_violation(argv: list[str], *, spray: bool = False) -> str | None:
         for token in argv[1:]:
             if token in _SEARCHSPLOIT_FORBIDDEN:
                 return f"searchsploit {token} is not display-only (forbidden)"
+    if tool == "aws":
+        aws_violation = _aws_violation(argv)
+        if aws_violation is not None:
+            return aws_violation
     if tool == "wpscan" and not spray:
         for token in argv[1:]:
             if token in _WPSCAN_FORBIDDEN:

@@ -1,0 +1,20 @@
+# S3 recon next-steps (read-only enumeration only; upload/delete is exploitation, out of scope).
+- match:
+    service: s3
+    field: kind
+    value: "^bucket$"
+  suggest:
+    - text: "Readable bucket found — list its objects (read-only); it is often the site's webroot"
+      command: "aws --endpoint=http://{target} s3 ls s3://{target}"
+    - text: "Check the bucket ACL/policy — a world-writable bucket enables webroot upload (note only)"
+      command: "aws --endpoint=http://{target} s3api get-bucket-acl --bucket {target}"
+# source: Obsidian: 0.00 Methdology/.../Cloud/AWS/Enumeration/S3 Buckets.md
+
+- match:
+    service: s3
+    field: kind
+    value: "^object$"
+  suggest:
+    - text: "Objects are the site's files — fetch the webroot files over HTTP to read source (recon)"
+      command: "curl -s http://{target}/index.php"
+# source: Obsidian: 0.00 Methdology/.../Cloud/AWS/Enumeration/S3 Buckets.md

@@ -1,3 +1,4 @@
+import shlex
 from pathlib import Path
 
 from oscprecon import shell
@@ -251,3 +252,26 @@ def test_blocks_postgresql_server_modifying_primitives() -> None:
     assert not blocked("SELECT schema_name FROM information_schema.schemata")
     assert not blocked("SELECT copy FROM audit_log")  # a column named 'copy' is not the COPY stmt
     assert not blocked("SELECT datname FROM pg_database WHERE datname = 'copydb'")
+
+
+def test_aws_allows_readonly_s3_blocks_writes_and_other_services() -> None:
+    def blocked(cmd: str) -> bool:
+        return shell.policy_violation(shlex.split(cmd)) is not None
+
+    # read-only S3 enumeration is allowed
+    assert not blocked("aws --endpoint=http://s3.thetoppers.htb s3 ls")
+    assert not blocked("aws --endpoint=http://s3.x s3 ls s3://thetoppers.htb")
+    assert not blocked("aws --endpoint http://s3.x s3 ls s3://b")  # space-form --endpoint
+    assert not blocked("aws s3api list-objects-v2 --bucket b")
+    assert not blocked("aws s3api get-bucket-acl --bucket b")
+    assert not blocked("aws configure set aws_access_key_id test")  # local cred setup
+    # writes / transfers / downloads / other services are blocked (upload-a-shell is exploitation)
+    assert blocked("aws --endpoint=http://s3.x s3 cp shell.php s3://b")
+    assert blocked("aws s3 rm s3://b/x")
+    assert blocked("aws s3 sync . s3://b")
+    assert blocked("aws s3 mv a s3://b")
+    assert blocked("aws s3api put-object --bucket b --key k")
+    assert blocked("aws s3api delete-object --bucket b --key k")
+    assert blocked("aws s3api get-object --bucket b --key k out")  # download writes local disk
+    assert blocked("aws ec2 describe-instances")  # non-S3 service
+    assert blocked("aws iam list-users")
