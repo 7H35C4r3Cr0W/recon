@@ -26,7 +26,8 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 15 | Bike | 10.129.32.229 | ssh/22 (OpenSSH 8.2p1) + http/80 (Node.js Express) | nmap parsed the `Node.js (Express middleware)` banner (no version) cleanly; whatweb caught `X-Powered-By[Express]`+jQuery+`Title[Bike]` despite no `Server:` header; searchsploit node.js→4 (not blasting), openssh 29→top 15; Handlebars SSTI is manual | none (clean — mid-banner parenthetical + no-version product parse validated) | `b999c26` |
 | 16 | Ignition | 10.129.32.240 | http/80 (nginx 1.14.2, 302→ignition.htb) | nmap's http-title redirect now **auto-sets** hostname=ignition.htb → http recon targets the vhost (serves Magento 200 + /admin 200); whatweb also surfaces it from the 302 `RedirectLocation`; Magento default-cred login is manual | nmap-redirect vhost wasn't surfaced until whatweb ran → now auto-wired at scan time | `b62ecc9` |
 | 17 | Pennyworth | 10.129.33.62 | http/8080 (Jetty 9.4.39 → Jenkins) + 68/udp (dhcpc) | **feature-validation box**: 8080→http module + HackTricks; EDB version-matched Jetty 9.4 → **EDB-50438 (CVE-2021-28164)**; recon tree + graph (icon nodes/glyphs/legend) clean; **custom-scan dialog + the merge fix + streaming range** all validated live; weak-cred Jenkins login + Groovy RCE is manual | none (clean — validated this session's scan/topology features on a live box) | `d0dc66d` |
-| 18 | Tactics | 10.129.33.82 | smb/445 (+135 msrpc, 139 netbios) — Windows Server 2019 (blocks ping) | **the -Pn box**: default scan finds 0 (ping-blocked) → the **custom scan dialog with -Pn** found 135/139/445 live; 445→SMB panel; Tier-1 correctly reports "null/guest denied" (not a false empty); the **Tier-2 `administrator:'' ` follow-up** (the foothold — I verified it gives `(Pwn3d!)`, ADMIN$/C$ R/W) is SHOWN pre-filled, never auto-run; HackTricks SMB page finding-jumped to "What is NTLM"; raw output saved to `smb/null-session/*.txt` etc. smbclient-C$/psexec is manual | none (clean — validated the -Pn custom scan + SMB Tier framing on a live ping-blocking Windows box) | _this commit_ |
+| 18 | Tactics | 10.129.33.82 | smb/445 (+135 msrpc, 139 netbios) — Windows Server 2019 (blocks ping) | **the -Pn box**: default scan finds 0 (ping-blocked) → the **custom scan dialog with -Pn** found 135/139/445 live; 445→SMB panel; Tier-1 correctly reports "null/guest denied" (not a false empty); the **Tier-2 `administrator:'' ` follow-up** (the foothold — I verified it gives `(Pwn3d!)`, ADMIN$/C$ R/W) is SHOWN pre-filled, never auto-run; HackTricks SMB page finding-jumped to "What is NTLM"; raw output saved to `smb/null-session/*.txt` etc. smbclient-C$/psexec is manual | none (clean — validated the -Pn custom scan + SMB Tier framing on a live ping-blocking Windows box) | `205f3b0` |
+| 19 | Vaccine | 10.129.33.84 | ftp/21 (vsFTPd 3.0.3, anon) + ssh/22 (OpenSSH 8.0p1) + http/80 (Apache 2.4.41, "MegaCorp Login") | live: FTP Tier-1 anon walk found **`/backup.zip`** + "Anonymous access: allowed" (read-only, **never auto-downloads**); the backup.zip **download is Tier-2** (`curl -s -O ftp://{t}/FILE`, shown/user-filled); HackTricks FTP page finding-jumped to "Anonymous login"; EDB version-matched vsFTPd 3.0.3 → **★ EDB-49719**; raw saved to `ftp/`. zip-crack→MD5→SQLi→os-shell→postgres/vi-GTFOBins root is all manual | none (clean — anon-FTP read-only enum + Tier-2 download boundary held live) | _this commit_ |
 
 ## Per-box notes
 
@@ -275,6 +276,24 @@ scanning and prove the flow on modeled data + note it — chasing a dead network
 
 **Lesson:** a Windows host that drops the ping is the poster child for the -Pn scan dialog; and the
 Tier-2 line is the whole point — surface the single-attempt `admin:'' ` foothold, never run it.
+
+**19 · Vaccine — ftp + http (Ubuntu, anon FTP → backup.zip) — live.** `10.129.33.84`,
+21/vsFTPd 3.0.3 · 22/OpenSSH 8.0p1 · 80/Apache 2.4.41 ("MegaCorp Login"). (Write-up IP
+`10.129.95.174` was stale/filtered — used the live 10.129.33.x.) Drove the FTP path live:
+- **Anon FTP read-only enum found `/backup.zip`** and reported "Anonymous access: allowed". The
+  panel is explicit: *"anonymous enumeration only; **download is a Tier-2 choice**"* — the bounded
+  walk lists the file but **never auto-downloads** it. The backup.zip grab is a Tier-2 follow-up
+  (`curl -s -O ftp://{target}/FILE`, user fills FILE) — the recon-only line: enumerate freely, pull
+  bytes only on an explicit click. Anon success also auto-records an `anonymous` cred (source
+  `ftp-anon-enum`) in the GUI's _on_ftp_done.
+- **References:** HackTricks FTP page rendered offline and **finding-jumped to "Anonymous login"**;
+  EDB **version-matched** vsFTPd 3.0.3 → **★ EDB-49719** (remote DoS). Raw saved under `ftp/`.
+- Everything past the file listing (download → `zip2john`/john crack `741852963` → `index.php`
+  MD5 `qwerty789` → login → SQLi `--os-shell` → postgres → `P@s5w0rd!` → `sudo /bin/vi` GTFOBins
+  → root) is **manual** — cracking, SQLi, and shells are exploitation, out of scope. No bug.
+
+**Lesson:** for anon FTP, listing is recon, downloading is a choice — the module walks + peeks
+bounded, and every actual byte-pull (backup.zip, a mirror) stays a Tier-2 click.
 
 ## Trends & lessons (adapt going forward)
 
