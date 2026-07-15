@@ -174,6 +174,32 @@ def test_graph_view_persists_status_and_note_via_detail(qtbot: QtBot, tmp_path: 
     assert override["note"] == "note here"
 
 
+def test_status_button_toggles_off_on_second_click(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = _profile(tmp_path)
+    view = GraphView()
+    qtbot.addWidget(view)
+    view.set_profile(prof)
+    detail = view._detail
+    detail.show_node("service-445-tcp", {"type": "service", "label": "445/tcp", "port": 445})
+
+    detail._emit_status("done")  # first click -> set
+    assert prof.load_graph()["node_overrides"]["service-445-tcp"]["status"] == "done"
+    detail._emit_status("done")  # same status again -> toggle OFF (ring cleared)
+    assert "status" not in prof.load_graph()["node_overrides"].get("service-445-tcp", {})
+    detail._emit_status("investigating")  # a different status after clearing -> set, not toggle
+    assert prof.load_graph()["node_overrides"]["service-445-tcp"]["status"] == "investigating"
+
+
+def test_bridge_clears_status_on_empty(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = _profile(tmp_path)
+    bridge = GraphBridge()
+    bridge.set_profile(prof)
+    bridge.set_status("service-445-tcp", "new")
+    assert prof.load_graph()["node_overrides"]["service-445-tcp"]["status"] == "new"
+    bridge.set_status("service-445-tcp", "")  # empty = toggle-off -> key removed
+    assert "status" not in prof.load_graph()["node_overrides"].get("service-445-tcp", {})
+
+
 def _rich_profile(tmp_path: Path) -> Profile:
     prof = Profile.create(tmp_path, "rich", Target(ip="10.10.10.5", hostname="box.htb"))
     prof.set_services(

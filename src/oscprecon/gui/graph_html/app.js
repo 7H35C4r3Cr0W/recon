@@ -209,7 +209,8 @@
       selector: 'node[type="note"]',
       style: { "background-color": "#9399b2", "background-image": ICON.note },
     },
-    { selector: "node[status]", style: { "border-width": 3, "border-color": "#f9e2af" } },
+    // status ring — thick so it stays visible when the graph is zoomed out / expanded wide
+    { selector: "node[status]", style: { "border-width": 6, "border-color": "#f9e2af" } },
     { selector: 'node[status="done"]', style: { "border-color": "#a6e3a1" } },
     { selector: 'node[status="dead-end"]', style: { opacity: 0.45 } },
     { selector: "node[note]", style: { "border-style": "dashed", "border-color": "#cba6f7" } },

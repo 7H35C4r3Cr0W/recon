@@ -77,6 +77,8 @@ class GraphBridge(QObject):
     def set_status(self, node_id: str, status: str) -> None:
         if status in _VALID_STATUS:
             self._update_override(node_id, "status", status)
+        elif not status:  # empty status = toggle-off; clear the override so the ring disappears
+            self._update_override(node_id, "status", None)
 
     @Slot(str, str)
     def add_note(self, node_id: str, note: str) -> None:
@@ -119,7 +121,10 @@ class GraphBridge(QObject):
         graph = self._profile.load_graph()
         slot = graph["node_overrides"].setdefault(node_id, {})
         if isinstance(slot, dict):
-            slot[key] = value
+            if value is None:
+                slot.pop(key, None)  # clear (e.g. toggling a status off)
+            else:
+                slot[key] = value
             self._profile.save_graph(graph)
 
 
@@ -133,6 +138,7 @@ class GraphDetail(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._node_id = ""
+        self._status = ""  # the node's current status, so clicking it again toggles it off
         self._service: tuple[int, str] | None = None
 
         self._title = QLabel("Click a node to see its detail.")
@@ -172,6 +178,7 @@ class GraphDetail(QWidget):
 
     def show_node(self, node_id: str, data: dict[str, Any]) -> None:
         self._node_id = node_id
+        self._status = str(data.get("status", ""))
         self._title.setText(str(data.get("label", node_id)))
         self._info.setText(self._describe(data))
         self._note.setPlainText(str(data.get("note", "")))
@@ -205,8 +212,12 @@ class GraphDetail(QWidget):
         self._save_note.setEnabled(enabled)
 
     def _emit_status(self, status: str) -> None:
-        if self._node_id:
-            self.status_changed.emit(self._node_id, status)
+        if not self._node_id:
+            return
+        # click the already-active status again to clear it (toggle off)
+        new_status = "" if status == self._status else status
+        self._status = new_status
+        self.status_changed.emit(self._node_id, new_status)
 
     def _emit_note(self) -> None:
         if self._node_id:
