@@ -21,11 +21,19 @@ or LLM calls at runtime**, and is **strictly recon-only by default**.
 - **Staged nmap discovery** → a service tree (TCP top-1000 → full → UDP top-100 → versioned), with
   per-port nodes for non-standard HTTP/DB ports.
 - **Per-service modules** with a tiered, safety-gated recon model — auto read-only checks, one-click
-  default-credential checks, and opt-in (off-by-default) spraying.
-- **Conservative findings** — an open port / version / Exploit-DB match is *never* called a
-  vulnerability; only real weak postures (anonymous access, null session, SMB signing off) are flagged.
-- **Reference pane** — vendored **offline** HackTricks + optional live copy, and `searchsploit`
-  Exploit-DB lookup (linkout only — never fetched or run).
+  default-credential checks, and opt-in (off-by-default) spraying. Includes **read-only S3 bucket
+  enumeration** (`aws s3 ls` only — writes/uploads/downloads are blocked) surfaced when an `s3.*`
+  vhost is discovered.
+- **Target hostname / vhost** — set a name (e.g. `box.htb`) on New Project or via *Edit → Set Target
+  Hostname*; host-based recon (HTTP dir-bust, whatweb, vhost) then targets the name, not the IP, and
+  the app surfaces the exact `/etc/hosts` line (and warns when the name doesn't resolve yet).
+- **Conservative findings + visible failures** — an open port / version / Exploit-DB match is *never*
+  called a vulnerability; only real weak postures (anonymous access, null session, SMB signing off)
+  are flagged. A missing/blocked tool is called out (`⚠ step did not run`) so "no findings" is never
+  mistaken for "the service isn't there".
+- **Reference pane** — vendored **offline** HackTricks + optional live copy, and a **version-aware
+  `searchsploit`** Exploit-DB lookup (product + `major.minor`, product-wide fallback, version-matched
+  hits ranked first, capped to the top 15 with a "showing top N of M" note — linkout only, never run).
 - **Attack-surface graph** (`Ctrl+G`), **credential vault** (masked, `0600`), **audit trail**, and an
   **Obsidian-ready `report.md`**.
 - **Workspace dashboard** — searchable/filterable table of every project, with locking, health checks,

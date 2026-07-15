@@ -70,7 +70,10 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 
 ## 3. Recon modules — ✅ (core) · 🚧 (breadth)
 
-- **Status:** ✅ — **49 service modules** (every `services.yaml`-mapped service has a backing module).
+- **Status:** ✅ — **49 port-service modules** (every `services.yaml`-mapped service has a backing
+  module) **+ `s3`**, a read-only cloud module surfaced via the vhost path rather than a port (S3 is
+  HTTP behind an `s3.*` subdomain, e.g. localstack): `aws s3 ls` / `s3api list-*` only — every
+  write/transfer/download and non-S3 service is blocked by `shell._aws_violation`.
 - **Files:** `modules/base.py` (ABC) + `modules/nmap.py` + `modules/<svc>/{__init__.py,parsers.py,
   manual_commands.yaml}` for: **http, vhost, smb, ftp, ssh, dns, ldap, smtp, nfs, snmp, tftp, netbios,
   ike, ntp, kerberos**, read-only DB modules **redis, mongodb, mssql, mysql, postgresql, oracle**, the
