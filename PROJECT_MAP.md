@@ -166,17 +166,25 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 
 ## 8. Graph functionality — ✅
 
-- **Status:** ✅ Complete (Phase 4 + §16 presentation reinforcements).
+- **Status:** ✅ Complete (Phase 4 + §16 reinforcements + BloodHound-style pass + pivot topology).
 - **Files:** `gui/widgets/graph_view.py`, `gui/graph_data.py`, `gui/graph_html/*` (vendored
-  `cytoscape.min.js`, `cytoscape-svg.js`, `index.html`, `app.js`, `style.css`).
+  `cytoscape.min.js`, `cytoscape-svg.js`, `layout-base.js`, `cose-base.js`, `cytoscape-fcose.js`,
+  `index.html`, `app.js`, `style.css`).
 - **Does:** offline Cytoscape.js via `QWebEngineView` + `QWebChannel` bridge; node/edge types per §16;
-  drag-to-reposition **persisted** to `graph.json`; right-click **Add Note** (→ tooltip + report);
-  minimap; smooth zoom/pan; **Export PNG / SVG**.
-- **Complete:** all §16 reinforcements verified present in code + JS.
+  **icon nodes + corner glyphs** (danger / OS / status / note, layered background-image); **fcose
+  compound layout**; the **pivot spider-web** (subnet compound boxes → host nodes → services + pivot
+  edges from `discovered_hosts`); drag-to-reposition **persisted** to `graph.json`; right-click **Add
+  Note**; minimap; hover peek; **Export PNG / SVG**. In-place refresh (`window.oscpRefresh`) + a native
+  always-visible **ReconSummaryTree** fallback so scan data shows even when QtWebEngine can't render.
+- **Recon-tab tree:** `gui/widgets/service_tree.py` renders the same topology (collapsible subnets that
+  persist collapse-state, host drill-down, right-click scan/remove host/subnet — flows to the graph).
+- **Custom/range scan:** `nmap_scan.py` (scan-spec builder + `merge_services`) + `pivot.py`
+  (`parse_nmap_hosts` / `NmapHostStream`) + `gui/dialogs/nmap_scan.py` + `CustomScanWorker`.
 - **Remaining:** none.
-- **Depends on:** profile model (graph.json), findings/credentials.
-- **Risks:** none material (fully local, no network).
-- **Tests:** `test_graph_data`, `tests/gui/test_graph_view`.
+- **Depends on:** profile model (graph.json, discovered_hosts), findings/credentials.
+- **Risks:** none material (fully local, no network); dense graphs (100+ nodes) rely on the type filter.
+- **Tests:** `test_graph_data`, `test_pivot`, `test_nmap_scan`, `tests/gui/test_graph_view`,
+  `tests/gui/test_widgets`, `tests/gui/test_nmap_scan_dialog`, `tests/gui/test_project_ops`.
 
 ## 9. Reports and exports — ✅
 

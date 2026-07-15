@@ -34,8 +34,17 @@ or LLM calls at runtime**, and is **strictly recon-only by default**.
 - **Reference pane** — vendored **offline** HackTricks + optional live copy, and a **version-aware
   `searchsploit`** Exploit-DB lookup (product + `major.minor`, product-wide fallback, version-matched
   hits ranked first, capped to the top 15 with a "showing top N of M" note — linkout only, never run).
-- **Attack-surface graph** (`Ctrl+G`), **credential vault** (masked, `0600`), **audit trail**, and an
-  **Obsidian-ready `report.md`**.
+- **Custom & range scanning** — a "Scan a host / range" dialog with full nmap-flag control (scan type
+  `-sT`/`-sS`/`-sU`/`-sn`, `-Pn`, ports, timing, NSE, free-form extra flags) and a live preview + raw-edit
+  escape hatch. Target can be a single IP **or a whole `/24`**.
+- **Pivot topology** — for a CTF/AD engagement that starts at one host and pivots inward (you tunnel with
+  ligolo-ng): scan an internal `/24` and hosts **stream** into the recon tree and the graph as they're
+  found, grouped by subnet with the pivot source they were reached through. Right-click to remove a host
+  or subnet, or re-scan a host deeper — the tree and graph stay in sync.
+- **BloodHound-style graph** (`Ctrl+G`) — icon nodes with corner glyphs (danger / OS / status / note),
+  subnet compound boxes and pivot edges for the connected spider-web, and a native always-visible summary
+  tree so scan data shows even where QtWebEngine can't render. Plus a **credential vault** (masked, `0600`),
+  **audit trail**, and an **Obsidian-ready `report.md`** with a pivot-topology section.
 - **Workspace dashboard** — searchable/filterable table of every project, with locking, health checks,
   and portable `<name>.tar.gz` import/export.
 - **Light / dark theme**, offline splash, and a **diagnostics log** (Help → View Diagnostics Log).
