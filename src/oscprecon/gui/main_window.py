@@ -564,7 +564,9 @@ class MainWindow(QMainWindow):
                 self._service_tree.set_empty_message(
                     f"No services yet.\nClick “Run Full Recon” to scan {target.ip}."
                 )
-        self._service_tree.populate(profile.discovered_services, force=True)
+        self._service_tree.populate(
+            profile.discovered_services, profile.discovered_hosts, force=True
+        )
         self._graph_view.set_profile(profile)
         self._report_view.set_profile(profile)
         self._findings_view.set_profile(profile)
@@ -1394,7 +1396,9 @@ class MainWindow(QMainWindow):
                     self._profile.add_reference_visited(label, url)
                 self._pending_visits.clear()
                 self._profile.save()
-            self._service_tree.populate(self._profile.discovered_services)
+            self._service_tree.populate(
+                self._profile.discovered_services, self._profile.discovered_hosts
+            )
             self._graph_view.set_profile(self._profile)
             self._refresh_suggestions()
             self._update_status_footer()

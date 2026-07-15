@@ -4,9 +4,11 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPaintEvent
 from PySide6.QtWidgets import QMenu, QTreeWidget, QTreeWidgetItem
 
-from oscprecon.models import DiscoveredService, Proto
+from oscprecon.models import DiscoveredHost, DiscoveredService, Proto
 
 _SERVICE_ROLE = Qt.ItemDataRole.UserRole
+_HOST_COLOR = QColor("#3f8fb0")  # matches the graph's pivoted-host teal
+_SUBNET_COLOR = QColor("#8a8fa0")
 
 # TCP vs UDP get distinct port colours so the two transports read apart at a glance (mirrors the
 # graph's TCP-blue / UDP-green language). Chosen for legibility on both the light and dark tree.
@@ -19,7 +21,7 @@ class ServiceTree(QTreeWidget):
 
     def __init__(self) -> None:
         super().__init__()
-        self._signature: tuple[tuple[int, str, str, str, str], ...] = ()
+        self._signature: tuple[object, ...] = ()
         # why: an empty QTreeWidget is just a blank box — with no message the user can't tell a
         # not-scanned-yet host from a 0-open-ports one from a scan-in-progress. This text is painted
         # over the empty viewport and the MainWindow updates it as the scan state changes.
@@ -62,13 +64,30 @@ class ServiceTree(QTreeWidget):
         if menu.exec(self.viewport().mapToGlobal(pos)) is action:
             self.treat_as_http.emit(service)
 
-    def populate(self, services: list[DiscoveredService], *, force: bool = False) -> None:
+    def populate(
+        self,
+        services: list[DiscoveredService],
+        hosts: list[DiscoveredHost] | None = None,
+        *,
+        force: bool = False,
+    ) -> None:
         # why: skip the clear()+rebuild when the service set is unchanged — a rebuild drops the
         # user's current selection, and background service recon (which never adds ports) would
         # otherwise churn it on every completion. force=True on a genuine profile switch, where a
         # coincidentally-identical signature must still rebind the items to the new profile.
-        signature = tuple(
-            (s.port, s.proto.value, s.service, s.product, s.version) for s in services
+        hosts = hosts or []
+        signature: tuple[object, ...] = (
+            tuple((s.port, s.proto.value, s.service, s.product, s.version) for s in services),
+            tuple(
+                (
+                    h.ip,
+                    h.hostname,
+                    h.subnet,
+                    h.pivot_source,
+                    tuple((v.port, v.proto.value) for v in h.services),
+                )
+                for h in hosts
+            ),
         )
         if not force and signature == self._signature:
             return
@@ -89,7 +108,38 @@ class ServiceTree(QTreeWidget):
                 )
                 item.setForeground(0, QBrush(_PROTO_COLOR[proto]))
                 item.setData(0, _SERVICE_ROLE, service)
+        self._add_pivot_hosts(hosts)
         self.expandAll()
+
+    def _add_pivot_hosts(self, hosts: list[DiscoveredHost]) -> None:
+        # pivoted hosts (found by scanning a /24 across the tunnel) grouped by subnet, so the whole
+        # engagement reads as one organised tree in the recon tab — mirrors the graph's spider-web.
+        if not hosts:
+            return
+        by_subnet: dict[str, list[DiscoveredHost]] = {}
+        for host in hosts:
+            by_subnet.setdefault(host.subnet or "unknown", []).append(host)
+        root = QTreeWidgetItem(self, [f"Pivoted networks ({len(hosts)})", "", ""])
+        root_font = root.font(0)
+        root_font.setWeight(QFont.Weight.DemiBold)
+        root.setFont(0, root_font)
+        for subnet in sorted(by_subnet):
+            members = sorted(by_subnet[subnet], key=lambda h: h.ip)
+            subnet_item = QTreeWidgetItem(root, [f"{subnet} ({len(members)})", "", ""])
+            subnet_item.setForeground(0, QBrush(_SUBNET_COLOR))
+            for host in members:
+                via = f"via {host.pivot_source}" if host.pivot_source else ""
+                label = f"{host.ip} ({host.hostname})" if host.hostname else host.ip
+                host_item = QTreeWidgetItem(subnet_item, [label, via, host.os_guess])
+                host_item.setForeground(0, QBrush(_HOST_COLOR))
+                for service in sorted(host.services, key=lambda s: (s.proto.value, s.port)):
+                    product = f"{service.product} {service.version}".strip()
+                    svc_item = QTreeWidgetItem(
+                        host_item,
+                        [f"{service.port}/{service.proto.value}", service.service, product],
+                    )
+                    svc_item.setForeground(0, QBrush(_PROTO_COLOR.get(service.proto, _HOST_COLOR)))
+                    svc_item.setData(0, _SERVICE_ROLE, service)
 
     def _on_current_changed(
         self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None

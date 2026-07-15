@@ -8,7 +8,7 @@ from oscprecon.gui.main_window import MainWindow, _slug
 from oscprecon.gui.widgets.reference_pane import ReferencePane
 from oscprecon.gui.widgets.service_tree import ServiceTree
 from oscprecon.gui.widgets.tool_panel import ToolPanel
-from oscprecon.models import DiscoveredService, Proto, Target
+from oscprecon.models import DiscoveredHost, DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 from oscprecon.references import EdbSearch, ExploitHit
 
@@ -44,6 +44,47 @@ def test_service_tree_groups_and_emits(qtbot: QtBot) -> None:
         tree.setCurrentItem(tcp_group.child(0))
     assert isinstance(blocker.args[0], DiscoveredService)
     assert blocker.args[0].port == 22
+
+
+def test_service_tree_shows_pivot_topology(qtbot: QtBot) -> None:
+    tree = ServiceTree()
+    qtbot.addWidget(tree)
+    hosts = [
+        DiscoveredHost(
+            ip="10.10.5.10",
+            hostname="dc01",
+            pivot_source="10.129.33.39",
+            os_guess="Windows",
+            services=[DiscoveredService(445, Proto.TCP, "smb")],
+        ),
+        DiscoveredHost(ip="172.16.8.10", pivot_source="10.10.5.10"),
+    ]
+    tree.populate([DiscoveredService(80, Proto.TCP, "http")], hosts)
+    labels = []
+
+    def walk(item: object) -> None:
+        labels.append(item.text(0))  # type: ignore[attr-defined]
+        for i in range(item.childCount()):  # type: ignore[attr-defined]
+            walk(item.child(i))  # type: ignore[attr-defined]
+
+    for i in range(tree.topLevelItemCount()):
+        walk(tree.topLevelItem(i))
+    blob = "\n".join(labels)
+    assert "TCP (1)" in blob  # entry services still shown
+    assert "Pivoted networks (2)" in blob
+    assert "10.10.5.0/24 (1)" in blob and "172.16.8.0/24 (1)" in blob
+    assert "10.10.5.10 (dc01)" in blob and "172.16.8.10" in blob
+    # a pivoted host's service is a real DiscoveredService item (selectable for its reference)
+    pivot_root = tree.topLevelItem(tree.topLevelItemCount() - 1)
+    subnet0 = pivot_root.child(0)
+    host0 = subnet0.child(0)
+    assert host0.child(0).data(0, tree_service_role()) is not None
+
+
+def tree_service_role() -> int:
+    from oscprecon.gui.widgets.service_tree import _SERVICE_ROLE
+
+    return int(_SERVICE_ROLE)
 
 
 def test_tool_panel_populates_hints_and_expands(qtbot: QtBot) -> None:
