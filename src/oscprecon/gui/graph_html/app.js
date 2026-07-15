@@ -149,6 +149,8 @@
     el.style.display = text ? "flex" : "none";
   }
 
+  var fcoseReady = false;
+
   function registerExtensions() {
     if (!svgReady && window.cytoscapeSvg) {
       try {
@@ -158,14 +160,43 @@
         svgReady = false;
       }
     }
+    if (!fcoseReady && window.cytoscapeFcose) {
+      try {
+        cytoscape.use(window.cytoscapeFcose);
+        fcoseReady = true;
+      } catch (e) {
+        fcoseReady = false;
+      }
+    }
+  }
+
+  // does the graph contain subnet compound boxes (a pivot topology)?
+  function hasCompound() {
+    return cy && cy.nodes('[type="subnet"]').length > 0;
   }
 
   function runLayout(name) {
     if (!cy) return;
-    var opts =
-      name === "force"
-        ? { name: "cose", animate: false, padding: 30 }
-        : { name: "breadthfirst", directed: true, padding: 30, spacingFactor: 1.3, roots: "#target" };
+    var opts;
+    if (name === "force") {
+      // fcose lays out compound (subnet) boxes properly — far better than cose/breadthfirst for the
+      // pivot spider-web; fall back to cose when the extension isn't available.
+      opts = fcoseReady
+        ? { name: "fcose", quality: "default", animate: false, padding: 30, nodeSeparation: 90 }
+        : { name: "cose", animate: false, padding: 30 };
+    } else if (hasCompound() && fcoseReady) {
+      // a pivot topology reads best with fcose even in the "hierarchical" slot — breadthfirst can't
+      // keep a subnet's hosts inside its box.
+      opts = { name: "fcose", quality: "default", animate: false, padding: 30, nodeSeparation: 90 };
+    } else {
+      opts = {
+        name: "breadthfirst",
+        directed: true,
+        padding: 30,
+        spacingFactor: 1.3,
+        roots: "#target",
+      };
+    }
     cy.layout(opts).run();
     cy.fit(undefined, 40);
   }

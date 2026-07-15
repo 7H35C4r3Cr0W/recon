@@ -317,3 +317,18 @@ def test_graph_app_js_exposes_refresh_and_overlay() -> None:
     assert "window.oscpRefresh" in app_js
     assert "setOverlay" in app_js
     assert 'id="cy-overlay"' in index_html
+
+
+def test_fcose_layout_is_vendored_offline_and_wired() -> None:
+    # the compound-aware pivot layout must ship offline (no runtime CDN) and be loaded in dep order.
+    for name in ("layout-base.js", "cose-base.js", "cytoscape-fcose.js"):
+        assert (_GRAPH_HTML / name).is_file(), f"{name} not vendored"
+    index_html = (_GRAPH_HTML / "index.html").read_text()
+    # dependency order matters: layout-base -> cose-base -> cytoscape-fcose
+    assert (
+        index_html.index("layout-base.js")
+        < index_html.index("cose-base.js")
+        < index_html.index("cytoscape-fcose.js")
+    )
+    app_js = (_GRAPH_HTML / "app.js").read_text()
+    assert "cytoscapeFcose" in app_js and "fcose" in app_js  # registered + used as a layout
