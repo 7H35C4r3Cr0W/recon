@@ -202,7 +202,9 @@ class ServiceTree(QTreeWidget):
             members = sorted((s for s in services if s.proto == proto), key=lambda s: s.port)
             if not members:
                 continue
-            parent = QTreeWidgetItem(entry_parent, [f"{proto.value.upper()} ({len(members)})", "", ""])
+            parent = QTreeWidgetItem(
+                entry_parent, [f"{proto.value.upper()} ({len(members)})", "", ""]
+            )
             parent.setData(0, _KEY_ROLE, f"g:{proto.value}")
             header_font = parent.font(0)
             header_font.setWeight(QFont.Weight.DemiBold)

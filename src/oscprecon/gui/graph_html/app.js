@@ -15,8 +15,11 @@
   var linkMode = false;
   var linkSource = null;
   var svgReady = false;
+  // drill-down: which compound nodes (subnet /24 boxes, host nodes) are collapsed. Persists across
+  // refreshes so a streamed host doesn't re-expand what the user collapsed. subnet-id / host-id -> true.
+  var collapseState = {};
 
-  var DEFAULT_HINT = "search · hover for detail · red ring = notable · dbl-click a service to collapse · drag (saved) · click to select";
+  var DEFAULT_HINT = "click a /24 to reveal its hosts · click a host to reveal its services · hover for detail · red ring = notable · drag (saved)";
 
   // BloodHound-style icon nodes: a coloured disc with a white/dark glyph and the label below. Icons
   // are inline SVGs (no network) encoded as data URIs. `#c` is the placeholder colour so one template
@@ -151,25 +154,32 @@
       selector: 'node[type="finding"]',
       style: { "background-color": "#f9e2af", "background-image": ICON.finding },
     },
-    // pivot topology: a subnet is a compound box that visually contains its hosts; a host is a node
-    // reached across a pivot; the pivots-into edge shows which host we tunnelled through.
+    // pivot topology: a /24 is a rounded-rect NODE (a chip) wired to the target/host it was reached
+    // through by a line — NOT a box that contains its hosts. Its hosts hang off it by contains-host
+    // lines and fold away on click. The label sizes the chip so it always reads.
     {
       selector: 'node[type="subnet"]',
       style: {
-        "background-color": "#585b70",
-        "background-opacity": 0.12,
-        "background-image": "none", // a compound box, not an icon node
-        "border-width": 1,
-        "border-color": "#9399b2",
-        "border-style": "dashed",
         shape: "round-rectangle",
-        "text-valign": "top",
+        "background-color": "#585b70",
+        "background-image": "none",
+        "border-width": 2,
+        "border-color": "#9399b2",
+        width: "label",
+        height: 24,
+        padding: "8px",
+        "font-size": 12,
+        "font-weight": "bold",
+        color: "#cdd6f4",
+        "text-valign": "center",
         "text-halign": "center",
         "text-margin-y": 0,
-        "font-size": 13,
-        color: "#bac2de",
-        padding: "20px",
       },
+    },
+    // a COLLAPSED /24 chip: brighter fill + border to say "click to reveal its hosts"
+    {
+      selector: 'node[type="subnet"].ec-collapsed',
+      style: { "background-color": "#6c7086", "border-color": "#cdd6f4" },
     },
     {
       selector: 'node[type="host"]',
@@ -211,6 +221,12 @@
     { selector: "node:selected", style: { "border-width": 4, "border-color": "#cba6f7" } },
     { selector: ".hidden", style: { display: "none" } },
     { selector: ".collapsed-child", style: { display: "none" } }, // double-click drill-down
+    { selector: ".ec-hidden", style: { display: "none" } }, // drill-down: an ancestor /24 or host is collapsed
+    // a host with its services collapsed gets a subtle gold ring to say "click to reveal services"
+    {
+      selector: 'node[type="host"].ec-collapsed',
+      style: { "border-width": 2, "border-color": "#f9e2af", "border-style": "solid" },
+    },
     // search: bright ring on matches, dim everything else
     {
       selector: ".search-hit",
@@ -263,6 +279,11 @@
         color: "#f9e2af",
       },
     },
+    // the line from a /24 chip to each of its hosts (drill-down): quiet grey so it reads as structure
+    {
+      selector: 'edge[type="contains-host"]',
+      style: { "line-color": "#9399b2", width: 1.5, opacity: 0.55, "target-arrow-shape": "none" },
+    },
   ];
 
   // A centered message over the canvas — used for "no services yet" and bridge/parse failures, so an
@@ -295,9 +316,102 @@
     }
   }
 
-  // does the graph contain subnet compound boxes (a pivot topology)?
+  // does the graph contain Cytoscape COMPOUND parents? (we no longer use them for the pivot topology
+  // — /24s connect to their hosts by lines — so this is false there and the tree layout kicks in.)
   function hasCompound() {
+    return cy && cy.nodes(":parent").length > 0;
+  }
+
+  function isPivotGraph() {
     return cy && cy.nodes('[type="subnet"]').length > 0;
+  }
+
+  // ---- drill-down: click the target / a /24 / a host to fold its children away. Everything is wired
+  // by lines (target → /24 → host → service). Positions come from the one full layout at render time,
+  // so expand/collapse is pure show/hide — revealed nodes appear where the layout already placed them.
+  function elementsVisible() {
+    return cy.elements().filter(function (el) {
+      return !el.hasClass("ec-hidden") && !el.hasClass("hidden") && !el.hasClass("collapsed-child");
+    });
+  }
+
+  // A host is hidden when its /24 is collapsed OR that /24 is itself hidden; a /24 is hidden when the
+  // host it was reached THROUGH (its `via`) is hidden — so folding net1 folds a second-hop net2 with
+  // it. Memoised recursion up the pivot chain (guards cycles).
+  function hiddenMap() {
+    var memo = {};
+    function hostHidden(id) {
+      if (id in memo) return memo[id];
+      memo[id] = false;
+      var sid = cy.getElementById(id).data("subnetId");
+      return (memo[id] = !!collapseState[sid] || (sid ? subnetHidden(sid) : false));
+    }
+    function subnetHidden(id) {
+      if (id in memo) return memo[id];
+      memo[id] = false;
+      var via = cy.getElementById(id).data("via");
+      return (memo[id] = via && via.indexOf("host-") === 0 ? hostHidden(via) : false);
+    }
+    return { hostHidden: hostHidden, subnetHidden: subnetHidden };
+  }
+
+  function setCompoundLabels() {
+    cy.nodes('[type="subnet"]').forEach(function (n) {
+      var base = n.data("cidr") || n.id().replace(/^subnet-/, "");
+      var c = n.data("childCount");
+      var arrow = collapseState[n.id()] ? " ▸" : " ▾"; // ▸ collapsed / ▾ expanded
+      n.data("label", base + (c != null ? " · " + c + " hosts" : "") + arrow);
+    });
+    cy.nodes('[type="host"]').forEach(function (n) {
+      if (n.data("baseLabel") == null) n.data("baseLabel", n.data("label"));
+      var c = n.data("childCount");
+      var arrow = collapseState[n.id()] ? " ▸" : c ? " ▾" : "";
+      n.data("label", n.data("baseLabel") + (c ? "  (" + c + ")" : "") + arrow);
+    });
+  }
+
+  function applyExpandCollapse() {
+    if (!cy) return;
+    var H = hiddenMap();
+    cy.batch(function () {
+      cy.nodes('[type="subnet"]').forEach(function (n) {
+        n.toggleClass("ec-hidden", H.subnetHidden(n.id()));
+      });
+      cy.nodes('[type="host"]').forEach(function (n) {
+        n.toggleClass("ec-hidden", H.hostHidden(n.id()));
+      });
+      cy.nodes('[type="service"][owner]').forEach(function (n) {
+        var owner = n.data("owner");
+        var hid =
+          owner === "target"
+            ? !!collapseState["target"]
+            : !!collapseState[owner] || H.hostHidden(owner);
+        n.toggleClass("ec-hidden", hid);
+      });
+      cy.edges().forEach(function (e) {
+        e.toggleClass("ec-hidden", e.source().hasClass("ec-hidden") || e.target().hasClass("ec-hidden"));
+      });
+      cy.nodes('[type="subnet"], [type="host"], [type="target"]').forEach(function (n) {
+        n.toggleClass("ec-collapsed", !!collapseState[n.id()]);
+      });
+    });
+    setCompoundLabels();
+  }
+
+  // first sight of a /24 or host → collapsed, so you land on the /24 chips and drill in. The target
+  // stays expanded (its few entry services anchor the view) but is still click-to-collapse. Any prior
+  // user toggle persists across refreshes / streamed hosts.
+  function defaultCollapse() {
+    cy.nodes('[type="subnet"], [type="host"]').forEach(function (n) {
+      if (!(n.id() in collapseState)) collapseState[n.id()] = true;
+    });
+  }
+
+  function toggleCollapse(node) {
+    collapseState[node.id()] = !collapseState[node.id()];
+    applyExpandCollapse();
+    var vis = elementsVisible();
+    if (vis.length) cy.animate({ fit: { eles: vis, padding: 45 } }, { duration: 180 });
   }
 
   function runLayout(name) {
@@ -631,6 +745,9 @@
         }
         return; // link mode swallows the tap — no detail sidebar
       }
+      // a /24 box or a host node drills down (collapse/expand); everything else just selects
+      var ttype = evt.target.data("type");
+      if (ttype === "subnet" || ttype === "host" || ttype === "target") toggleCollapse(evt.target);
       if (bridge) bridge.node_clicked(id, JSON.stringify(evt.target.data()));
     });
 
@@ -691,6 +808,16 @@
     // node type) and search so unchecking "services" or a search term survives a refresh.
     applyFilter();
     if (search && search.value) applySearch(search.value);
+    // drill-down: default new /24s + hosts to collapsed, then hide their descendants. On the FIRST
+    // render fit to the collapsed chips so you land on the ranges; a refresh keeps the camera.
+    if (isPivotGraph()) {
+      defaultCollapse();
+      applyExpandCollapse();
+      if (!hadPrev) {
+        var vis = elementsVisible();
+        if (vis.length) cy.fit(vis, 45);
+      }
+    }
   }
 
   // (Re)fetch the current profile's elements from Qt and render them in place. Exposed to Qt so a

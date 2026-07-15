@@ -591,7 +591,10 @@ class MainWindow(QMainWindow):
                 )
         self._service_tree.reset_view_state()  # don't carry the prior project's collapse state
         self._service_tree.populate(
-            profile.discovered_services, profile.discovered_hosts, force=True
+            profile.discovered_services,
+            profile.discovered_hosts,
+            target=profile.target,
+            force=True,
         )
         self._graph_view.set_profile(profile)
         self._report_view.set_profile(profile)
@@ -1249,7 +1252,9 @@ class MainWindow(QMainWindow):
         if self._profile is None:
             return
         self._service_tree.populate(
-            self._profile.discovered_services, self._profile.discovered_hosts
+            self._profile.discovered_services,
+            self._profile.discovered_hosts,
+            target=self._profile.target,
         )
         self._graph_view.set_profile(self._profile)
 
@@ -1409,7 +1414,10 @@ class MainWindow(QMainWindow):
         if profile is self._profile:
             self._topology_refresh_timer.stop()  # this is the final, authoritative refresh
             self._service_tree.populate(
-                profile.discovered_services, profile.discovered_hosts, force=True
+                profile.discovered_services,
+                profile.discovered_hosts,
+                target=profile.target,
+                force=True,
             )
             self._graph_view.set_profile(profile)
             self._tool_panel.append_output(f"[scan] done (exit {exit_code}).")
@@ -1598,7 +1606,9 @@ class MainWindow(QMainWindow):
                 self._pending_visits.clear()
                 self._profile.save()
             self._service_tree.populate(
-                self._profile.discovered_services, self._profile.discovered_hosts
+                self._profile.discovered_services,
+                self._profile.discovered_hosts,
+                target=self._profile.target,
             )
             self._graph_view.set_profile(self._profile)
             self._refresh_suggestions()

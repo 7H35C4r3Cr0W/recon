@@ -26,12 +26,16 @@ def test_pivot_topology_builds_subnets_hosts_and_pivot_edges(tmp_path: Path) -> 
     )
     els = build_elements(prof)
     by_id = {n["data"]["id"]: n["data"] for n in els["nodes"]}
-    # subnet compound boxes exist; hosts declare them as their Cytoscape parent
+    edge_pairs = {
+        (e["data"]["source"], e["data"]["target"], e["data"]["type"]) for e in els["edges"]
+    }
+    # /24 chips are plain nodes; hosts declare their /24 via subnetId + a contains-host line
     assert by_id["subnet-10.10.5.0/24"]["type"] == "subnet"
     assert by_id["subnet-172.16.8.0/24"]["type"] == "subnet"
-    assert by_id["host-10.10.5.23"]["parent"] == "subnet-10.10.5.0/24"
-    assert by_id["host-172.16.8.10"]["parent"] == "subnet-172.16.8.0/24"
-    # host services hang off the host, not the entry target
+    assert by_id["host-10.10.5.23"]["subnetId"] == "subnet-10.10.5.0/24"
+    assert by_id["host-172.16.8.10"]["subnetId"] == "subnet-172.16.8.0/24"
+    assert ("subnet-10.10.5.0/24", "host-10.10.5.23", "contains-host") in edge_pairs
+    # host services hang off the host by a has-service line, not off the entry target
     assert by_id["hostservice-10.10.5.23-445-tcp"]["type"] == "service"
     hs_edge = next(
         e for e in els["edges"] if e["data"]["target"] == "hostservice-10.10.5.23-445-tcp"
@@ -45,6 +49,30 @@ def test_pivot_topology_builds_subnets_hosts_and_pivot_edges(tmp_path: Path) -> 
     }
     assert ("target", "subnet-10.10.5.0/24") in pivots
     assert ("host-10.10.5.23", "subnet-172.16.8.0/24") in pivots
+
+
+def test_drilldown_data_child_counts_and_service_owner(tmp_path: Path) -> None:
+    # the JS drill-down needs: subnet.childCount (# hosts) + host.childCount (# services) for the
+    # collapsed-chip labels, and each host-service.owner (its host id) to hide/show per host.
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.10.10.5"))
+    prof.add_hosts(
+        [
+            DiscoveredHost(
+                ip="10.10.5.23",
+                pivot_source="10.10.10.5",
+                services=[
+                    DiscoveredService(445, Proto.TCP, "smb"),
+                    DiscoveredService(80, Proto.TCP, "http"),
+                ],
+            ),
+            DiscoveredHost(ip="10.10.5.40", pivot_source="10.10.10.5"),
+        ]
+    )
+    by_id = {n["data"]["id"]: n["data"] for n in build_elements(prof)["nodes"]}
+    assert by_id["subnet-10.10.5.0/24"]["childCount"] == 2  # two hosts in the /24
+    assert by_id["host-10.10.5.23"]["childCount"] == 2  # two services on this host
+    assert by_id["host-10.10.5.40"]["childCount"] == 0  # no services yet
+    assert by_id["hostservice-10.10.5.23-445-tcp"]["owner"] == "host-10.10.5.23"
 
 
 def test_target_and_host_nodes_carry_os_for_glyphs(tmp_path: Path) -> None:

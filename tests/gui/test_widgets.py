@@ -46,6 +46,21 @@ def test_service_tree_groups_and_emits(qtbot: QtBot) -> None:
     assert blocker.args[0].port == 22
 
 
+def test_service_tree_entry_host_header_shows_ip(qtbot: QtBot) -> None:
+    # the entry host's services sit under a single IP-labelled node, not a bare "TCP (n)" — so the
+    # target IP/hostname is always visible at the top of the recon tree.
+    tree = ServiceTree()
+    qtbot.addWidget(tree)
+    services = [DiscoveredService(22, Proto.TCP, "ssh"), DiscoveredService(80, Proto.TCP, "http")]
+    tree.populate(services, [], target=Target(ip="10.10.110.100", hostname="DANTE-WEB-NIX01"))
+    assert tree.topLevelItemCount() == 1  # one entry-host node, not two proto groups
+    entry = tree.topLevelItem(0)
+    assert entry is not None
+    assert "10.10.110.100" in entry.text(0) and "DANTE-WEB-NIX01" in entry.text(0)
+    tcp_group = entry.child(0)  # TCP group nested under the entry host
+    assert tcp_group is not None and tcp_group.childCount() == 2
+
+
 def test_service_tree_shows_pivot_topology(qtbot: QtBot) -> None:
     tree = ServiceTree()
     qtbot.addWidget(tree)
@@ -207,8 +222,11 @@ def test_main_window_selection_updates_panes(qtbot: QtBot, tmp_path: Path) -> No
     prof = Profile.create(tmp_path, "htb-test", Target(ip="10.10.10.100"))
     prof.set_services(_services())
     window._set_profile(prof)
-    assert window._service_tree.topLevelItemCount() == 2
-    tcp = window._service_tree.topLevelItem(0)
+    # entry host is a single top-level node (IP shown) with the TCP/UDP groups nested under it
+    assert window._service_tree.topLevelItemCount() == 1
+    entry = window._service_tree.topLevelItem(0)
+    assert entry is not None and "10.10.10.100" in entry.text(0)
+    tcp = entry.child(0)
     assert tcp is not None
     window._service_tree.setCurrentItem(tcp.child(1))  # 445 (sorted 22, 445)
     assert "445" in window._reference_pane._label.text()

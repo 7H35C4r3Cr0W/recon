@@ -55,7 +55,9 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
         node_ids.add(node_id)
 
     target = profile.target
-    tlabel = f"{target.ip}\n{target.hostname}" if target.hostname else target.ip
+    # the entry "main circle" shows the IP with the host / box name on the line beneath it
+    entry_name = target.hostname or target.box_name or ""
+    tlabel = f"{target.ip}\n{entry_name}" if entry_name else target.ip
     add_node("target", "target", tlabel, {"ip": target.ip, "os": target.os_guess or ""})
 
     module_service: dict[str, str] = {}  # module name -> first service node that owns it
@@ -64,7 +66,10 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
         if sid in node_ids:  # a profile can list the same port twice — keep one node
             continue
         label = f"{svc.port}/{svc.proto.value} {svc.service}".strip()
-        add_node(sid, "service", label, {"proto": svc.proto.value, "port": svc.port})
+        # owner=target so the drill-down can fold the entry host's own services under it too
+        add_node(
+            sid, "service", label, {"proto": svc.proto.value, "port": svc.port, "owner": "target"}
+        )
         edges.append(_edge("target", sid, "has-service", f"e-has-{sid}"))
         ref = ref_match(svc)
         if ref is not None and ref.module and ref.module not in module_service:
@@ -96,26 +101,64 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
         )
         edges.append(_edge("target", cid, "references-credential", f"e-cred-{index}"))
 
-    # pivot topology (§CTF): the entry Target is the root; hosts found across a pivot are grouped
-    # into subnet compound boxes and wired back to the host they were reached through, so the whole
-    # engagement reads as one connected spider-web. Nodes first, then pivot edges (a pivot_source
-    # may be a host added later in the loop — only draw the edge once both endpoints exist).
+    # pivot topology (CTF): the entry Target is the root; a pivoted host wires back to the host it
+    # was reached through, so the engagement reads as one connected map. All relationships are
+    # explicit EDGES (lines), NOT compound boxes: target -> /24 -> host -> service. Each /24 carries
+    # childCount (labels the collapsed chip) and `via` (the node it was reached through), so the JS
+    # folds a second-hop /24 away when its bridging host is hidden. Nodes first, then the pivot
+    # edges (a pivot_source may be a host added later in the loop — draw the edge once both exist).
+    subnet_host_count: dict[str, int] = {}
+    subnet_via: dict[str, str] = {}
+    for host in profile.discovered_hosts:
+        sn = host.subnet or subnet_of(host.ip) or "unknown"
+        subnet_host_count[sn] = subnet_host_count.get(sn, 0) + 1
+        if sn not in subnet_via and host.pivot_source:
+            src = host.pivot_source
+            subnet_via[sn] = "target" if src == target.ip else f"host-{src}"
+
     for host in profile.discovered_hosts:
         subnet = host.subnet or subnet_of(host.ip) or "unknown"
         subnet_id = f"subnet-{subnet}"
         if subnet_id not in node_ids:
-            add_node(subnet_id, "subnet", subnet, {"cidr": subnet})
+            add_node(
+                subnet_id,
+                "subnet",
+                subnet,
+                {
+                    "cidr": subnet,
+                    "childCount": subnet_host_count[subnet],
+                    "via": subnet_via.get(subnet, ""),
+                },
+            )
         host_id = f"host-{host.ip}"
         if host_id in node_ids:
             continue
         hlabel = f"{host.ip}\n{host.hostname}" if host.hostname else host.ip
-        add_node(host_id, "host", hlabel, {"ip": host.ip, "parent": subnet_id, "os": host.os_guess})
+        add_node(
+            host_id,
+            "host",
+            hlabel,
+            {
+                "ip": host.ip,
+                "subnetId": subnet_id,  # which /24 to fold me under (edge-linked, no compound)
+                "os": host.os_guess,
+                "childCount": len(host.services),
+            },
+        )
+        edges.append(_edge(subnet_id, host_id, "contains-host", f"e-sh-{host.ip}"))
+        # host services carry `owner` (their host id) so the drill-down hides/shows them per host,
+        # and hang off the host by a has-service line. Collapsing a host hides its services.
         for svc in host.services:
             hsid = f"hostservice-{host.ip}-{svc.port}-{svc.proto.value}"
             if hsid in node_ids:
                 continue
             slabel = f"{svc.port}/{svc.proto.value} {svc.service}".strip()
-            add_node(hsid, "service", slabel, {"proto": svc.proto.value, "port": svc.port})
+            add_node(
+                hsid,
+                "service",
+                slabel,
+                {"proto": svc.proto.value, "port": svc.port, "owner": host_id},
+            )
             edges.append(
                 _edge(host_id, hsid, "has-service", f"e-hs-{host.ip}-{svc.port}-{svc.proto.value}")
             )
