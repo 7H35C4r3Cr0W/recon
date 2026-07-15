@@ -259,6 +259,12 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 # plain summary line: "http://host/ [200 OK] Apache[2.4.38], JQuery[3.2.1], PasswordField[password]"
 _WHATWEB_PLAIN = re.compile(r"^(?P<url>\S+)\s+\[(?P<status>\d{3})[^\]]*\]\s+(?P<plugins>.+)$")
 
+# whatweb plugins that carry a redirect target; a redirect to a *hostname* (not the target IP) is a
+# vhost worth enumerating — surface it so the operator adds it to /etc/hosts (§10 vhost module).
+_REDIRECT_PLUGINS = frozenset({"meta-refresh-redirect", "redirectlocation", "location"})
+# a real vhost name: has a letter and a dotted TLD, so a bare IP ("10.10.10.5") is rejected.
+_VHOST_HOST_RE = re.compile(r"^(?=.*[A-Za-z])[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+
 
 def _split_top_level(text: str) -> list[str]:
     # split on commas that are NOT inside [...] — a whatweb plugin detail (e.g. a page Title) can
@@ -278,6 +284,47 @@ def _split_top_level(text: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
+def _plugin_name_value(seg: str) -> tuple[str, str]:
+    name, sep, rest = seg.partition("[")
+    value = rest[:-1] if sep and rest.endswith("]") else ""
+    return name.strip(), value.strip()
+
+
+def is_vhost_host(value: str) -> bool:
+    return bool(_VHOST_HOST_RE.match(value.strip()))
+
+
+def vhost_from_redirect(value: str) -> str:
+    # pull a vhost hostname out of a redirect target ("http://unika.htb/" -> "unika.htb"); return it
+    # only when it looks like a real vhost name (has a dotted TLD + a letter, not a bare IP).
+    target = value.strip()
+    host = urlsplit(target if "//" in target else f"//{target}").hostname or ""
+    return host if is_vhost_host(host) else ""
+
+
+def _redirect_findings(
+    pairs: list[tuple[str, str]], port: int, path: str, status: int
+) -> list[HttpFinding]:
+    out: list[HttpFinding] = []
+    seen: set[str] = set()
+    for name, value in pairs:
+        if name.lower() not in _REDIRECT_PLUGINS:
+            continue
+        host = vhost_from_redirect(value)
+        if host and host not in seen:
+            seen.add(host)
+            out.append(
+                HttpFinding(
+                    port=port,
+                    path=path,
+                    status=status,
+                    redirect_to=host,
+                    note=f"redirect -> {host} — add to /etc/hosts and enumerate as a vhost",
+                )
+            )
+    return out
+
+
 def _parse_whatweb_plain(text: str, port: int) -> list[HttpFinding]:
     findings: list[HttpFinding] = []
     for raw in text.splitlines():
@@ -285,18 +332,19 @@ def _parse_whatweb_plain(text: str, port: int) -> list[HttpFinding]:
         match = _WHATWEB_PLAIN.match(line)
         if match is None:
             continue
-        names = sorted(
-            {seg.split("[", 1)[0].strip() for seg in _split_top_level(match.group("plugins"))}
-            - {""}
-        )
+        pairs = [_plugin_name_value(seg) for seg in _split_top_level(match.group("plugins"))]
+        names = sorted({name for name, _ in pairs if name})
+        path = _path_of(match.group("url"))
+        status = int(match.group("status"))
         findings.append(
             HttpFinding(
                 port=port,
-                path=_path_of(match.group("url")),
-                status=int(match.group("status")),
+                path=path,
+                status=status,
                 note=f"whatweb: {', '.join(names)}" if names else "whatweb",
             )
         )
+        findings += _redirect_findings(pairs, port, path, status)
     return findings
 
 

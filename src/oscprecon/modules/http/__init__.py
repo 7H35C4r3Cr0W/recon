@@ -9,6 +9,7 @@ from oscprecon.modules.base import Module
 from oscprecon.modules.http.parsers import (
     HttpFinding,
     detect_wordpress,
+    is_vhost_host,
     parse_tool,
 )
 
@@ -25,6 +26,7 @@ __all__ = [
     "default_url",
     "detect_wordpress",
     "is_tls",
+    "is_vhost_host",
     "parse_tool",
     "wide_net_extensions",
 ]
@@ -287,10 +289,23 @@ class HttpModule(Module):
         return findings
 
     def suggest(self, findings: list[Finding]) -> list[str]:
+        out: list[str] = []
         blob = " ".join(f.detail for f in findings)
         if detect_wordpress(blob):
-            return [
+            out.append(
                 "WordPress detected — enumerate (never brute): "
                 "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url {url}"
-            ]
-        return []
+            )
+        hosts = sorted(
+            {
+                str(f.fields.get("redirect_to", ""))
+                for f in findings
+                if is_vhost_host(str(f.fields.get("redirect_to", "")))
+            }
+        )
+        for host in hosts:
+            out.append(
+                f"Name-based virtual host '{host}' found via redirect — add it to /etc/hosts and "
+                f"enumerate it as a vhost (Host: FUZZ.{host}); it may serve content the IP won't."
+            )
+        return out

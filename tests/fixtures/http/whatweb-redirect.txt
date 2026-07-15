@@ -1,0 +1,2 @@
+ERROR Opening: http://unika.htb/ - no address for unika.htb
+http://10.129.32.225/ [200 OK] Apache[2.4.52], Country[RESERVED][ZZ], HTTPServer[Apache/2.4.52 (Win64) OpenSSL/1.1.1m PHP/8.1.1], IP[10.129.32.225], Meta-Refresh-Redirect[http://unika.htb/], OpenSSL[1.1.1m], PHP[8.1.1], X-Powered-By[PHP/8.1.1]

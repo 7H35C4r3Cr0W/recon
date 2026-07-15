@@ -103,6 +103,26 @@ def test_whatweb_plain_summary() -> None:
     assert "Apache" in findings[0].note
 
 
+def test_whatweb_plain_surfaces_redirect_vhost() -> None:
+    # Responder: whatweb skips the ERROR line, fingerprints the IP, AND surfaces the meta-refresh
+    # redirect target (unika.htb) as a separate vhost finding — the box's key pivot.
+    findings = parse_whatweb(_read("whatweb-redirect.txt"), 80)
+    assert len(findings) == 2
+    fingerprint, redirect = findings
+    assert "Apache" in fingerprint.note and fingerprint.redirect_to == ""
+    assert redirect.redirect_to == "unika.htb"
+    assert "/etc/hosts" in redirect.note and "vhost" in redirect.note
+
+
+def test_whatweb_redirect_ignores_ip_and_self() -> None:
+    from oscprecon.modules.http.parsers import vhost_from_redirect
+
+    assert vhost_from_redirect("http://unika.htb/") == "unika.htb"
+    assert vhost_from_redirect("//sub.example.com:8080/x") == "sub.example.com"
+    assert vhost_from_redirect("http://10.129.32.225/") == ""  # a bare IP is not a vhost
+    assert vhost_from_redirect("/local/path") == ""  # a path redirect is not a vhost
+
+
 def test_whatweb_plain_strips_ansi_colour() -> None:
     coloured = (
         "\x1b[1m\x1b[34mhttp://t/\x1b[0m [200 OK] "

@@ -148,3 +148,21 @@ def test_suggest_wordpress() -> None:
     assert out
     assert "wpscan --enumerate" in out[0]
     assert "--passwords" not in out[0]
+
+
+def test_suggest_vhost_from_redirect() -> None:
+    # Responder: whatweb's Meta-Refresh-Redirect surfaces a vhost the bare IP won't serve.
+    module = HttpModule()
+    finding = Finding(
+        service="http",
+        title="200 /",
+        detail="redirect -> unika.htb",
+        fields={"redirect_to": "unika.htb"},
+    )
+    out = module.suggest([finding])
+    assert any("unika.htb" in line and "/etc/hosts" in line for line in out)
+    # a dir-bust path redirect must NOT be mistaken for a vhost
+    path_redirect = Finding(
+        service="http", title="301 /a", detail="", fields={"redirect_to": "/a/"}
+    )
+    assert not module.suggest([path_redirect])
