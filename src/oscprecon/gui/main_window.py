@@ -177,6 +177,10 @@ class MainWindow(QMainWindow):
         self._service_tree = ServiceTree()
         self._service_tree.service_selected.connect(self._on_service_selected)
         self._service_tree.treat_as_http.connect(self._on_treat_as_http)
+        self._service_tree.host_selected.connect(self._on_host_selected)
+        self._service_tree.scan_host_requested.connect(self._on_scan_host_requested)
+        self._service_tree.remove_host_requested.connect(self._on_remove_host)
+        self._service_tree.remove_subnet_requested.connect(self._on_remove_subnet)
         self._tool_panel = ToolPanel()
         self._tool_panel.run_requested.connect(self._on_run_command)
         self._tool_panel.http_run_requested.connect(self._on_http_run)
@@ -373,7 +377,7 @@ class MainWindow(QMainWindow):
         custom_scan_action.setStatusTip(
             "Configure nmap flags, or scan a whole /24 across your pivot into the topology"
         )
-        custom_scan_action.triggered.connect(self._on_custom_scan)
+        custom_scan_action.triggered.connect(lambda: self._on_custom_scan())
         scan_menu.addAction(custom_scan_action)
 
         profile_menu = scan_menu.addMenu("Run recon with profile")
@@ -1234,7 +1238,68 @@ class MainWindow(QMainWindow):
         )
         self._graph_view.set_profile(self._profile)
 
-    def _on_custom_scan(self) -> None:
+    def _on_host_selected(self, host: object) -> None:
+        # clicking a pivoted host in the recon tree drills into just that host — echo its summary
+        if not isinstance(host, DiscoveredHost):
+            return
+        svc = ", ".join(f"{s.port}/{s.service}".strip("/") for s in host.services) or "none yet"
+        bits = [host.ip]
+        if host.hostname:
+            bits.append(f"({host.hostname})")
+        if host.os_guess:
+            bits.append(host.os_guess)
+        if host.pivot_source:
+            bits.append(f"via {host.pivot_source}")
+        self._tool_panel.append_output(f"[host] {' '.join(bits)} — services: {svc}")
+
+    def _on_scan_host_requested(self, ip: str) -> None:
+        self._on_custom_scan(default_target=ip)  # re-scan this pivoted host deeper
+
+    def _on_remove_host(self, ip: str) -> None:
+        if self._profile is None or self._profile.read_only:
+            return
+        if (
+            QMessageBox.question(
+                self,
+                "Remove host",
+                f"Remove {ip} from this project's topology?\n\n"
+                "It disappears from the recon tree and the graph. Re-scan to add it back.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
+            return
+        if self._profile.remove_host(ip):
+            self._profile.save()
+            self._tool_panel.append_output(f"[topology] removed host {ip}")
+            self._audit_action("host-removed", ip=ip)
+            self._refresh_topology_views()
+
+    def _on_remove_subnet(self, subnet: str) -> None:
+        if self._profile is None or self._profile.read_only:
+            return
+        count = sum(1 for h in self._profile.discovered_hosts if h.subnet == subnet)
+        if (
+            QMessageBox.question(
+                self,
+                "Remove subnet",
+                f"Remove the whole {subnet} network ({count} host{'s' if count != 1 else ''}) "
+                "from this project's topology?\n\nRe-scan the range to add it back.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
+            return
+        removed = self._profile.remove_subnet(subnet)
+        if removed:
+            self._profile.save()
+            self._tool_panel.append_output(f"[topology] removed {subnet} ({removed} hosts)")
+            self._audit_action("subnet-removed", subnet=subnet, hosts=removed)
+            self._refresh_topology_views()
+
+    def _on_custom_scan(self, default_target: str | None = None) -> None:
         if self._profile is None:
             QMessageBox.information(
                 self, APP_NAME, "Open or create a project first, then Scan a host / range."
@@ -1248,7 +1313,7 @@ class MainWindow(QMainWindow):
             return
         profile = self._profile
         dialog = NmapScanDialog(
-            profile.target.ip, profile.known_host_ips(), profile.target.ip, self
+            default_target or profile.target.ip, profile.known_host_ips(), profile.target.ip, self
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return

@@ -312,3 +312,76 @@ def test_custom_scan_no_profile_is_safe(qtbot: QtBot, monkeypatch: pytest.Monkey
     window._on_custom_scan()  # no project loaded -> info dialog, no crash
     assert window._profile is None
     window.close()
+
+
+# ---- remove host / subnet from the topology (recon-tree right-click) --------------------------
+
+
+def test_remove_host_flows_to_tree_and_graph(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    from PySide6.QtWidgets import QMessageBox
+
+    from oscprecon.gui.graph_data import build_elements
+    from oscprecon.models import DiscoveredHost
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "ctf", Target(ip="10.129.33.39"))
+    prof.add_hosts(
+        [
+            DiscoveredHost(ip="10.10.5.10", pivot_source="10.129.33.39"),
+            DiscoveredHost(ip="10.10.5.23", pivot_source="10.129.33.39"),
+        ]
+    )
+    window._set_profile(prof)
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
+    window._on_remove_host("10.10.5.23")
+    assert [h.ip for h in window._profile.discovered_hosts] == ["10.10.5.10"]
+    # flows to the map: the removed host is no longer a graph node, but the kept one is
+    ids = {n["data"]["id"] for n in build_elements(window._profile)["nodes"]}
+    assert "host-10.10.5.10" in ids
+    assert "host-10.10.5.23" not in ids
+    window.close()
+
+
+def test_remove_subnet_flows_to_tree_and_graph(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PySide6.QtWidgets import QMessageBox
+
+    from oscprecon.gui.graph_data import build_elements
+    from oscprecon.models import DiscoveredHost
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "ctf", Target(ip="10.129.33.39"))
+    prof.add_hosts(
+        [
+            DiscoveredHost(ip="10.10.5.10", pivot_source="10.129.33.39"),
+            DiscoveredHost(ip="10.10.5.23", pivot_source="10.129.33.39"),
+            DiscoveredHost(ip="172.16.8.10", pivot_source="10.10.5.10"),
+        ]
+    )
+    window._set_profile(prof)
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Yes)
+    window._on_remove_subnet("10.10.5.0/24")
+    assert [h.ip for h in window._profile.discovered_hosts] == ["172.16.8.10"]
+    ids = {n["data"]["id"] for n in build_elements(window._profile)["nodes"]}
+    assert "subnet-10.10.5.0/24" not in ids and "host-10.10.5.10" not in ids
+    assert "subnet-172.16.8.0/24" in ids  # the untouched subnet remains
+    window.close()
+
+
+def test_remove_host_cancelled_keeps_it(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    from PySide6.QtWidgets import QMessageBox
+
+    from oscprecon.models import DiscoveredHost
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "ctf", Target(ip="10.0.0.1"))
+    prof.add_hosts([DiscoveredHost(ip="10.10.5.10", pivot_source="10.0.0.1")])
+    window._set_profile(prof)
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.StandardButton.Cancel)
+    window._on_remove_host("10.10.5.10")
+    assert [h.ip for h in window._profile.discovered_hosts] == ["10.10.5.10"]  # cancel keeps it
+    window.close()

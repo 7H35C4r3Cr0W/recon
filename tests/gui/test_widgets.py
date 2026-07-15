@@ -87,6 +87,67 @@ def tree_service_role() -> int:
     return int(_SERVICE_ROLE)
 
 
+def _find(tree: ServiceTree, prefix: str) -> object:
+    def walk(item: object) -> object:
+        if item.text(0).startswith(prefix):  # type: ignore[attr-defined]
+            return item
+        for i in range(item.childCount()):  # type: ignore[attr-defined]
+            hit = walk(item.child(i))  # type: ignore[attr-defined]
+            if hit is not None:
+                return hit
+        return None
+
+    for i in range(tree.topLevelItemCount()):
+        hit = walk(tree.topLevelItem(i))
+        if hit is not None:
+            return hit
+    return None
+
+
+def _pivot_hosts() -> list[DiscoveredHost]:
+    return [
+        DiscoveredHost(
+            ip="10.10.5.10", pivot_source="x", services=[DiscoveredService(445, Proto.TCP, "smb")]
+        ),
+        DiscoveredHost(ip="172.16.8.10", pivot_source="y"),
+    ]
+
+
+def test_service_tree_collapse_persists_across_refresh(qtbot: QtBot) -> None:
+    tree = ServiceTree()
+    qtbot.addWidget(tree)
+    hosts = _pivot_hosts()
+    tree.populate([DiscoveredService(80, Proto.TCP, "http")], hosts)
+    subnet = _find(tree, "10.10.5.0/24")
+    subnet.setExpanded(False)  # type: ignore[attr-defined]  # user folds this /24 shut
+    hosts.append(DiscoveredHost(ip="10.10.5.23", pivot_source="x"))  # a streaming scan adds a host
+    tree.populate([DiscoveredService(80, Proto.TCP, "http")], hosts, force=True)
+    assert _find(tree, "10.10.5.0/24").isExpanded() is False  # type: ignore[attr-defined]
+    assert _find(tree, "172.16.8.0/24").isExpanded() is True  # type: ignore[attr-defined]  # others open
+
+
+def test_service_tree_emits_host_selected(qtbot: QtBot) -> None:
+    tree = ServiceTree()
+    qtbot.addWidget(tree)
+    tree.populate([DiscoveredService(80, Proto.TCP, "http")], _pivot_hosts())
+    got: list[object] = []
+    tree.host_selected.connect(got.append)
+    tree.setCurrentItem(_find(tree, "10.10.5.10"))
+    assert isinstance(got[-1], DiscoveredHost) and got[-1].ip == "10.10.5.10"
+
+
+def test_service_tree_host_and_subnet_roles(qtbot: QtBot) -> None:
+    from oscprecon.gui.widgets.service_tree import _HOST_ROLE, _SUBNET_ROLE
+
+    tree = ServiceTree()
+    qtbot.addWidget(tree)
+    tree.populate([], _pivot_hosts())
+    host_item = _find(tree, "10.10.5.10")
+    subnet_item = _find(tree, "10.10.5.0/24")
+    assert isinstance(host_item.data(0, _HOST_ROLE), DiscoveredHost)  # type: ignore[attr-defined]
+    assert subnet_item.data(0, _SUBNET_ROLE) == "10.10.5.0/24"  # type: ignore[attr-defined]
+
+
 def test_tool_panel_populates_hints_and_expands(qtbot: QtBot) -> None:
     panel = ToolPanel()
     qtbot.addWidget(panel)

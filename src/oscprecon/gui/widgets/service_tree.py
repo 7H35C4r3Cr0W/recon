@@ -7,6 +7,9 @@ from PySide6.QtWidgets import QHeaderView, QMenu, QTreeWidget, QTreeWidgetItem
 from oscprecon.models import DiscoveredHost, DiscoveredService, Proto
 
 _SERVICE_ROLE = Qt.ItemDataRole.UserRole
+_HOST_ROLE = Qt.ItemDataRole.UserRole + 1  # a pivoted-host row -> its DiscoveredHost
+_SUBNET_ROLE = Qt.ItemDataRole.UserRole + 2  # a subnet row -> its CIDR string
+_KEY_ROLE = Qt.ItemDataRole.UserRole + 3  # a stable key for expand/collapse persistence
 _HOST_COLOR = QColor("#3f8fb0")  # matches the graph's pivoted-host teal
 _SUBNET_COLOR = QColor("#8a8fa0")
 
@@ -16,12 +19,20 @@ _PROTO_COLOR = {Proto.TCP: QColor("#4a7fb5"), Proto.UDP: QColor("#4f8a5f")}
 
 
 class ServiceTree(QTreeWidget):
-    service_selected = Signal(object)
-    treat_as_http = Signal(object)
+    service_selected = Signal(object)  # DiscoveredService | None
+    host_selected = Signal(object)  # DiscoveredHost | None (a pivoted-host row was clicked)
+    treat_as_http = Signal(object)  # DiscoveredService
+    scan_host_requested = Signal(str)  # ip — re-scan a pivoted host deeper
+    remove_host_requested = Signal(str)  # ip — drop one host from the topology
+    remove_subnet_requested = Signal(str)  # cidr — drop a whole /24
 
     def __init__(self) -> None:
         super().__init__()
         self._signature: tuple[object, ...] = ()
+        # collapse/expand state persists across the clear()+rebuild a streaming scan triggers, keyed
+        # by a stable per-node string, so a subnet the user folded shut stays shut as hosts arrive.
+        self._collapsed: set[str] = set()
+        self._restoring = False  # suppress the collapse/expand signals during programmatic restore
         # why: an empty QTreeWidget is just a blank box — with no message the user can't tell a
         # not-scanned-yet host from a 0-open-ports one from a scan-in-progress. This text is painted
         # over the empty viewport and the MainWindow updates it as the scan state changes.
@@ -37,6 +48,8 @@ class ServiceTree(QTreeWidget):
                 header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
             header.setStretchLastSection(False)
         self.currentItemChanged.connect(self._on_current_changed)
+        self.itemExpanded.connect(self._on_expanded)
+        self.itemCollapsed.connect(self._on_collapsed)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
 
@@ -60,15 +73,82 @@ class ServiceTree(QTreeWidget):
         painter.drawText(rect, int(flags), self._empty_message)
         painter.end()
 
+    # --- expand/collapse persistence ---
+    def _on_expanded(self, item: QTreeWidgetItem) -> None:
+        if self._restoring:
+            return
+        key = item.data(0, _KEY_ROLE)
+        if isinstance(key, str):
+            self._collapsed.discard(key)
+
+    def _on_collapsed(self, item: QTreeWidgetItem) -> None:
+        if self._restoring:
+            return
+        key = item.data(0, _KEY_ROLE)
+        if isinstance(key, str):
+            self._collapsed.add(key)
+
+    def _apply_expansion(self) -> None:
+        # a keyed node expands unless the user folded it shut before (default = expanded, so new
+        # nodes open). Top-down so a parent is set before its children.
+        self._restoring = True
+
+        def walk(item: QTreeWidgetItem | None) -> None:
+            if item is None:
+                return
+            key = item.data(0, _KEY_ROLE)
+            if isinstance(key, str):
+                item.setExpanded(key not in self._collapsed)
+            for i in range(item.childCount()):
+                walk(item.child(i))
+
+        for i in range(self.topLevelItemCount()):
+            walk(self.topLevelItem(i))
+        self._restoring = False
+
     def _on_context_menu(self, pos: QPoint) -> None:
         item = self.itemAt(pos)
-        service = item.data(0, _SERVICE_ROLE) if item is not None else None
-        if not isinstance(service, DiscoveredService):
+        if item is None:
             return
+        host = item.data(0, _HOST_ROLE)
+        subnet = item.data(0, _SUBNET_ROLE)
+        service = item.data(0, _SERVICE_ROLE)
         menu = QMenu(self)
-        action = menu.addAction("Treat as HTTP")
-        if menu.exec(self.viewport().mapToGlobal(pos)) is action:
+        viewport = self.viewport()
+        if viewport is None:
+            return
+        globalpos = viewport.mapToGlobal(pos)
+        if isinstance(host, DiscoveredHost):
+            act_scan = menu.addAction("Scan this host…")
+            act_remove = menu.addAction("Remove host from topology")
+            chosen = menu.exec(globalpos)
+            if chosen is act_scan:
+                self.scan_host_requested.emit(host.ip)
+            elif chosen is act_remove:
+                self.remove_host_requested.emit(host.ip)
+            return
+        if isinstance(subnet, str):
+            n = item.childCount()
+            act_remove = menu.addAction(f"Remove subnet ({n} host{'s' if n != 1 else ''})…")
+            if menu.exec(globalpos) is act_remove:
+                self.remove_subnet_requested.emit(subnet)
+            return
+        # "Treat as HTTP" probes the ENTRY target — only offer it for the entry host's services, not
+        # a pivoted host's (that would probe the wrong ip). Early-out keeps menu-add before exec.
+        if not (isinstance(service, DiscoveredService) and not self._under_host(item)):
+            return
+        act_http = menu.addAction("Treat as HTTP")
+        if menu.exec(globalpos) is act_http:
             self.treat_as_http.emit(service)
+
+    @staticmethod
+    def _under_host(item: QTreeWidgetItem) -> bool:
+        parent = item.parent()
+        while parent is not None:
+            if isinstance(parent.data(0, _HOST_ROLE), DiscoveredHost):
+                return True
+            parent = parent.parent()
+        return False
 
     def populate(
         self,
@@ -104,6 +184,7 @@ class ServiceTree(QTreeWidget):
             if not members:
                 continue
             parent = QTreeWidgetItem(self, [f"{proto.value.upper()} ({len(members)})", "", ""])
+            parent.setData(0, _KEY_ROLE, f"g:{proto.value}")
             header_font = parent.font(0)
             header_font.setWeight(QFont.Weight.DemiBold)
             parent.setFont(0, header_font)
@@ -115,7 +196,7 @@ class ServiceTree(QTreeWidget):
                 item.setForeground(0, QBrush(_PROTO_COLOR[proto]))
                 item.setData(0, _SERVICE_ROLE, service)
         self._add_pivot_hosts(hosts)
-        self.expandAll()
+        self._apply_expansion()
 
     def _add_pivot_hosts(self, hosts: list[DiscoveredHost]) -> None:
         # pivoted hosts (found by scanning a /24 across the tunnel) grouped by subnet, so the whole
@@ -126,6 +207,7 @@ class ServiceTree(QTreeWidget):
         for host in hosts:
             by_subnet.setdefault(host.subnet or "unknown", []).append(host)
         root = QTreeWidgetItem(self, [f"Pivoted networks ({len(hosts)})", "", ""])
+        root.setData(0, _KEY_ROLE, "pivot-root")
         root_font = root.font(0)
         root_font.setWeight(QFont.Weight.DemiBold)
         root.setFont(0, root_font)
@@ -133,6 +215,8 @@ class ServiceTree(QTreeWidget):
             members = sorted(by_subnet[subnet], key=lambda h: h.ip)
             subnet_item = QTreeWidgetItem(root, [f"{subnet} ({len(members)})", "", ""])
             subnet_item.setForeground(0, QBrush(_SUBNET_COLOR))
+            subnet_item.setData(0, _SUBNET_ROLE, subnet)
+            subnet_item.setData(0, _KEY_ROLE, f"n:{subnet}")
             for host in members:
                 # col 0 = ip/name (kept short so it doesn't crowd out the entry services' names);
                 # os in col 1, pivot source in col 2 (the host's otherwise-empty Product column).
@@ -140,6 +224,8 @@ class ServiceTree(QTreeWidget):
                 via = f"← {host.pivot_source}" if host.pivot_source else ""
                 host_item = QTreeWidgetItem(subnet_item, [name, host.os_guess, via])
                 host_item.setForeground(0, QBrush(_HOST_COLOR))
+                host_item.setData(0, _HOST_ROLE, host)
+                host_item.setData(0, _KEY_ROLE, f"h:{host.ip}")
                 for service in sorted(host.services, key=lambda s: (s.proto.value, s.port)):
                     product = f"{service.product} {service.version}".strip()
                     svc_item = QTreeWidgetItem(
@@ -153,4 +239,6 @@ class ServiceTree(QTreeWidget):
         self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None
     ) -> None:
         service = current.data(0, _SERVICE_ROLE) if current is not None else None
+        host = current.data(0, _HOST_ROLE) if current is not None else None
         self.service_selected.emit(service if isinstance(service, DiscoveredService) else None)
+        self.host_selected.emit(host if isinstance(host, DiscoveredHost) else None)
