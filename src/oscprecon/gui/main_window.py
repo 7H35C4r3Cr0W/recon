@@ -1283,13 +1283,14 @@ class MainWindow(QMainWindow):
         self._audit_action("custom-scan", target=target, command=command)
 
     def _on_scan_host_found(self, host: object, profile: Profile) -> None:
-        # a range/host scan discovered a host (streamed live). Add it, then refresh the UI only when
-        # this is still the active profile (a background scan can outlive a profile switch).
+        # a range/host scan discovered a host (streamed live). Persist it to the ORIGINATING profile
+        # unconditionally (so a scan that outlives a profile switch keeps its hosts); only touch the
+        # UI when that profile is still the active one.
         if not isinstance(host, DiscoveredHost):
             return
         profile.add_hosts([host])
+        profile.save()
         if profile is self._profile:
-            profile.save()
             svc = len(host.services)
             plural = "s" if svc != 1 else ""
             self._tool_panel.append_output(f"[scan] + {host.ip} ({svc} service{plural})")
