@@ -25,7 +25,8 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 14 | Funnel | 10.129.228.195 | ftp/21 (vsftpd 3.0.3, anon) + ssh/22 (OpenSSH 8.2p1) | anon FTP walked into `mail_backup/`, peeked the 713B text email (surfaced 5 `@funnel.htb` usernames), skipped the 58KB PDF; searchsploit vsftpd→1★, openssh 29→top 15; spray + SSH-tunnel→psql is manual | none (clean — validated the FTP subdir walk/peek + EDB cap live) | `a05ae6b` |
 | 15 | Bike | 10.129.32.229 | ssh/22 (OpenSSH 8.2p1) + http/80 (Node.js Express) | nmap parsed the `Node.js (Express middleware)` banner (no version) cleanly; whatweb caught `X-Powered-By[Express]`+jQuery+`Title[Bike]` despite no `Server:` header; searchsploit node.js→4 (not blasting), openssh 29→top 15; Handlebars SSTI is manual | none (clean — mid-banner parenthetical + no-version product parse validated) | `b999c26` |
 | 16 | Ignition | 10.129.32.240 | http/80 (nginx 1.14.2, 302→ignition.htb) | nmap's http-title redirect now **auto-sets** hostname=ignition.htb → http recon targets the vhost (serves Magento 200 + /admin 200); whatweb also surfaces it from the 302 `RedirectLocation`; Magento default-cred login is manual | nmap-redirect vhost wasn't surfaced until whatweb ran → now auto-wired at scan time | `b62ecc9` |
-| 17 | Pennyworth | 10.129.33.62 | http/8080 (Jetty 9.4.39 → Jenkins) + 68/udp (dhcpc) | **feature-validation box**: 8080→http module + HackTricks; EDB version-matched Jetty 9.4 → **EDB-50438 (CVE-2021-28164)**; recon tree + graph (icon nodes/glyphs/legend) clean; **custom-scan dialog + the merge fix + streaming range** all validated live; weak-cred Jenkins login + Groovy RCE is manual | none (clean — validated this session's scan/topology features on a live box) | _this commit_ |
+| 17 | Pennyworth | 10.129.33.62 | http/8080 (Jetty 9.4.39 → Jenkins) + 68/udp (dhcpc) | **feature-validation box**: 8080→http module + HackTricks; EDB version-matched Jetty 9.4 → **EDB-50438 (CVE-2021-28164)**; recon tree + graph (icon nodes/glyphs/legend) clean; **custom-scan dialog + the merge fix + streaming range** all validated live; weak-cred Jenkins login + Groovy RCE is manual | none (clean — validated this session's scan/topology features on a live box) | `d0dc66d` |
+| 18 | Tactics | 10.129.33.82 | smb/445 (+135 msrpc, 139 netbios) — Windows Server 2019 (blocks ping) | **the -Pn box**: default scan finds 0 (ping-blocked) → the **custom scan dialog with -Pn** found 135/139/445 live; 445→SMB panel; Tier-1 correctly reports "null/guest denied" (not a false empty); the **Tier-2 `administrator:'' ` follow-up** (the foothold — I verified it gives `(Pwn3d!)`, ADMIN$/C$ R/W) is SHOWN pre-filled, never auto-run; HackTricks SMB page finding-jumped to "What is NTLM"; raw output saved to `smb/null-session/*.txt` etc. smbclient-C$/psexec is manual | none (clean — validated the -Pn custom scan + SMB Tier framing on a live ping-blocking Windows box) | _this commit_ |
 
 ## Per-box notes
 
@@ -255,6 +256,25 @@ scanning the internal range.
 
 **Lesson:** when the VPN itself is dropping packets (a previously-open box goes filtered), stop
 scanning and prove the flow on modeled data + note it — chasing a dead network wastes the session.
+
+**18 · Tactics — smb (Windows Server 2019, blocks ping) — the -Pn box, live.**
+`10.129.33.82`, ports 135/msrpc · 139/netbios-ssn · 445/microsoft-ds. Drove the full flow live:
+- **Ping-blocked → -Pn:** exactly the case this session's custom-scan dialog was built for. The
+  default battery would report 0 ports (host "down"); the **"Scan a host / range" dialog with -Pn**
+  (`nmap -Pn -sV -sC -p 135,139,445`, via CustomScanWorker) found all three live and merged them in.
+- **445 → SMB panel; §11 tiers hold:** Tier-1 "Run full SMB recon" ran null + guest (both **denied**)
+  and reported **"Anonymous access: none (null/guest denied)"** — NOT a false empty. The foothold,
+  **`administrator` with a blank password**, is a **Tier-2** follow-up: pre-filled
+  (`netexec smb {target} -u 'administrator' -p '' --shares`), **shown not auto-run**. I verified it
+  out-of-band: `Tactics\administrator: (Pwn3d!)`, ADMIN$/C$ = READ,WRITE — so the panel surfaces the
+  exact path in, and stops there. The C$-smbclient flag grab / psexec→SYSTEM is manual (exploitation).
+- **References + raw data:** HackTricks SMB page rendered offline and **finding-jumped to "What is
+  NTLM"**; EDB correctly skipped (445 had no product/version). Raw output saved as `.txt` under
+  `smb/null-session/`, `smb/guest/`, `smb/nmap-smb.txt`, `enum4linux-ng.txt` — CLI-readable.
+- No bug — clean end-to-end validation of the -Pn custom scan + SMB Tier framing on a live box.
+
+**Lesson:** a Windows host that drops the ping is the poster child for the -Pn scan dialog; and the
+Tier-2 line is the whole point — surface the single-attempt `admin:'' ` foothold, never run it.
 
 ## Trends & lessons (adapt going forward)
 
