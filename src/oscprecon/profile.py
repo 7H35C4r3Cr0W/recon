@@ -7,7 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from oscprecon import creds
-from oscprecon.models import Credential, DiscoveredService, Proto, Target
+from oscprecon.models import (
+    Credential,
+    DiscoveredHost,
+    DiscoveredService,
+    Proto,
+    Target,
+    subnet_of,
+)
 from oscprecon.workspace.models import (
     Organization,
     normalize_status,
@@ -15,7 +22,9 @@ from oscprecon.workspace.models import (
     normalize_tags,
 )
 
-SCHEMA_VERSION = 1
+# v2 adds discovered_hosts (the pivot topology). Loading a v1 profile is unchanged — the field
+# simply defaults to [] — so no migration is needed and old projects open exactly as before.
+SCHEMA_VERSION = 2
 
 
 class ReadOnlyError(RuntimeError):
@@ -98,6 +107,32 @@ def _service_from_dict(data: dict[str, Any]) -> DiscoveredService:
     )
 
 
+def _host_to_dict(host: DiscoveredHost) -> dict[str, Any]:
+    return {
+        "ip": host.ip,
+        "hostname": host.hostname,
+        "subnet": host.subnet,
+        "pivot_source": host.pivot_source,
+        "os_guess": host.os_guess,
+        "services": [_service_to_dict(s) for s in host.services],
+        "discovered_at": host.discovered_at,
+        "notes": host.notes,
+    }
+
+
+def _host_from_dict(data: dict[str, Any]) -> DiscoveredHost:
+    return DiscoveredHost(
+        ip=str(data["ip"]),
+        hostname=str(data.get("hostname", "")),
+        subnet=str(data.get("subnet", "")),
+        pivot_source=str(data.get("pivot_source", "")),
+        os_guess=str(data.get("os_guess", "")),
+        services=[_service_from_dict(s) for s in data.get("services", [])],
+        discovered_at=str(data.get("discovered_at", "")),
+        notes=str(data.get("notes", "")),
+    )
+
+
 @dataclass
 class Profile:
     directory: Path
@@ -105,6 +140,7 @@ class Profile:
     target: Target
     status: dict[str, Any] = field(default_factory=dict)
     discovered_services: list[DiscoveredService] = field(default_factory=list)
+    discovered_hosts: list[DiscoveredHost] = field(default_factory=list)
     command_history: list[dict[str, Any]] = field(default_factory=list)
     references_visited: list[dict[str, Any]] = field(default_factory=list)
     module_settings: dict[str, Any] = field(default_factory=dict)
@@ -155,6 +191,7 @@ class Profile:
             target=_target_from_dict(raw.get("target", {})),
             status=dict(raw.get("status", {})),
             discovered_services=[_service_from_dict(s) for s in raw.get("discovered_services", [])],
+            discovered_hosts=[_host_from_dict(h) for h in raw.get("discovered_hosts", [])],
             command_history=[dict(c) for c in raw.get("command_history", [])],
             references_visited=[dict(r) for r in raw.get("references_visited", [])],
             module_settings=dict(raw.get("module_settings", {})),
@@ -175,6 +212,7 @@ class Profile:
             "target": _target_to_dict(self.target),
             "status": self.status,
             "discovered_services": [_service_to_dict(s) for s in self.discovered_services],
+            "discovered_hosts": [_host_to_dict(h) for h in self.discovered_hosts],
             "command_history": self.command_history,
             "references_visited": self.references_visited,
             "user_notes_path": "notes.md",
@@ -191,6 +229,41 @@ class Profile:
     def set_services(self, services: list[DiscoveredService]) -> None:
         self.discovered_services = services
         self.touch()
+
+    def add_hosts(self, hosts: list[DiscoveredHost]) -> int:
+        # Upsert pivoted hosts by ip: a re-scan of the same host updates its services / os / pivot
+        # source in place rather than creating a duplicate node. The entry Target is never added
+        # here (it stays the profile's primary target). Returns the number of NEW hosts added.
+        by_ip = {h.ip: h for h in self.discovered_hosts}
+        added = 0
+        for host in hosts:
+            if host.ip == self.target.ip:
+                continue  # the entry host is the Target, not a discovered_host
+            if not host.discovered_at:
+                host.discovered_at = _now_iso()
+            if not host.subnet:
+                host.subnet = subnet_of(host.ip)
+            existing = by_ip.get(host.ip)
+            if existing is None:
+                self.discovered_hosts.append(host)
+                by_ip[host.ip] = host
+                added += 1
+            else:
+                if host.services:
+                    existing.services = host.services
+                if host.hostname:
+                    existing.hostname = host.hostname
+                if host.os_guess:
+                    existing.os_guess = host.os_guess
+                if host.pivot_source:
+                    existing.pivot_source = host.pivot_source
+        self.touch()
+        return added
+
+    def known_host_ips(self) -> list[str]:
+        # every host the topology knows about — the entry Target plus discovered hosts. Used to
+        # offer a pivot-source picker when importing a new subnet.
+        return [self.target.ip, *(h.ip for h in self.discovered_hosts)]
 
     def set_hostname(self, hostname: str | None) -> None:
         # the vhost name is usually learned AFTER the first scan (a redirect, a cert CN, a contact

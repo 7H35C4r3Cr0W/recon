@@ -72,6 +72,36 @@ class DiscoveredService:
     discovered_at: str = ""
 
 
+def subnet_of(ip: str, prefix: int = 24) -> str:
+    # group a host into its network for the pivot topology (e.g. 10.10.5.23 -> "10.10.5.0/24").
+    # Returns "" for anything that isn't a plain IP so a bad token never becomes a graph node.
+    try:
+        return str(ipaddress.ip_network(f"{ip}/{prefix}", strict=False))
+    except ValueError:
+        return ""
+
+
+@dataclass
+class DiscoveredHost:
+    # a host reached across a pivot (CTF/AD lateral movement). The entry host stays Target; these
+    # are the additional hosts found by scanning from a foothold, grouped by subnet for the graph.
+    ip: str
+    hostname: str = ""
+    subnet: str = ""  # "10.10.5.0/24" — filled from ip via subnet_of() when empty
+    pivot_source: str = ""  # ip of the host we reached this one THROUGH ("" = entry-reachable)
+    os_guess: str = ""
+    services: list[DiscoveredService] = field(default_factory=list)
+    discovered_at: str = ""
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        validate_host(self.ip)  # ip is interpolated into command lines — never let a flag/space in
+        if self.hostname:
+            validate_host(self.hostname)
+        if not self.subnet:
+            self.subnet = subnet_of(self.ip)
+
+
 @dataclass(frozen=True)
 class Command:
     module: str

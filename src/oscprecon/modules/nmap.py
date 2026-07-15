@@ -179,36 +179,43 @@ class NmapModule(Module):
     def _parse_text(self, text: str) -> list[DiscoveredService]:
         services: list[DiscoveredService] = []
         for line in text.splitlines():
-            match = _PORT_LINE.match(line.strip())
-            if match is None:
-                continue
-            rest = match.group("rest") or ""
-            product = ""
-            version = ""
-            # a leading "(" means nmap detected no product name, just parenthetical extrainfo
-            # (rsync's "(protocol version 31)"); leave product/version empty rather than mangle it.
-            if rest and not rest.startswith("("):
-                # nmap's version column is "<product> [version] [extrainfo]" with a free-text,
-                # often multi-word product ("Redis key-value store", "Samba smbd", "Linux telnetd").
-                # Split on the first version-looking token (starts with a digit) so product and
-                # version are clean and extrainfo noise is dropped; with no version token the whole
-                # banner is the product. Splitting on the first word instead mangled both fields
-                # (product "Redis", version "key-value store 5.0.7").
-                tokens = rest.split()
-                vi = next((i for i, tok in enumerate(tokens) if tok[:1].isdigit()), None)
-                if vi is None:
-                    product = " ".join(tokens)
-                else:
-                    product = " ".join(tokens[:vi])
-                    version = tokens[vi]
-            services.append(
-                DiscoveredService(
-                    port=int(match.group("port")),
-                    proto=Proto(match.group("proto")),
-                    service=match.group("service"),
-                    product=product,
-                    version=version,
-                    discovered_at=_now_iso(),
-                )
-            )
+            service = parse_port_line(line.strip())
+            if service is not None:
+                services.append(service)
         return services
+
+
+def parse_port_line(line: str) -> DiscoveredService | None:
+    """One nmap 'PORT STATE SERVICE VERSION' row → a DiscoveredService (None if not a port row).
+
+    Reused by the pivot multi-host parser so both read nmap version columns identically."""
+    match = _PORT_LINE.match(line.strip())
+    if match is None:
+        return None
+    rest = match.group("rest") or ""
+    product = ""
+    version = ""
+    # a leading "(" means nmap detected no product name, just parenthetical extrainfo
+    # (rsync's "(protocol version 31)"); leave product/version empty rather than mangle it.
+    if rest and not rest.startswith("("):
+        # nmap's version column is "<product> [version] [extrainfo]" with a free-text,
+        # often multi-word product ("Redis key-value store", "Samba smbd", "Linux telnetd").
+        # Split on the first version-looking token (starts with a digit) so product and
+        # version are clean and extrainfo noise is dropped; with no version token the whole
+        # banner is the product. Splitting on the first word instead mangled both fields
+        # (product "Redis", version "key-value store 5.0.7").
+        tokens = rest.split()
+        vi = next((i for i, tok in enumerate(tokens) if tok[:1].isdigit()), None)
+        if vi is None:
+            product = " ".join(tokens)
+        else:
+            product = " ".join(tokens[:vi])
+            version = tokens[vi]
+    return DiscoveredService(
+        port=int(match.group("port")),
+        proto=Proto(match.group("proto")),
+        service=match.group("service"),
+        product=product,
+        version=version,
+        discovered_at=_now_iso(),
+    )
