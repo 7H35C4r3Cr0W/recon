@@ -116,6 +116,24 @@ def test_profile_add_hosts_roundtrip_and_upsert(tmp_path: Path) -> None:
     assert [s.port for s in reloaded.discovered_hosts[0].services] == [445]
 
 
+def test_remove_host_and_subnet(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.129.33.39"))
+    prof.add_hosts(
+        [
+            DiscoveredHost(ip="10.10.5.10", pivot_source="10.129.33.39"),
+            DiscoveredHost(ip="10.10.5.23", pivot_source="10.129.33.39"),
+            DiscoveredHost(ip="172.16.8.10", pivot_source="10.10.5.10"),
+        ]
+    )
+    assert prof.remove_host("10.10.5.23") is True
+    assert prof.remove_host("9.9.9.9") is False  # not present
+    assert [h.ip for h in prof.discovered_hosts] == ["10.10.5.10", "172.16.8.10"]
+    assert prof.remove_subnet("10.10.5.0/24") == 1  # removes the remaining 10.10.5.x host
+    assert [h.ip for h in prof.discovered_hosts] == ["172.16.8.10"]
+    prof.save()
+    assert [h.ip for h in Profile.load(prof.directory).discovered_hosts] == ["172.16.8.10"]
+
+
 def test_known_host_ips(tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "ctf", Target(ip="10.10.10.5"))
     prof.add_hosts([DiscoveredHost(ip="10.10.5.23"), DiscoveredHost(ip="172.16.8.10")])

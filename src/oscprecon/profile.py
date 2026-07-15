@@ -265,6 +265,27 @@ class Profile:
         # offer a pivot-source picker when importing a new subnet.
         return [self.target.ip, *(h.ip for h in self.discovered_hosts)]
 
+    def remove_host(self, ip: str) -> bool:
+        # drop one pivoted host from the topology. A deeper host reached VIA this one keeps its
+        # pivot_source string, but the graph simply omits the now-dangling pivot edge — no crash.
+        before = len(self.discovered_hosts)
+        self.discovered_hosts = [h for h in self.discovered_hosts if h.ip != ip]
+        if len(self.discovered_hosts) != before:
+            self.touch()
+            return True
+        return False
+
+    def remove_subnet(self, subnet: str) -> int:
+        # drop a whole /24 (every host in it) from the topology. Returns the number removed.
+        before = len(self.discovered_hosts)
+        self.discovered_hosts = [
+            h for h in self.discovered_hosts if (h.subnet or subnet_of(h.ip)) != subnet
+        ]
+        removed = before - len(self.discovered_hosts)
+        if removed:
+            self.touch()
+        return removed
+
     def set_hostname(self, hostname: str | None) -> None:
         # the vhost name is usually learned AFTER the first scan (a redirect, a cert CN, a contact
         # email) — let it be set later; host-based recon then targets the name instead of the IP.
