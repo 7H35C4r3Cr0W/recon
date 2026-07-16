@@ -1,99 +1,139 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 860" font-family="'Segoe UI',system-ui,sans-serif">
-<rect width="1320" height="860" fill="#111827"/>
-<g stroke="#3b4658" stroke-width="1.5" fill="none">
-<line x1="120" y1="418" x2="165" y2="418"/>
-<line x1="235" y1="418" x2="470" y2="250"/>
-<line x1="500" y1="250" x2="421" y2="149"/>
-<line x1="500" y1="250" x2="451" y2="132"/>
-<line x1="500" y1="250" x2="483" y2="123"/>
-<line x1="500" y1="250" x2="517" y2="123"/>
-<line x1="500" y1="250" x2="550" y2="132"/>
-<line x1="500" y1="250" x2="579" y2="150"/>
-<line x1="500" y1="250" x2="603" y2="174"/>
-<line x1="500" y1="250" x2="619" y2="204"/>
-<line x1="500" y1="250" x2="627" y2="237"/>
-<line x1="500" y1="250" x2="626" y2="271"/>
-<line x1="500" y1="250" x2="616" y2="304"/>
-<line x1="500" y1="250" x2="598" y2="332"/>
-<line x1="517" y1="123" x2="583" y2="105"/>
-<line x1="517" y1="123" x2="583" y2="135"/>
-<line x1="603" y1="174" x2="669" y2="156"/>
-<line x1="910" y1="210" x2="850" y2="106"/>
-<line x1="910" y1="210" x2="894" y2="91"/>
-<line x1="910" y1="210" x2="941" y2="94"/>
-<line x1="910" y1="210" x2="983" y2="115"/>
-<line x1="910" y1="210" x2="1014" y2="150"/>
-<line x1="910" y1="210" x2="1029" y2="194"/>
-<line x1="910" y1="210" x2="1026" y2="241"/>
-<line x1="910" y1="210" x2="1005" y2="283"/>
-<line x1="910" y1="210" x2="970" y2="314"/>
-<line x1="941" y1="94" x2="1007" y2="76"/>
-<line x1="1005" y1="283" x2="1071" y2="265"/>
-<line x1="1110" y1="560" x2="1200" y2="636"/>
-<line x1="1110" y1="560" x2="1157" y2="668"/>
-<line x1="1110" y1="560" x2="1103" y2="678"/>
-<line x1="1110" y1="560" x2="1051" y2="662"/>
-<line x1="1110" y1="560" x2="1011" y2="625"/>
-<line x1="1110" y1="560" x2="993" y2="574"/>
-<line x1="1110" y1="560" x2="999" y2="520"/>
-<line x1="1103" y1="678" x2="1169" y2="660"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 1010" font-family="'Segoe UI',system-ui,sans-serif">
+<rect width="1560" height="1010" fill="#111827"/>
+<g stroke="#3b4658" stroke-width="1.7" fill="none">
+<line x1="130" y1="499" x2="172" y2="499"/>
+<line x1="250" y1="499" x2="500" y2="300"/>
+<line x1="530" y1="300" x2="415" y2="204"/>
+<line x1="530" y1="300" x2="443" y2="178"/>
+<line x1="530" y1="300" x2="476" y2="160"/>
+<line x1="530" y1="300" x2="513" y2="151"/>
+<line x1="530" y1="300" x2="551" y2="152"/>
+<line x1="530" y1="300" x2="588" y2="162"/>
+<line x1="530" y1="300" x2="621" y2="181"/>
+<line x1="530" y1="300" x2="648" y2="207"/>
+<line x1="530" y1="300" x2="667" y2="240"/>
+<line x1="530" y1="300" x2="678" y2="276"/>
+<line x1="530" y1="300" x2="679" y2="314"/>
+<line x1="530" y1="300" x2="671" y2="351"/>
+<line x1="476" y1="160" x2="558" y2="130"/>
+<line x1="476" y1="160" x2="558" y2="162"/>
+<line x1="476" y1="160" x2="558" y2="194"/>
+<line x1="621" y1="181" x2="699" y2="167"/>
+<line x1="678" y1="276" x2="758" y2="264"/>
+<line x1="250" y1="499" x2="500" y2="730"/>
+<line x1="530" y1="740" x2="671" y2="791"/>
+<line x1="530" y1="740" x2="649" y2="831"/>
+<line x1="530" y1="740" x2="617" y2="862"/>
+<line x1="530" y1="740" x2="577" y2="882"/>
+<line x1="530" y1="740" x2="533" y2="890"/>
+<line x1="530" y1="740" x2="488" y2="884"/>
+<line x1="530" y1="740" x2="448" y2="865"/>
+<line x1="530" y1="740" x2="414" y2="835"/>
+<line x1="530" y1="740" x2="391" y2="797"/>
+<line x1="530" y1="740" x2="381" y2="753"/>
+<line x1="649" y1="831" x2="731" y2="837"/>
+<line x1="414" y1="835" x2="496" y2="841"/>
+<line x1="1030" y1="250" x2="934" y2="135"/>
+<line x1="1030" y1="250" x2="976" y2="110"/>
+<line x1="1030" y1="250" x2="1024" y2="100"/>
+<line x1="1030" y1="250" x2="1073" y2="106"/>
+<line x1="1030" y1="250" x2="1117" y2="128"/>
+<line x1="1030" y1="250" x2="1152" y2="163"/>
+<line x1="1030" y1="250" x2="1174" y2="207"/>
+<line x1="1030" y1="250" x2="1180" y2="256"/>
+<line x1="1030" y1="250" x2="1170" y2="304"/>
+<line x1="1030" y1="250" x2="1145" y2="346"/>
+<line x1="1073" y1="106" x2="1157" y2="84"/>
+<line x1="1073" y1="106" x2="1157" y2="116"/>
+<line x1="1174" y1="207" x2="1258" y2="199"/>
+<line x1="1310" y1="690" x2="1431" y2="760"/>
+<line x1="1310" y1="690" x2="1389" y2="806"/>
+<line x1="1310" y1="690" x2="1331" y2="828"/>
+<line x1="1310" y1="690" x2="1269" y2="824"/>
+<line x1="1310" y1="690" x2="1215" y2="793"/>
+<line x1="1310" y1="690" x2="1180" y2="741"/>
+<line x1="1310" y1="690" x2="1170" y2="680"/>
+<line x1="1310" y1="690" x2="1189" y2="620"/>
+<line x1="1331" y1="828" x2="1235" y2="808"/>
+<line x1="1331" y1="828" x2="1235" y2="840"/>
+<line x1="1180" y1="741" x2="1100" y2="747"/>
 </g>
-<g stroke="#e0705f" stroke-width="2.4" fill="none" stroke-dasharray="6 4">
-<line x1="627" y1="237" x2="880" y2="210"/>
-<line x1="1029" y1="194" x2="1080" y2="560"/>
+<g stroke="#e0705f" stroke-width="2.8" fill="none" stroke-dasharray="7 5">
+<line x1="678" y1="276" x2="1000" y2="250"/>
+<line x1="1180" y1="256" x2="1290" y2="690"/>
 </g>
-<rect x="34" y="392" width="86" height="52" rx="11" fill="#1b2434" stroke="#6d8fe0" stroke-width="1.4"/><text x="77" y="414" fill="#eef2ff" font-size="12" font-weight="700" text-anchor="middle">Kali</text><text x="77" y="430" fill="#9fb0c8" font-size="9.5" text-anchor="middle">tun0 · ligolo</text>
-<ellipse cx="235" cy="418" rx="70" ry="34" fill="#3457bf" stroke="#6d8fe0" stroke-width="1.6"/><text x="235" y="416" fill="#eef2ff" font-size="12.5" font-weight="700" text-anchor="middle">ENTRY</text><text x="235" y="432" fill="#c2ccf0" font-size="10" text-anchor="middle">10.10.110.100</text>
-<rect x="425.0" y="228.0" width="150" height="44" rx="11" fill="#254a4d" stroke="#5b8a8f" stroke-width="1.6"/><text x="500" y="247" fill="#cfeaec" font-size="13" font-weight="600" text-anchor="middle">11 hosts · via ENTRY</text><text x="500" y="263" fill="#8fb7ba" font-size="10" text-anchor="middle">172.16.1.0/24</text>
-<circle cx="421.19533115831575" cy="149.13462353833958" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="421.19533115831575" y="168.13462353833958" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.5</text>
-<circle cx="450.5478239112796" cy="131.93865035461357" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="450.5478239112796" y="150.93865035461357" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.8</text>
-<circle cx="483.3933303282942" cy="123.08184321219109" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="483.3933303282942" y="142.08184321219107" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.11</text>
-<circle cx="517.4118351584337" cy="123.18979537744003" r="8" fill="#e88b9c" stroke="#c0564b" stroke-width="1.3"/><text x="517.4118351584337" y="142.18979537744002" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.14</text>
-<circle cx="550.2004693754888" cy="132.25488173821975" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="550.2004693754888" y="151.25488173821975" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.17</text>
-<circle cx="579.4432348494622" cy="149.63679739738677" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="579.4432348494622" y="168.63679739738677" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.20</text>
-<circle cx="603.0745929639755" cy="174.107785081006" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="603.0745929639755" y="193.107785081006" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.23</text>
-<circle cx="619.4253622325357" cy="203.93935676059616" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="619.4253622325357" y="222.93935676059616" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.26</text>
-<circle cx="627.3406195558972" cy="237.02438397916117" r="12" fill="none" stroke="#c9a227" stroke-width="2.4"/><circle cx="627.3406195558972" cy="237.02438397916117" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="627.3406195558972" y="256.02438397916114" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.29</text>
-<circle cx="626.2612772624603" cy="271.0259331315427" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="626.2612772624603" y="290.0259331315427" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.32</text>
-<circle cx="616.2635738047536" cy="303.54233284184227" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="616.2635738047536" y="322.54233284184227" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.35</text>
-<circle cx="598.0536887192292" cy="332.276814039877" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="598.0536887192292" y="351.276814039877" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.38</text>
-<rect x="544.4118351584337" y="92.18979537744003" width="78" height="26" rx="7" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.2"/><text x="583.4118351584337" y="109.18979537744003" fill="#0f2810" font-size="10" font-weight="600" text-anchor="middle">445 · smb</text>
-<rect x="544.4118351584337" y="122.18979537744002" width="78" height="26" rx="7" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.2"/><text x="583.4118351584337" y="139.18979537744002" fill="#0f2810" font-size="10" font-weight="600" text-anchor="middle">5985 · winrm</text>
-<rect x="630.0745929639755" y="143.107785081006" width="78" height="26" rx="7" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.2"/><text x="669.0745929639755" y="160.107785081006" fill="#0f2810" font-size="10" font-weight="600" text-anchor="middle">80 · http</text>
-<rect x="835.0" y="188.0" width="150" height="44" rx="11" fill="#254a4d" stroke="#5b8a8f" stroke-width="1.6"/><text x="910" y="207" fill="#cfeaec" font-size="13" font-weight="600" text-anchor="middle">9 hosts · via 172.16.1.x</text><text x="910" y="223" fill="#8fb7ba" font-size="10" text-anchor="middle">172.16.2.0/24</text>
-<circle cx="850.0" cy="106.07695154586736" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="850.0" y="125.07695154586736" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.5</text>
-<circle cx="894.3368569335938" cy="91.02661663514276" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="894.3368569335938" y="110.02661663514276" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.8</text>
-<circle cx="941.0582854123024" cy="94.0889008453118" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="941.0582854123024" y="113.0889008453118" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.11</text>
-<circle cx="983.0513714810464" cy="114.79759916505178" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="983.0513714810464" y="133.7975991650518" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.14</text>
-<circle cx="1013.9230484541326" cy="150.0" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="1013.9230484541326" y="169.0" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.17</text>
-<circle cx="1028.9733833648572" cy="194.33685693359382" r="12" fill="none" stroke="#c9a227" stroke-width="2.4"/><circle cx="1028.9733833648572" cy="194.33685693359382" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="1028.9733833648572" y="213.33685693359382" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.20</text>
-<circle cx="1025.9110991546881" cy="241.0582854123025" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="1025.9110991546881" y="260.0582854123025" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.23</text>
-<circle cx="1005.2024008349482" cy="283.0513714810465" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="1005.2024008349482" y="302.0513714810465" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.26</text>
-<circle cx="970.0" cy="313.92304845413264" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="970.0" y="332.92304845413264" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.29</text>
-<rect x="968.0582854123024" y="63.0889008453118" width="78" height="26" rx="7" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.2"/><text x="1007.0582854123024" y="80.0889008453118" fill="#0f2810" font-size="10" font-weight="600" text-anchor="middle">3389 · rdp</text>
-<rect x="1032.202400834948" y="252.0513714810465" width="78" height="26" rx="7" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.2"/><text x="1071.202400834948" y="269.0513714810465" fill="#0f2810" font-size="10" font-weight="600" text-anchor="middle">1433 · mssql</text>
-<rect x="1035.0" y="538.0" width="150" height="44" rx="11" fill="#254a4d" stroke="#5b8a8f" stroke-width="1.6"/><text x="1110" y="557" fill="#cfeaec" font-size="13" font-weight="600" text-anchor="middle">7 hosts · via 172.16.2.x</text><text x="1110" y="573" fill="#8fb7ba" font-size="10" text-anchor="middle">172.16.3.0/24</text>
-<circle cx="1200.3932442880393" cy="635.8489379430116" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="1200.3932442880393" y="654.8489379430116" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.5</text>
-<circle cx="1156.7374123926206" cy="668.3495006118724" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="1156.7374123926206" y="687.3495006118724" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.8</text>
-<circle cx="1103.1389101885638" cy="677.8003626760096" r="8" fill="#e88b9c" stroke="#c0564b" stroke-width="1.3"/><text x="1103.1389101885638" y="696.8003626760096" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.11</text>
-<circle cx="1051.0" cy="662.1909976465638" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="1051.0" y="681.1909976465638" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.14</text>
-<circle cx="1011.4124382532735" cy="624.8420594123552" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="1011.4124382532735" y="643.8420594123552" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.17</text>
-<circle cx="992.7978737864507" cy="573.6989638667771" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="992.7978737864507" y="592.6989638667771" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.20</text>
-<circle cx="999.1162707472628" cy="519.6416230875711" r="8" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.3"/><text x="999.1162707472628" y="538.6416230875711" fill="#9fb0c8" font-size="9.5" text-anchor="middle">.23</text>
-<rect x="1130.1389101885638" y="646.8003626760096" width="78" height="26" rx="7" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.2"/><text x="1169.1389101885638" y="663.8003626760096" fill="#0f2810" font-size="10" font-weight="600" text-anchor="middle">389 · ldap</text>
-<g font-size="11.5" fill="#aab3c2"><rect x="34" y="800" width="1252" height="34" rx="9" fill="#1b2434" stroke="#2a3446"/>
-<ellipse cx="56" cy="817" rx="11" ry="7" fill="#3457bf"/>
-<text x="74" y="821">entry target</text>
-<rect x="178.2" y="810" width="18" height="14" rx="4" fill="#254a4d" stroke="#5b8a8f"/>
-<text x="205.2" y="821">subnet /24</text>
-<circle cx="303.2" cy="817" r="7" fill="#8fb6f2" stroke="#4a7fb5"/>
-<text x="321.2" y="821">internal host</text>
-<circle cx="442.0" cy="817" r="7" fill="#e88b9c" stroke="#c0564b"/>
-<text x="460.0" y="821">domain controller</text>
-<rect x="602.2" y="810" width="18" height="14" rx="4" fill="#8fd39a" stroke="#4f8a5f"/>
-<text x="629.2" y="821">service</text>
-<line x1="693.4000000000001" y1="817" x2="715.4000000000001" y2="817" stroke="#e0705f" stroke-width="2.4" stroke-dasharray="6 4"/>
-<text x="722.4000000000001" y="821">pivot (via)</text>
-<circle cx="828.0000000000001" cy="817" r="7" fill="none" stroke="#c9a227" stroke-width="2.4"/>
-<text x="846.0000000000001" y="821">pivot host</text>
+<rect x="34" y="470" width="96" height="58" rx="12" fill="#1b2434" stroke="#6d8fe0" stroke-width="1.6"/><text x="82" y="495" fill="#eef2ff" font-size="14" font-weight="700" text-anchor="middle">Kali</text><text x="82" y="514" fill="#a8b7cd" font-size="11" text-anchor="middle">tun0 · ligolo</text>
+<ellipse cx="250" cy="499" rx="80" ry="38" fill="#3457bf" stroke="#6d8fe0" stroke-width="1.8"/><text x="250" y="495" fill="#eef2ff" font-size="14" font-weight="700" text-anchor="middle">ENTRY</text><text x="250" y="514" fill="#c9d3f2" font-size="12" text-anchor="middle">10.10.110.100</text>
+<rect x="444.0" y="275.0" width="172" height="50" rx="12" fill="#254a4d" stroke="#5b8a8f" stroke-width="2"/><text x="530" y="296" fill="#d6f0f2" font-size="16" font-weight="700" text-anchor="middle">172.16.1.0/24</text><text x="530" y="315" fill="#9fc4c7" font-size="12" text-anchor="middle">12 hosts · via ENTRY</text>
+<circle cx="415.09333353215334" cy="203.58185854701907" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="415.09333353215334" y="226.58185854701907" fill="#c3d0e4" font-size="11" text-anchor="middle">.5</text>
+<circle cx="442.99146356432027" cy="177.81360719244964" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="442.99146356432027" y="200.81360719244964" fill="#c3d0e4" font-size="11" text-anchor="middle">.8</text>
+<circle cx="476.46706676121926" cy="159.87782096023398" r="9" fill="#e88b9c" stroke="#c0564b" stroke-width="1.5"/><text x="476.46706676121926" y="182.87782096023398" fill="#c3d0e4" font-size="12" font-weight="700" text-anchor="middle">172.16.1.11</text>
+<circle cx="513.3742700148483" cy="150.9242303308119" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="513.3742700148483" y="173.9242303308119" fill="#c3d0e4" font-size="11" text-anchor="middle">.14</text>
+<circle cx="551.3472257409928" cy="151.5267837178601" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="551.3472257409928" y="174.5267837178601" fill="#c3d0e4" font-size="11" text-anchor="middle">.17</text>
+<circle cx="587.9517688539693" cy="161.64685588431277" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="587.9517688539693" y="184.64685588431277" fill="#c3d0e4" font-size="11" text-anchor="middle">.20</text>
+<circle cx="620.84145307065" cy="180.63572392037517" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="620.84145307065" y="203.63572392037517" fill="#c3d0e4" font-size="11" text-anchor="middle">.23</text>
+<circle cx="647.9079642114181" cy="207.27615206690922" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="647.9079642114181" y="230.27615206690922" fill="#c3d0e4" font-size="11" text-anchor="middle">.26</text>
+<circle cx="667.4162686148104" cy="239.86041968900798" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="667.4162686148104" y="262.860419689008" fill="#c3d0e4" font-size="11" text-anchor="middle">.29</text>
+<circle cx="678.1158333014591" cy="276.2997906039975" r="14" fill="none" stroke="#c9a227" stroke-width="2.8"/><circle cx="678.1158333014591" cy="276.2997906039975" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="678.1158333014591" y="299.2997906039975" fill="#c3d0e4" font-size="11" font-weight="700" text-anchor="middle">172.16.1.32</text>
+<circle cx="679.3207883859627" cy="314.25840649562736" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="679.3207883859627" y="337.25840649562736" fill="#c3d0e4" font-size="11" text-anchor="middle">.35</text>
+<circle cx="670.9538931178863" cy="351.3030214988503" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="670.9538931178863" y="374.3030214988503" fill="#c3d0e4" font-size="11" text-anchor="middle">.38</text>
+<rect x="506.16706676121925" y="115.87782096023398" width="104.60000000000001" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="558.4670667612193" y="133.87782096023398" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">88 · kerberos</text>
+<rect x="520.5670667612193" y="147.87782096023398" width="75.8" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="558.4670667612193" y="165.87782096023398" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">445 · smb</text>
+<rect x="516.9670667612193" y="179.87782096023398" width="83.0" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="558.4670667612193" y="197.87782096023398" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">389 · ldap</text>
+<rect x="660.94145307065" y="152.63572392037517" width="75.8" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="698.84145307065" y="170.63572392037517" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">80 · http</text>
+<rect x="709.4158333014591" y="250.2997906039975" width="97.4" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="758.1158333014591" y="268.2997906039975" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">5985 · winrm</text>
+<rect x="444.0" y="715.0" width="172" height="50" rx="12" fill="#254a4d" stroke="#5b8a8f" stroke-width="2"/><text x="530" y="736" fill="#d6f0f2" font-size="16" font-weight="700" text-anchor="middle">172.16.2.0/24</text><text x="530" y="755" fill="#9fc4c7" font-size="12" text-anchor="middle">10 hosts · via ENTRY</text>
+<circle cx="670.9538931178863" cy="791.3030214988503" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="670.9538931178863" y="814.3030214988503" fill="#c3d0e4" font-size="11" text-anchor="middle">.5</text>
+<circle cx="649.4443045672633" cy="830.7362006392312" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="649.4443045672633" y="853.7362006392312" fill="#c3d0e4" font-size="11" text-anchor="middle">.8</text>
+<circle cx="617.223810693204" cy="862.0328105394451" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="617.223810693204" y="885.0328105394451" fill="#c3d0e4" font-size="11" text-anchor="middle">.11</text>
+<circle cx="577.1817134227421" cy="882.3863965359551" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="577.1817134227421" y="905.3863965359551" fill="#c3d0e4" font-size="11" text-anchor="middle">.14</text>
+<circle cx="532.9086997657737" cy="889.9717955672752" r="14" fill="none" stroke="#c9a227" stroke-width="2.8"/><circle cx="532.9086997657737" cy="889.9717955672752" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="532.9086997657737" y="912.9717955672752" fill="#c3d0e4" font-size="11" font-weight="700" text-anchor="middle">172.16.2.17</text>
+<circle cx="488.3748548542856" cy="884.108803657508" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="488.3748548542856" y="907.108803657508" fill="#c3d0e4" font-size="11" text-anchor="middle">.20</text>
+<circle cx="447.5736532893791" cy="865.3231717119404" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="447.5736532893791" y="888.3231717119404" fill="#c3d0e4" font-size="11" text-anchor="middle">.23</text>
+<circle cx="414.1638530890897" cy="835.2994599608728" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="414.1638530890897" y="858.2994599608728" fill="#c3d0e4" font-size="11" text-anchor="middle">.26</text>
+<circle cx="391.14140460966644" cy="796.7299787257464" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="391.14140460966644" y="819.7299787257464" fill="#c3d0e4" font-size="11" text-anchor="middle">.29</text>
+<circle cx="380.5707952862382" cy="753.0733614121488" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="380.5707952862382" y="776.0733614121488" fill="#c3d0e4" font-size="11" text-anchor="middle">.32</text>
+<rect x="682.7443045672633" y="822.7362006392312" width="97.4" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="731.4443045672633" y="840.7362006392312" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">3306 · mysql</text>
+<rect x="451.06385308908966" y="827.2994599608728" width="90.2" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="496.1638530890897" y="845.2994599608728" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">8080 · http</text>
+<rect x="944.0" y="225.0" width="172" height="50" rx="12" fill="#254a4d" stroke="#5b8a8f" stroke-width="2"/><text x="1030" y="246" fill="#d6f0f2" font-size="16" font-weight="700" text-anchor="middle">172.16.3.0/24</text><text x="1030" y="265" fill="#9fc4c7" font-size="12" text-anchor="middle">10 hosts · via 172.16.1.32</text>
+<circle cx="933.5818585470191" cy="135.09333353215328" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="933.5818585470191" y="158.09333353215328" fill="#c3d0e4" font-size="11" text-anchor="middle">.5</text>
+<circle cx="975.9733412792934" cy="110.06744429019992" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="975.9733412792934" y="133.06744429019992" fill="#c3d0e4" font-size="11" text-anchor="middle">.8</text>
+<circle cx="1024.1836943114774" cy="100.1128071243655" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1024.1836943114774" y="123.1128071243655" fill="#c3d0e4" font-size="11" text-anchor="middle">.11</text>
+<circle cx="1073.0204849066636" cy="106.30157315267667" r="9" fill="#e88b9c" stroke="#c0564b" stroke-width="1.5"/><text x="1073.0204849066636" y="129.30157315267667" fill="#c3d0e4" font-size="12" font-weight="700" text-anchor="middle">172.16.3.14</text>
+<circle cx="1117.223810693204" cy="127.96718946055486" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1117.223810693204" y="150.96718946055486" fill="#c3d0e4" font-size="11" text-anchor="middle">.17</text>
+<circle cx="1152.032810539445" cy="162.776189306796" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1152.032810539445" y="185.776189306796" fill="#c3d0e4" font-size="11" text-anchor="middle">.20</text>
+<circle cx="1173.6984268473234" cy="206.97951509333646" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1173.6984268473234" y="229.97951509333646" fill="#c3d0e4" font-size="11" text-anchor="middle">.23</text>
+<circle cx="1179.8871928756346" cy="255.81630568852253" r="14" fill="none" stroke="#c9a227" stroke-width="2.8"/><circle cx="1179.8871928756346" cy="255.81630568852253" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1179.8871928756346" y="278.81630568852256" fill="#c3d0e4" font-size="11" font-weight="700" text-anchor="middle">172.16.3.26</text>
+<circle cx="1169.9325557098" cy="304.02665872070656" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1169.9325557098" y="327.02665872070656" fill="#c3d0e4" font-size="11" text-anchor="middle">.29</text>
+<circle cx="1144.9066664678467" cy="346.4181414529809" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1144.9066664678467" y="369.4181414529809" fill="#c3d0e4" font-size="11" text-anchor="middle">.32</text>
+<rect x="1119.1204849066635" y="70.30157315267667" width="75.8" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="1157.0204849066636" y="88.30157315267667" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">445 · smb</text>
+<rect x="1115.5204849066636" y="102.30157315267667" width="83.0" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="1157.0204849066636" y="120.30157315267667" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">3389 · rdp</text>
+<rect x="1208.9984268473233" y="184.97951509333646" width="97.4" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="1257.6984268473234" y="202.97951509333646" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">1433 · mssql</text>
+<rect x="1224.0" y="665.0" width="172" height="50" rx="12" fill="#254a4d" stroke="#5b8a8f" stroke-width="2"/><text x="1310" y="686" fill="#d6f0f2" font-size="16" font-weight="700" text-anchor="middle">172.16.4.0/24</text><text x="1310" y="705" fill="#9fc4c7" font-size="12" text-anchor="middle">8 hosts · via 172.16.3.26</text>
+<circle cx="1431.2435565298215" cy="760.0" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1431.2435565298215" y="783.0" fill="#c3d0e4" font-size="11" text-anchor="middle">.5</text>
+<circle cx="1388.864808128907" cy="805.6734284042393" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1388.864808128907" y="828.6734284042393" fill="#c3d0e4" font-size="11" text-anchor="middle">.8</text>
+<circle cx="1330.8659172646644" cy="828.4363156715181" r="9" fill="#e88b9c" stroke="#c0564b" stroke-width="1.5"/><text x="1330.8659172646644" y="851.4363156715181" fill="#c3d0e4" font-size="12" font-weight="700" text-anchor="middle">172.16.4.11</text>
+<circle cx="1268.7342755824734" cy="823.7801928100597" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1268.7342755824734" y="846.7801928100597" fill="#c3d0e4" font-size="11" text-anchor="middle">.14</text>
+<circle cx="1214.7758167120714" cy="792.6272620561757" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1214.7758167120714" y="815.6272620561757" fill="#c3d0e4" font-size="11" text-anchor="middle">.17</text>
+<circle cx="1179.6776751898115" cy="741.1477434112953" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1179.6776751898115" y="764.1477434112953" fill="#c3d0e4" font-size="11" text-anchor="middle">.20</text>
+<circle cx="1170.3914683946348" cy="679.5377868979007" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1170.3914683946348" y="702.5377868979007" fill="#c3d0e4" font-size="11" text-anchor="middle">.23</text>
+<circle cx="1188.7564434701785" cy="620.0" r="9" fill="#8fb6f2" stroke="#4a7fb5" stroke-width="1.5"/><text x="1188.7564434701785" y="643.0" fill="#c3d0e4" font-size="11" text-anchor="middle">.26</text>
+<rect x="1193.3659172646644" y="794.4363156715181" width="83.0" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="1234.8659172646644" y="812.4363156715181" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">389 · ldap</text>
+<rect x="1189.7659172646645" y="826.4363156715181" width="90.2" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="1234.8659172646644" y="844.4363156715181" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">636 · ldaps</text>
+<rect x="1062.6776751898115" y="733.1477434112953" width="74" height="28" rx="8" fill="#8fd39a" stroke="#4f8a5f" stroke-width="1.4"/><text x="1099.6776751898115" y="751.1477434112953" fill="#0e2a10" font-size="12" font-weight="600" text-anchor="middle">22 · ssh</text>
+<g font-size="13" fill="#b3bccb"><rect x="34" y="946" width="1492" height="40" rx="10" fill="#1b2434" stroke="#2a3446"/>
+<ellipse cx="60" cy="966" rx="13" ry="8" fill="#3457bf"/>
+<text x="80" y="971">entry target</text>
+<rect x="194.39999999999998" y="958" width="20" height="16" rx="4" fill="#254a4d" stroke="#5b8a8f"/>
+<text x="224.39999999999998" y="971">subnet /24</text>
+<circle cx="332.4" cy="966" r="8" fill="#8fb6f2" stroke="#4a7fb5"/>
+<text x="352.4" y="971">internal host</text>
+<circle cx="485.0" cy="966" r="8" fill="#e88b9c" stroke="#c0564b"/>
+<text x="505.0" y="971">domain controller</text>
+<rect x="660.4" y="958" width="20" height="16" rx="4" fill="#8fd39a" stroke="#4f8a5f"/>
+<text x="690.4" y="971">port · service</text>
+<line x1="819.1999999999999" y1="966" x2="843.1999999999999" y2="966" stroke="#e0705f" stroke-width="2.8" stroke-dasharray="7 5"/>
+<text x="851.1999999999999" y="971">pivot (via)</text>
+<circle cx="967.3999999999999" cy="966" r="8" fill="none" stroke="#c9a227" stroke-width="2.8"/>
+<text x="987.3999999999999" y="971">pivot host</text>
 </g></svg>
