@@ -87,20 +87,33 @@ ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(
 .steps li b{color:var(--text)} .steps li .where{color:var(--teal);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-left:6px}
 .steps code{font-family:var(--mono);font-size:12.5px;background:#0b0f18;border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:#e2e9f2;display:block;margin-top:5px;overflow-x:auto;white-space:nowrap}
 .steps code .g{color:var(--green)} .steps code .m{color:var(--muted)}
-.helper{width:100%;max-width:1200px;margin:0 auto}
-.helper .hd{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:18px}
-.helper .fld{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:7px 13px;font-size:13px}
-.helper .fld b{color:var(--muted);font-weight:600;margin-right:7px}
-.helper .fld code{font-family:var(--mono);color:var(--text)}
-.stepcards{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
-@media(max-width:900px){.stepcards{grid-template-columns:minmax(0,1fr)}}
-.stepcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px 17px;position:relative;box-shadow:0 8px 24px rgba(0,0,0,.28);min-width:0}
-.stepcard .num{position:absolute;left:-12px;top:-12px;width:30px;height:30px;border-radius:50%;background:var(--gold);color:#1a1200;font-weight:800;font-size:15px;display:grid;place-items:center;box-shadow:0 3px 10px rgba(0,0,0,.45)}
-.stepcard h4{margin:0 0 9px;font-size:15.5px}
-.stepcard h4 .where{color:var(--teal);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-left:9px}
-.stepcard code{font-family:var(--mono);font-size:12.5px;background:#0b0f18;border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:#e2e9f2;display:block;overflow-x:auto;white-space:nowrap;line-height:1.5}
-.stepcard code .g{color:var(--green)} .stepcard code .m{color:var(--muted)}
-.stepcard .copy{position:absolute;top:14px;right:14px;font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:2px 9px;background:var(--surface-2)}
+/* ligolo slide: inputs panel + generated-command timeline */
+.lg-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:34px;align-items:center;flex:1;min-height:0;width:100%;max-width:1240px;margin:0 auto}
+@media(max-width:920px){.lg-grid{grid-template-columns:1fr;gap:18px}}
+.lg-inputs{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 22px 12px;box-shadow:0 12px 34px rgba(0,0,0,.3)}
+.lg-inhead{color:var(--muted);font-size:13px;padding:14px 0 12px;border-bottom:1px solid var(--border)}
+.lg-inhead b{color:var(--gold)}
+.lg-field{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:11px 0;border-bottom:1px dashed var(--border)}
+.lg-field:last-child{border-bottom:0}
+.lg-field span{color:var(--muted);font-size:13px}
+.lg-field code{font-family:var(--mono);font-size:13px;color:var(--text);text-align:right;line-height:1.45}
+.lg-time{list-style:none;margin:0;padding:0}
+.lg-time li{position:relative;padding:0 0 15px 46px}
+.lg-time li:last-child{padding-bottom:0}
+.lg-time li::before{content:"";position:absolute;left:16px;top:30px;bottom:-4px;width:2px;background:var(--border)}
+.lg-time li:last-child::before{display:none}
+.lg-num{position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;background:var(--gold);color:#1a1200;font-weight:800;font-size:15px;display:grid;place-items:center;z-index:1;box-shadow:0 3px 10px rgba(0,0,0,.4)}
+.lg-body{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 14px;min-width:0}
+.lg-bh{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.lg-bh b{font-size:15px}
+.lg-loc{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.lg-loc::before{content:"";width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+.lg-loc.kali::before{background:var(--blue)}.lg-loc.host::before{background:var(--red)}.lg-loc.console::before{background:var(--gold)}.lg-loc.nabu::before{background:var(--teal)}
+.lg-copy{margin-left:auto;font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:2px 9px;background:var(--surface-2);flex:0 0 auto}
+.lg-body code{font-family:var(--mono);font-size:12.5px;background:#0b0f18;border:1px solid var(--border);border-radius:7px;padding:8px 11px;color:#e2e9f2;display:block;overflow-x:auto;white-space:nowrap;line-height:1.55}
+.lg-body code .g{color:var(--green)}.lg-body code .m{color:var(--muted)}
+.lg-result{margin-top:15px;color:var(--teal);font-size:14px;font-weight:600;padding-left:46px}
+.lg-result span{color:var(--muted);font-weight:400}
 .term{font-family:var(--mono);font-size:13px;background:#0b0f18;border:1px solid var(--border);border-radius:10px;padding:15px 17px;line-height:1.55;overflow:auto;box-shadow:0 16px 42px rgba(0,0,0,.42);width:100%}
 .term .c{color:var(--teal)} .term .pr{color:var(--gold)} .term .g{color:var(--green)} .term .m{color:var(--muted)}
 .kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
@@ -275,32 +288,34 @@ const SLIDES = [
   // 11 — LIGOLO pivot steps
   {cls:"", html:`
     <div class="eyebrow">Pivot · ligolo-ng</div>
-    <h2>Reach an internal network — Nabu builds the steps.</h2>
-    <div class="showcase">
-      <p class="lede" style="font-size:15px;text-align:center;max-width:88ch;margin-bottom:4px">
-        Scan → <b>"Pivot with Ligolo-ng…"</b>: fill your tun0 IP and the internal /24s, and the exact commands update
-        live — each with a <b>Copy</b> button. Nabu doesn't run ligolo (a tunnel needs root); you copy, it scans the routed network.</p>
-      <div class="helper">
-        <div class="hd">
-          <div class="fld"><b>Attacker · tun0</b><code>10.10.14.91</code></div>
-          <div class="fld"><b>Proxy port</b><code>11601</code></div>
-          <div class="fld"><b>Interface</b><code>ligolo</code></div>
-          <div class="fld"><b>Internal routes</b><code>172.16.1.0/24 · 172.16.2.0/24</code></div>
-        </div>
-        <div class="stepcards">
-          <div class="stepcard"><span class="num">1</span><span class="copy">Copy</span>
-            <h4>Start the proxy<span class="where">on Kali</span></h4>
-            <code>./proxy -selfcert -laddr 0.0.0.0:11601</code></div>
-          <div class="stepcard"><span class="num">2</span><span class="copy">Copy</span>
-            <h4>Run the agent<span class="where">on the pivot host</span></h4>
-            <code>./agent -connect <span class="g">10.10.14.91:11601</span> -ignore-cert</code></div>
-          <div class="stepcard"><span class="num">3</span><span class="copy">Copy</span>
-            <h4>Create the tunnel + routes<span class="where">ligolo console</span></h4>
-            <code>interface_create --name ligolo<br>interface_add_route --route 172.16.1.0/24<br>tunnel_start</code></div>
-          <div class="stepcard"><span class="num">4</span><span class="copy">Copy</span>
-            <h4>Scan it in Nabu<span class="where">recon</span></h4>
-            <code>Scan → "Scan a host / range" → 172.16.1.0/24<span class="m">  → into the graph</span></code></div>
-        </div>
+    <h2>Reach an internal network — Nabu writes the pivot.</h2>
+    <p class="lede" style="font-size:15.5px;max-width:96ch;margin:0 0 6px">
+      Fill four values and Nabu generates the exact ligolo-ng commands — each with a <b>Copy</b> button and
+      a badge for <b>where it runs</b>. It never runs the tunnel itself (that needs root); you copy, then Nabu scans the routed network.</p>
+    <div class="lg-grid">
+      <div class="lg-inputs">
+        <div class="lg-inhead">Scan → <b>Pivot with Ligolo-ng…</b></div>
+        <div class="lg-field"><span>Attacker · tun0</span><code>10.10.14.91</code></div>
+        <div class="lg-field"><span>Proxy port</span><code>11601</code></div>
+        <div class="lg-field"><span>Interface</span><code>ligolo</code></div>
+        <div class="lg-field"><span>Internal routes</span><code>172.16.1.0/24<br>172.16.2.0/24</code></div>
+      </div>
+      <div>
+        <ol class="lg-time">
+          <li><span class="lg-num">1</span><div class="lg-body">
+            <div class="lg-bh"><b>Start the proxy</b><span class="lg-loc kali">Kali</span><span class="lg-copy">Copy</span></div>
+            <code>./proxy -selfcert -laddr 0.0.0.0:11601</code></div></li>
+          <li><span class="lg-num">2</span><div class="lg-body">
+            <div class="lg-bh"><b>Run the agent</b><span class="lg-loc host">pivot host</span><span class="lg-copy">Copy</span></div>
+            <code>./agent -connect <span class="g">10.10.14.91:11601</span> -ignore-cert</code></div></li>
+          <li><span class="lg-num">3</span><div class="lg-body">
+            <div class="lg-bh"><b>Tunnel &amp; routes</b><span class="lg-loc console">ligolo console</span><span class="lg-copy">Copy</span></div>
+            <code>interface_create --name ligolo<br>interface_add_route --route 172.16.1.0/24<br>tunnel_start</code></div></li>
+          <li><span class="lg-num">4</span><div class="lg-body">
+            <div class="lg-bh"><b>Scan it in Nabu</b><span class="lg-loc nabu">recon</span><span class="lg-copy">Copy</span></div>
+            <code>Scan → "Scan a host / range" → 172.16.1.0/24</code></div></li>
+        </ol>
+        <div class="lg-result">→ hosts stream into the recon tree &amp; graph <span>— grouped by subnet, pivoted via this host</span></div>
       </div>
     </div>`},
 
