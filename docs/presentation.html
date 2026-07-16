@@ -88,7 +88,7 @@ ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(
 .steps code{font-family:var(--mono);font-size:12.5px;background:#0b0f18;border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:#e2e9f2;display:block;margin-top:5px;overflow-x:auto;white-space:nowrap}
 .steps code .g{color:var(--green)} .steps code .m{color:var(--muted)}
 /* ligolo slide: inputs panel + generated-command timeline */
-.lg-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:34px;align-items:center;flex:1;min-height:0;width:100%;max-width:1240px;margin:0 auto}
+.lg-grid{display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);gap:34px;align-items:start;width:100%;max-width:1240px;margin:auto}
 @media(max-width:920px){.lg-grid{grid-template-columns:1fr;gap:18px}}
 .lg-inputs{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 22px 12px;box-shadow:0 12px 34px rgba(0,0,0,.3)}
 .lg-inhead{color:var(--muted);font-size:13px;padding:14px 0 12px;border-bottom:1px solid var(--border)}
@@ -112,7 +112,8 @@ ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(
 .lg-copy{margin-left:auto;font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:2px 9px;background:var(--surface-2);flex:0 0 auto}
 .lg-body code{font-family:var(--mono);font-size:12.5px;background:#0b0f18;border:1px solid var(--border);border-radius:7px;padding:8px 11px;color:#e2e9f2;display:block;overflow-x:auto;white-space:nowrap;line-height:1.55}
 .lg-body code .g{color:var(--green)}.lg-body code .m{color:var(--muted)}
-.lg-result{margin-top:15px;color:var(--teal);font-size:14px;font-weight:600;padding-left:46px}
+.lg-innote{color:var(--muted);font-size:12px;line-height:1.45;margin-top:13px;padding-top:12px;border-top:1px solid var(--border)}
+.lg-result{margin-top:16px;color:var(--teal);font-size:14px;font-weight:600;padding-left:46px}
 .lg-result span{color:var(--muted);font-weight:400}
 .term{font-family:var(--mono);font-size:13px;background:#0b0f18;border:1px solid var(--border);border-radius:10px;padding:15px 17px;line-height:1.55;overflow:auto;box-shadow:0 16px 42px rgba(0,0,0,.42);width:100%}
 .term .c{color:var(--teal)} .term .pr{color:var(--gold)} .term .g{color:var(--green)} .term .m{color:var(--muted)}
@@ -299,6 +300,7 @@ const SLIDES = [
         <div class="lg-field"><span>Proxy port</span><code>11601</code></div>
         <div class="lg-field"><span>Interface</span><code>ligolo</code></div>
         <div class="lg-field"><span>Internal routes</span><code>172.16.1.0/24<br>172.16.2.0/24</code></div>
+        <div class="lg-innote">The commands update live as you fill these in — copy each and run it where its badge says.</div>
       </div>
       <div>
         <ol class="lg-time">
