@@ -34,6 +34,27 @@ def test_script_output_merges_in_from_the_versioned_scan() -> None:
     assert "ssh-hostkey:" in merged[22].nmap_scripts_output
 
 
+AD_SAMPLE = """PORT      STATE SERVICE       VERSION
+445/tcp   open  microsoft-ds  Windows Server 2019
+| smb-os-discovery:
+|   OS: Windows Server 2019
+49667/tcp open  msrpc         Microsoft Windows RPC
+Host script results:
+| smb2-security-mode:
+|_  Message signing enabled and required
+| clock-skew: mean: 2h00m00s
+"""
+
+
+def test_host_script_results_not_glued_to_the_last_port() -> None:
+    # nmap's host-level "Host script results:" block must not be mis-attributed to the last port row
+    by_port = {s.port: s for s in NmapModule().discovered_services({"ad.txt": AD_SAMPLE})}
+    assert "clock-skew" not in by_port[49667].nmap_scripts_output
+    assert "smb2-security-mode" not in by_port[49667].nmap_scripts_output
+    assert by_port[49667].nmap_scripts_output == ""  # ephemeral RPC port carries no host scripts
+    assert "smb-os-discovery" in by_port[445].nmap_scripts_output  # per-port script stays put
+
+
 def test_report_shows_product_version_and_script_detail(tmp_path: Path) -> None:
     profile = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     profile.set_services(NmapModule().discovered_services({"v.txt": VERSIONED}))

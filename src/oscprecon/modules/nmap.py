@@ -221,6 +221,12 @@ class NmapModule(Module):
             stripped = raw.strip()
             if current is not None and stripped.startswith("|"):
                 script_lines.append(_clean_script_line(stripped))
+            elif stripped and not stripped.startswith("|"):
+                # a non-port, non-continuation line ("Service Info:", "Host script results:", "Nmap
+                # done") ends the current port's NSE block — otherwise host-level scripts (smb-os-
+                # discovery, clock-skew, smb-security-mode) get glued onto the last port row.
+                flush()
+                current = None
         flush()
         return services
 

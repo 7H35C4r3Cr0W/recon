@@ -70,9 +70,13 @@ class Target:
 
     def __post_init__(self) -> None:
         # ip may be a single host OR a whole CIDR range (a /24 network project). A range never has a
-        # hostname (there's no single host to name); host-based recon doesn't apply to a network.
+        # hostname (there's no single host to name); host-based recon doesn't apply to a network —
+        # so drop any hostname on a range, keeping every construction path (New Project, Edit, load)
+        # consistent with Profile.set_target.
         object.__setattr__(self, "ip", validate_host_or_range(self.ip))
-        if self.hostname:
+        if is_cidr_range(self.ip):
+            object.__setattr__(self, "hostname", None)
+        elif self.hostname:
             validate_host(self.hostname)
 
     @property

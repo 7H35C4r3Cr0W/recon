@@ -573,6 +573,14 @@ class MainWindow(QMainWindow):
             locks.release(self._locked_dir)
             self._locked_dir = None
 
+    def _we_hold_lock(self, directory: Path) -> bool:
+        # True when <directory>/.lock is OUR live lock (same pid + host) — e.g. it moved with the
+        # folder on a rename, so acquire() collides with our own lock rather than a foreign one.
+        info, _malformed = locks.read_lock(directory)
+        return (
+            info is not None and info.pid == os.getpid() and info.hostname == socket.gethostname()
+        )
+
     def _resolve_lock(self, profile: Profile) -> bool:
         # returns True to proceed (may set profile.read_only), False if the user cancels. A stale /
         # malformed / absent lock proceeds (recovered by _set_profile); a LIVE lock held by another
@@ -608,7 +616,9 @@ class MainWindow(QMainWindow):
                 acquired = locks.acquire(profile.directory)
                 if acquired is None:
                     acquired = locks.recover_stale(profile.directory)  # clears a stale lock
-                if acquired is not None:
+                if acquired is not None or self._we_hold_lock(profile.directory):
+                    # adopt a lock that is already OURS (e.g. it moved with the folder on a rename
+                    # whose save() then failed) instead of wrongly dropping to read-only.
                     self._locked_dir = profile.directory
                 else:  # a live / foreign lock we can't take -> fall back to read-only
                     profile.read_only = True
@@ -1187,6 +1197,7 @@ class MainWindow(QMainWindow):
             )
             return
         old_dir = profile.directory
+        was_range = profile.target.is_range
         # 1) target change first (validates; converting to a /24 range drops the vhost name)
         try:
             if new_ip != profile.target.ip or (new_hostname or None) != profile.target.hostname:
@@ -1194,6 +1205,17 @@ class MainWindow(QMainWindow):
         except ValueError as exc:
             QMessageBox.warning(self, "Invalid target", str(exc))
             return
+        # a single-host <-> /24 flip changes the target's very nature: the prior discovery (single-
+        # host services, or a network's pivoted hosts) no longer belongs to the new target, so clear
+        # it rather than show stale data under a mismatched target. Announced, never silent.
+        if profile.target.is_range != was_range:
+            profile.set_services([])
+            profile.discovered_hosts = []
+            profile.save()
+            self._tool_panel.append_output(
+                "[edited] target type changed (host ↔ network) — cleared prior discovery; "
+                "Run Recon to repopulate."
+            )
         # 2) rename the folder — moves EVERYTHING (incl. the .lock we hold) to the new path
         renamed = False
         if new_name != profile.profile_name:
@@ -2049,7 +2071,19 @@ class MainWindow(QMainWindow):
             "ping",
             lambda result: self._preflight_done(result, profile_name),
             exclusive=True,
+            on_failed=lambda msg: self._preflight_failed(msg, profile_name),
         )
+
+    def _preflight_failed(self, message: str, profile_name: str) -> None:
+        # the pre-flight ping itself errored — never silently eat the user's Run; scan anyway.
+        self._tool_panel.append_output(f"[ping] check failed ({message}) — starting recon anyway.")
+        self._proceed_after_preflight(profile_name)
+
+    def _proceed_after_preflight(self, profile_name: str) -> None:
+        # defer to the next event-loop tick so the ping worker's exclusive slot (released on
+        # `finished`, which fires AFTER this done/failed handler) is free before _launch_recon
+        # re-checks capacity. The modal confirm path already drains it, so it launches directly.
+        QTimer.singleShot(0, lambda: self._launch_recon(profile_name))
 
     def _preflight_done(self, result: object, profile_name: str) -> None:
         # confirm the alive result and let the user proceed (or scan a filtered/down host anyway).
@@ -2057,7 +2091,7 @@ class MainWindow(QMainWindow):
         if self._profile is None:
             return
         if not isinstance(result, alive.AliveResult):
-            self._launch_recon(profile_name)  # parse hiccup — don't block the scan on it
+            self._proceed_after_preflight(profile_name)  # parse hiccup — don't block the scan
             return
         target = self._profile.target
         if target.is_range:

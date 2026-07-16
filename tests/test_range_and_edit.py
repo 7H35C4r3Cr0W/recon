@@ -42,6 +42,14 @@ def test_target_range_flag() -> None:
     assert host.is_range is False
 
 
+def test_target_range_never_keeps_a_hostname() -> None:
+    # a /24 network has no single vhost — every construction path (New Project builds Target
+    # directly) must agree with Profile.set_target and drop the hostname.
+    net = Target(ip="10.10.5.0/24", hostname="foo.htb")
+    assert net.hostname is None
+    assert net.host == "10.10.5.0/24"
+
+
 # --- network scan command (a whole /24 Run Recon) -------------------------------------------------
 
 

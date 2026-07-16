@@ -72,12 +72,17 @@ def test_edit_project_renames_folder_and_retargets(
     assert window._locked_dir == tmp_path / "renamed"
 
 
-def test_edit_project_to_range_project(
+def test_edit_project_to_range_project_clears_stale_discovery(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from oscprecon.models import DiscoveredService, Proto
+
     window = MainWindow()
     qtbot.addWidget(window)
-    window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.5", hostname="box.htb")))
+    prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5", hostname="box.htb"))
+    prof.set_services([DiscoveredService(port=80, proto=Proto.TCP, service="http")])
+    prof.save()
+    window._set_profile(prof)
 
     def fake_exec(self: NewProfileDialog) -> int:
         self._ip.setText("10.10.5.0/24")
@@ -89,6 +94,24 @@ def test_edit_project_to_range_project(
     assert window._profile is not None
     assert window._profile.target.is_range is True
     assert window._profile.target.hostname is None  # dropped for a network
+    # a host->/24 flip clears single-host discovery that no longer belongs to the network target
+    assert window._profile.discovered_services == []
+
+
+def test_set_profile_adopts_our_own_lock(qtbot: QtBot, tmp_path: Path) -> None:
+    # a rename moves the .lock with the folder; if bookkeeping points elsewhere, _set_profile must
+    # ADOPT our own live lock rather than collide with it and wrongly fall back to read-only.
+    from oscprecon.workspace import locks
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(tmp_path, "p", Target(ip="10.10.10.5"))
+    locks.acquire(prof.directory)  # OUR lock (current pid + host) sits in the folder
+    window._locked_dir = tmp_path / "stale-elsewhere"  # bookkeeping points at the wrong dir
+    window._set_profile(prof)
+    assert window._profile is not None
+    assert window._profile.read_only is False  # adopted our own lock, not read-only
+    assert window._locked_dir == prof.directory
 
 
 # --- Scan-presets chooser -------------------------------------------------------------------------
