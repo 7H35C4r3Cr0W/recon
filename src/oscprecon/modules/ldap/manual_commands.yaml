@@ -76,3 +76,20 @@
   command: 'ldapsearch -x -H ldap://{target} -D USER@DOMAIN -w PASSWORD -b {basedn} "(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=524288))" sAMAccountName'
   requires: ["creds"]
 # source: Obsidian: 0.00 Methdology/.../Credentialed LDAP Enumeration.md
+
+- description: "Enumerate AD Certificate Services (CAs + templates)"
+  why: "netexec adcs module lists CAs / cert templates — read-only recon that surfaces ESC misconfigs"
+  command: "netexec ldap {target} -u USER -p PASS -M adcs"
+  requires: ["creds"]
+# source: AD-toolkit eval (netexec ldap enum modules — read-only)
+
+- description: "Read the machine account quota (MachineAccountQuota)"
+  why: "netexec maq reads ms-DS-MachineAccountQuota — a read-only fact (>0 enables RBCD/add-computer paths)"
+  command: "netexec ldap {target} -u USER -p PASS -M maq"
+  requires: ["creds"]
+# source: AD-toolkit eval (netexec ldap enum modules — read-only)
+
+- description: "Check LDAP signing / channel-binding posture (null bind)"
+  why: "netexec ldap-checker reports whether LDAP signing + channel binding are enforced — read-only relay-susceptibility recon, no attack"
+  command: "netexec ldap {target} -u '' -p '' -M ldap-checker"
+# source: AD-toolkit eval (netexec ldap enum modules — read-only)
