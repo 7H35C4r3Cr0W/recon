@@ -44,10 +44,10 @@ b,strong{color:var(--text)} .gold{color:var(--gold)}
 .body.even{grid-template-columns:1.2fr .88fr}
 @media(max-width:940px){.body{grid-template-columns:1fr;gap:16px}}
 .showcase{display:flex;flex-direction:column;gap:14px;flex:1;min-height:0;align-items:center}
-.showcase .shot{max-width:min(100%,1080px)}
-.showcase .shot img{max-height:52vh;width:auto;max-width:100%}
-.showcase.hero .shot{max-width:min(100%,1300px)}
-.showcase.hero .shot img{max-height:66vh}
+.showcase .shot{max-width:min(100%,1140px)}
+.showcase .shot img{max-height:58vh;width:auto;max-width:100%}
+.showcase.hero .shot{max-width:min(100%,1360px)}
+.showcase.hero .shot img{max-height:72vh}
 .prow{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;width:100%;max-width:1080px}
 .prow .p{flex:1 1 210px;max-width:330px}
 .prow .p .h{color:var(--gold);font-weight:700;display:block;margin-bottom:2px;font-size:14.5px}
@@ -81,6 +81,12 @@ ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(
 .tier .b{flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:6px;border:1px solid;margin-top:2px}
 .tier .b.a{color:var(--green);border-color:var(--green)}.tier .b.s{color:var(--gold);border-color:var(--gold)}.tier .b.o{color:var(--red);border-color:var(--red)}
 .tier .d{font-size:14px;line-height:1.4} .tier .d b{color:var(--text)} .tier .d small{color:var(--muted)}
+.steps{list-style:none;counter-reset:st;padding:0;margin:0;display:flex;flex-direction:column;gap:13px}
+.steps li{counter-increment:st;position:relative;padding-left:40px;font-size:15px;line-height:1.4}
+.steps li::before{content:counter(st);position:absolute;left:0;top:-1px;width:27px;height:27px;border-radius:50%;background:var(--gold-soft);border:1px solid var(--gold);color:var(--gold);font-weight:700;font-size:13.5px;display:grid;place-items:center}
+.steps li b{color:var(--text)} .steps li .where{color:var(--teal);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-left:6px}
+.steps code{font-family:var(--mono);font-size:12.5px;background:#0b0f18;border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:#e2e9f2;display:block;margin-top:5px;overflow-x:auto;white-space:nowrap}
+.steps code .g{color:var(--green)} .steps code .m{color:var(--muted)}
 .term{font-family:var(--mono);font-size:13px;background:#0b0f18;border:1px solid var(--border);border-radius:10px;padding:15px 17px;line-height:1.55;overflow:auto;box-shadow:0 16px 42px rgba(0,0,0,.42);width:100%}
 .term .c{color:var(--teal)} .term .pr{color:var(--gold)} .term .g{color:var(--green)} .term .m{color:var(--muted)}
 .kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
@@ -103,7 +109,7 @@ ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(
     <div class="spacer"></div>
     <button id="autoplay" type="button">▶ Autoplay</button>
     <button id="theme" type="button">◐ Theme</button>
-    <span class="counter"><span id="cur">1</span> / <span id="tot">20</span></span>
+    <span class="counter"><span id="cur">1</span> / <span id="tot">21</span></span>
   </div>
   <div class="progress"><i id="bar"></i></div>
   <div class="stage" id="stage">
@@ -124,7 +130,7 @@ const SLIDES = [
     <p class="lede">One local workspace that discovers a box, enumerates every service, maps the attack
       surface, pivots across internal networks — and now <b>attacks</b>, one human-confirmed command at a
       time. Exam-legal by default, offline, no AI.</p>
-    <p class="lede" style="font-size:14px">20 slides · click the <span class="gold">‹ ›</span> arrows or use
+    <p class="lede" style="font-size:14px">21 slides · click the <span class="gold">‹ ›</span> arrows or use
       <span class="kbd">→</span>/<span class="kbd">←</span> · <span class="kbd">F</span> fullscreen · <span class="kbd">▶</span> autoplay</p>`},
 
   // 2 — workspace dashboard
@@ -252,15 +258,32 @@ const SLIDES = [
       </div>
     </div>`},
 
-  // 11 — DANTE pivots
+  // 11 — LIGOLO pivot steps
+  {cls:"", html:`
+    <div class="eyebrow">Pivot · ligolo-ng</div>
+    <h2>Reach an internal network — Nabu builds the steps.</h2>
+    <div class="body even">
+      ${S("ligolo-helper.png","The Ligolo-ng helper dialog with the pivot steps")}<div class="cap">Scan → "Pivot with Ligolo-ng…" · fill your tun0 IP + the internal /24s, the commands update live</div></div>
+      <div>
+        <p class="lede" style="font-size:14.5px;margin-bottom:12px">Nabu doesn't run ligolo (a tunnel needs root) — it hands you the exact commands to copy, then scans the routed network for you:</p>
+        <ol class="steps">
+          <li><b>Start the proxy</b><span class="where">on Kali</span><code>./proxy -selfcert -laddr 0.0.0.0:11601</code></li>
+          <li><b>Run the agent</b><span class="where">on the pivot host</span><code>./agent -connect <span class="g">10.10.14.91:11601</span> -ignore-cert</code></li>
+          <li><b>Route the /24s</b><span class="where">ligolo console</span><code>interface_create --name ligolo<span class="m"> · </span>interface_add_route --route 172.16.1.0/24<span class="m"> · </span>tunnel_start</code></li>
+          <li><b>Scan it in Nabu</b><span class="where">recon</span><code>Scan → "Scan a host / range" → 172.16.1.0/24 <span class="m">(hosts stream into the tree + graph)</span></code></li>
+        </ol>
+      </div>
+    </div>`},
+
+  // 12 — DANTE pivots
   {cls:"", html:`
     <div class="eyebrow">Present · multi-network pivots</div>
     <h2>One project — the entire internal engagement.</h2>
-    <div class="showcase">
-      ${S("dante-graph.png","Multi-network pivot spider-web from the Dante Pro Lab")}<div class="cap">Pivot topology · entry → 172.16.1.0/24 → double pivot → .2.0/24 → triple pivot → .3.0/24</div></div>
+    <div class="showcase hero">
+      ${S("dante-graph.png","Multi-network pivot spider-web from the Dante Pro Lab")}<div class="cap">Pivot topology · ENTRY branches to two /24s, then double + triple pivots reach two more — ports &amp; services on each host</div></div>
       <div class="prow">
         <div class="p"><span class="h">You tunnel, Nabu ingests.</span><small>ligolo-ng gives you the route; scans of each internal /24 stream in as they run.</small></div>
-        <div class="p"><span class="h">Chained pivots.</span><small>A host in one /24 reaches the next — the spider-web spans 3 subnets and 28 hosts here.</small></div>
+        <div class="p"><span class="h">Chained pivots.</span><small>A host in one /24 reaches the next — 4 subnets, 40 hosts, DCs &amp; services here.</small></div>
         <div class="p"><span class="h">Live-validated on Dante.</span><small>Every host tagged with the pivot it was reached through.</small></div>
       </div>
     </div>`},
