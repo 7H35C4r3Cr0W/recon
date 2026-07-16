@@ -36,7 +36,7 @@ class ServiceTree(QTreeWidget):
         # why: an empty QTreeWidget is just a blank box — with no message the user can't tell a
         # not-scanned-yet host from a 0-open-ports one from a scan-in-progress. This text is painted
         # over the empty viewport and the MainWindow updates it as the scan state changes.
-        self._empty_message = "No services yet.\nClick “Run Full Recon” to scan the target."
+        self._empty_message = "No services yet.\nClick Run Recon (or its ▾ for scan options)."
         self.setAccessibleName("Discovered services")
         self.setHeaderLabels(["Port / host", "Service", "Product"])
         # size every column to its content so a host's ip/name (col 0, indented 3 levels under

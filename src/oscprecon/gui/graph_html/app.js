@@ -334,6 +334,15 @@
     return cy && cy.nodes('[type="subnet"]').length > 0;
   }
 
+  // zoom in/out around the viewport centre (the +/- toolbar buttons)
+  function zoomBy(factor) {
+    if (!cy) return;
+    cy.zoom({
+      level: cy.zoom() * factor,
+      renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
+    });
+  }
+
   // ---- drill-down: click the target / a /24 / a host to fold its children away. Everything is wired
   // by lines (target → /24 → host → service). Positions come from the one full layout at render time,
   // so expand/collapse is pure show/hide — revealed nodes appear where the layout already placed them.
@@ -433,35 +442,27 @@
     });
   }
 
-  // re-lay-out just what's VISIBLE, so revealing nodes spreads them (BloodHound-style) rather than
-  // stacking. fcose with randomize:false is INCREMENTAL — it starts from current positions and settles,
-  // so already-placed nodes barely move (no full reshuffle) and newly-revealed ones flow into place.
+  // re-lay-out just what's VISIBLE as a clean top-down TREE rooted at the entry. breadthfirst is
+  // deterministic and assigns every visible node a fresh, non-overlapping slot — so an expand always
+  // looks tidy (no jumbled pile of nodes stacked on each other, which is what fcose gave when
+  // freshly-revealed nodes started at the origin).
   function relayoutVisible() {
     if (!cy) return;
     var vis = elementsVisible();
     if (!vis.length) return;
-    var opts = fcoseReady
-      ? {
-          name: "fcose",
-          quality: "default",
-          randomize: false,
-          animate: true,
-          animationDuration: 300,
-          padding: 40,
-          nodeSeparation: 120,
-          fit: true,
-        }
-      : {
-          name: "breadthfirst",
-          directed: true,
-          roots: "#target",
-          padding: 30,
-          spacingFactor: 1.5,
-          animate: true,
-          animationDuration: 250,
-          fit: true,
-        };
-    vis.layout(opts).run();
+    vis
+      .layout({
+        name: "breadthfirst",
+        directed: true,
+        roots: cy.nodes('[type="target"]'),
+        padding: 40,
+        spacingFactor: 1.6,
+        avoidOverlap: true,
+        animate: true,
+        animationDuration: 300,
+        fit: true,
+      })
+      .run();
   }
 
   function toggleCollapse(node) {
@@ -741,7 +742,7 @@
     if (!nodeCount) {
       setOverlay("No project data yet. Open a project and run Full Recon to build the graph.");
     } else if (!serviceCount) {
-      setOverlay("No services discovered yet — click “Run Full Recon” to scan the target.");
+      setOverlay("No services discovered yet — click Run Recon (or its ▾ for scan options).");
     } else {
       setOverlay("");
     }
@@ -865,14 +866,20 @@
     cy.on("mouseout", "node", hideTip);
     cy.on("pan zoom drag", hideTip);
 
+    document.getElementById("zoom-in").onclick = function () {
+      zoomBy(1.3);
+    };
+    document.getElementById("zoom-out").onclick = function () {
+      zoomBy(1 / 1.3);
+    };
     document.getElementById("layout-hier").onclick = function () {
-      runLayout("hier");
+      relayoutVisible();
     };
     document.getElementById("layout-force").onclick = function () {
       runLayout("force");
     };
     document.getElementById("fit").onclick = function () {
-      cy.fit(undefined, 40);
+      cy.fit(elementsVisible(), 40);
     };
     document.getElementById("link-mode").onclick = function () {
       setLinkMode(!linkMode);

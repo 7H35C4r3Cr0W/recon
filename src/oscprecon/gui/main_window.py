@@ -23,9 +23,9 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
-    QPushButton,
     QSplitter,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -169,11 +169,21 @@ class MainWindow(QMainWindow):
         self._save_action: QAction
 
         self._target_label = QLabel("No profile loaded.")
-        self._run_button = QPushButton("Run Full Recon")
-        self._run_button.setStyleSheet(styles.accent_button())  # primary recon action
+        # a split button, not just "Run Full Recon": the main click runs a FAST quick scan (so a big
+        # box never blocks you off the jump), and the ▾ menu offers the full plethora — every scan
+        # profile, a custom/surgical scan, and individual nmap presets. Built in _build_run_menu().
+        self._run_button = QToolButton()
+        self._run_button.setText("Run Recon")
+        self._run_button.setStyleSheet(styles.accent_tool_button())  # primary recon action
         self._run_button.setAccessibleName("Run full recon")
         self._run_button.setEnabled(False)
-        self._run_button.clicked.connect(self._on_run)
+        self._run_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self._run_button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        self._run_button.setToolTip(
+            "Click: quick scan (fast). ▾: choose a profile / custom / preset."
+        )
+        self._run_button.clicked.connect(lambda: self._start_recon("quick"))
+        self._build_run_menu()
 
         self._service_tree = ServiceTree()
         self._service_tree.service_selected.connect(self._on_service_selected)
@@ -583,11 +593,11 @@ class MainWindow(QMainWindow):
             if scanned:
                 self._service_tree.set_empty_message(
                     f"Last scan found 0 open ports on {target.ip}.\n"
-                    "Run Full Recon again once the VPN / target IP is confirmed."
+                    "Run Recon again once the VPN / target IP is confirmed."
                 )
             else:
                 self._service_tree.set_empty_message(
-                    f"No services yet.\nClick “Run Full Recon” to scan {target.ip}."
+                    f"No services yet on {target.ip}.\nClick Run Recon (▾ for scan options)."
                 )
         self._service_tree.reset_view_state()  # don't carry the prior project's collapse state
         self._service_tree.populate(
@@ -1651,8 +1661,37 @@ class MainWindow(QMainWindow):
         self._tool_panel.prefill_command(filled)
         self._tool_panel.append_output(f"[preset] loaded: {filled}")
 
+    def _build_run_menu(self) -> None:
+        # the ▾ dropdown on the Run Recon button: every scan profile + a custom/surgical scan +
+        # individual nmap presets, so the user chooses exactly how heavy to go instead of being
+        # forced into a full battery. Mirrors the Scan menu but right on the primary control.
+        menu = QMenu(self._run_button)
+        menu.setToolTipsVisible(True)
+        hints = {
+            "quick": "top-1000 TCP only — fastest triage",
+            "default": "top-1000 → full -p- → UDP top-100 (standard)",
+            "full": "standard battery + the slow full UDP sweep",
+            "exam": "speed-tuned, exam-legal (no vuln NSE)",
+        }
+        for name in config.SCAN_PROFILES:
+            act = menu.addAction(f"{name.capitalize()} scan")
+            act.setToolTip(hints.get(name, ""))
+            act.triggered.connect(lambda _checked=False, n=name: self._start_recon(n))
+        menu.addSeparator()
+        custom = menu.addAction("Custom scan / range…")
+        custom.setToolTip("Pick exact nmap flags/ports, or scan a whole /24 across your pivot")
+        custom.triggered.connect(lambda _checked=False: self._on_custom_scan())
+        presets = menu.addMenu("Nmap presets")
+        for preset in load_manual_commands(_SCAN_PRESETS):
+            item = presets.addAction(preset.description)
+            item.setToolTip(preset.why)
+            item.triggered.connect(
+                lambda _checked=False, cmd=preset.command: self._on_scan_preset(cmd)
+            )
+        self._run_button.setMenu(menu)
+
     def _on_run(self) -> None:
-        # Run Full Recon button/menu → uses the configured default scan profile.
+        # Run Full Recon menu item → uses the configured default scan profile.
         self._start_recon(None)
 
     def _start_recon(self, scan_profile: str | None) -> None:

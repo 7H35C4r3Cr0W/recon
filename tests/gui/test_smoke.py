@@ -29,3 +29,19 @@ def test_new_profile_dialog_values(qtbot: QtBot) -> None:
     dialog._name.setText("  htb-active  ")
     dialog._ip.setText(" 10.10.10.100 ")
     assert dialog.values() == ("htb-active", "10.10.10.100", "")
+
+
+def test_run_button_menu_offers_scan_options(qtbot: QtBot) -> None:
+    from oscprecon import config
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    menu = window._run_button.menu()
+    assert menu is not None
+    texts = [a.text().lower() for a in menu.actions() if a.text()]
+    # every scan profile is offered, plus a custom/surgical option
+    for profile in config.SCAN_PROFILES:
+        assert any(profile in t for t in texts), profile
+    assert any("custom" in t for t in texts)
+    # the main click runs a QUICK scan (fast) — never the heavy full battery by surprise
+    assert window._run_button.accessibleName() == "Run full recon"

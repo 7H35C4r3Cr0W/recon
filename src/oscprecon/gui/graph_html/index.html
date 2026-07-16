@@ -14,9 +14,11 @@
   <body>
     <div id="toolbar">
       <input id="search" type="search" placeholder="search: ssh, 445, admin…" />
-      <button id="layout-hier">Hierarchical</button>
+      <button id="zoom-in" title="Zoom in">+</button>
+      <button id="zoom-out" title="Zoom out">&minus;</button>
+      <button id="fit" title="Fit everything visible in view">Fit</button>
+      <button id="layout-hier" title="Re-layout as a clean tree">Tidy</button>
       <button id="layout-force">Force-directed</button>
-      <button id="fit">Fit</button>
       <button id="link-mode">Link mode</button>
       <button id="export-png">Export PNG</button>
       <button id="export-svg">Export SVG</button>
@@ -25,7 +27,7 @@
         <label class="filter-label"><input type="checkbox" class="filter" data-type="finding" checked /> findings</label>
         <label class="filter-label"><input type="checkbox" class="filter" data-type="credential" checked /> creds</label>
       </span>
-      <span id="hint">search · red ring = notable · dbl-click a service to collapse · drag (saved) · click for detail</span>
+      <span id="hint">double-click to expand · single-click for detail · +/− or scroll to zoom · drag to pan</span>
     </div>
     <div id="cy"></div>
     <div id="cy-overlay"></div>

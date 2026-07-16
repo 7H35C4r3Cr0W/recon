@@ -48,6 +48,17 @@ def accent_button() -> str:
     return primary_button(tokens.active_palette())
 
 
+def accent_tool_button() -> str:
+    """accent_button() styling applied to a QToolButton (a split/menu button keeps the CTA look)."""
+    base = accent_button().replace("QPushButton", "QToolButton")
+    # keep the ▾ menu indicator visible (a distinct right-hand region) so the dropdown is found
+    return base + (
+        f" QToolButton::menu-button {{ border:none; width:18px;"
+        f" border-top-right-radius:{tokens.RADIUS_SM}px;"
+        f" border-bottom-right-radius:{tokens.RADIUS_SM}px; }}"
+    )
+
+
 def secondary_button(pal: Palette) -> str:
     return (
         "QPushButton {"

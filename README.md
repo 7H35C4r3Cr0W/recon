@@ -34,6 +34,10 @@ or LLM calls at runtime**, and is **strictly recon-only by default**.
 - **Reference pane** — vendored **offline** HackTricks + optional live copy, and a **version-aware
   `searchsploit`** Exploit-DB lookup (product + `major.minor`, product-wide fallback, version-matched
   hits ranked first, capped to the top 15 with a "showing top N of M" note — linkout only, never run).
+- **Surgical recon, not all-or-nothing** — the **Run Recon** split-button chooses how heavy to go: a
+  single click runs a fast **Quick** scan (top-1000 TCP), and its ▾ menu offers every profile
+  (Quick / Default / Full / Exam), a custom scan, and individual nmap presets. Each service panel is
+  likewise granular (e.g. SMB: full recon, or just null-session / guest / shares).
 - **Custom & range scanning** — a "Scan a host / range" dialog with full nmap-flag control (scan type
   `-sT`/`-sS`/`-sU`/`-sn`, `-Pn`, ports, timing, NSE, free-form extra flags) and a live preview + raw-edit
   escape hatch. Target can be a single IP **or a whole `/24`**.
@@ -42,11 +46,13 @@ or LLM calls at runtime**, and is **strictly recon-only by default**.
   found, grouped by subnet with the pivot source they were reached through. Right-click to remove a host
   or subnet, or re-scan a host deeper — the tree and graph stay in sync.
 - **BloodHound-style graph** (`Ctrl+G`) — icon nodes with corner glyphs (danger / OS / status / note),
-  a **progressive drill-down** pivot topology: it opens on one node (the entry) and expands on click
-  (`entry → /24 → host → service`, all connected by lines), re-laying-out so nodes spread instead of
-  stacking; click the entry to collapse it all back to one node. Drag the canvas to pan (hand cursor),
-  drag a node to move it. Plus a native always-visible summary tree so scan data shows even where
-  QtWebEngine can't render, a **credential vault** (masked, `0600`), **audit trail**, and an
+  a **progressive drill-down** pivot topology: it opens centred on one node (the entry) and expands on
+  **double-click** (`entry → /24 → host → service`, all connected by lines), re-laying-out into a clean
+  tree so nodes spread instead of stacking; double-click the entry to collapse it all back to one node.
+  **Single-click** a node for its full detail (IP / OS / service+version / a /24's host count) and a
+  note, without leaving the graph. Zoom with +/− or the wheel, drag to pan (hand cursor), drag a node
+  to move it. Plus a native always-visible summary tree so scan data shows even where QtWebEngine can't
+  render, a **credential vault** (masked, `0600`, click-away autosave), **audit trail**, and an
   **Obsidian-ready `report.md`** with a pivot-topology section.
 - **Workspace dashboard** — searchable/filterable table of every project, with locking, health checks,
   and portable `<name>.tar.gz` import/export.
