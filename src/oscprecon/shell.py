@@ -541,6 +541,25 @@ def _script_values(argv: list[str]) -> list[str]:
 
 _ENVVAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
+# match a hard-forbidden tool as a whole WORD anywhere in the command string — after a wrapper flag
+# (`sudo -u root sqlmap`), inside a shell payload (`bash -c "sqlmap …"`), or as a bare token. Word
+# boundaries are shell separators / path slashes, so a filename `sqlmap-notes.txt` or a URL path
+# `/metasploit/` does NOT trip it (the trailing '-' or '/' isn't a separator).
+_FORBIDDEN_WORD_RE = re.compile(
+    r"(?:^|[\s/;&|`$(><'\"])("
+    + "|".join(re.escape(t) for t in sorted(_HARD_FORBIDDEN_TOOLS))
+    + r")(?:$|[\s;&|)'\"])"
+)
+
+
+def _names_forbidden_tool(argv: list[str]) -> str | None:
+    # authoritative hard-block: no wrapper/shell/path trick may run sqlmap/Metasploit/a scanner.
+    for tok in argv:
+        if os.path.basename(tok).lower() in _HARD_FORBIDDEN_TOOLS:
+            return os.path.basename(tok).lower()
+    m = _FORBIDDEN_WORD_RE.search(" ".join(argv).lower())
+    return m.group(1) if m is not None else None
+
 
 def _effective_tool(argv: list[str]) -> str:
     # skip leading `VAR=val` env assignments and command wrappers (sudo/env/timeout…) to return the
@@ -569,14 +588,14 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
     # capture, ntpdate clock-set stay blocked either way.
     if not argv:
         return "empty command"
-    # resolve the REAL command past any `sudo`/`env`/`VAR=val` prefix, so the hard-block and the
-    # allow-list judge the actual tool (and `sudo sqlmap` can't sneak past argv[0]).
+    # authoritative hard-block FIRST: sqlmap/Metasploit/commercial scanners can never run — not via
+    # a wrapper (sudo/env), a shell payload (bash -c "…"), a path, or a flag value. EVERY mode.
+    forbidden = _names_forbidden_tool(argv)
+    if forbidden is not None:
+        return f"{forbidden} is a banned automated-exploitation/commercial tool (never run — §2)"
+    # resolve the REAL command past any `sudo`/`env`/`VAR=val` prefix for the allow-list check.
     tool = _effective_tool(argv)
     base = os.path.basename(tool).lower()
-    if base in _HARD_FORBIDDEN_TOOLS:
-        return (
-            f"{tool} is a banned automated-exploitation/commercial tool (never run — CLAUDE.md §2)"
-        )
     allowed = set(ALLOWED_TOOLS)
     if spray:
         allowed |= SPRAY_TOOLS
