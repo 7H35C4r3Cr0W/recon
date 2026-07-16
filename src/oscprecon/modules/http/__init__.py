@@ -11,6 +11,7 @@ from oscprecon.modules.http.parsers import (
     detect_wordpress,
     is_vhost_host,
     parse_tool,
+    vhost_from_redirect,
 )
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "is_tls",
     "is_vhost_host",
     "parse_tool",
+    "vhost_from_redirect",
     "wide_net_extensions",
 ]
 
@@ -298,11 +300,13 @@ class HttpModule(Module):
                 "WordPress detected — enumerate (never brute): "
                 "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url {url}"
             )
+        # a Location is a bare host (whatweb), a full URL (ferox/gobuster/ffuf) or a relative path;
+        # vhost_from_redirect pulls the hostname from any of them, so 'http://internal.htb/' shows.
         hosts = sorted(
             {
-                str(f.fields.get("redirect_to", ""))
+                host
                 for f in findings
-                if is_vhost_host(str(f.fields.get("redirect_to", "")))
+                if (host := vhost_from_redirect(str(f.fields.get("redirect_to", ""))))
             }
         )
         for host in hosts:

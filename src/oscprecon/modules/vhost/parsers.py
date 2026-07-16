@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from oscprecon.modules.http.parsers import is_vhost_host
+
 
 @dataclass
 class VhostFinding:
@@ -95,8 +97,13 @@ def parse_gobuster_dns(text: str) -> list[VhostFinding]:
     for line in text.splitlines():
         match = _GOBUSTER_DNS.match(line.strip())
         if match is not None:
+            host = match.group("host")
+            # the dotted-token pattern also matches version strings ('2.4.5') and bare hex — require
+            # a real hostname shape (a letter + a dotted alpha TLD) before recording it as a vhost.
+            if not is_vhost_host(host):
+                continue
             ip = (match.group("ip") or "").split(",")[0]
-            findings.append(VhostFinding(vhost=match.group("host"), ip=ip, note="gobuster dns"))
+            findings.append(VhostFinding(vhost=host, ip=ip, note="gobuster dns"))
     return findings
 
 

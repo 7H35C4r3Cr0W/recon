@@ -78,6 +78,7 @@ def netexec_auth_ok(text: str) -> bool:
 def parse_netexec_shares(text: str) -> list[SmbFinding]:
     findings: list[SmbFinding] = []
     in_table = False
+    perm_start = perm_end = -1  # header column offsets of the Permissions cell (fixed-width table)
     for line in text.splitlines():
         rest = _nxc_rest(line)
         if rest is None:
@@ -92,6 +93,10 @@ def parse_netexec_shares(text: str) -> list[SmbFinding]:
             continue
         if rest.startswith("Share") and "Permissions" in rest:
             in_table = True
+            # capture the fixed-width Permissions column span so an EMPTY perms cell can't pull the
+            # Remark text ("READ" as a bare remark) in as a fake permission (share-perms bug #45).
+            perm_start = rest.index("Permissions")
+            perm_end = rest.index("Remark") if "Remark" in rest else len(rest)
             continue
         if rest.startswith("---"):
             continue
@@ -100,12 +105,19 @@ def parse_netexec_shares(text: str) -> list[SmbFinding]:
                 in_table = False
                 continue
             # netexec pads columns, so split on 2+ spaces: a multi-word share name (single spaces)
-            # stays intact, and the perms column arrives as one token ("READ,WRITE") to comma-split.
+            # stays intact.
             cols = re.split(r"\s{2,}", rest.strip())
             if not cols or not cols[0]:
                 in_table = False
                 continue
-            perms = [p for col in cols[1:] for p in col.split(",") if p in ("READ", "WRITE")]
+            # read perms ONLY from the Permissions column span (not every column after the name), so
+            # a Remark where perms would be won't false-flag the share readable/writable. If a long
+            # share name overflows the column, fall back to the old comma-token scan of cols[1].
+            if perm_start >= 0 and len(cols[0]) <= perm_start:
+                cell = rest[perm_start:perm_end]
+            else:
+                cell = cols[1] if len(cols) >= 2 else ""
+            perms = [p for p in re.split(r"[,\s]+", cell.strip()) if p in ("READ", "WRITE")]
             findings.append(SmbFinding("share", cols[0], ",".join(perms)))
     return findings
 

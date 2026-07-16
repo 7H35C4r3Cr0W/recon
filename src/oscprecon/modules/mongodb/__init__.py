@@ -45,7 +45,8 @@ class MongoDbModule(Module):
             for s in scan_results.services
         )
 
-    def recon_steps(self, target: Target) -> list[MongoDbStep]:
+    def recon_steps(self, target: Target, port: int = _DEFAULT_PORT) -> list[MongoDbStep]:
+        port = port or _DEFAULT_PORT
         # why: Tier-1 uses nmap NSE, not mongosh. mongosh isn't a stock Kali tool, and modern
         # mongosh version-refuses the old MongoDB (<= 3.6, wire v6) these boxes run — the wall the
         # write-up hits. nmap needs no client and speaks the wire protocol directly, so it lists the
@@ -55,7 +56,7 @@ class MongoDbModule(Module):
             MongoDbStep(
                 Command(
                     "mongodb",
-                    f"nmap -p {_DEFAULT_PORT} --script mongodb-info,mongodb-databases {target.ip}",
+                    f"nmap -p {port} --script mongodb-info,mongodb-databases {target.ip}",
                     "Unauth server info + database list via nmap NSE — no client needed; a locked "
                     "server returns an auth error instead of the DB list (read-only).",
                     "< 30s",

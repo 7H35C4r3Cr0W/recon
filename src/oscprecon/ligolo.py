@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import ipaddress
+import re
 import socket
 import struct
 from dataclasses import dataclass, field
@@ -28,11 +29,21 @@ def detect_tun_ip(iface: str = "tun0") -> str:
     # best-effort: the VPN/tunnel IP the agent should dial back to. Linux-only ioctl; "" on failure
     # (non-Linux, no such iface) so the dialog just leaves the field blank for the user to fill.
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        packed = struct.pack("256s", iface[:15].encode())
-        return socket.inet_ntoa(fcntl.ioctl(sock.fileno(), _SIOCGIFADDR, packed)[20:24])
+        with socket.socket(
+            socket.AF_INET, socket.SOCK_DGRAM
+        ) as sock:  # close the fd, success or not
+            packed = struct.pack("256s", iface[:15].encode())
+            return socket.inet_ntoa(fcntl.ioctl(sock.fileno(), _SIOCGIFADDR, packed)[20:24])
     except OSError:
         return ""
+
+
+def _clean_iface(iface: str) -> str:
+    # the iface name is interpolated into copy-paste console/route lines; keep it a bare interface
+    # token (letters/digits/_/-, max 15 like the kernel limit) so a stray space/metachar can't turn
+    # the copied command into two.
+    text = (iface or "").strip()
+    return text if re.fullmatch(r"[A-Za-z0-9_-]{1,15}", text) else "ligolo"
 
 
 def _clean_routes(routes: list[str]) -> list[str]:
@@ -57,7 +68,7 @@ def build_ligolo_steps(
     routes: list[str] | None = None,
 ) -> list[LigoloStep]:
     ip = (kali_ip or "<your-tun0-ip>").strip()
-    iface = (iface or "ligolo").strip() or "ligolo"
+    iface = _clean_iface(iface)
     clean = _clean_routes(routes or [])
     steps: list[LigoloStep] = [
         LigoloStep(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import threading
 import time
@@ -74,6 +75,10 @@ _SKIP_TAGS = {
     "input",
     "textarea",
 }
+# VOID (self-closing) elements never emit an end tag, so a skip-tagged void element (input/meta etc)
+# must NOT open a skip region — else self._skip rises with no matching decrement and the rest of the
+# document is silently dropped (HackTricks checklists use <input type=checkbox disabled>).
+_VOID_TAGS = {"input", "meta", "link", "br", "hr", "img", "source", "area", "base", "col", "wbr"}
 _HEADING_LEVEL = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
 _BLOCK_TAGS = {"p", "div", "section", "article", "tr", "table", "ul", "ol", "blockquote"}
 _CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -117,7 +122,10 @@ class _MarkdownExtractor(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in _SKIP_TAGS:
-            self._skip += 1
+            if (
+                tag not in _VOID_TAGS
+            ):  # a void skip element has no end tag → never open a skip region
+                self._skip += 1
             return
         if self._skip:
             return
@@ -237,7 +245,9 @@ def read_cache(url: str) -> CacheEntry | None:
 
 def _write_cache(entry: CacheEntry) -> None:
     path = _cache_path(entry.url)
-    tmp = path.with_suffix(".json.tmp")
+    # unique per-write temp (pid) so concurrent Nabu instances refreshing the same URL don't race on
+    # a shared `<sha>.json.tmp` (one replacing the other's half-written file). §6b allows instances.
+    tmp = path.with_suffix(f".json.tmp.{os.getpid()}")
     try:
         tmp.write_text(json.dumps(asdict(entry), indent=2), encoding="utf-8")
         tmp.replace(path)  # atomic

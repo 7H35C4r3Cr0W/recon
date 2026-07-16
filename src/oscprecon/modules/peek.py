@@ -41,9 +41,26 @@ _TEXT_EXT = frozenset(
         "jsp",
         "pl",
         "rb",
-        "pem",
-        "pub",
-        "key",
+    }
+)
+
+# never auto-peek secret material: a private-key / password-hash file's head would land unredacted
+# in findings.json + report + graph, breaking the 'secrets never logged / always redacted' rule.
+# The file still shows up in the directory listing by name — we just don't dump its contents.
+_SENSITIVE_EXT = frozenset(
+    {"pem", "pub", "key", "ppk", "p12", "pfx", "htpasswd", "htaccess", "kdbx"}
+)
+_SENSITIVE_NAMES = frozenset(
+    {
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519",
+        "shadow",
+        "sam",
+        "ntds.dit",
+        ".htpasswd",  # dotfiles: extension() resolves these to "" so match the whole name
+        ".htaccess",
         "htpasswd",
         "htaccess",
     }
@@ -57,8 +74,16 @@ def extension(name: str) -> str:
     return ext.lower() if dot and head else ""  # "" for no-ext and dotfiles (.bashrc)
 
 
+def is_sensitive(name: str) -> bool:
+    # a secret-bearing file we must never dump the head of (key material, password/hash stores)
+    return extension(name) in _SENSITIVE_EXT or name.strip().lower() in _SENSITIVE_NAMES
+
+
 def is_text_like(name: str) -> bool:
-    # a known text extension, or NO extension (often a config/script) — worth a peek
+    # a known text extension, or NO extension (often a config/script) — worth a peek, unless it is
+    # known secret material.
+    if is_sensitive(name):
+        return False
     ext = extension(name)
     return ext == "" or ext in _TEXT_EXT
 

@@ -16,6 +16,68 @@ from pathlib import Path
 
 logger = logging.getLogger("oscprecon.shell")
 
+# Redact credential-bearing tokens before a command line is LOGGED or written to a blocked/missing
+# output file — secrets must never persist in the diagnostics log or on disk (CLAUDE.md). The run
+# argv is untouched; only the string we log/echo is masked. -p/-a/-w/-H are overloaded (nmap=ports,
+# feroxbuster -w=wordlist), so their values are masked only for known credential tools; --password /
+# --pass are unambiguous and masked for any tool.
+_CRED_TOOLS: frozenset[str] = frozenset(
+    {
+        "mysql",
+        "mysqladmin",
+        "psql",
+        "redis-cli",
+        "netexec",
+        "nxc",
+        "crackmapexec",
+        "hydra",
+        "medusa",
+        "smbmap",
+        "evil-winrm",
+        "mssqlclient",
+        "ldapsearch",
+        "wpscan",
+    }
+)
+_SECRET_VALUE_FLAGS: frozenset[str] = frozenset({"-p", "-a", "-w", "-H", "--hashes"})
+
+
+def _mask(value: str) -> str:
+    return f"<redacted len={len(value)}>"
+
+
+def _redact_cmdline(argv: list[str]) -> str:
+    if not argv:
+        return ""
+    base = os.path.basename(argv[0]).lower()
+    cred_tool = base in _CRED_TOOLS or base.startswith("impacket-")
+    out: list[str] = []
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        head = tok.split("=", 1)[0]
+        next_is_secret = (head in ("--password", "--pass")) or (
+            cred_tool and tok in _SECRET_VALUE_FLAGS
+        )
+        if "=" in tok and head in ("--password", "--pass"):
+            out.append(f"{head}={_mask(tok.split('=', 1)[1])}")
+        elif next_is_secret and i + 1 < len(argv):
+            out += [tok, _mask(argv[i + 1])]
+            i += 2
+            continue
+        elif (
+            cred_tool
+            and len(tok) > 2
+            and not tok.startswith("--")
+            and tok[:2] in ("-p", "-a", "-H")
+        ):
+            out.append(f"{tok[:2]}{_mask(tok[2:])}")
+        else:
+            out.append(tok)
+        i += 1
+    return " ".join(out)
+
+
 # why: shell.run is the sole exec chokepoint, so it is where CLAUDE.md §2 exam-legality is
 # enforced. Only these binaries may run; anything else is refused before execution.
 ALLOWED_TOOLS: frozenset[str] = frozenset(
@@ -422,16 +484,35 @@ def run(
     on_line: Callable[[str], None] | None = None,
     spray: bool = False,
 ) -> ShellResult:
-    argv = shlex.split(shell_line)
-    tool = argv[0] if argv else ""
     output_file = Path(output_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     started = _now_iso()
     start = time.monotonic()
 
+    # an unbalanced quote must fail gracefully at this chokepoint, not raise into the worker thread
+    try:
+        argv = shlex.split(shell_line)
+    except ValueError:
+        message = "[blocked] unparseable command line (unbalanced quotes)"
+        logger.warning(message)
+        output_file.write_text(message + "\n", encoding="utf-8")
+        if on_line is not None:
+            on_line(message)
+        return ShellResult(
+            shell_line,
+            126,
+            output_file,
+            started,
+            _now_iso(),
+            0.0,
+            blocked="unparseable command line",
+        )
+    tool = argv[0] if argv else ""
+    redacted = _redact_cmdline(argv)  # secret-free string for logging / disk
+
     violation = policy_violation(argv, spray=spray)
     if violation is not None:
-        message = f"[blocked] {violation}: {shell_line}"
+        message = f"[blocked] {violation}: {redacted}"
         logger.warning(message)
         output_file.write_text(message + "\n", encoding="utf-8")
         if on_line is not None:
@@ -450,7 +531,7 @@ def run(
             shell_line, 127, output_file, started, _now_iso(), 0.0, missing_tool=tool
         )
 
-    logger.info("run: %s", shell_line)
+    logger.info("run: %s", redacted)
     # why: stdin=DEVNULL + start_new_session detach the child from the launching terminal, so a
     # wrapped tool can never block on stdin or /dev/tty for interactive input (e.g. an ssh password
     # prompt). Without this a single interactive command hangs the streaming read loop forever and

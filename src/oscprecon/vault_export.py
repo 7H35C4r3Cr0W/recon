@@ -226,10 +226,20 @@ def _write_notes(profile: Profile, root: Path) -> None:
 
 
 def export_vault(profile: Profile, dest_root: Path) -> Path:
-    root = Path(dest_root) / profile.profile_name
+    dest = Path(dest_root).resolve()
+    # SECURITY: profile_name is read verbatim from profile.json and is attacker-influenceable (a
+    # crafted/hand-edited import). Never use it as a raw path component — slug it to a safe charset,
+    # strip leading/trailing separators, and fall back to the folder name so it can never be empty
+    # (empty would make root == dest and rmtree the user's whole vault) or contain ../ (traversal).
+    slug = (
+        re.sub(r"[^A-Za-z0-9._-]+", "-", profile.profile_name).strip("-.") or profile.directory.name
+    )
+    root = (dest / (slug or "project")).resolve()
     # why: a re-export is a fresh point-in-time snapshot — clear the profile's own export subfolder
-    # first so records deleted since the last export don't linger as orphans. Only <root> (the
-    # computed <dest>/<profile_name>) is removed, never the user-picked dest_root itself.
+    # first so records deleted since the last export don't linger as orphans. HARD CONTAINMENT: root
+    # must be a strict child of dest — never dest itself, never outside it — before any rmtree.
+    if root == dest or dest not in root.parents:
+        raise ValueError(f"unsafe vault export target: {root}")
     if root.exists():
         shutil.rmtree(root, ignore_errors=True)
     for sub in _SUBDIRS:

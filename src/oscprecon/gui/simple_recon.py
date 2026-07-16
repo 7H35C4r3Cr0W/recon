@@ -60,7 +60,7 @@ from oscprecon.modules.base import Module
 
 
 def _smtp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
-    return [(s.command, s.tool) for s in smtp.SmtpModule().recon_steps(target)]
+    return [(s.command, s.tool) for s in smtp.SmtpModule().recon_steps(target, port or 25)]
 
 
 def _nfs_steps(target: Target, port: int) -> list[tuple[Command, str]]:
@@ -96,11 +96,11 @@ def _ntp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 
 def _redis_steps(target: Target, port: int) -> list[tuple[Command, str]]:
-    return [(s.command, s.tool) for s in redis.RedisModule().recon_steps(target)]
+    return [(s.command, s.tool) for s in redis.RedisModule().recon_steps(target, port)]
 
 
 def _mongodb_steps(target: Target, port: int) -> list[tuple[Command, str]]:
-    return [(s.command, s.tool) for s in mongodb.MongoDbModule().recon_steps(target)]
+    return [(s.command, s.tool) for s in mongodb.MongoDbModule().recon_steps(target, port)]
 
 
 def _mssql_steps(target: Target, port: int) -> list[tuple[Command, str]]:

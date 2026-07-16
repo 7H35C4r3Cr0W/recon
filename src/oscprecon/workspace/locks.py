@@ -121,16 +121,13 @@ def acquire(directory: Path) -> LockInfo | None:
 
 
 def release(directory: Path, info: LockInfo | None = None) -> bool:
-    """Remove the lock only if it is ours (pid + host match) or the caller passes our info."""
+    """Remove the lock only if it is ours (pid + host match). A malformed lock is never unlinked —
+    we can't prove we own it, and it may belong to a live instance of a different app version."""
     existing, malformed = read_lock(directory)
-    if existing is None and not malformed:
-        return False  # nothing to release
+    if existing is None:
+        return False  # no readable lock (absent, or malformed = not provably ours) — leave it
     owner = info or current_lock_info()
-    if (
-        existing is not None
-        and not malformed
-        and (existing.pid != owner.pid or existing.hostname != owner.hostname)
-    ):
+    if existing.pid != owner.pid or existing.hostname != owner.hostname:
         return False  # not ours — never release someone else's lock
     try:
         lock_path(directory).unlink(missing_ok=True)
@@ -139,15 +136,36 @@ def release(directory: Path, info: LockInfo | None = None) -> bool:
     return True
 
 
+def _sweep_stale_orphans(directory: Path) -> None:
+    # remove leftover .lock.stale.<pid> rename-artifacts from crashed recoveries so they never
+    # linger or travel in an export. Only clear one whose pid is provably dead, so we don't race an
+    # in-flight recovery that is between os.rename and claimed.unlink.
+    for orphan in Path(directory).glob(".lock.stale.*"):
+        suffix = orphan.name.rsplit(".", 1)[-1]
+        try:
+            pid = int(suffix)
+        except ValueError:
+            pid = 0
+        if not _pid_alive(pid):
+            with contextlib.suppress(OSError):
+                orphan.unlink()
+
+
 def recover_stale(directory: Path) -> LockInfo | None:
-    """If the current lock is provably stale (same host, dead PID) or malformed, replace it and
-    acquire a fresh one. Never steals a live or foreign-host lock (returns None).
+    """If the current lock is provably stale (same host, dead PID), replace it and acquire a fresh
+    one. Refuses (returns None) a live lock, a foreign-host lock, OR a present-but-malformed lock:
+    an unreadable lock is an unknown/other-version owner we cannot prove dead, so we never steal it.
 
     The claim is atomic: only the instance that wins an os.rename of the exact stale file removes
     it, so two instances racing to recover the same stale lock can never both end up writable (the
     loser's rename fails, and acquire() is O_EXCL so at most one gets the fresh lock)."""
+    _sweep_stale_orphans(directory)
     existing, malformed = read_lock(directory)
-    if existing is not None and not is_stale(existing):
+    if malformed:
+        return None  # present but unparseable — treat as a live/unknown owner, never reclaim
+    if existing is None:
+        return acquire(directory)  # genuinely no lock (or already cleared) — take it directly
+    if not is_stale(existing):
         return None  # live or foreign — refuse
     path = lock_path(directory)
     claimed = path.with_name(f".lock.stale.{os.getpid()}")

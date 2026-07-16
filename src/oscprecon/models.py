@@ -98,8 +98,18 @@ class DiscoveredHost:
         validate_host(self.ip)  # ip is interpolated into command lines — never let a flag/space in
         if self.hostname:
             validate_host(self.hostname)
-        if not self.subnet:
-            self.subnet = subnet_of(self.ip)
+        # canonicalize the subnet so a hand-edited/untrusted value ("$(id)/24") can never be stored:
+        # keep a provided CIDR only if it's a real network containing our ip, else derive it.
+        derived = subnet_of(self.ip)
+        if self.subnet:
+            try:
+                net = ipaddress.ip_network(self.subnet, strict=False)
+                if ipaddress.ip_address(self.ip) not in net:
+                    self.subnet = derived
+            except ValueError:
+                self.subnet = derived
+        else:
+            self.subnet = derived
 
 
 @dataclass(frozen=True)

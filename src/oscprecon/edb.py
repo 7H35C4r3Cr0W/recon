@@ -60,8 +60,12 @@ def add_edb(
         changed = True
     if changed:
         path = edb_path(profile_dir)
-        path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text(json.dumps(existing, indent=2), encoding="utf-8")
-        tmp.replace(path)
+        # citation cache write is non-authoritative — a read-only/full disk mustn't crash the caller
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+            tmp.replace(path)
+        except OSError:
+            tmp.unlink(missing_ok=True)
     return existing

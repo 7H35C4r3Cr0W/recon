@@ -35,6 +35,9 @@ _ACCESS_KINDS = frozenset({"auth", "bind", "access"})
 
 _EXPOSURE_TEXT = ("null session", "world-readable", "world readable", "writable", "no_root_squash")
 _ACCESS_TEXT = ("anonymous", "anon ", "guest login")
+# a negated signal ('anonymous login DISABLED', 'null session NOT allowed') is a hardened posture,
+# not a weakness — suppress the text-fallback escalation when any of these appears in value/detail.
+_NEGATION_TEXT = ("disabl", "not allowed", "denied", "rejected", "refused", "no anonymous")
 
 
 def classify(kind: str, value: str = "", detail: str = "") -> str:
@@ -60,11 +63,14 @@ def classify(kind: str, value: str = "", detail: str = "") -> str:
         # null-session enumeration is an exposure; anonymous/guest auth is an access misconfig
         return EXPOSURE if "null" in value_l else ACCESS
 
-    # value/detail text signals (parser-agnostic) — kept conservative
-    if any(sig in text for sig in _EXPOSURE_TEXT):
-        return EXPOSURE
-    if any(sig in text for sig in _ACCESS_TEXT):
-        return ACCESS
+    # value/detail text signals (parser-agnostic), conservative. Skip when the text negates the
+    # signal ('anonymous access DISABLED') so a hardened posture stated in a banner/note isn't
+    # mis-escalated to a weakness with the red 'look here' ring.
+    if not any(neg in text for neg in _NEGATION_TEXT):
+        if any(sig in text for sig in _EXPOSURE_TEXT):
+            return EXPOSURE
+        if any(sig in text for sig in _ACCESS_TEXT):
+            return ACCESS
 
     return INFO
 

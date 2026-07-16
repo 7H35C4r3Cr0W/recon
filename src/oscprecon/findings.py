@@ -42,6 +42,9 @@ def _key(finding: dict[str, Any]) -> tuple[Any, ...]:
         finding.get("size"),
         finding.get("redirect_to"),
         finding.get("note"),
+        finding.get(
+            "detail"
+        ),  # policy/peek findings differ only here (e.g. 'threshold: 5' vs 'duration: 30m')
     )
 
 

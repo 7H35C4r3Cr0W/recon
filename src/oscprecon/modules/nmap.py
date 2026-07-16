@@ -27,6 +27,9 @@ _REDIRECT_TITLE_RE = re.compile(
 )
 # a real vhost name: a letter + a dotted TLD, so a bare IP redirect is not mistaken for a vhost.
 _VHOST_HOST_RE = re.compile(r"^(?=.*[A-Za-z])[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+# a version-shaped token: a dotted/dashed number (2.4.52, 8.2p1, 0.8.13). A product name that starts
+# with a digit (3proxy, 3CX, 7-Zip) does NOT match, so it is not mistaken for its own version.
+_VERSION_RE = re.compile(r"^v?\d+([.\-]\d+)+")
 
 
 def redirect_vhosts(raw_outputs: dict[str, str]) -> list[str]:
@@ -164,7 +167,10 @@ class NmapModule(Module):
                     existing.product = service.product
                 if service.version and not existing.version:
                     existing.version = service.version
-                if service.service and existing.service in ("", "unknown"):
+                # the -sV scan (it carries product/version) has the AUTHORITATIVE service name — let
+                # it override the bare port-table guess (e.g. 8080 'http-proxy' -> 'http'); a scan
+                # with no product only fills a blank/unknown name.
+                if service.service and (service.product or existing.service in ("", "unknown")):
                     existing.service = service.service
         return sorted(merged.values(), key=lambda s: (s.proto.value, s.port))
 
@@ -216,7 +222,16 @@ def parse_port_line(line: str) -> DiscoveredService | None:
         # banner is the product. Splitting on the first word instead mangled both fields
         # (product "Redis", version "key-value store 5.0.7").
         tokens = rest.split()
-        vi = next((i for i, tok in enumerate(tokens) if tok[:1].isdigit()), None)
+
+        def _is_version(index: int, tok: str) -> bool:
+            # a dotted/dashed number is a version anywhere (2.4.52, 8.2p1, 0.8.13); a BARE number is
+            # a version only past position 0, so a product whose name starts with a digit (3proxy,
+            # 3CX, 7-Zip) is not mistaken for its own version.
+            if _VERSION_RE.match(tok):
+                return True
+            return index > 0 and tok[:1].isdigit()
+
+        vi = next((i for i, tok in enumerate(tokens) if _is_version(i, tok)), None)
         if vi is None:
             product = " ".join(tokens)
         else:

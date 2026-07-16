@@ -125,18 +125,33 @@ def summarize_profile(directory: Path, *, workspace_root: Path | None = None) ->
             elif code is not None:
                 summary.commands_failed += 1  # non-zero incl. -9 (cancelled)
 
-    findings_count = _count_records(directory / "findings.json")
+    def _safe(name: str) -> Path | None:
+        # apply the same symlink-escape guard used for profile.json to EVERY per-profile file read —
+        # a crafted `creds.json`/`notes.md` symlink can't make this background scan read (and count/
+        # stat) a file outside the workspace root.
+        path = directory / name
+        if _escapes_root(path, workspace_root):
+            summary.warnings.append(f"{name} symlinks outside the workspace — not read")
+            return None
+        return path
+
+    findings_file = _safe("findings.json")
+    findings_count = _count_records(findings_file) if findings_file is not None else 0
     if findings_count is None:
         summary.warnings.append("corrupt findings.json")
     summary.finding_count = findings_count or 0
-    creds_count = _count_records(directory / "creds.json")
+    creds_file = _safe("creds.json")
+    creds_count = _count_records(creds_file) if creds_file is not None else 0
     if creds_count is None:
         summary.warnings.append("corrupt creds.json")
     summary.credential_count = creds_count or 0
 
-    summary.has_notes = _has_notes(directory / "notes.md")
-    summary.has_report = _has_report(directory / "report.md")
-    summary.has_graph = _has_graph(directory / "graph.json")
+    notes_file = _safe("notes.md")
+    summary.has_notes = _has_notes(notes_file) if notes_file is not None else False
+    report_file = _safe("report.md")
+    summary.has_report = _has_report(report_file) if report_file is not None else False
+    graph_file = _safe("graph.json")
+    summary.has_graph = _has_graph(graph_file) if graph_file is not None else False
     return summary
 
 

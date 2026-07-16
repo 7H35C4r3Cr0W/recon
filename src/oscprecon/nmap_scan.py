@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 from dataclasses import dataclass
 
 from oscprecon.models import DiscoveredService, Proto, validate_host
@@ -51,7 +52,8 @@ def is_entry_target(target: str, entry_ip: str, entry_hostname: str = "") -> boo
     # pivoted host)? Accept the bare IP, the entry hostname, or the entry IP written as /32 — not
     # just an exact string match, so re-spelling the entry doesn't misroute + drop the results.
     text = target.strip()
-    if text == entry_ip or (entry_hostname and text == entry_hostname):
+    # hostnames are case-insensitive — 'ACTIVE.HTB' is the same entry as 'active.htb'
+    if text == entry_ip or (entry_hostname and text.casefold() == entry_hostname.casefold()):
         return True
     if "/" in text:
         try:
@@ -80,7 +82,9 @@ def merge_services(
             cur.product = svc.product
         if svc.version and not cur.version:
             cur.version = svc.version
-        if svc.service and cur.service in ("", "unknown"):
+        # a -sV scan (carries product) gives the authoritative service name — let it override a bare
+        # port-table guess ('http-proxy' -> 'http'), not just fill a blank (mirrors #21 in nmap.py).
+        if svc.service and (svc.product or cur.service in ("", "unknown")):
             cur.service = svc.service
         if svc.nmap_scripts_output and not cur.nmap_scripts_output:
             cur.nmap_scripts_output = svc.nmap_scripts_output
@@ -97,8 +101,30 @@ def is_range(target: str) -> bool:
         return False
 
 
+# nmap flags that write to (or read commands from) the filesystem — a structured field must never
+# smuggle these in and clobber a file. -oN/-oA/-oG/-oX/-oS, --stylesheet, --resume, --datadir,
+# --script-args-file, -iL/-iR (input-list). The raw-edit escape hatch still allows them explicitly.
+_UNSAFE_LONG_FLAGS = frozenset(
+    {"--stylesheet", "--resume", "--datadir", "--script-args-file", "--script-help", "--webxml"}
+)
+
+
+def _reject_unsafe_field(field: str, value: str) -> None:
+    if re.search(r"[;&|`$><\n]", value):  # shell metachars have no place in a structured flag field
+        raise ValueError(f"{field} contains a shell metacharacter — use the raw-edit box for that")
+    for tok in value.split():
+        low = tok.lower()
+        if re.match(r"^-o[naxgs]", low) or low in ("-il", "-ir") or low in _UNSAFE_LONG_FLAGS:
+            raise ValueError(
+                f"{field} contains a file-writing nmap flag ({tok}) — use the raw-edit box for that"
+            )
+
+
 def build_nmap_command(spec: ScanSpec) -> str:
     target = validate_scan_target(spec.target)
+    _reject_unsafe_field("ports", spec.ports)
+    _reject_unsafe_field("scripts", spec.scripts)
+    _reject_unsafe_field("extra", spec.extra)
     tokens: list[str] = ["nmap"]
     ping_sweep = spec.scan_type == "ping"
     tokens.append(_SCAN_TYPE_FLAG.get(spec.scan_type, "-sT"))

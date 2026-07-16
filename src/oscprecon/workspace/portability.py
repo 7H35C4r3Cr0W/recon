@@ -14,10 +14,15 @@ from pathlib import Path, PurePosixPath
 # transient process-state that must not travel in an archive (a stale lock would confuse import).
 _TRANSIENT_NAMES = frozenset({".lock"})
 _TRANSIENT_SUFFIXES = frozenset({".tmp"})
+# rename-artifacts from a crashed stale-lock recovery (.lock.stale.<pid>) — never put in an export.
+_TRANSIENT_PREFIXES = (".lock.stale.", ".import-")
 
 # why: refuse a decompression bomb — a tiny .tar.gz can declare gigabytes of content and fill the
 # disk on extract. A real recon profile is far below this; the cap only stops pathological archives.
 _MAX_TOTAL_BYTES = 2 * 1024**3
+# ...and cap the member COUNT: a bomb can declare ~0 bytes yet millions of empty files, exhausting
+# inodes / making extraction pathologically slow. A real profile has well under this many files.
+_MAX_MEMBERS = 200_000
 
 
 class ProjectArchiveError(Exception):
@@ -59,8 +64,13 @@ def delete_project(profile_dir: Path, workspace_root: Path) -> None:
     # symlink pointing outside — so a wrong path can never rmtree the wrong tree. Destructive and
     # irreversible; the caller confirms with the user first. A corrupt profile (no profile.json) is
     # still deletable so the workspace can be cleaned up.
-    profile_dir = profile_dir.resolve()
+    original = Path(profile_dir)
     workspace_root = workspace_root.resolve()
+    if original.is_symlink():
+        # delete the LINK entry itself, never rmtree its target — resolve() would redirect the
+        # delete to a DIFFERENT real project when 'link' points at another in-workspace folder.
+        raise ProjectArchiveError(f"{original} is a symlink, not a real project directory")
+    profile_dir = original.resolve()
     if profile_dir == workspace_root or profile_dir.parent != workspace_root:
         raise ProjectArchiveError(f"{profile_dir} is not a project inside {workspace_root}")
     if not profile_dir.is_dir():
@@ -81,6 +91,8 @@ def export_project_archive(profile_dir: Path, dest: Path) -> Path:
     def _drop_transient(info: tarfile.TarInfo) -> tarfile.TarInfo | None:
         base = PurePosixPath(info.name).name
         if base in _TRANSIENT_NAMES or PurePosixPath(base).suffix in _TRANSIENT_SUFFIXES:
+            return None
+        if base.startswith(_TRANSIENT_PREFIXES):
             return None
         return info
 
@@ -127,6 +139,10 @@ def import_project_archive(archive: Path, workspace_root: Path, *, overwrite: bo
 
 def _validate_members(members: list[tarfile.TarInfo], root: Path) -> str:
     root = root.resolve()
+    if len(members) > _MAX_MEMBERS:
+        raise ProjectArchiveError(
+            f"archive has too many entries ({len(members)}); refusing (inode-exhaustion bomb)"
+        )
     tops: set[str] = set()
     total = 0
     for member in members:

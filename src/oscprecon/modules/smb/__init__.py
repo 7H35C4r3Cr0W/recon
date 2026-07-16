@@ -245,6 +245,9 @@ class SmbModule(Module):
         host = target.ip
         auth = "-U 'guest%'" if method == "guest" else "-N"
         safe = share.replace("$", "").replace("/", "-") or "share"
+        # hash the raw name so 'C' and 'C$' (or 'Users'/'Users$') don't collide to the same
+        # file and overwrite each other's listing.
+        digest = hashlib.sha1(share.encode(), usedforsecurity=False).hexdigest()[:8]
         # quote the UNC so a legal multi-word share name ("Team Share") stays one argv token
         unc = shlex.quote(f"//{host}/{share}")
         return [
@@ -254,7 +257,7 @@ class SmbModule(Module):
                     f"smbclient {unc} {auth} -c 'ls'",
                     f"Root listing of share {share}.",
                     "< 30s",
-                    f"smb/shares/{safe}-ls.txt",
+                    f"smb/shares/{safe}-{digest}-ls.txt",
                 ),
             )
         ]
@@ -265,7 +268,11 @@ class SmbModule(Module):
         host = target.ip
         auth = "-U 'guest%'" if method == "guest" else "-N"
         unc = shlex.quote(f"//{host}/{share}")
-        inner = f'get "{name.replace("/", chr(92))}" -'
+        # '/' is smbclient's in-share path separator (kept as '\'); escape an embedded double-quote
+        # for smbclient's OWN parser (shlex.quote below only guards the shell) so a name like
+        # a"b.txt can't terminate smbclient's quoted get argument and mis-target a different file.
+        smb_path = name.replace("/", chr(92)).replace('"', '\\"')
+        inner = f'get "{smb_path}" -'
         digest = hashlib.sha1(f"{share}/{name}".encode(), usedforsecurity=False).hexdigest()[:8]
         slug = re.sub(r"[^A-Za-z0-9._-]", "-", f"{share}-{name}").strip("-")[:40] or "file"
         return SmbStep(

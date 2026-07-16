@@ -43,9 +43,9 @@ class RedisModule(Module):
             for s in scan_results.services
         )
 
-    def recon_steps(self, target: Target) -> list[RedisStep]:
+    def recon_steps(self, target: Target, port: int = _DEFAULT_PORT) -> list[RedisStep]:
         host = target.ip
-        port = _DEFAULT_PORT
+        port = port or _DEFAULT_PORT
         base = f"redis-cli -h {host} -p {port}"
         return [
             RedisStep(

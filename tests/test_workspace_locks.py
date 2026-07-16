@@ -103,8 +103,11 @@ def test_malformed_lock_detected(tmp_path: Path) -> None:
     locks.lock_path(tmp_path).write_text("{ not json")
     info, malformed = locks.read_lock(tmp_path)
     assert info is None and malformed is True
-    # a malformed lock can be recovered (no valid owner to protect)
-    assert locks.recover_stale(tmp_path) is not None
+    # a present-but-malformed lock is treated as a live/unknown owner (possibly a different app
+    # version actively editing) — recover_stale must REFUSE it, never steal it (#13), and the file
+    # must remain in place for the owner.
+    assert locks.recover_stale(tmp_path) is None
+    assert locks.lock_path(tmp_path).exists()
 
 
 def test_no_lock_reads_cleanly(tmp_path: Path) -> None:

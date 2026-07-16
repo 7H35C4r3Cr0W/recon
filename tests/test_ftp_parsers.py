@@ -140,11 +140,15 @@ def test_is_peekable_only_small_text_files() -> None:
     from oscprecon.modules.ftp.parsers import FtpEntry
 
     assert is_peekable(FtpEntry("db.conf", False, 200)) is True
-    assert is_peekable(FtpEntry("id_rsa", False, 1600)) is True  # no-ext small file
+    assert is_peekable(FtpEntry("readme", False, 1600)) is True  # no-ext small file
     assert is_peekable(FtpEntry("etc", True, 0)) is False  # directory
     assert is_peekable(FtpEntry("huge.log", False, PEEK_MAX_BYTES + 1)) is False  # too big
     assert is_peekable(FtpEntry("photo.jpg", False, 500)) is False  # binary extension
     assert is_peekable(FtpEntry("weird", False, 0)) is False  # unknown/zero size
+    # secret material is never peeked — its head would land unredacted in findings/report (#44)
+    assert is_peekable(FtpEntry("id_rsa", False, 1600)) is False  # private key (no ext)
+    assert is_peekable(FtpEntry("server.key", False, 1600)) is False  # private key ext
+    assert is_peekable(FtpEntry(".htpasswd", False, 200)) is False  # password-hash store
 
 
 def test_ftp_file_url_and_peek_step() -> None:

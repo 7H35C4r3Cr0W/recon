@@ -99,7 +99,19 @@ def check_provenance(directory: Path | None = None) -> list[str]:
     errors: list[str] = []
     for path in sorted(directory.glob("*.yaml")):
         text = path.read_text(encoding="utf-8")
-        for index, block in enumerate(_split_entries(text)):
+        parsed = yaml.safe_load(text)
+        entries = parsed if isinstance(parsed, list) else []
+        blocks = _split_entries(text)
+        if len(blocks) != len(entries):
+            # flow/JSON-style YAML (`[{match: ...}]` on one line) yields entries yaml reads but zero
+            # column-0 `- ` blocks, so the per-entry source heuristic would silently pass. Reject —
+            # provenance is mandatory (§15) and must be verifiable per entry.
+            errors.append(
+                f"{path.name}: {len(entries)} entries parse but {len(blocks)} are block-style — "
+                "write each as a top-level `- ` item with its own `# source:` comment"
+            )
+            continue
+        for index, block in enumerate(blocks):
             if not _source_of(block):
                 errors.append(f"{path.name}: entry #{index + 1} is missing a `# source:` comment")
     return errors

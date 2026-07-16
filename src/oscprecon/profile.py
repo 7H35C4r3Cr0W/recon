@@ -74,8 +74,12 @@ def _target_to_dict(target: Target) -> dict[str, str | None]:
 
 
 def _target_from_dict(data: dict[str, Any]) -> Target:
+    # the target is required; surface a clear error (not a bare KeyError traceback) if malformed
+    ip = str(data.get("ip") or "")
+    if not ip:
+        raise ValueError("profile.json is corrupt: the target has no 'ip'")
     return Target(
-        ip=str(data["ip"]),
+        ip=ip,
         hostname=data.get("hostname"),
         platform=data.get("platform"),
         box_name=data.get("box_name"),
@@ -95,16 +99,20 @@ def _service_to_dict(service: DiscoveredService) -> dict[str, Any]:
     }
 
 
-def _service_from_dict(data: dict[str, Any]) -> DiscoveredService:
-    return DiscoveredService(
-        port=int(data["port"]),
-        proto=Proto(str(data["proto"])),
-        service=str(data.get("service", "")),
-        product=str(data.get("product", "")),
-        version=str(data.get("version", "")),
-        nmap_scripts_output=str(data.get("nmap_scripts_output", "")),
-        discovered_at=str(data.get("discovered_at", "")),
-    )
+def _service_from_dict(data: dict[str, Any]) -> DiscoveredService | None:
+    # a single malformed/hand-edited service entry must not abort the whole project open — skip it
+    try:
+        return DiscoveredService(
+            port=int(data["port"]),
+            proto=Proto(str(data["proto"])),
+            service=str(data.get("service", "")),
+            product=str(data.get("product", "")),
+            version=str(data.get("version", "")),
+            nmap_scripts_output=str(data.get("nmap_scripts_output", "")),
+            discovered_at=str(data.get("discovered_at", "")),
+        )
+    except (KeyError, ValueError, TypeError):
+        return None
 
 
 def _host_to_dict(host: DiscoveredHost) -> dict[str, Any]:
@@ -120,17 +128,25 @@ def _host_to_dict(host: DiscoveredHost) -> dict[str, Any]:
     }
 
 
-def _host_from_dict(data: dict[str, Any]) -> DiscoveredHost:
-    return DiscoveredHost(
-        ip=str(data["ip"]),
-        hostname=str(data.get("hostname", "")),
-        subnet=str(data.get("subnet", "")),
-        pivot_source=str(data.get("pivot_source", "")),
-        os_guess=str(data.get("os_guess", "")),
-        services=[_service_from_dict(s) for s in data.get("services", [])],
-        discovered_at=str(data.get("discovered_at", "")),
-        notes=str(data.get("notes", "")),
-    )
+def _host_from_dict(data: dict[str, Any]) -> DiscoveredHost | None:
+    # a malformed pivoted-host entry (bad ip / hostname) must not abort the project open — skip it
+    try:
+        ip = str(data.get("ip") or "")
+        if not ip:
+            return None
+        services = [s for s in (_service_from_dict(s) for s in data.get("services", [])) if s]
+        return DiscoveredHost(
+            ip=ip,
+            hostname=str(data.get("hostname", "")),
+            subnet=str(data.get("subnet", "")),
+            pivot_source=str(data.get("pivot_source", "")),
+            os_guess=str(data.get("os_guess", "")),
+            services=services,
+            discovered_at=str(data.get("discovered_at", "")),
+            notes=str(data.get("notes", "")),
+        )
+    except (ValueError, TypeError):
+        return None
 
 
 @dataclass
@@ -190,8 +206,16 @@ class Profile:
             profile_name=str(raw.get("profile_name", directory.name)),
             target=_target_from_dict(raw.get("target", {})),
             status=dict(raw.get("status", {})),
-            discovered_services=[_service_from_dict(s) for s in raw.get("discovered_services", [])],
-            discovered_hosts=[_host_from_dict(h) for h in raw.get("discovered_hosts", [])],
+            discovered_services=[
+                s
+                for s in (_service_from_dict(s) for s in raw.get("discovered_services", []))
+                if s is not None
+            ],
+            discovered_hosts=[
+                h
+                for h in (_host_from_dict(h) for h in raw.get("discovered_hosts", []))
+                if h is not None
+            ],
             command_history=[dict(c) for c in raw.get("command_history", [])],
             references_visited=[dict(r) for r in raw.get("references_visited", [])],
             module_settings=dict(raw.get("module_settings", {})),
@@ -207,7 +231,9 @@ class Profile:
     def save(self) -> None:
         self._ensure_writable()
         payload: dict[str, Any] = {
-            "schema_version": self.schema_version,
+            # always persist the CURRENT code schema — a v1 file that gains v2 content (hosts)
+            # must not keep lying that it is still version 1.
+            "schema_version": SCHEMA_VERSION,
             "profile_name": self.profile_name,
             "target": _target_to_dict(self.target),
             "status": self.status,
