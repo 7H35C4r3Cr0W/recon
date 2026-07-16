@@ -15,6 +15,8 @@ shipped as actions.
 ![Nabu — the three-pane recon workspace](docs/screenshots/shell-dark.png)
 
 > **See it in action** (open these local HTML files in a browser):
+> [`docs/presentation.html`](docs/presentation.html) — **What's New: Recon → Exploitation** (a team-facing
+> showcase of the Exploitation tab, msfvenom builder, port-80 attacks &amp; the Dante multi-network graph) ·
 > [`docs/nabu-demo.html`](docs/nabu-demo.html) — a 20-slide guided tour ·
 > [`docs/how-nabu-works.html`](docs/how-nabu-works.html) — an interactive pipeline + system map ·
 > [`docs/screenshots/`](docs/screenshots/) — the screenshot set ·
