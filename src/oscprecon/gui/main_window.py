@@ -52,6 +52,7 @@ from oscprecon.gui.task_manager import TaskManager
 from oscprecon.gui.theme import styles
 from oscprecon.gui.widgets.activity_view import ActivityView
 from oscprecon.gui.widgets.app_header import AppHeader
+from oscprecon.gui.widgets.exploit_panel import ExploitPanel
 from oscprecon.gui.widgets.findings_view import FindingsView
 from oscprecon.gui.widgets.graph_view import GraphView
 from oscprecon.gui.widgets.nav_rail import NavRail
@@ -246,6 +247,8 @@ class MainWindow(QMainWindow):
         self._report_view = ReportView()
         self._findings_view = FindingsView()
         self._activity_view = ActivityView()
+        self._exploit_panel = ExploitPanel(theme.normalize(settings.theme))
+        self._exploit_panel.add_credentials.connect(self._on_exploit_loot)
         self._dashboard = WorkspaceDashboard()
         self._dashboard.open_requested.connect(lambda d: self._open_path(Path(str(d))))
         self._dashboard.create_requested.connect(self._on_new)
@@ -260,6 +263,7 @@ class MainWindow(QMainWindow):
         self._central_stack.addWidget(self._dashboard)  # 3: workspace dashboard (home)
         self._central_stack.addWidget(self._findings_view)  # 4: findings
         self._central_stack.addWidget(self._activity_view)  # 5: activity / audit
+        self._central_stack.addWidget(self._exploit_panel)  # 6: exploitation (copy-and-run builder)
 
         # app shell: compact header on top, primary nav rail on the left, central stack in the body
         theme_name = theme.normalize(settings.theme)
@@ -718,7 +722,15 @@ class MainWindow(QMainWindow):
         self._nav.set_enabled_keys(False)
 
     # central-stack index -> nav key, so the rail highlight always matches the visible view
-    _INDEX_KEY = {0: "recon", 1: "graph", 2: "report", 3: "workspace", 4: "findings", 5: "activity"}
+    _INDEX_KEY = {
+        0: "recon",
+        1: "graph",
+        2: "report",
+        3: "workspace",
+        4: "findings",
+        5: "activity",
+        6: "exploit",
+    }
 
     def _sync_nav(self) -> None:
         self._nav.set_current(self._INDEX_KEY.get(self._central_stack.currentIndex(), "workspace"))
@@ -730,6 +742,8 @@ class MainWindow(QMainWindow):
             self._show_workspace()
         elif key == "recon":
             self._show_recon()
+        elif key == "exploit":
+            self._show_exploit()
         elif key == "graph":
             self._graph_action.setChecked(True)
         elif key == "report":
@@ -761,6 +775,23 @@ class MainWindow(QMainWindow):
         self._report_action.setChecked(False)
         self._central_stack.setCurrentIndex(0)
         self._sync_nav()
+
+    def _show_exploit(self) -> None:
+        self._graph_action.setChecked(False)
+        self._report_action.setChecked(False)
+        self._exploit_panel.set_profile(self._profile)  # refresh target/cred picker on entry
+        self._central_stack.setCurrentWidget(self._exploit_panel)
+        self._sync_nav()
+
+    def _on_exploit_loot(self, creds: list[Credential]) -> None:
+        # loot parsed from pasted exploitation output -> persist to the active profile's vault (§6),
+        # never auto-run anything with it. Mirrors _record_creds' originating-profile discipline.
+        if self._profile is None or self._profile.read_only or not creds:
+            return
+        for cred in creds:
+            self._profile.add_credential(cred)
+        self._audit_action("exploit-loot-added", count=str(len(creds)))
+        self._tool_panel.append_output(f"[exploit] added {len(creds)} credential(s) to the vault.")
 
     def _show_findings(self) -> None:
         self._graph_action.setChecked(False)

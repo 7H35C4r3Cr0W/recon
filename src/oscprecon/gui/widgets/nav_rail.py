@@ -14,6 +14,7 @@ from oscprecon.gui.theme.tokens import Palette
 _ITEMS: tuple[tuple[str, str, str, bool, str], ...] = (
     ("workspace", "Workspace", "home", False, "Ctrl+0"),
     ("recon", "Recon", "target", False, ""),
+    ("exploit", "Exploitation", "bolt", False, ""),
     ("graph", "Graph", "graph", False, "Ctrl+G"),
     ("findings", "Findings", "flag", False, ""),
     ("credentials", "Credentials", "key", True, ""),

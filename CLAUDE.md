@@ -15,7 +15,7 @@ A **PySide6 desktop GUI recon orchestrator** for OSCP exam prep and exam day, bu
 1. **Learn** — work each box on Lain Kusanagi's OSCP-like list manually to build muscle memory.
 2. **Build** — turn each box's lessons into reusable, OSCP-exam-legal recon automation.
 
-The tool is **recon-first**. It wraps standard OSCP-allowed enumeration tools, surfaces findings in a Bloodhound-style graph, links inline to HackTricks and Exploit-DB references, and produces Obsidian-friendly markdown reports. It does **not** exploit, chain attacks, or call any LLM at runtime. **Credential spraying** — OSCP-legal against your own authorized targets — is supported as an **explicit, opt-in, off-by-default** capability (see § 2a); with Spray mode **off** (the default) the tool is strictly recon-only and blocks all brute/spray.
+The tool is **recon-first**. It wraps standard OSCP-allowed enumeration tools, surfaces findings in a Bloodhound-style graph, links inline to HackTricks and Exploit-DB references, and produces Obsidian-friendly markdown reports. It does **not** auto-exploit, chain attacks, or call any LLM at runtime — the engine never executes an exploit. **Credential spraying** — OSCP-legal against your own authorized targets — is supported as an **explicit, opt-in, off-by-default** capability (see § 2a); with Spray mode **off** (the default) the tool is strictly recon-only and blocks all brute/spray. A separate, owner-authorized **Exploitation tab** (see § 2b) helps the user run exploitation / post-ex **by hand** — it *builds and shows* the command syntax (Copy-to-run) and *parses* pasted output into loot, but **never executes anything itself** (it does not touch `shell.run`), so the recon default stays exam-legal.
 
 ---
 
@@ -75,6 +75,19 @@ Password spraying / credential brute against **your own authorized targets** is 
 - **Still forbidden even in Spray mode:** Metasploit / meterpreter, SQLMap, commercial scanners, LLM calls, automated exploit *chains*, and spraying anything other than the assigned target (never the exam VPN / control panel or an out-of-scope host — that is a hard, non-negotiable scope limit).
 - **Cred vault:** sprays draw from the editable `creds.json` store (add / edit / delete in the GUI). The user selects which credentials / combinations to spray and **confirms before anything runs** — it never auto-sprays.
 - **Tooling preference:** prefer `netexec` (already wrapped) for SMB/WinRM; `hydra`/`medusa` for FTP/SSH/etc. Secrets stay redacted in reports / audit / logs as always. UX: a clean, Burp-style surface.
+
+### 2b. Exploitation tab — owner-authorized, GUI-initiated, DISPLAY-ONLY (never executes)
+
+Owner-authorized (Andre, 2026-07-15): the tool now carries an **Exploitation** tab, clearly separated from Recon, that helps the user run exploitation / post-exploitation by hand. It is a **command *builder* and output *parser*, not an executor** — the same "shown, you run it" model as the Tier-2 manual commands and the ligolo helper. This is why it does **not** breach the recon-only exec posture: the exploitation tab **never calls `shell.run`**, so the exec chokepoint and its exam-legal-by-default block-list are untouched, and the default recon experience is unchanged.
+
+Rules (non-negotiable):
+
+- **Builds syntax; never runs it.** Each action renders the exact tool command (impacket, netexec, evil-winrm, certipy, responder, ntlmrelayx, mimikatz, hashcat/john, …), pre-filled from the active profile (target/domain) and a chosen credential from the vault, with a **Copy** button. The user runs it in their own terminal. **Nothing on this tab auto-exploits, chains, or executes — in any capacity.** No path from this tab reaches `shell.run` or a subprocess.
+- **Parses pasted output into loot.** The user pastes tool output (secretsdump / Kerberoast / AS-REP) back into the tab; it parses hashes/creds and offers **Add to vault** (→ `creds.json`). Secrets are **redacted** in the loot table exactly as everywhere else.
+- **Clearly labeled + off the recon path.** Its own nav entry + a prominent banner: *shown-not-run, and off-limits during the OSCP exam unless the user knows a tool is allowed.* Recon stays the default, exam-legal surface.
+- **Engine lives in `src/oscprecon/exploit/`** (`base.py` registry + `fill_template`, one module per service e.g. `ad.py`, `parsers.py`). Templates cite a `source=` (adpt.py eval / vault cheatsheet). GUI is `gui/widgets/exploit_panel.py`.
+- **Still forbidden anywhere in the tool:** Metasploit/msfvenom/meterpreter and SQLMap are **not wrapped or executed** (they may appear as copy-only reference syntax only if added deliberately); **no runtime LLM calls; no automated scan→exploit chains; no PoC download/execute/transform.** Exploit-DB stays lookup + linkout.
+- **Build out per service in clean chunks** (AD first, then other services from the maintainer's cheatsheet/methodology), each organized like the Recon tab.
 
 ---
 

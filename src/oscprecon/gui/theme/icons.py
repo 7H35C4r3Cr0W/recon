@@ -29,6 +29,7 @@ _GLYPHS: dict[str, str] = {
     "chart": '<rect x="5" y="4" width="14" height="16" rx="2"/>'
     '<path d="M9 15 V17 M12 11 V17 M15 8 V17"/>',
     "pulse": '<path d="M3 12 H8 L10 6 L14 18 L16 12 H21"/>',
+    "bolt": '<path d="M13 2 L4 14 H11 L10 22 L20 9 H13 Z"/>',  # exploitation tab
 }
 
 
