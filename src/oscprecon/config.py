@@ -131,11 +131,11 @@ class Settings:
     # opt-in, OFF BY DEFAULT (CLAUDE.md §2a): unlocks OSCP-legal credential spraying (hydra/medusa/
     # netexec list-spray + password wordlists). With this false the tool is strictly recon-only.
     spray_enabled: bool = False
-    # opt-in, OFF BY DEFAULT (CLAUDE.md §2b): lets the Exploitation tab EXECUTE the selected attack
-    # command (impacket/evil-winrm/hashcat/responder/certipy…). Every Run still confirms first — no
-    # blind attacks. False = the tab is shown-only (build + copy). sqlmap/Metasploit/scanners stay
-    # hard-blocked in every mode.
-    exploit_enabled: bool = False
+    # ON BY DEFAULT (owner, 2026-07-16): the Exploitation tab may EXECUTE the attack command you
+    # select — but NEVER automatically. Every Run is user-initiated and confirms against a named
+    # target first (§2b). Set False to make the tab shown-only (build + copy). The DEFAULT recon
+    # mode is unaffected either way. sqlmap/Metasploit/mass scanners are not shipped as actions.
+    exploit_enabled: bool = True
     # Live HackTricks fetch/cache (§14a) — OFF by default; offline vendored pages stay the fallback.
     hacktricks_live_enabled: bool = False
     hacktricks_auto_refresh: bool = False  # auto-refresh stale cached pages when live is on
@@ -193,7 +193,7 @@ def default_settings() -> Settings:
         nmap_udp_full=False,
         scan_profile=DEFAULT_SCAN_PROFILE,
         spray_enabled=False,
-        exploit_enabled=False,
+        exploit_enabled=True,
         hacktricks_live_enabled=False,
         hacktricks_auto_refresh=False,
         hacktricks_prefer_live=False,
@@ -241,8 +241,8 @@ def spray_enabled() -> bool:
 
 
 def exploit_enabled() -> bool:
-    """True when the user has opted into Exploitation execution (§2b). Off by default; every Run
-    still confirms first, and sqlmap/Metasploit/scanners stay hard-blocked regardless."""
+    """True when the Exploitation tab may execute a selected command (§2b). ON by default; nothing
+    ever runs automatically — every Run is user-initiated and confirms against a named target."""
     return load_settings().exploit_enabled
 
 

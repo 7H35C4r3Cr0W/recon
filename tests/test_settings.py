@@ -150,11 +150,11 @@ def test_spray_enabled_defaults_off_and_roundtrips() -> None:
     assert config.spray_enabled() is True  # the accessor the engine reads
 
 
-def test_exploit_enabled_defaults_off_and_roundtrips() -> None:
-    assert config.default_settings().exploit_enabled is False  # OFF by default (§2b)
-    config.save_prefs({"exploit_enabled": "true"})
-    assert config.load_settings().exploit_enabled is True
-    assert config.exploit_enabled() is True  # the accessor the exec gate reads
+def test_exploit_enabled_defaults_on_and_roundtrips() -> None:
+    assert config.default_settings().exploit_enabled is True  # ON by default (§2b, owner)
+    config.save_prefs({"exploit_enabled": "false"})  # user can still turn the tab shown-only
+    assert config.load_settings().exploit_enabled is False
+    assert config.exploit_enabled() is False
 
 
 def test_hacktricks_live_settings_default_off_and_roundtrip() -> None:

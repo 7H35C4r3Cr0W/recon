@@ -806,13 +806,13 @@ class MainWindow(QMainWindow):
             self._exploit_panel.set_running(False)
             return
         if not config.load_settings().exploit_enabled:
-            # off by default (exam-legal posture) — offer a one-time enable, never silently run
+            # execution is ON by default; only reached if the user turned the tab shown-only in
+            # Preferences. Offer to re-enable, never silently run.
             enable = QMessageBox.question(
                 self,
                 "Enable exploitation execution?",
-                "Running attacks is OFF by default (the tab is shown-only). Enable it so the "
-                "Exploitation tab can execute the commands you select?\n\nsqlmap, Metasploit and "
-                "commercial scanners stay blocked. Every run still asks for confirmation.",
+                "You set the Exploitation tab to shown-only. Re-enable execution so it can run the "
+                "commands you select?\n\nNothing runs automatically — every run still confirms.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )

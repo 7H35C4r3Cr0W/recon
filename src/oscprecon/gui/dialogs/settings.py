@@ -180,10 +180,10 @@ class SettingsDialog(QDialog):
         self._exploit_enabled = QCheckBox("Enable Exploitation execution (attack scripts)")
         layout.addWidget(self._exploit_enabled)
         exploit_note = QLabel(
-            "OFF by default. When on, the Exploitation tab can EXECUTE the attack command you pick "
-            "(impacket / evil-winrm / hashcat / responder / certipy…). Every run still confirms "
-            "first — no blind attacks. OSCP-legal manual tooling (§ 2b); sqlmap, Metasploit and "
-            "commercial scanners stay blocked in every mode. Only attack authorized targets."
+            "ON by default. The Exploitation tab EXECUTES the attack command you pick (impacket / "
+            "evil-winrm / hashcat / responder / certipy…) — but NEVER automatically: every run is "
+            "user-initiated and confirms against a named target first (§ 2b). Uncheck to make the "
+            "tab shown-only (build + copy). Recon is unaffected. Only attack authorized targets."
         )
         exploit_note.setWordWrap(True)
         layout.addWidget(exploit_note)
