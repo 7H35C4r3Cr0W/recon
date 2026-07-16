@@ -211,6 +211,67 @@ def doctor(
     raise typer.Exit(code)
 
 
+@app.command("exploit")
+def exploit_cmd(
+    service: str | None = typer.Argument(
+        None,
+        help="Service key (ad, web, smb, mssql, mysql, ftp, ssh, snmp, redis, rdp, nfs, "
+        "linux, windows, shells). Omit to list all services.",
+    ),
+    profile: str | None = typer.Option(
+        None, "--profile", "-p", help="Profile to pre-fill {target}/{domain}/{cred} from."
+    ),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Show exploitation command templates (§2b). CLI is display-only — copy a command to run it."""
+    from oscprecon import exploit as exploit_mod
+
+    values: dict[str, str] = {}
+    if profile is not None:
+        root = workspace if workspace is not None else config.workspace_root()
+        directory = Path(root) / profile
+        if not (directory / "profile.json").exists():
+            typer.echo(f"[error] no profile '{profile}' in {root}", err=True)
+            raise typer.Exit(2)
+        prof = Profile.load(directory)
+        values["target"] = prof.target.ip
+        values["dc"] = prof.target.ip
+        values["url"] = f"http://{prof.target.host}/"
+        if prof.target.hostname and "." in prof.target.hostname:
+            values["domain"] = prof.target.hostname.split(".", 1)[1]
+        creds = prof.credentials()
+        pw = next((c for c in creds if c.secret_type == "password"), None)
+        if pw is not None:
+            values["user"] = pw.username
+            values["password"] = pw.secret
+            if pw.domain:
+                values["domain"] = pw.domain
+
+    if service is None:
+        typer.echo("Exploitation services (use `nabu-cli exploit <service>` for actions):\n")
+        for key in exploit_mod.service_keys():
+            spec = exploit_mod.service_exploits(key)
+            if spec is None:
+                continue
+            ports = ", ".join(str(p) for p in spec.ports) or "—"
+            typer.echo(f"  {key:9} {spec.label:22} {len(spec.actions):3} actions   ports: {ports}")
+        raise typer.Exit(0)
+
+    spec = exploit_mod.service_exploits(service)
+    if spec is None:
+        typer.echo(f"[error] unknown service '{service}'", err=True)
+        raise typer.Exit(2)
+    typer.echo(f"# {spec.label} — {spec.note}\n")
+    for category in spec.categories():
+        typer.echo(f"── {category} ──")
+        for action in spec.by_category(category):
+            tag = "RUN " if action.executable else "COPY"  # attacker (run) vs victim (copy)
+            typer.echo(f"[{tag}] {action.title}  ({action.tool})")
+            typer.echo(f"    {exploit_mod.fill_template(action.template, values)}")
+        typer.echo("")
+    raise typer.Exit(0)
+
+
 def main() -> None:
     app()
 

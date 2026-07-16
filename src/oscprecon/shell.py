@@ -198,6 +198,12 @@ EXPLOIT_TOOLS: frozenset[str] = frozenset(
         "impacket-smbserver",
         "smbserver.py",
         "impacket-changepasswd",
+        # impacket enum wrappers WITHOUT the .py suffix (modern Kali packaging), used in attacks
+        "impacket-GetUserSPNs",
+        "impacket-GetNPUsers",
+        "impacket-GetADUsers",
+        "impacket-lookupsid",
+        "impacket-mssqlclient",
         # shells / lateral
         "evil-winrm",
         "certipy-ad",
@@ -217,6 +223,59 @@ EXPLOIT_TOOLS: frozenset[str] = frozenset(
         "sh",
         "sshpass",
         "git",
+        # service-specific attack clients (attacker-side, run FROM Kali)
+        "snmpset",  # SNMP write with a RW community
+        "xfreerdp",
+        "xfreerdp3",
+        "rdesktop",  # RDP clients
+        "ftp",
+        "tftp",
+        "ncftpput",  # FTP transfer clients
+        "mount",
+        "umount",  # NFS/SMB mount for exploitation (no_root_squash etc.)
+        "tcpdump",  # OOB confirmation (blind cmdi / hash capture)
+        "jar",
+        "java",
+        "gcc",  # build/deploy exploit artefacts (WAR, kernel exploit)
+        "scp",
+        "ssh-keygen",  # key-based lateral movement + transfer
+        # coreutils used to stage payloads on the attacker side
+        "echo",
+        "cat",
+        "ls",
+        "cp",
+        "mv",
+        "chmod",
+        "base64",
+        "tee",
+        "printf",
+        "mkfifo",
+        # offline cracking prep + shell handlers (attacker-side, no target contact by themselves)
+        "ssh2john",
+        "pwncat-cs",
+        "pwncat",
+        "mimikatz",  # usually victim-side; harmless here (not-found) if a template is attacker-set
+        "sshuttle",  # attacker-side pivot/tunnel
+        "mkdir",  # stage payloads / mount points
+    }
+)
+
+# leading tokens that are NOT the real command: env-var assignments (VAR=val) and command wrappers.
+# _effective_tool() skips them so both the hard-forbidden block AND the allow-list see the ACTUAL
+# tool — e.g. `sudo mount`, `KRB5CCNAME=x impacket-psexec`, `sudo sqlmap` (still blocked).
+_CMD_WRAPPERS: frozenset[str] = frozenset(
+    {
+        "sudo",
+        "env",
+        "command",
+        "nice",
+        "time",
+        "stdbuf",
+        "timeout",
+        "doas",
+        "rlwrap",
+        "proxychains",
+        "proxychains4",
     }
 )
 
@@ -480,6 +539,28 @@ def _script_values(argv: list[str]) -> list[str]:
     return values
 
 
+_ENVVAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+
+def _effective_tool(argv: list[str]) -> str:
+    # skip leading `VAR=val` env assignments and command wrappers (sudo/env/timeout…) to return the
+    # token of the REAL command. `sudo mount` -> `mount`; `KRB5CCNAME=x impacket-psexec` ->
+    # `impacket-psexec`; `sudo sqlmap` -> `sqlmap` (so the hard-block still catches it).
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if _ENVVAR_RE.match(tok):
+            i += 1
+            continue
+        if os.path.basename(tok).lower() in _CMD_WRAPPERS:
+            i += 1
+            while i < len(argv) and argv[i].startswith("-"):  # skip wrapper flags (sudo -u, -n…)
+                i += 1
+            continue
+        return tok
+    return argv[0] if argv else ""
+
+
 def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = False) -> str | None:
     # `spray=True` ONLY in opt-in Spray mode (§2a); `exploit=True` ONLY for a command launched from
     # the Exploitation tab (§2b). Each loosens exactly its own tool category; everything else stays
@@ -488,7 +569,9 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
     # capture, ntpdate clock-set stay blocked either way.
     if not argv:
         return "empty command"
-    tool = argv[0]
+    # resolve the REAL command past any `sudo`/`env`/`VAR=val` prefix, so the hard-block and the
+    # allow-list judge the actual tool (and `sudo sqlmap` can't sneak past argv[0]).
+    tool = _effective_tool(argv)
     base = os.path.basename(tool).lower()
     if base in _HARD_FORBIDDEN_TOOLS:
         return (
@@ -499,7 +582,7 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
         allowed |= SPRAY_TOOLS
     if exploit:
         allowed |= EXPLOIT_TOOLS
-    if tool not in allowed:
+    if tool not in allowed and base not in allowed:
         return f"{tool} is not on the OSCP-allowed tool list"
     if not spray:
         for token in argv[1:]:
@@ -535,7 +618,10 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
         # why: ntpdate WITHOUT -q SETS the local clock (modifies local state, needs root). Recon is
         # query-only — the module always passes -q; back-stop it here for the custom-command path.
         return "ntpdate without -q sets the local clock (forbidden — recon-only)"
-    if tool in _DB_CLIENTS:
+    if tool in _DB_CLIENTS and not exploit:
+        # the DB file/OS primitives (INTO OUTFILE, xp_cmdshell, load_file…) are BLOCKED in recon
+        # (query-only), but they ARE the attack in Exploitation mode — permit them there (user opted
+        # in + confirmed). The hard-forbidden block above still applies.
         db_violation = _db_primitive_violation(tool, argv)
         if db_violation is not None:
             return db_violation
