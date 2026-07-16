@@ -20,7 +20,7 @@ def test_banner_never_leaks_into_output() -> None:
     # output and tests stay clean.
     result = runner.invoke(app, ["doctor"])
     assert "{o,o}" not in result.output
-    assert "recon-only by default · OSCP exam-legal" not in result.output
+    assert "recon-first · OSCP exam-legal by default" not in result.output
 
 
 def test_cli_still_runs_with_the_callback() -> None:

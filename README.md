@@ -3,8 +3,12 @@
 A **recon-first, OSCP-exam-legal desktop workspace** that orchestrates the standard enumeration
 tools you already use (nmap, feroxbuster/gobuster/ffuf, nikto/whatweb, smbclient/netexec, …),
 structures what they find, links each service to HackTricks and Exploit-DB, draws a BloodHound-style
-attack-surface graph, and produces Obsidian-friendly reports. It runs **offline**, makes **no exploit
-or LLM calls at runtime**, and is **strictly recon-only by default**.
+attack-surface graph, and produces Obsidian-friendly reports. It runs **offline** and makes **no LLM
+calls at runtime**. Recon is **exam-legal by default**; a separate, **owner-authorized Exploitation
+tab** lets you build and Run **human-confirmed** attacks by hand — **182 services / 2,200+ actions**
+(impacket, evil-winrm, netexec, public PoCs, port-80 web attacks) plus an **msfvenom payload
+builder** — nothing auto-runs, you confirm every command, and SQLmap/Metasploit-modules are never
+shipped as actions.
 
 *Internal package `oscprecon`; installs as `oscp-recon`; entry points `nabu` (GUI) and `nabu-cli` (headless).*
 
@@ -54,6 +58,17 @@ or LLM calls at runtime**, and is **strictly recon-only by default**.
   to move it. Plus a native always-visible summary tree so scan data shows even where QtWebEngine can't
   render, a **credential vault** (masked, `0600`, click-away autosave), **audit trail**, and an
   **Obsidian-ready `report.md`** with a pivot-topology section.
+- **Exploitation tab** (owner-authorized, human-driven) — clearly separated from Recon. It surfaces the
+  services found on *this* box first and, across **182 services / 2,200+ attacker actions** mined from
+  the vault (AD, web/port-80, SMB, databases, mail, app servers, CVE-technique targets, …), shows the
+  exact attack command pre-filled from the profile + a chosen vault credential. **Nothing auto-runs**:
+  you pick an action and press **Run ▸**, which confirms the target before executing **one** command
+  (never a chain), then **Parse** extracts dumped hashes/creds into the vault. Attacker-side actions get
+  a Run button; victim-side privesc/reverse-shells are copy-only. Includes a **🎯 msfvenom payload
+  builder** — pick platform → payload → format, fill LHOST/LPORT, and copy the exact `msfvenom` command
+  **plus its matching listener** (exam-safe non-meterpreter default; meterpreter flagged as one-use).
+  Exam-legal by the OSCP+ guide (manual attack scripts allowed); SQLmap/Metasploit-modules are never
+  shipped as actions.
 - **Workspace dashboard** — searchable/filterable table of every project, with locking, health checks,
   and portable `<name>.tar.gz` import/export.
 - **Light / dark theme**, offline splash, and a **diagnostics log** (Help → View Diagnostics Log).
@@ -108,8 +123,8 @@ writes everything into a self-contained project folder:
 ```console
 $ nabu-cli scan 10.10.10.100 --profile htb-active
    {o,o}   Nabu — Local Recon Workspace
-   |)__)   v0.0.1 · recon-only by default · OSCP exam-legal
-   -"-"-   offline · no exploitation · no AI at runtime
+   |)__)   v0.0.1 · recon-first · OSCP exam-legal by default
+   -"-"-   offline · human-confirmed exploitation · no AI at runtime
 
 [profile] /home/kali/oscprecon/htb-active  (scan profile: default)
 PORT     STATE SERVICE       VERSION
@@ -224,17 +239,25 @@ Each box is a self-contained folder under the workspace root (default `~/oscprec
 
 ## Safety boundaries (OSCP exam-legal by default)
 
-Recon-first, **exam-legal by default**. **No** exploitation, Metasploit, SQLMap, or LLM calls at
-runtime — see [`CLAUDE.md`](CLAUDE.md) §2. Every command runs through one chokepoint (`shell.run` →
-`policy_violation`) that refuses non-allow-listed tools, brute/spray flags, and file-write / OS-exec DB
-primitives. By default the wordlist picker hides `Passwords/` and credential attempts are single-shot
-Tier-2 actions the user clicks.
+Recon-first and **exam-legal by default**, with **no LLM calls at runtime** — see
+[`CLAUDE.md`](CLAUDE.md) §2. In the default recon mode every command runs through one chokepoint
+(`shell.run` → `policy_violation`) that refuses non-allow-listed tools, brute/spray flags, and
+file-write / OS-exec DB primitives; the wordlist picker hides `Passwords/` and credential attempts are
+single-shot Tier-2 actions the user clicks. **SQLmap and Metasploit exploitation modules are never
+shipped as one-click actions** (a test enforces this).
+
+**Exploitation** happens only in the separate, **owner-authorized Exploitation tab** (§2b) — and only
+because *you* pick an action and **confirm each Run**. The guardrail there is the human, not an
+allow-list: `policy_violation(exploit=True)` runs the exact command you selected (impacket, evil-winrm,
+netexec, public PoCs, msfvenom — all OSCP-legal manual attack scripts). Nothing auto-runs, nothing
+chains, and the default recon mode is untouched. This is exactly what the OSCP+ Exam Guide permits
+(manual attack scripts yes; autopwn / mass scanners / Metasploit-as-a-target no).
 
 **Credential spraying** (hydra/medusa/netexec across SMB/WinRM/LDAP/SSH/FTP/RDP) is OSCP-legal against
 your own authorized targets and is supported as an **explicit, opt-in, off-by-default** mode
-(`Preferences → Scan → Enable Spray mode`; §2a). With it off, the tool is strictly recon-only. When on,
-`Edit → Credential Vault…` manages the creds and `Scan → Credential Spray…` runs single-target sprays
-from them.
+(`Preferences → Scan → Enable Spray mode`; §2a). With it off, recon mode blocks all brute/spray. When
+on, `Edit → Credential Vault…` manages the creds and `Scan → Credential Spray…` runs single-target
+sprays from them.
 
 ## Troubleshooting
 

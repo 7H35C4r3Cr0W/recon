@@ -31,6 +31,6 @@ def cli_banner() -> str:
     """A small owl-furby banner for the CLI. Cosmetic; callers print it to stderr on a real TTY."""
     return (
         f"   {{o,o}}   {APP_NAME} — {APP_TAGLINE}\n"
-        f"   |)__)   v{app_version()} · recon-only by default · OSCP exam-legal\n"
-        f'   -"-"-   offline · no exploitation · no AI at runtime\n'
+        f"   |)__)   v{app_version()} · recon-first · OSCP exam-legal by default\n"
+        f'   -"-"-   offline · human-confirmed exploitation · no AI at runtime\n'
     )

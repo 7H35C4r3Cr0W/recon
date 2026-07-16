@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How Nabu Works — the recon pipeline</title>
+<title>How Nabu Works — recon → exploitation, end to end</title>
 </head>
 <body>
 <style>
@@ -264,10 +264,11 @@
       node for detail.</p>
 
     <div class="guarantee">
-      <span class="g-pill"><span class="g-dot"></span>Recon-only by default — <b>no exploitation</b></span>
+      <span class="g-pill"><span class="g-dot"></span><b>Recon-first</b> &amp; exam-legal by default</span>
+      <span class="g-pill"><span class="g-dot"></span>Owner-authorized <b>Exploitation tab</b> — you confirm every attack</span>
       <span class="g-pill"><span class="g-dot"></span>Runs <b>offline</b>, no AI at runtime</span>
-      <span class="g-pill"><span class="g-dot"></span>Every command passes a <b>compliance gate</b></span>
-      <span class="g-pill"><span class="g-dot"></span>Credentials stay <b>masked & local</b></span>
+      <span class="g-pill"><span class="g-dot"></span>Every recon command passes a <b>compliance gate</b></span>
+      <span class="g-pill"><span class="g-dot"></span>Credentials stay <b>local</b> (0600)</span>
     </div>
 
     <div class="toolbar">
@@ -291,12 +292,15 @@
     <div class="card"><span class="tier auto">Auto</span><p>Runs on one click. Read-only enumeration only — anonymous checks, banners, listings.</p></div>
     <div class="card"><span class="tier shown">Shown</span><p>Pre-filled and surfaced, but <b>you</b> click Run. Single default-credential checks — never a list.</p></div>
     <div class="card"><span class="tier optin">Opt-in</span><p>Password spraying against your own authorized target. <b>Off by default</b>; you enable it explicitly.</p></div>
-    <div class="card"><span class="tier gate">Gate</span><p>The safety checkpoint every command passes. Blocks exploitation and brute-force unless Spray mode is on.</p></div>
+    <div class="card"><span class="tier gate">Gate</span><p>The safety checkpoint every recon command passes. Blocks exploitation and brute-force unless Spray mode is on.</p></div>
+    <div class="card"><span class="tier shown">Exploit</span><p>The owner-authorized Exploitation tab: pre-filled attack commands you Run one at a time, each confirmed. The human is the guardrail.</p></div>
   </section>
 
   <footer>
-    <b>Nabu</b> — reconnaissance workspace for OSCP prep and exam day. Wraps standard enumeration tools;
-    surfaces findings, references, a graph, and an Obsidian-ready report. Recon-first, exam-legal, offline.
+    <b>Nabu</b> — reconnaissance-and-exploitation workspace for OSCP prep and exam day. Wraps standard
+    enumeration tools; surfaces findings, references, a graph, and an Obsidian-ready report — then, in a
+    separate owner-authorized Exploitation tab, builds and Runs human-confirmed attacks across 182
+    services. Recon-first &amp; exam-legal by default, offline, no AI at runtime.
   </footer>
 </div></div>
 
@@ -310,6 +314,7 @@
     { id: "enumerate", label: "Enumerate", sub: "safe recon, per service" },
     { id: "analyze", label: "Analyze", sub: "parse, classify, enrich" },
     { id: "present", label: "Present", sub: "graph & report" },
+    { id: "exploit", label: "Exploit", sub: "owner-authorized, human-driven" },
   ];
   const STAGES = [
     { id: "open", phase: "launch", tier: "auto", title: "Open Nabu",
@@ -337,9 +342,9 @@
       reads: ["the service", "credential vault"], writes: ["raw tool output", "creds.json (on anonymous wins)"], next: ["gate"],
       end: "Three tiers, clearly separated: Auto runs, Shown waits for your click, Opt-in stays off until you enable it." },
     { id: "gate", phase: "enumerate", tier: "gate", title: "Command safety gate",
-      blurb: "Every single command — automatic or manual — passes through one checkpoint that enforces the exam rules. It blocks exploitation frameworks and brute-force. Brute/spray is refused unless you’ve explicitly turned on Spray mode against your own target.",
+      blurb: "Every <b>recon</b> command — automatic or manual — passes through one checkpoint that enforces the exam rules. It blocks exploitation frameworks and brute-force; brute/spray is refused unless you’ve explicitly turned on Spray mode against your own target. The <b>Exploitation tab</b> is the one deliberate exception: there the guardrail is your per-Run confirmation (not the allow-list), so a human always chooses each attack — the default recon mode stays exam-legal, provably.",
       reads: ["every command"], writes: ["allowed output — or a blocked notice"], next: ["parse"],
-      end: "This is the compliance guarantee: exam-legal by default, provably." },
+      end: "The compliance guarantee: exam-legal recon by default; attacks only when you confirm them." },
     { id: "parse", phase: "analyze", tier: "auto", title: "Parsing",
       blurb: "Tool output is turned into structured findings — users, shares, misconfigurations, versions, protocols. If a tool’s output changes and nothing parses, Nabu says so instead of dropping it silently.",
       reads: ["raw tool output"], writes: ["findings.json"], next: ["classify", "suggest"],
@@ -362,8 +367,20 @@
       end: "The whole discovery story — one host or a multi-subnet engagement — on one canvas." },
     { id: "report", phase: "present", tier: "auto", title: "Report",
       blurb: "Everything becomes an Obsidian-friendly markdown report: open ports, per-service findings, a pivot-topology section (every subnet → host → service, with the pivot source), your notes, suggested next steps with sources, the full command log with timings, and an audit-trail appendix of every action. Exportable to a vault; nothing about what ran is hidden.",
-      reads: ["the whole project"], writes: ["report.md + vault export"], next: [],
+      reads: ["the whole project"], writes: ["report.md + vault export"], next: ["exploit"],
       end: "Drop it into your notes and the write-up is already half done." },
+    { id: "exploit", phase: "exploit", tier: "shown", title: "Exploitation console",
+      blurb: "A <b>separate, owner-authorized</b> tab — never part of the automatic recon flow. It surfaces the services found on <i>this</i> box first, and for each one shows exact, ready-to-run attack commands across <b>182 services / 2,200+ actions</b> mined from the vault (AD, web/port-80, SMB, databases, and every service above). Each command is pre-filled from the profile + a chosen vault credential. <b>Nothing runs by itself</b>: you pick an action and press <b>Run</b>, which pops a confirmation naming the target before a single command executes — one command per Run, never a chain or autopwn. Attacker-side actions get a Run button; victim-side ones (privesc / reverse shells you paste into an obtained shell) are copy-only. This is exam-legal: the OSCP+ guide allows manual attack scripts (impacket, evil-winrm, netexec, public PoCs); it forbids autopwn (SQLmap/Metasploit-modules), which are never shipped as actions here. The human confirmation IS the guardrail.",
+      reads: ["discovered services", "vault credentials"], writes: ["the exact attack command"], next: ["loot", "msfvenom"],
+      end: "You attack — deliberately, one confirmed command at a time — not the tool." },
+    { id: "msfvenom", phase: "exploit", tier: "shown", title: "msfvenom payload builder",
+      blurb: "Reverse-shell syntax made easy: pick a platform → payload → format, fill LHOST/LPORT, and get the exact <code>msfvenom</code> command <b>plus its matching listener</b> (netcat for stageless, multi/handler for staged/meterpreter). LHOST auto-fills from tun0; encoder and bad-chars are one field away. It defaults to exam-safe non-meterpreter <code>*_reverse_tcp</code> shells (no exam limit) and flags meterpreter as counting toward the one-Metasploit-use limit. Copy-only — it never executes anything.",
+      reads: ["platform, LHOST/LPORT"], writes: ["msfvenom command + listener"], next: [],
+      end: "No more fighting the payload syntax — copy, listen, catch." },
+    { id: "loot", phase: "exploit", tier: "auto", title: "Loot → vault",
+      blurb: "When a Run produces output (or you paste tool output), Parse extracts dumped hashes / credentials into a loot table — shown in full, since it's your own capture — and Add-to-vault writes them into creds.json for reuse across services. Exploit commands are audited and logged raw; the recon side keeps its redaction.",
+      reads: ["command output"], writes: ["loot → creds.json"], next: [],
+      end: "Dumped secrets flow straight back into the credential vault for the next move." },
   ];
 
   /* ---------------- System map data (real files, top-down) ---------------- */
@@ -425,6 +442,13 @@
         { id: "graphview", name: "gui/widgets/graph_view.py", role: "the graph", does: "The BloodHound-style graph (vendored Cytoscape.js + fcose compound layout) — icon nodes, corner glyphs, search, drill-down, notes, export — with a native always-visible summary tree so scan data shows even if the canvas can’t render.", reads: ["graph elements + graph.json"], writes: ["the interactive graph"] },
         { id: "svctree", name: "gui/widgets/service_tree.py", role: "recon tree", does: "The recon-tab tree: TCP/UDP services plus the collapsible pivot topology (subnet → host → services). Right-click to scan a host, or remove a host / subnet — which flows to the graph too.", reads: ["services + hosts"], writes: ["the recon tree"] },
         { id: "reporter", name: "reporter.py", role: "the report", does: "Renders the Obsidian-friendly report — ports, findings, notes, suggestions, the command log, and the audit-trail appendix.", reads: ["the whole project"], writes: ["report.md + vault export"] },
+      ] },
+    { id: "exploit", label: "Exploitation (owner-authorized)", role: "build + Run confirmed attacks", flow: "the exact attack command → loot",
+      files: [
+        { id: "exploitbase", name: "exploit/base.py · exploit/<service>.py", role: "attack registry", does: "182 service modules registering copy-and-Run attack actions (fill_template + runs_on attacker/victim + ports tie-back). One file per service; base._load_builtin imports them. Never ships SQLmap/Metasploit-modules as actions.", reads: ["a discovered service"], writes: ["pre-filled attack commands"] },
+        { id: "exploitpanel", name: "gui/widgets/exploit_panel.py", role: "the console", does: "The Exploitation tab: present-services-first picker, category/action tree, Copy + Run ▸ (pops a confirmation naming the target before executing), then Parse → loot table → Add-to-vault.", reads: ["services + vault creds"], writes: ["a single confirmed Run"] },
+        { id: "msfvenombuild", name: "exploit/msfvenom.py", role: "payload builder", does: "Copy-only msfvenom reverse-shell builder — the exact command plus its matching listener (nc / multi/handler); exam-safe non-meterpreter default, meterpreter flagged as one-use.", reads: ["platform, LHOST/LPORT"], writes: ["msfvenom command + listener"] },
+        { id: "exploitrun", name: "shell.py · run(exploit=True)", role: "confirmed exec", gate: true, does: "The one path where the recon allow-list is bypassed — and only after your per-Run confirmation. Runs the exact command you selected; nothing chains or auto-runs. Recon mode (exploit=False) is unchanged and exam-legal.", reads: ["a confirmed command"], writes: ["streamed output → loot"] },
       ] },
   ];
   const CROSSCUT = {

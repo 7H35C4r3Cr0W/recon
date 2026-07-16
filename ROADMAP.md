@@ -6,6 +6,27 @@ Status legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ---
 
+## Post-roadmap — Exploitation tab + msfvenom builder (owner-authorized) — ✅ built
+
+Beyond the original six recon phases, the owner authorized a **human-driven Exploitation tab**
+(`CLAUDE.md` §2b/§2c), clearly separated from Recon and **exam-legal by the OSCP+ guide** (manual
+attack scripts allowed; autopwn / Metasploit-modules / SQLmap never shipped as actions):
+
+- `exploit/` engine — `base.py` (ExploitAction/ServiceExploits registry + `fill_template` + `runs_on`
+  attacker/victim + `ports` tie-back), one module per service, `parsers.py` (secretsdump/kerberos → loot).
+  **182 services / ~2,244 attacker actions** mined from the vault across 13 gap-analysis batches.
+- `gui/widgets/exploit_panel.py` — the Exploitation tab: present-services-first picker → action tree →
+  filled command → **Copy / Run ▸** (confirms the target before executing **one** command) → **Parse**
+  → loot table → Add-to-vault. Execution is on by default but **nothing auto-runs** — every Run is
+  human-selected + confirmed via `shell.run(exploit=True)`.
+- `exploit/msfvenom.py` + `gui/dialogs/msfvenom_builder.py` — a **copy-only msfvenom payload builder**
+  (platform → payload → format, LHOST auto from tun0, the command **and** its matching listener;
+  exam-safe non-meterpreter default, meterpreter flagged one-use). Headless: `nabu-cli exploit` / `payload`.
+
+The default recon mode (`exploit=False`) is unchanged and stays exam-legal.
+
+---
+
 ## Phase 0 — Scaffold (engine + minimal GUI + nmap) — ✅ built & verified
 
 Delivered:
