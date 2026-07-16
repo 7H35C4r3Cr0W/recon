@@ -48,6 +48,9 @@ from oscprecon.modules.ssh import SshFinding, SshModule, parse_ssh_tool
 from oscprecon.parsing import run_parser
 from oscprecon.profile import Profile
 
+# per-step watchdog (seconds): enum steps are quick; this only kills a wedged/tarpit transfer. [#24]
+_STEP_TIMEOUT_S = 300.0
+
 
 @dataclass
 class SmbReconResult:
@@ -72,6 +75,11 @@ class SmbReconWorker(CancellableThread):
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
             return
+        if self._cancel.is_set():
+            # a cancelled walk broke out of its step loops but still collected + persisted partial
+            # findings — mark the run interrupted so the UI/report doesn't read it as a complete
+            # enumeration (a half-walked share tree looking 'done'). [#38]
+            result.summary.insert(0, "⚠ recon cancelled — results are partial")
         self.done.emit(result)
 
     def _run_phase(self, steps: list[SmbStep]) -> tuple[list[SmbFinding], bool]:
@@ -235,12 +243,26 @@ class FtpReconWorker(CancellableThread):
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
             return
+        if self._cancel.is_set():
+            # a cancelled walk broke out of its step loops but still collected + persisted partial
+            # findings — mark the run interrupted so the UI/report doesn't read it as a complete
+            # enumeration (a half-walked share tree looking 'done'). [#38]
+            result.summary.insert(0, "⚠ recon cancelled — results are partial")
         self.done.emit(result)
 
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
+        # watchdog: a single enum step (banner/listing/peek) is quick — a slow-loris / tarpit target
+        # that trickles bytes forever must not wedge the sole worker slot until the user cancels.
+        shell.run(
+            shell_line,
+            out,
+            cwd=base,
+            timeout=_STEP_TIMEOUT_S,
+            cancel=self._cancel,
+            on_line=self.line.emit,
+        )
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -381,12 +403,26 @@ class SshReconWorker(CancellableThread):
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
             return
+        if self._cancel.is_set():
+            # a cancelled walk broke out of its step loops but still collected + persisted partial
+            # findings — mark the run interrupted so the UI/report doesn't read it as a complete
+            # enumeration (a half-walked share tree looking 'done'). [#38]
+            result.summary.insert(0, "⚠ recon cancelled — results are partial")
         self.done.emit(result)
 
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
+        # watchdog: a single enum step (banner/listing/peek) is quick — a slow-loris / tarpit target
+        # that trickles bytes forever must not wedge the sole worker slot until the user cancels.
+        shell.run(
+            shell_line,
+            out,
+            cwd=base,
+            timeout=_STEP_TIMEOUT_S,
+            cancel=self._cancel,
+            on_line=self.line.emit,
+        )
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -456,12 +492,26 @@ class DnsReconWorker(CancellableThread):
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
             return
+        if self._cancel.is_set():
+            # a cancelled walk broke out of its step loops but still collected + persisted partial
+            # findings — mark the run interrupted so the UI/report doesn't read it as a complete
+            # enumeration (a half-walked share tree looking 'done'). [#38]
+            result.summary.insert(0, "⚠ recon cancelled — results are partial")
         self.done.emit(result)
 
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
+        # watchdog: a single enum step (banner/listing/peek) is quick — a slow-loris / tarpit target
+        # that trickles bytes forever must not wedge the sole worker slot until the user cancels.
+        shell.run(
+            shell_line,
+            out,
+            cwd=base,
+            timeout=_STEP_TIMEOUT_S,
+            cancel=self._cancel,
+            on_line=self.line.emit,
+        )
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -532,12 +582,26 @@ class LdapReconWorker(CancellableThread):
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
             return
+        if self._cancel.is_set():
+            # a cancelled walk broke out of its step loops but still collected + persisted partial
+            # findings — mark the run interrupted so the UI/report doesn't read it as a complete
+            # enumeration (a half-walked share tree looking 'done'). [#38]
+            result.summary.insert(0, "⚠ recon cancelled — results are partial")
         self.done.emit(result)
 
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
+        # watchdog: a single enum step (banner/listing/peek) is quick — a slow-loris / tarpit target
+        # that trickles bytes forever must not wedge the sole worker slot until the user cancels.
+        shell.run(
+            shell_line,
+            out,
+            cwd=base,
+            timeout=_STEP_TIMEOUT_S,
+            cancel=self._cancel,
+            on_line=self.line.emit,
+        )
         try:
             return out.read_text(encoding="utf-8", errors="replace")
         except OSError:

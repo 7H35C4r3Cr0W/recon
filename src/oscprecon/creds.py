@@ -79,8 +79,12 @@ def save_creds(path: Path, credentials: list[Credential]) -> None:
         raise
 
 
-def _key(cred: Credential) -> tuple[str, str, str, str]:
+def cred_key(cred: Credential) -> tuple[str, str, str, str]:
+    # identity of a stored credential — dedup + in-place edit key (username, domain, secret, source)
     return (cred.username, cred.domain, cred.secret, cred.source)
+
+
+_key = cred_key  # internal alias (kept for existing call sites)
 
 
 def add_credential(path: Path, cred: Credential) -> list[Credential]:

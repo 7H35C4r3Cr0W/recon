@@ -119,12 +119,22 @@ class GraphBridge(QObject):
         if self._profile is None:
             return
         graph = self._profile.load_graph()
-        slot = graph["node_overrides"].setdefault(node_id, {})
+        overrides = graph["node_overrides"]
+        if value is None:
+            # clearing (e.g. status toggle-off): only touch a node that already has an override —
+            # setdefault would otherwise create an empty {} for a never-overridden node, churning
+            # graph.json with a no-op write and leaving orphan {} entries. [#34]
+            slot = overrides.get(node_id)
+            if not isinstance(slot, dict) or key not in slot:
+                return
+            slot.pop(key, None)
+            if not slot:  # drop the node entirely once its last override is gone
+                overrides.pop(node_id, None)
+            self._profile.save_graph(graph)
+            return
+        slot = overrides.setdefault(node_id, {})
         if isinstance(slot, dict):
-            if value is None:
-                slot.pop(key, None)  # clear (e.g. toggling a status off)
-            else:
-                slot[key] = value
+            slot[key] = value
             self._profile.save_graph(graph)
 
 

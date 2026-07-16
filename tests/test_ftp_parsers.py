@@ -163,3 +163,4 @@ def test_ftp_file_url_and_peek_step() -> None:
         and "ftp://10.0.0.1/pub/db.conf" in step.command.shell_line
     )
     assert "--max-time" in step.command.shell_line  # bounded even if the listed size was wrong
+    assert "-r 0-8191" in step.command.shell_line  # byte cap so a mis-reported size can't OOM (#23)

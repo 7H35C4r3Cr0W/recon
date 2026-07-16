@@ -768,6 +768,11 @@
     var hasSaved = (elements.nodes || []).some(function (n) {
       return n.position;
     });
+    // NOTE (#33): pivot drill-down graphs use a COMPUTED breadthfirst layout by design — the user
+    // asked for the clean expand/collapse tree, and every expand re-runs relayoutVisible(). Saved
+    // per-node positions (hasSaved) are therefore honoured only for the NON-pivot graph below; for a
+    // pivot graph the computed tree wins, so per-node drag positions are not restored across
+    // sessions. This is intentional, not a persistence bug.
     var isPivot = isPivotGraph();
     if (isPivot) {
       // RESET the fold state on a profile SWITCH — ids like "target" / "subnet-<cidr>" collide across

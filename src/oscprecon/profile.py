@@ -253,6 +253,7 @@ class Profile:
         tmp.replace(self.profile_json_path)
 
     def set_services(self, services: list[DiscoveredService]) -> None:
+        self._ensure_writable()  # never mutate in-memory state on a read-only profile [#43]
         self.discovered_services = services
         self.touch()
 
@@ -260,6 +261,7 @@ class Profile:
         # Upsert pivoted hosts by ip: a re-scan of the same host updates its services / os / pivot
         # source in place rather than creating a duplicate node. The entry Target is never added
         # here (it stays the profile's primary target). Returns the number of NEW hosts added.
+        self._ensure_writable()  # [#43]
         by_ip = {h.ip: h for h in self.discovered_hosts}
         added = 0
         for host in hosts:
@@ -275,6 +277,10 @@ class Profile:
                 by_ip[host.ip] = host
                 added += 1
             else:
+                # intentional (#19): an empty service list is treated as "no new data", NOT "the
+                # host has no open ports". A pivoted re-scan that momentarily returns nothing (a
+                # flaky tunnel, a filtered sweep) must not wipe the ports an earlier scan found —
+                # keeping the prior services is the safe default. Use remove_host to clear a host.
                 if host.services:
                     existing.services = host.services
                 if host.hostname:
@@ -294,24 +300,32 @@ class Profile:
     def remove_host(self, ip: str) -> bool:
         # drop one pivoted host from the topology. A deeper host reached VIA this one keeps its
         # pivot_source string, but the graph simply omits the now-dangling pivot edge — no crash.
+        self._ensure_writable()  # [#43]
         before = len(self.discovered_hosts)
         self.discovered_hosts = [h for h in self.discovered_hosts if h.ip != ip]
         if len(self.discovered_hosts) == before:
             return False
-        self._prune_graph_for_hosts([ip])
+        # persist profile.json FIRST, then prune graph.json: if the profile write fails we raise
+        # before deleting the host's graph overrides, so the two files can't diverge (host gone from
+        # graph but still in profile, losing its overrides on the next reload). [#43]
         self.touch()
+        self.save()
+        self._prune_graph_for_hosts([ip])
         return True
 
     def remove_subnet(self, subnet: str) -> int:
         # drop a whole /24 (every host in it) from the topology. Returns the number removed.
+        self._ensure_writable()  # [#43]
+
         def in_subnet(h: DiscoveredHost) -> bool:
             return (h.subnet or subnet_of(h.ip)) == subnet
 
         removed_ips = [h.ip for h in self.discovered_hosts if in_subnet(h)]
         self.discovered_hosts = [h for h in self.discovered_hosts if not in_subnet(h)]
         if removed_ips:
-            self._prune_graph_for_hosts(removed_ips)
             self.touch()
+            self.save()  # profile.json before graph.json prune (see remove_host) [#43]
+            self._prune_graph_for_hosts(removed_ips)
         return len(removed_ips)
 
     def _prune_graph_for_hosts(self, ips: list[str]) -> None:
@@ -451,6 +465,28 @@ class Profile:
         # tested_against) — the dedup key ignores tested_against, so add_credential can't update it.
         self._ensure_writable()
         creds.save_creds(self.creds_path, credentials)
+
+    def replace_credential(self, current: Credential, updated: Credential) -> None:
+        # in-place edit as a SINGLE atomic write (never delete-then-add, which loses the credential
+        # if the second write fails [#12] and silently drops a row when the edit collides with a
+        # different entry [#37]). Preserve order; on a collision `updated` wins and the dup goes.
+        self._ensure_writable()
+        old_key = creds.cred_key(current)
+        new_key = creds.cred_key(updated)
+        out: list[Credential] = []
+        replaced = False
+        for cred in self.credentials():
+            key = creds.cred_key(cred)
+            if not replaced and key == old_key:
+                out.append(updated)
+                replaced = True
+            elif key == new_key and key != old_key:
+                continue  # a different entry the edit now collides with — drop it, `updated` wins
+            else:
+                out.append(cred)
+        if not replaced:
+            out.append(updated)
+        creds.save_creds(self.creds_path, out)
 
     @property
     def graph_path(self) -> Path:

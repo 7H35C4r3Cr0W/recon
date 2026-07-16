@@ -153,6 +153,12 @@ class LiveHacktricksWorker(QThread):
         self._force = force
         self._max_age_days = max_age_days
         self._request_id = request_id
+        self._cancelled = False
+
+    def cancel(self) -> None:
+        # can't abort the in-flight (timeout-bounded) fetch, but suppress its result so a close/
+        # delete needn't wait for it and no stale done fires against a torn-down profile. [#48]
+        self._cancelled = True
 
     def run(self) -> None:
         try:
@@ -164,4 +170,6 @@ class LiveHacktricksWorker(QThread):
             )
         except Exception:  # boundary: a fetch must never crash the worker
             result = live_hacktricks.LiveResult("error", "", [], 0.0, self._url, "fetch failed")
+        if self._cancelled:
+            return  # dropped: the requester (profile/pane) is gone
         self.done.emit(result, self._request_id)

@@ -28,7 +28,7 @@ def test_banner_and_anon_steps() -> None:
     banner = [s.command.shell_line for s in module.banner_steps(_target())]
     assert "nmap -sV --script ftp-anon,ftp-syst,ftp-bounce -p 21 10.10.10.5" in banner
     anon = [s.command.shell_line for s in module.anon_steps(_target())]
-    assert anon == ["curl -s ftp://10.10.10.5/"]
+    assert len(anon) == 1 and shlex.split(anon[0])[-1] == "ftp://10.10.10.5/"
 
 
 def test_commands_batch() -> None:
@@ -38,22 +38,21 @@ def test_commands_batch() -> None:
 def test_non_default_port() -> None:
     assert ftp_base_url("10.10.10.5", 2121) == "ftp://10.10.10.5:2121"
     step = FtpModule().anon_steps(_target(), port=2121)[0]
-    assert step.command.shell_line == "curl -s ftp://10.10.10.5:2121/"
+    assert shlex.split(step.command.shell_line)[-1] == "ftp://10.10.10.5:2121/"
 
 
 def test_list_step_encodes_untrusted_path() -> None:
     module = FtpModule()
     # a directory name with a space is percent-encoded, so it stays one argv token
     spaced = module.list_step(_target(), "/New Folder", port=21).command.shell_line
-    assert spaced == "curl -s ftp://10.10.10.5/New%20Folder/"
-    assert len(shlex.split(spaced)) == 3
+    assert shlex.split(spaced)[-1] == "ftp://10.10.10.5/New%20Folder/"
     # a hostile dir name cannot inject a flag or a second URL: the space (token break) and colon
-    # (scheme) are percent-encoded, so shell.run's shlex.split yields exactly curl / -s / <one url>
+    # (scheme) are percent-encoded, so the URL is a single trailing token and no second URL forms
     hostile = module.list_step(_target(), "/-x http://evil/", port=21).command.shell_line
     tokens = shlex.split(hostile)
-    assert tokens[0:2] == ["curl", "-s"]
-    assert len(tokens) == 3
-    assert tokens[2].startswith("ftp://10.10.10.5/")
+    assert tokens[0] == "curl"
+    assert tokens[-1].startswith("ftp://10.10.10.5/")
+    assert sum(t.startswith("ftp://") for t in tokens) == 1  # exactly one URL token
     assert "http://evil" not in hostile  # the ':' is encoded, so no second URL forms
 
 

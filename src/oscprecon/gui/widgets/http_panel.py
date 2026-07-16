@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -46,6 +47,14 @@ _TOOL_LABELS = {
     "ffuf": "ffuf",
     "dirsearch": "dirsearch",
 }
+
+
+def _port_from_url(url: str) -> int:
+    # the effective port for a URL: an explicit :port, else 443 for https / 80 for http
+    parts = urlsplit(url if "//" in url else f"//{url}")
+    if parts.port:
+        return parts.port
+    return 443 if parts.scheme == "https" else 80
 
 
 class HttpPanel(QWidget):
@@ -213,6 +222,10 @@ class HttpPanel(QWidget):
 
     def set_url(self, url: str) -> None:
         self._url.setText(url)
+        # re-derive the port from the URL so the default output path lands under the NEW target's
+        # subtree — else a vhost enumerated from an 8443 selection would file its port-80 scan under
+        # http/8443/ (the stale _port). [#36]
+        self._port = _port_from_url(url)
         self._output_is_custom = False
         self._refresh()
 

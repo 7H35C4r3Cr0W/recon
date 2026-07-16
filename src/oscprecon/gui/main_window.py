@@ -697,11 +697,20 @@ class MainWindow(QMainWindow):
         if not self._profile.read_only:
             self._notes_pane.flush()
         self._notes_pane.clear_profile()
+        # cancel edb + live-HackTricks workers so a close/delete returns promptly. edb workers obey
+        # the cancel event, so wait() returns fast. A live fetch can't be aborted mid-socket, so we
+        # cancel (drop its stale result) and DON'T block on it — it only writes the XDG cache, and
+        # the app-exit closeEvent still wait()s any survivors. Blocking here froze the UI for the
+        # fetch timeout during a delete. [#48]
         for edb_worker in list(self._edb_workers):
             self._tasks.cancel(edb_worker)
-        for worker in (*self._edb_workers, *self._live_workers):
-            if isinstance(worker, QThread) and worker.isRunning():
-                worker.wait()
+        for live_worker in list(self._live_workers):
+            cancel = getattr(live_worker, "cancel", None)
+            if callable(cancel):
+                cancel()
+        for edb_worker in list(self._edb_workers):
+            if isinstance(edb_worker, QThread) and edb_worker.isRunning():
+                edb_worker.wait()
         self._release_lock()
         self._profile = None
         self._graph_view.clear_profile()  # no ghost of the deleted project in the graph/summary
@@ -1439,6 +1448,13 @@ class MainWindow(QMainWindow):
         if self._profile.read_only:
             QMessageBox.information(self, "Read-only", "This profile is open read-only.")
             return
+        if self._spray_pending > 0:
+            # a batch is already running against the shared spray/users.txt+passwords.txt lists — a
+            # a second launch would clobber _spray_pending and truncate the in-use lists mid-spray
+            QMessageBox.information(
+                self, "Spray running", "A credential spray is already running — wait or Stop it."
+            )
+            return
         dialog = SprayDialog(self._profile, config.load_settings().spray_enabled, self)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
@@ -1474,16 +1490,31 @@ class MainWindow(QMainWindow):
                 partial(
                     self._spray_done, profile=profile, service=service, output_file=output_file
                 ),
+                on_failed=partial(self._spray_failed, profile=profile),
                 line_filter=redact,
             )
             launched += 1
         self._spray_pending = launched  # set before any queued done-callback runs (GUI thread)
+        if launched == 0:
+            # nothing ran (no services selected, or every task slot was busy) — don't leave the
+            # plaintext users/passwords lists orphaned on disk with no worker to clean them [#8]
+            spray.clean_spray_artifacts(profile.directory)
 
     def _spray_done(self, code: int, profile: Profile, service: str, output_file: Path) -> None:
         self._record_spray_success(profile, service, output_file)
         self._command_done(code, None)
+        self._spray_worker_finished(profile)
+
+    def _spray_failed(self, message: str, profile: Profile) -> None:
+        # a spray worker that raised (missing tool, policy refusal) still counts as finished — clean
+        # up on this path too, else _spray_pending never reaches 0 and the plaintext lists leak [#8]
+        self._on_run_failed(message)
+        self._spray_worker_finished(profile)
+
+    def _spray_worker_finished(self, profile: Profile) -> None:
         self._spray_pending -= 1
         if self._spray_pending <= 0:  # last spray of this launch finished -> drop the input lists
+            self._spray_pending = 0
             removed = spray.clean_spray_artifacts(profile.directory)
             if removed and profile is self._profile:
                 self._tool_panel.append_output(f"[spray] removed input lists: {', '.join(removed)}")
@@ -1524,6 +1555,15 @@ class MainWindow(QMainWindow):
             dialog.exec()
         finally:
             picker.shutdown()  # wait the index worker before the widget is destroyed
+
+    def _at_capacity(self) -> bool:
+        # true (and tells the user why) when no task slot is free. The tool-panel launch buttons are
+        # normally disabled at capacity, but a queued/re-entrant signal can still reach these slots;
+        # §24 forbids dropping the action silently. [#49]
+        if self._tasks.can_start():
+            return False
+        self._tool_panel.append_output("[busy] at capacity — wait or Stop a task.")
+        return True
 
     def _refresh_busy(self) -> None:
         # why: profile-lifecycle actions (New/Open/Save) replace the shared Profile, so they lock
@@ -1569,6 +1609,8 @@ class MainWindow(QMainWindow):
         *,
         exclusive: bool = False,
         line_filter: Callable[[str], str] | None = None,
+        on_failed: Callable[[str], None]
+        | None = None,  # replaces the default failure slot if given
     ) -> None:
         # one lifecycle path for a line/done/failed worker: wire the streaming output, the result
         # slot, and the failure slot, then admit via _launch. Callers bind the originating profile
@@ -1583,7 +1625,7 @@ class MainWindow(QMainWindow):
             redact = line_filter
             signals.line.connect(lambda line: self._tool_panel.append_output(redact(line)))
         signals.done.connect(on_done)
-        signals.failed.connect(self._on_run_failed)
+        signals.failed.connect(on_failed if on_failed is not None else self._on_run_failed)
         self._launch(worker, label, exclusive=exclusive)
 
     def _release(self, worker: QThread) -> None:
@@ -1737,7 +1779,9 @@ class MainWindow(QMainWindow):
         self._start(worker, "nmap", self._on_scan_done, exclusive=True)
 
     def _on_run_command(self, command: str) -> None:
-        if self._profile is None or not self._tasks.can_start():
+        if self._profile is None:
+            return
+        if self._at_capacity():
             return
         manual_dir = self._profile.directory / "manual"
         manual_dir.mkdir(parents=True, exist_ok=True)
@@ -1750,7 +1794,9 @@ class MainWindow(QMainWindow):
         self._start(worker, _slug(command), lambda code: self._command_done(code, None))
 
     def _on_http_run(self, command: str, output_rel: str, tool: str, port: int) -> None:
-        if self._profile is None or not self._tasks.can_start() or not output_rel:
+        if self._profile is None or not output_rel:
+            return
+        if self._at_capacity():
             return
         struct_path = _contained_path(self._profile.directory, output_rel)
         if struct_path is None:
@@ -1810,7 +1856,9 @@ class MainWindow(QMainWindow):
             )
 
     def _on_vhost_run(self, command: str, output_rel: str, tool: str, domain: str) -> None:
-        if self._profile is None or not self._tasks.can_start() or not output_rel:
+        if self._profile is None or not output_rel:
+            return
+        if self._at_capacity():
             return
         struct_path = _contained_path(self._profile.directory, output_rel)
         if struct_path is None:
@@ -1855,7 +1903,9 @@ class MainWindow(QMainWindow):
                 self._tool_panel.append_output(f"[vhosts] +{len(hits)} -> findings.json")
 
     def _on_wildcard_detect(self, command: str, output_rel: str) -> None:
-        if self._profile is None or not self._tasks.can_start():
+        if self._profile is None:
+            return
+        if self._at_capacity():
             return
         out = _contained_path(self._profile.directory, output_rel)
         if out is None:
@@ -1884,11 +1934,9 @@ class MainWindow(QMainWindow):
         self._tool_panel.append_output(f"[http] enumerate vhost as http://{vhost}/")
 
     def _on_treat_as_http(self, service: object) -> None:
-        if (
-            not isinstance(service, DiscoveredService)
-            or self._profile is None
-            or not self._tasks.can_start()
-        ):
+        if not isinstance(service, DiscoveredService) or self._profile is None:
+            return
+        if self._at_capacity():
             return
         url = default_url(self._profile.target.ip, service.port, False)
         probe_out = self._profile.directory / "http" / str(service.port) / "probe.txt"
@@ -1913,7 +1961,9 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(f"[http] port {service.port} now treated as HTTP")
 
     def _on_smb_recon(self, mode: str) -> None:
-        if self._profile is None or not self._tasks.can_start():
+        if self._profile is None:
+            return
+        if self._at_capacity():
             return
         self._tool_panel.append_output(f"[smb] {mode} recon starting…")
         prof = self._profile
@@ -1932,7 +1982,9 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(f"[error] {exc}")
 
     def _on_ftp_recon(self, mode: str, port: int) -> None:
-        if self._profile is None or not self._tasks.can_start():
+        if self._profile is None:
+            return
+        if self._at_capacity():
             return
         self._tool_panel.append_output(f"[ftp] {mode} recon on port {port} starting…")
         prof = self._profile
@@ -1951,7 +2003,9 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(f"[error] {exc}")
 
     def _on_ssh_recon(self, port: int) -> None:
-        if self._profile is None or not self._tasks.can_start():
+        if self._profile is None:
+            return
+        if self._at_capacity():
             return
         self._tool_panel.append_output(f"[ssh] recon on port {port} starting…")
         prof = self._profile
@@ -1968,7 +2022,9 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(f"[error] {exc}")
 
     def _on_simple_recon(self, module_name: str, port: int = 0) -> None:
-        if self._profile is None or module_name not in SIMPLE_SPECS or not self._tasks.can_start():
+        if self._profile is None or module_name not in SIMPLE_SPECS:
+            return
+        if self._at_capacity():
             return
         self._tool_panel.append_output(f"[{module_name}] recon starting…")
         prof = self._profile
@@ -1985,7 +2041,9 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(f"[error] {exc}")
 
     def _on_dns_recon(self, domain: str, port: int) -> None:
-        if self._profile is None or not self._tasks.can_start():
+        if self._profile is None:
+            return
+        if self._at_capacity():
             return
         scope = f"zone {domain}" if domain else "no zone (version + recursion only)"
         self._tool_panel.append_output(f"[dns] recon on port {port} — {scope} starting…")
@@ -2003,7 +2061,9 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(f"[error] {exc}")
 
     def _on_ldap_recon(self, basedn: str, port: int) -> None:
-        if self._profile is None or not self._tasks.can_start():
+        if self._profile is None:
+            return
+        if self._at_capacity():
             return
         scope = f"base {basedn}" if basedn else "auto-discover base DN"
         self._tool_panel.append_output(f"[ldap] recon on port {port} — {scope} starting…")

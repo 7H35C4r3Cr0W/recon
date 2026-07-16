@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QEventLoop, Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -65,11 +66,28 @@ class AddCredentialDialog(QDialog):
     def _is_valid(self) -> bool:
         return bool(self._username.text().strip()) and bool(self._secret.text())
 
+    def _is_empty(self) -> bool:
+        # nothing typed anywhere — a click-away can safely close it (no input to lose)
+        fields = (self._username, self._secret, self._domain, self._source, self._notes)
+        return not any(w.text().strip() for w in fields)
+
     def event(self, e: QEvent) -> bool:
-        # click outside the popup (it loses window focus) -> dismiss it, AUTOSAVING if the required
-        # fields are filled (the "click-away to save & close" feel). Empty fields -> just close.
-        if e.type() == QEvent.Type.WindowDeactivate and self.isVisible():
-            self.accept() if self._is_valid() else self.reject()
+        # click outside the dialog (it loses window focus) -> AUTOSAVE & close if the required
+        # fields are filled (the "click-away to save" feel the user asked for). Guards:
+        #  - ignore deactivation caused by our OWN popup, e.g. opening the Type combo dropdown —
+        #    that is not a click-away and must not close the dialog mid-edit [#10];
+        #  - NEVER discard typed input on deactivate: if the fields are incomplete, stay open so the
+        #    user can Alt-Tab to a password manager to copy the secret and come back [#11]. Only an
+        #    untouched (empty) dialog auto-closes on click-away.
+        if (
+            e.type() == QEvent.Type.WindowDeactivate
+            and self.isVisible()
+            and QApplication.activePopupWidget() is None
+        ):
+            if self._is_valid():
+                self.accept()
+            elif self._is_empty():
+                self.reject()
         return super().event(e)
 
     def exec(self) -> int:

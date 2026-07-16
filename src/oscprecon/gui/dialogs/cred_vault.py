@@ -153,10 +153,12 @@ class CredentialVaultDialog(QDialog):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         updated = dialog.credential()
-        if updated is not None:
-            self._profile.delete_credential(current)  # edit = delete then re-add
-            self._profile.add_credential(updated)
-            self._refresh()
+        if updated is None:
+            return
+        # single atomic write instead of delete-then-add (avoids losing the cred on a failed write
+        # [#12] and the silent-drop-on-collision bug [#37]) — see Profile.replace_credential.
+        self._profile.replace_credential(current, updated)
+        self._refresh()
 
     def _on_delete(self) -> None:
         current = self._selected_cred()

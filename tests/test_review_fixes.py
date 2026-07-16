@@ -142,6 +142,69 @@ def test_netexec_shares_empty_perms_with_read_remark_not_readable() -> None:
     assert "backup" not in readable and "data" in readable
 
 
+# --- #4 auto vhost ffuf sweep carries -ac (wildcard filtering) ---------------------------------
+def test_auto_vhost_ffuf_has_autocalibration() -> None:
+    from oscprecon.models import Target
+    from oscprecon.modules.vhost import VhostModule
+
+    cmds = VhostModule().commands(Target(ip="10.10.10.5", hostname="thetoppers.htb"), [])
+    ffuf = next(c.shell_line for c in cmds if c.shell_line.startswith("ffuf"))
+    assert "-ac" in ffuf.split() and "-fs" not in ffuf.split()
+
+
+# --- #12/#37 atomic credential edit ------------------------------------------------------------
+def _profile_at(tmp_path: Path):  # type: ignore[no-untyped-def]
+    from oscprecon.models import Target
+    from oscprecon.profile import Profile
+
+    return Profile(profile_name="t", directory=tmp_path, target=Target(ip="10.10.10.5"))
+
+
+def test_replace_credential_is_in_place(tmp_path: Path) -> None:
+    from oscprecon.models import Credential
+
+    prof = _profile_at(tmp_path)
+    a = Credential(username="alice", domain="corp", secret="P@ss", source="smb")
+    b = Credential(username="bob", domain="corp", secret="P@ss", source="smb")
+    prof.add_credential(a)
+    prof.add_credential(b)
+    edited = Credential(
+        username="bob", domain="corp", secret="NewP@ss", source="smb", notes="rotated"
+    )
+    prof.replace_credential(b, edited)
+    creds = prof.credentials()
+    assert len(creds) == 2  # alice + edited bob, no loss, no accidental delete
+    bob = next(c for c in creds if c.username == "bob")
+    assert bob.secret == "NewP@ss" and bob.notes == "rotated"
+
+
+def test_replace_credential_collision_keeps_one_row(tmp_path: Path) -> None:
+    from oscprecon.models import Credential
+
+    prof = _profile_at(tmp_path)
+    a = Credential(username="alice", domain="corp", secret="P@ss", source="smb")
+    b = Credential(username="bob", domain="corp", secret="P@ss", source="smb")
+    prof.add_credential(a)
+    prof.add_credential(b)
+    # rename bob -> alice (colliding key). The edit must win and not silently vanish (#37).
+    collide = Credential(
+        username="alice", domain="corp", secret="P@ss", source="smb", notes="merged"
+    )
+    prof.replace_credential(b, collide)
+    creds = prof.credentials()
+    assert len(creds) == 1
+    assert creds[0].username == "alice" and creds[0].notes == "merged"
+
+
+# --- #36 http panel re-derives the port from a new URL -----------------------------------------
+def test_port_from_url() -> None:
+    from oscprecon.gui.widgets.http_panel import _port_from_url
+
+    assert _port_from_url("http://vhost/") == 80
+    assert _port_from_url("https://vhost/") == 443
+    assert _port_from_url("http://vhost:8080/app") == 8080
+
+
 # --- #40 delete_project refuses a symlink entry ------------------------------------------------
 def test_delete_project_refuses_symlink(tmp_path: Path) -> None:
     ws = tmp_path / "ws"

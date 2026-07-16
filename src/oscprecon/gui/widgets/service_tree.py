@@ -168,8 +168,12 @@ class ServiceTree(QTreeWidget):
         # otherwise churn it on every completion. force=True on a genuine profile switch, where a
         # coincidentally-identical signature must still rebind the items to the new profile.
         hosts = hosts or []
+        # the signature must include EVERY field the tree renders, else a deeper rescan that only
+        # enriches an existing row (fills a pivot host's product/OS on the same port set) yields an
+        # identical signature and the early-return leaves the tree stale. Track os_guess for the
+        # entry + each host, and full service detail (service/product/version) for pivot hosts. [#9]
         signature: tuple[object, ...] = (
-            (target.ip, target.hostname) if target is not None else None,
+            (target.ip, target.hostname, target.os_guess) if target is not None else None,
             tuple((s.port, s.proto.value, s.service, s.product, s.version) for s in services),
             tuple(
                 (
@@ -177,7 +181,10 @@ class ServiceTree(QTreeWidget):
                     h.hostname,
                     h.subnet,
                     h.pivot_source,
-                    tuple((v.port, v.proto.value) for v in h.services),
+                    h.os_guess,
+                    tuple(
+                        (v.port, v.proto.value, v.service, v.product, v.version) for v in h.services
+                    ),
                 )
                 for h in hosts
             ),

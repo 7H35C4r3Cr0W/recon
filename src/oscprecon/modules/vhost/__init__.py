@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from dataclasses import dataclass
 
 from oscprecon.models import Command, Finding, Port, ScanResults, Target
@@ -58,6 +59,11 @@ def wildcard_probe_command(scheme: str, target: str, domain: str) -> str:
     )
 
 
+# quote path fields so a space in a wordlist/output path survives shell.run's shlex.split (only adds
+# quotes when needed, so ordinary paths are emitted verbatim). [#35]
+_q = shlex.quote
+
+
 def _build_ffuf(s: VhostScanSettings) -> str:
     parts = [
         "ffuf",
@@ -66,13 +72,18 @@ def _build_ffuf(s: VhostScanSettings) -> str:
         "-H",
         f'"Host: FUZZ.{s.domain}"',
         "-w",
-        s.wordlist,
+        _q(s.wordlist),
     ]
     if s.filter_size is not None:
         parts += ["-fs", str(s.filter_size)]
+    else:
+        # auto-calibrate: filter the wildcard/default-vhost baseline. Without this (and with no -fs)
+        # a box that serves the same page for any Host header matches ALL ~5000 payloads, flooding
+        # findings with false vhosts (auto sweep passes filter_size=None). [#4]
+        parts += ["-ac"]
     parts += ["-t", str(s.threads)]
     if s.output_file:
-        parts += ["-o", s.output_file, "-of", "json"]
+        parts += ["-o", _q(s.output_file), "-of", "json"]
     return " ".join(parts)
 
 
@@ -85,7 +96,7 @@ def _build_gobuster_vhost(s: VhostScanSettings) -> str:
         "-u",
         f"{s.scheme}://{s.target}/",
         "-w",
-        s.wordlist,
+        _q(s.wordlist),
         "--append-domain",
         "--domain",
         s.domain,
@@ -93,29 +104,29 @@ def _build_gobuster_vhost(s: VhostScanSettings) -> str:
         str(s.threads),
     ]
     if s.output_file:
-        parts += ["-o", s.output_file]
+        parts += ["-o", _q(s.output_file)]
     return " ".join(parts)
 
 
 def _build_gobuster_dns(s: VhostScanSettings) -> str:
     # why: gobuster >=3.7 uses --domain (not -d, which is --delay) and --resolver (no -r alias).
-    parts = ["gobuster", "dns", "--domain", s.domain, "-w", s.wordlist, "-t", str(s.threads)]
+    parts = ["gobuster", "dns", "--domain", s.domain, "-w", _q(s.wordlist), "-t", str(s.threads)]
     if s.dns_server:
         parts += ["--resolver", s.dns_server]
     if s.output_file:
-        parts += ["-o", s.output_file]
+        parts += ["-o", _q(s.output_file)]
     return " ".join(parts)
 
 
 def _build_dnsrecon(s: VhostScanSettings) -> str:
-    parts = ["dnsrecon", "-d", s.domain, "-t", "brt", "-D", s.wordlist]
+    parts = ["dnsrecon", "-d", s.domain, "-t", "brt", "-D", _q(s.wordlist)]
     if s.dns_server:
         parts += ["-n", s.dns_server]
     return " ".join(parts)
 
 
 def _build_wfuzz(s: VhostScanSettings) -> str:
-    parts = ["wfuzz", "-c", "-w", s.wordlist, "-H", f'"Host: FUZZ.{s.domain}"']
+    parts = ["wfuzz", "-c", "-w", _q(s.wordlist), "-H", f'"Host: FUZZ.{s.domain}"']
     if s.filter_size is not None:
         parts += ["--hh", str(s.filter_size)]
     parts += ["-u", f"{s.scheme}://{s.target}/"]

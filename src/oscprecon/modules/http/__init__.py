@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -13,6 +14,12 @@ from oscprecon.modules.http.parsers import (
     parse_tool,
     vhost_from_redirect,
 )
+
+# why: paths (wordlist/output) and the URL can carry a space (a ~/wordlists/ dir, a typed output
+# name) that shell.run's shlex.split would break into two argv tokens. Quote them so the assembled
+# command survives the round-trip. shlex.quote adds quotes ONLY when needed, so ordinary paths are
+# emitted verbatim and existing command strings are unchanged. [#35]
+_q = shlex.quote
 
 __all__ = [
     "EXTENSION_PRESETS",
@@ -141,7 +148,7 @@ def _csv(values: list[int]) -> str:
 
 
 def _build_feroxbuster(s: HttpScanSettings) -> str:
-    parts = ["feroxbuster", "-u", s.url, "-w", s.wordlist]
+    parts = ["feroxbuster", "-u", _q(s.url), "-w", _q(s.wordlist)]
     if s.extensions:
         parts += ["-x", ",".join(s.extensions)]
     parts += ["-d", str(s.depth), "-t", str(s.threads), "--timeout", str(s.timeout)]
@@ -152,12 +159,12 @@ def _build_feroxbuster(s: HttpScanSettings) -> str:
     if s.status_codes:
         parts += ["-s", _csv(s.status_codes)]
     if s.output_file:
-        parts += ["-o", s.output_file]
+        parts += ["-o", _q(s.output_file)]
     return " ".join(parts)
 
 
 def _build_gobuster(s: HttpScanSettings) -> str:
-    parts = ["gobuster", "dir", "-u", s.url, "-w", s.wordlist]
+    parts = ["gobuster", "dir", "-u", _q(s.url), "-w", _q(s.wordlist)]
     if s.extensions:
         parts += ["-x", ",".join(s.extensions)]
     parts += ["-t", str(s.threads), "--timeout", f"{s.timeout}s"]
@@ -166,13 +173,13 @@ def _build_gobuster(s: HttpScanSettings) -> str:
     if s.status_codes:
         parts += ["-b", '""', "-s", _csv(s.status_codes)]
     if s.output_file:
-        parts += ["-o", s.output_file]
+        parts += ["-o", _q(s.output_file)]
     return " ".join(parts)
 
 
 def _build_ffuf(s: HttpScanSettings) -> str:
     url = s.url if "FUZZ" in s.url else s.url.rstrip("/") + "/FUZZ"
-    parts = ["ffuf", "-u", url, "-w", s.wordlist]
+    parts = ["ffuf", "-u", _q(url), "-w", _q(s.wordlist)]
     if s.extensions:
         parts += ["-e", "." + ",.".join(s.extensions)]
     parts += ["-t", str(s.threads), "-timeout", str(s.timeout)]
@@ -183,12 +190,12 @@ def _build_ffuf(s: HttpScanSettings) -> str:
     if s.status_codes:
         parts += ["-mc", _csv(s.status_codes)]
     if s.output_file:
-        parts += ["-o", s.output_file, "-of", "json"]
+        parts += ["-o", _q(s.output_file), "-of", "json"]
     return " ".join(parts)
 
 
 def _build_dirsearch(s: HttpScanSettings) -> str:
-    parts = ["dirsearch", "-u", s.url, "-w", s.wordlist]
+    parts = ["dirsearch", "-u", _q(s.url), "-w", _q(s.wordlist)]
     if s.extensions:
         parts += ["-e", ",".join(s.extensions)]
     parts += ["-t", str(s.threads), "--timeout", str(s.timeout)]
@@ -197,7 +204,7 @@ def _build_dirsearch(s: HttpScanSettings) -> str:
     if s.status_codes:
         parts += ["-i", _csv(s.status_codes)]
     if s.output_file:
-        parts += ["-o", s.output_file]
+        parts += ["-o", _q(s.output_file)]
     return " ".join(parts)
 
 

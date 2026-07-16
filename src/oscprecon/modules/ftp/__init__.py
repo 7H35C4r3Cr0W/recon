@@ -122,7 +122,7 @@ class FtpModule(Module):
             FtpStep(
                 Command(
                     "ftp",
-                    f"curl -s {shlex.quote(url)}",
+                    f"curl -s --connect-timeout 10 --max-time 60 {shlex.quote(url)}",
                     "Anonymous root directory listing.",
                     "< 30s",
                     "ftp/curl-root.txt",
@@ -140,7 +140,7 @@ class FtpModule(Module):
         return FtpStep(
             Command(
                 "ftp",
-                f"curl -s {shlex.quote(url)}",
+                f"curl -s --connect-timeout 10 --max-time 60 {shlex.quote(url)}",
                 f"Anonymous listing of {path}.",
                 "< 30s",
                 f"ftp/dirs/{_dir_slug(path)}-{digest}.txt",
@@ -149,14 +149,16 @@ class FtpModule(Module):
         )
 
     def peek_step(self, target: Target, path: str, port: int = 21) -> FtpStep:
-        # fetch a small, already-listed text file whole (§12: bounded read). --max-time bounds
-        # a slow/large transfer even if the listed size was wrong; the snippet shows only the head.
+        # fetch the HEAD of a small, already-listed text file (§12: bounded read). `-r 0-N` caps the
+        # transfer by BYTES, not just --max-time (which bounds time only): a target under-reporting
+        # a file's size in its listing can't force a multi-GB download / OOM on a fast link. [#23]
         url = ftp_file_url(target.ip, port, path)
         digest = hashlib.sha1(path.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
         return FtpStep(
             Command(
                 "ftp",
-                f"curl -s --max-time 15 {shlex.quote(url)}",
+                f"curl -s --connect-timeout 10 --max-time 15 -r 0-{PEEK_MAX_BYTES - 1} "
+                f"{shlex.quote(url)}",
                 f"Peek: preview the head of {path} (small text file).",
                 "< 15s",
                 f"ftp/peek/{_dir_slug(path)}-{digest}.txt",
