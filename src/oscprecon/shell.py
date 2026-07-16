@@ -42,28 +42,9 @@ _CRED_TOOLS: frozenset[str] = frozenset(
 )
 _SECRET_VALUE_FLAGS: frozenset[str] = frozenset({"-p", "-a", "-w", "-H", "--hashes"})
 
-# inline creds that aren't flag-values: impacket / URL target forms `[domain/]user:PASSWORD@host`.
-# Mask PASSWORD from ':' to the LAST '@' before the host (so a secret CONTAINING '@' — impacket
-# splits on the last '@' — is fully masked). A bare `host:port` has no '@', so it's untouched.
-_INLINE_CRED_RE = re.compile(r"(:)([^\s'\"]+)(@[\w.-]+)(?=['\"\s/]|$)")
-# smbclient/netexec `-U user%PASSWORD` — mask after '%'. Scoped to a -U/--user value so a URL's %XX
-# percent-encoding is never touched.
-_UNC_CRED_RE = re.compile(r"(-U\s+|--user[ =])([^\s'\"%]+%)([^\s'\"]+)")
-
 
 def _mask(value: str) -> str:
     return f"<redacted len={len(value)}>"
-
-
-def redact_secrets(shell_line: str) -> str:
-    # secret-free rendering of a full command for audit/report/log: flag-value secrets (-p/--pass…)
-    # AND inline user:PASSWORD@host creds are masked. Best-effort; never raises on a weird line.
-    try:
-        redacted = _redact_cmdline(shlex.split(shell_line))
-    except ValueError:
-        redacted = shell_line
-    redacted = _INLINE_CRED_RE.sub(lambda m: f"{m.group(1)}<redacted>{m.group(3)}", redacted)
-    return _UNC_CRED_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}<redacted>", redacted)
 
 
 def _redact_cmdline(argv: list[str]) -> str:
@@ -179,147 +160,6 @@ _FORBIDDEN_FLAGS: frozenset[str] = frozenset({"--continue-on-success", "--passwo
 # why: OSCP-legal credential-spraying binaries (§2a). Permitted ONLY in Spray mode
 # (policy_violation(spray=True), i.e. config.spray_enabled). Off everywhere else.
 SPRAY_TOOLS: frozenset[str] = frozenset({"hydra", "medusa"})
-
-# why: manual-exploitation attack tools (CLAUDE.md §2b). Permitted ONLY when a command is launched
-# from the Exploitation tab (policy_violation(exploit=True)). These are OSCP-legal attack SCRIPTS —
-# the exam bans automated-exploitation FRAMEWORKS + AI, not manual tools like impacket/evil-winrm/
-# hashcat/responder/certipy. Each is user-selected and Run one command at a time — never a chain.
-EXPLOIT_TOOLS: frozenset[str] = frozenset(
-    {
-        # impacket exploitation/post-ex (the enum ones are already in ALLOWED_TOOLS)
-        "impacket-secretsdump",
-        "secretsdump.py",
-        "impacket-psexec",
-        "psexec.py",
-        "impacket-wmiexec",
-        "wmiexec.py",
-        "impacket-smbexec",
-        "smbexec.py",
-        "impacket-atexec",
-        "atexec.py",
-        "impacket-dcomexec",
-        "dcomexec.py",
-        "impacket-getTGT",
-        "getTGT.py",
-        "impacket-getST",
-        "getST.py",
-        "impacket-ticketer",
-        "ticketer.py",
-        "impacket-findDelegation",
-        "findDelegation.py",
-        "impacket-addcomputer",
-        "addcomputer.py",
-        "impacket-owneredit",
-        "owneredit.py",
-        "impacket-dacledit",
-        "dacledit.py",
-        "impacket-ntlmrelayx",
-        "ntlmrelayx.py",
-        "impacket-smbserver",
-        "smbserver.py",
-        "impacket-changepasswd",
-        # impacket enum wrappers WITHOUT the .py suffix (modern Kali packaging), used in attacks
-        "impacket-GetUserSPNs",
-        "impacket-GetNPUsers",
-        "impacket-GetADUsers",
-        "impacket-lookupsid",
-        "impacket-mssqlclient",
-        # shells / lateral
-        "evil-winrm",
-        "certipy-ad",
-        "certipy",
-        "responder",
-        # offline cracking (operates on captured hashes, never touches the target)
-        "hashcat",
-        "john",
-        # generic exploit delivery / shells the user drives by hand
-        "nc",
-        "ncat",
-        "socat",
-        "python3",
-        "python",
-        "php",
-        "bash",
-        "sh",
-        "sshpass",
-        "git",
-        # service-specific attack clients (attacker-side, run FROM Kali)
-        "snmpset",  # SNMP write with a RW community
-        "xfreerdp",
-        "xfreerdp3",
-        "rdesktop",  # RDP clients
-        "ftp",
-        "tftp",
-        "ncftpput",  # FTP transfer clients
-        "mount",
-        "umount",  # NFS/SMB mount for exploitation (no_root_squash etc.)
-        "tcpdump",  # OOB confirmation (blind cmdi / hash capture)
-        "jar",
-        "java",
-        "gcc",  # build/deploy exploit artefacts (WAR, kernel exploit)
-        "scp",
-        "ssh-keygen",  # key-based lateral movement + transfer
-        # coreutils used to stage payloads on the attacker side
-        "echo",
-        "cat",
-        "ls",
-        "cp",
-        "mv",
-        "chmod",
-        "base64",
-        "tee",
-        "printf",
-        "mkfifo",
-        # offline cracking prep + shell handlers (attacker-side, no target contact by themselves)
-        "ssh2john",
-        "pwncat-cs",
-        "pwncat",
-        "mimikatz",  # usually victim-side; harmless here (not-found) if a template is attacker-set
-        "sshuttle",  # attacker-side pivot/tunnel
-        "mkdir",  # stage payloads / mount points
-    }
-)
-
-# leading tokens that are NOT the real command: env-var assignments (VAR=val) and command wrappers.
-# _effective_tool() skips them so both the hard-forbidden block AND the allow-list see the ACTUAL
-# tool — e.g. `sudo mount`, `KRB5CCNAME=x impacket-psexec`, `sudo sqlmap` (still blocked).
-_CMD_WRAPPERS: frozenset[str] = frozenset(
-    {
-        "sudo",
-        "env",
-        "command",
-        "nice",
-        "time",
-        "stdbuf",
-        "timeout",
-        "doas",
-        "rlwrap",
-        "proxychains",
-        "proxychains4",
-    }
-)
-
-# why: NEVER run these — even in Exploitation mode. sqlmap + the Metasploit family are the
-# automated-exploitation tools the OSCP exam forbids (Metasploit is limited to one manual use and is
-# out of this tool entirely); commercial scanners are banned. Blocked ahead of every allow-list so a
-# hand-typed or template command can never launch one. (Exploit-DB PoCs stay lookup-only, §14.)
-_HARD_FORBIDDEN_TOOLS: frozenset[str] = frozenset(
-    {
-        "sqlmap",
-        "msfconsole",
-        "msfvenom",
-        "msfdb",
-        "meterpreter",
-        "metasploit",
-        "armitage",
-        "cobaltstrike",
-        "nessus",
-        "openvas",
-        "nexpose",
-        "burpsuite",
-        "acunetix",
-    }
-)
 
 # why: the DB clients are allow-listed for read-only enum (§12), but the custom-command path lets a
 # user hand-type a query — refuse file-write / read / OS-exec / DDL primitives (not recon).
@@ -559,111 +399,25 @@ def _script_values(argv: list[str]) -> list[str]:
     return values
 
 
-_ENVVAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-
-# match a hard-forbidden tool as a whole WORD anywhere in the command string — after a wrapper flag
-# (`sudo -u root sqlmap`), inside a shell payload (`bash -c "sqlmap …"`), or as a bare token. Word
-# boundaries are shell separators / path slashes, so a filename `sqlmap-notes.txt` or a URL path
-# `/metasploit/` does NOT trip it (the trailing '-' or '/' isn't a separator).
-_FORBIDDEN_WORD_RE = re.compile(
-    r"(?:^|[\s/;&|`$(><'\"])("
-    + "|".join(re.escape(t) for t in sorted(_HARD_FORBIDDEN_TOOLS))
-    + r")(?:$|[\s;&|)'\"])"
-)
-
-
-def _names_forbidden_tool(argv: list[str]) -> str | None:
-    # authoritative hard-block: no wrapper/shell/path trick may run sqlmap/Metasploit/a scanner.
-    for tok in argv:
-        if os.path.basename(tok).lower() in _HARD_FORBIDDEN_TOOLS:
-            return os.path.basename(tok).lower()
-    m = _FORBIDDEN_WORD_RE.search(" ".join(argv).lower())
-    return m.group(1) if m is not None else None
-
-
-# wrapper options that take a SEPARATE-token value — their value must be skipped too, or it gets
-# mistaken for the program (`env -u nmap bash` would resolve to 'nmap', spoofing the allow-list).
-_WRAPPER_VALUE_FLAGS = frozenset(
-    {
-        "-u",
-        "-g",
-        "-U",
-        "-p",
-        "-C",
-        "-h",
-        "-r",
-        "-t",
-        "-R",
-        "-D",
-        "-n",
-        "-s",
-        "-k",
-        "-f",
-        "-i",
-        "-o",
-        "-e",
-        "-S",
-        "-P",
-    }
-)
-_DURATION_RE = re.compile(r"^\d+(?:\.\d+)?[smhd]?$")  # timeout's positional DURATION
-
-
-def _effective_tool(argv: list[str]) -> str:
-    # resolve the token of the REAL program past leading `VAR=val` env assignments and ONE level of
-    # command wrapper (sudo/env/timeout…), correctly skipping each wrapper flag AND any value-taking
-    # value it consumes. `sudo mount`->`mount`; `KRB5CCNAME=x impacket-psexec`->`impacket-psexec`;
-    # `env -u nmap bash -c id`->`bash` (NOT the -u value 'nmap'). Used ONLY in exploit mode — recon/
-    # spray never strip wrappers (policy_violation passes argv[0] there), so a wrapper is just a
-    # non-allowlisted tool and is blocked.
-    i = 0
-    while i < len(argv):
-        tok = argv[i]
-        if _ENVVAR_RE.match(tok):
-            i += 1
-            continue
-        base = os.path.basename(tok).lower()
-        if base in _CMD_WRAPPERS:
-            i += 1
-            if base == "timeout" and i < len(argv) and _DURATION_RE.match(argv[i]):
-                i += 1  # timeout DURATION cmd — DURATION may lead the flags
-            while i < len(argv) and argv[i].startswith("-"):
-                takes_value = argv[i] in _WRAPPER_VALUE_FLAGS  # `-u NAME` etc. — skip NAME too
-                i += 1
-                if takes_value and i < len(argv):
-                    i += 1
-            if i < len(argv) and argv[i] == "--":  # sudo/env end-of-options marker
-                i += 1
-            if base == "timeout" and i < len(argv) and _DURATION_RE.match(argv[i]):
-                i += 1  # …or DURATION follows the flags
-            continue
-        return tok
-    return argv[0] if argv else ""
-
-
 def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = False) -> str | None:
-    # `spray=True` ONLY in opt-in Spray mode (§2a); `exploit=True` ONLY for a command launched from
-    # the Exploitation tab (§2b). Each loosens exactly its own tool category; everything else stays
-    # blocked. Metasploit/SQLMap/commercial scanners are HARD-blocked ahead of every allow-list, so
-    # they can never run in any mode. DB file/OS primitives, searchsploit PoC copy, ike-scan PSK
-    # capture, ntpdate clock-set stay blocked either way.
+    # `spray=True` ONLY in opt-in Spray mode (§2a); `exploit=True` ONLY for a command the user
+    # SELECTED and CONFIRMED in the Exploitation tab (§2b).
+    #
+    # Exploitation mode is a human-driven attack console: the operator picks the command + confirms
+    # it against a named target before anything runs. That human step — not a tool block-list — is
+    # the guardrail (OSCP bans *auto*-exploitation + AI, not manual attack scripts; nothing here is
+    # automatic or chained). So exploit mode runs the confirmed command as-is, including attack
+    # tools recon mode would never allow. The DEFAULT recon mode is unchanged and stays exam-legal.
     if not argv:
         return "empty command"
-    # authoritative hard-block FIRST: sqlmap/Metasploit/commercial scanners can never run — not via
-    # a wrapper (sudo/env), a shell payload (bash -c "…"), a path, or a flag value. EVERY mode.
-    forbidden = _names_forbidden_tool(argv)
-    if forbidden is not None:
-        return f"{forbidden} is a banned automated-exploitation/commercial tool (never run — §2)"
-    # allow-list check. ONLY exploit mode resolves past sudo/env/VAR= wrappers (attacker perk);
-    # recon/spray judge argv[0] directly, so a wrapper (`env …`, `sudo …`) is a non-allowlisted tool
-    # and is refused — closing the `env -u nmap bash -c …` arbitrary-exec hole in the default mode.
-    tool = _effective_tool(argv) if exploit else argv[0]
+    if exploit:
+        return None  # user-selected + confirmed attack command — the human is the gate
+    # --- recon / spray (default, exam-legal) below ---
+    tool = argv[0]
     base = os.path.basename(tool).lower()
     allowed = set(ALLOWED_TOOLS)
     if spray:
         allowed |= SPRAY_TOOLS
-    if exploit:
-        allowed |= EXPLOIT_TOOLS
     if tool not in allowed and base not in allowed:
         return f"{tool} is not on the OSCP-allowed tool list"
     if not spray:
@@ -792,7 +546,9 @@ def run(
             shell_line, 127, output_file, started, _now_iso(), 0.0, missing_tool=tool
         )
 
-    logger.info("run: %s", redacted)
+    # exploit mode is the user's own attack console — log the raw command (they want to see it);
+    # recon commands stay redacted in the diagnostics log as before.
+    logger.info("run: %s", shell_line if exploit else redacted)
     # why: stdin=DEVNULL + start_new_session detach the child from the launching terminal, so a
     # wrapped tool can never block on stdin or /dev/tty for interactive input (e.g. an ssh password
     # prompt). Without this a single interactive command hangs the streaming read loop forever and

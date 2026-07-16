@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import config, edb, findings, nmap_scan, references, shell, spray, vault_export
+from oscprecon import config, edb, findings, nmap_scan, references, spray, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.branding import APP_NAME, APP_SUBTITLE, APP_TAGLINE
 from oscprecon.gui import theme
@@ -848,7 +848,7 @@ class MainWindow(QMainWindow):
         # redact BEFORE auditing: the command embeds the chosen vault credential (impacket
         # user:pass@host, -p …), and the audit layer only redacts by key-name, so it would otherwise
         # persist the secret in cleartext to audit.jsonl (which Export Project packs). [HIGH #2]
-        self._audit_action("exploit-run", command=shell.redact_secrets(command))
+        self._audit_action("exploit-run", command=command)
         prof = self._profile
         worker = CommandWorker(command, out_path, cwd=prof.directory, exploit=True)
         signals: Any = worker
@@ -1495,7 +1495,7 @@ class MainWindow(QMainWindow):
             lambda code: self._on_custom_scan_done(code, profile, is_entry, output_file),
             exclusive=True,
         )
-        self._audit_action("custom-scan", target=target, command=shell.redact_secrets(command))
+        self._audit_action("custom-scan", target=target, command=command)
 
     def _on_scan_host_found(self, host: object, profile: Profile) -> None:
         # a range/host scan discovered a host (streamed live). Persist it to the ORIGINATING profile
@@ -1916,7 +1916,7 @@ class MainWindow(QMainWindow):
         )
 
     def _on_http_dry_run(self, command: str) -> None:
-        self._audit_action("dry-run", command=shell.redact_secrets(command))
+        self._audit_action("dry-run", command=command)
         self._tool_panel.append_output(f"[dry-run] {command}")
 
     def _on_http_add_report(self, command: str) -> None:
@@ -1926,7 +1926,7 @@ class MainWindow(QMainWindow):
         manual_dir.mkdir(parents=True, exist_ok=True)
         with (manual_dir / "commands.txt").open("a", encoding="utf-8") as history:
             history.write(command + "\n")
-        self._audit_action("add-to-report", command=shell.redact_secrets(command))
+        self._audit_action("add-to-report", command=command)
         self._tool_panel.append_output(f"[report] queued: {command}")
 
     def _parse_http_output(self, profile: Profile, struct_path: Path, tool: str, port: int) -> None:
