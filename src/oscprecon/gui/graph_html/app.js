@@ -785,8 +785,18 @@
       applyExpandCollapse();
     }
     if (!hadPrev) {
-      if (isPivot) relayoutVisible();
-      else if (hasSaved) cy.fit(undefined, 40);
+      if (isPivot) {
+        // land the entry node front-and-centre IMMEDIATELY (no black canvas / off-screen node): with
+        // just the entry visible there's nothing to lay out, so centre it at a comfortable zoom right
+        // away. Only fall back to the force layout once more than a couple of nodes are shown.
+        var vis0 = elementsVisible();
+        if (vis0.nodes().length <= 3) {
+          cy.zoom(1.1);
+          cy.center(vis0);
+        } else {
+          relayoutVisible();
+        }
+      } else if (hasSaved) cy.fit(undefined, 40);
       else runLayout("hier");
     } else if (newNodes > 0 && !isPivot) {
       // refresh with new nodes on a simple graph: re-layout so they get placed, then keep the camera

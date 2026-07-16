@@ -132,3 +132,31 @@ def test_vault_read_only_disables_mutation_but_not_copy(qtbot: QtBot, tmp_path: 
     d._table.selectRow(0)  # row actions are selection-gated; copy stays available read-only
     assert not d._add.isEnabled() and not d._edit.isEnabled() and not d._delete.isEnabled()
     assert d._copy_user.isEnabled() and d._copy_secret.isEnabled()  # copy is read-only-safe
+
+
+def test_credential_dialog_autosaves_on_click_away(qtbot: QtBot) -> None:
+    from PySide6.QtCore import QEvent
+
+    from oscprecon.gui.dialogs.credential import AddCredentialDialog
+
+    d = AddCredentialDialog()
+    qtbot.addWidget(d)
+    d._username.setText("svc")
+    d._secret.setText("S3cret")
+    d.show()
+    d.event(QEvent(QEvent.Type.WindowDeactivate))  # click outside the popup
+    assert d.result() == QDialog.DialogCode.Accepted
+    cred = d.credential()
+    assert cred is not None and cred.username == "svc" and cred.secret == "S3cret"
+
+
+def test_credential_dialog_dismisses_when_empty_on_click_away(qtbot: QtBot) -> None:
+    from PySide6.QtCore import QEvent
+
+    from oscprecon.gui.dialogs.credential import AddCredentialDialog
+
+    d = AddCredentialDialog()
+    qtbot.addWidget(d)
+    d.show()
+    d.event(QEvent(QEvent.Type.WindowDeactivate))  # click away with nothing entered -> just close
+    assert d.result() == QDialog.DialogCode.Rejected

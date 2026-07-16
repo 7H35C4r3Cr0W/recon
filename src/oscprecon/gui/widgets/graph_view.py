@@ -194,8 +194,8 @@ class GraphDetail(QWidget):
 
     @staticmethod
     def _describe(data: dict[str, Any]) -> str:
-        # a rich, node-type-aware summary so the graph is self-sufficient — the user never has to flip
-        # back to the recon tab to see an IP, a service/version, or a /24's host count.
+        # a rich, node-type-aware summary so the graph is self-sufficient — no flipping back to the
+        # recon tab just to see an IP, a service/version, or a /24's host count.
         node_type = str(data.get("type", "node"))
         bits: list[str] = []
         if node_type == "target":
@@ -210,7 +210,9 @@ class GraphDetail(QWidget):
             bits.append(f"Internal network (/24) — {hosts}")
             via = str(data.get("via", ""))
             if via:
-                bits.append("reached via: entry host" if via == "target" else f"reached via: {via[5:]}")
+                bits.append(
+                    "reached via: entry host" if via == "target" else f"reached via: {via[5:]}"
+                )
         elif node_type == "host":
             bits.append("Pivoted host")
             if data.get("ip"):
@@ -221,7 +223,8 @@ class GraphDetail(QWidget):
             if count is not None:
                 bits.append(f"{count} service{'s' if count != 1 else ''}")
         elif node_type == "service":
-            bits.append(f"Service — {data.get('port', '?')}/{data.get('proto', '?')} {data.get('service', '')}".strip())
+            port_proto = f"{data.get('port', '?')}/{data.get('proto', '?')}"
+            bits.append(f"Service — {port_proto} {data.get('service', '')}".strip())
             if data.get("product"):
                 bits.append(f"product: {data['product']}")
         elif node_type == "credential":

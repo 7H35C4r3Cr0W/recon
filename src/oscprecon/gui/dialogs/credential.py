@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PySide6.QtCore import QEvent, QEventLoop, Qt
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -59,7 +60,29 @@ class AddCredentialDialog(QDialog):
         self._validate()  # Ok stays disabled until the required fields are present
 
     def _validate(self) -> None:
-        self._ok.setEnabled(bool(self._username.text().strip()) and bool(self._secret.text()))
+        self._ok.setEnabled(self._is_valid())
+
+    def _is_valid(self) -> bool:
+        return bool(self._username.text().strip()) and bool(self._secret.text())
+
+    def event(self, e: QEvent) -> bool:
+        # click outside the popup (it loses window focus) -> dismiss it, AUTOSAVING if the required
+        # fields are filled (the "click-away to save & close" feel). Empty fields -> just close.
+        if e.type() == QEvent.Type.WindowDeactivate and self.isVisible():
+            self.accept() if self._is_valid() else self.reject()
+        return super().event(e)
+
+    def exec(self) -> int:
+        # run NON-modally so an outside click deactivates + dismisses us, but still block the caller
+        # (its `dialog.exec() == Accepted` flow) via a local event loop until we close.
+        self.setWindowModality(Qt.WindowModality.NonModal)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        loop = QEventLoop()
+        self.finished.connect(loop.quit)
+        loop.exec()
+        return self.result()
 
     def credential(self) -> Credential | None:
         username = self._username.text().strip()
