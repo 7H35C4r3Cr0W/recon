@@ -46,6 +46,8 @@ b,strong{color:var(--text)} .gold{color:var(--gold)}
 .showcase{display:flex;flex-direction:column;gap:14px;flex:1;min-height:0;align-items:center}
 .showcase .shot{max-width:min(100%,1080px)}
 .showcase .shot img{max-height:52vh;width:auto;max-width:100%}
+.showcase.hero .shot{max-width:min(100%,1300px)}
+.showcase.hero .shot img{max-height:66vh}
 .prow{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;width:100%;max-width:1080px}
 .prow .p{flex:1 1 210px;max-width:330px}
 .prow .p .h{color:var(--gold);font-weight:700;display:block;margin-bottom:2px;font-size:14.5px}
@@ -143,14 +145,14 @@ const SLIDES = [
   {cls:"", html:`
     <div class="eyebrow">The workspace</div>
     <h2>Everything for one box, in one window.</h2>
-    <div class="body">
-      ${S("shell-dark.png","Nabu's three-pane recon workspace")}<div class="cap">Recon tab · service tree · command builder · live HackTricks &amp; Exploit-DB</div></div>
-      <ul class="points">
-        <li><span class="h">Left: your services.</span> <small>Every open port, TCP + UDP, click to drive its module.</small></li>
-        <li><span class="h">Middle: the command builder.</span> <small>Dropdowns &amp; sliders build the exact tool command — you press Run.</small></li>
-        <li><span class="h">Right: references, offline.</span> <small>The matching HackTricks page + a version-aware Exploit-DB lookup.</small></li>
-        <li><span class="h">Rail: the whole workflow.</span> <small>Workspace · Recon · Graph · Findings · Credentials · Notes · Report.</small></li>
-      </ul>
+    <div class="showcase hero">
+      ${S("shell-dark.png","Nabu's three-pane recon workspace")}<div class="cap">Recon tab · service tree (left) · command builder (middle) · live HackTricks &amp; Exploit-DB (right)</div></div>
+      <div class="prow">
+        <div class="p"><span class="h">Left: your services.</span><small>Every open port, TCP + UDP — click to drive its module.</small></div>
+        <div class="p"><span class="h">Middle: the command builder.</span><small>Dropdowns &amp; sliders build the exact command — you press Run.</small></div>
+        <div class="p"><span class="h">Right: references, offline.</span><small>The matching HackTricks page + a version-aware Exploit-DB lookup.</small></div>
+        <div class="p"><span class="h">Rail: the whole workflow.</span><small>Workspace · Recon · Graph · Findings · Credentials · Notes · Report.</small></div>
+      </div>
     </div>`},
 
   // 4 — discover
