@@ -8,6 +8,7 @@ from oscprecon.gui.dialogs.log_viewer import LogViewerDialog
 from oscprecon.gui.dialogs.new_profile import NewProfileDialog
 from oscprecon.gui.dialogs.nmap_scan import NmapScanDialog
 from oscprecon.gui.dialogs.pivot_network import AddPivotNetworkDialog
+from oscprecon.gui.dialogs.scan_presets import ScanPresetsDialog
 from oscprecon.gui.dialogs.settings import SettingsDialog
 from oscprecon.gui.dialogs.spray import SprayDialog
 
@@ -20,6 +21,7 @@ __all__ = [
     "LogViewerDialog",
     "NewProfileDialog",
     "NmapScanDialog",
+    "ScanPresetsDialog",
     "SettingsDialog",
     "SprayDialog",
 ]

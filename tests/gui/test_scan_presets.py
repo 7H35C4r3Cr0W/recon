@@ -43,6 +43,7 @@ def test_scan_preset_noop_without_profile(qtbot: QtBot) -> None:
 def test_start_recon_passes_the_chosen_profile(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    config.save_prefs({"preflight_ping": "false"})  # skip the pre-flight ping -> scan launches now
     window = MainWindow()
     qtbot.addWidget(window)
     window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.42")))
@@ -55,7 +56,7 @@ def test_start_recon_passes_the_chosen_profile(
 def test_start_recon_default_uses_the_configured_profile(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    config.save_prefs({"scan_profile": "quick"})
+    config.save_prefs({"scan_profile": "quick", "preflight_ping": "false"})
     window = MainWindow()
     qtbot.addWidget(window)
     window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.42")))

@@ -168,6 +168,15 @@ class SettingsDialog(QDialog):
         )
         note.setWordWrap(True)
         layout.addWidget(note)
+        self._preflight_ping = QCheckBox("Pre-flight ping check before a full recon")
+        layout.addWidget(self._preflight_ping)
+        preflight_note = QLabel(
+            "ON by default. A quick nmap host-discovery ping (no port scan) runs first and "
+            "confirms the target answered before the long recon starts — or lets you scan a "
+            "filtered/down host anyway. Uncheck to jump straight into the scan."
+        )
+        preflight_note.setWordWrap(True)
+        layout.addWidget(preflight_note)
         self._spray_enabled = QCheckBox("Enable Spray mode (credential brute / spraying)")
         layout.addWidget(self._spray_enabled)
         spray_note = QLabel(
@@ -311,6 +320,7 @@ class SettingsDialog(QDialog):
         prof_idx = self._scan_profile.findData(settings.scan_profile)
         self._scan_profile.setCurrentIndex(prof_idx if prof_idx >= 0 else 0)
         self._udp_full.setChecked(settings.nmap_udp_full)
+        self._preflight_ping.setChecked(settings.preflight_ping)
         self._spray_enabled.setChecked(settings.spray_enabled)
         self._exploit_enabled.setChecked(settings.exploit_enabled)
         self._ht_live.setChecked(settings.hacktricks_live_enabled)
@@ -330,6 +340,7 @@ class SettingsDialog(QDialog):
             max_concurrency=self._concurrency.value(),
             nmap_udp_full=self._udp_full.isChecked(),
             scan_profile=str(self._scan_profile.currentData()),
+            preflight_ping=self._preflight_ping.isChecked(),
             spray_enabled=self._spray_enabled.isChecked(),
             exploit_enabled=self._exploit_enabled.isChecked(),
             hacktricks_live_enabled=self._ht_live.isChecked(),

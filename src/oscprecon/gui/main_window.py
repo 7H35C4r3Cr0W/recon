@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import config, edb, findings, nmap_scan, references, spray, vault_export
+from oscprecon import alive, config, edb, findings, nmap_scan, references, spray, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.branding import APP_NAME, APP_SUBTITLE, APP_TAGLINE
 from oscprecon.gui import theme
@@ -44,6 +44,7 @@ from oscprecon.gui.dialogs import (
     LogViewerDialog,
     NewProfileDialog,
     NmapScanDialog,
+    ScanPresetsDialog,
     SettingsDialog,
     SprayDialog,
 )
@@ -75,6 +76,7 @@ from oscprecon.gui.workers import (
     LdapReconWorker,
     LiveHacktricksWorker,
     NmapWorker,
+    PingWorker,
     SearchsploitWorker,
     SimpleReconResult,
     SimpleReconWorker,
@@ -186,6 +188,24 @@ class MainWindow(QMainWindow):
         self._run_button.clicked.connect(lambda: self._start_recon("quick"))
         self._build_run_menu()
 
+        # a visible Pivot control so ligolo-ng isn't buried in a menu — one click to the helper,
+        # plus importing a pivot scan / scanning a range across the tunnel.
+        self._pivot_button = QToolButton()
+        self._pivot_button.setText("🔀 Pivot…")
+        self._pivot_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self._pivot_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._pivot_button.setToolTip(
+            "Pivot into an internal network — Ligolo-ng helper, import a pivot scan, scan a /24"
+        )
+        pivot_menu = QMenu(self._pivot_button)
+        lig = pivot_menu.addAction("🔀 Ligolo-ng helper…")
+        lig.triggered.connect(self._on_ligolo_helper)
+        addnet = pivot_menu.addAction("Add pivoted network (import a scan)…")
+        addnet.triggered.connect(self._on_add_pivot_network)
+        scanrange = pivot_menu.addAction("Scan a host / range…")
+        scanrange.triggered.connect(lambda: self._on_custom_scan())
+        self._pivot_button.setMenu(pivot_menu)
+
         self._service_tree = ServiceTree()
         self._service_tree.service_selected.connect(self._on_service_selected)
         self._service_tree.treat_as_http.connect(self._on_treat_as_http)
@@ -230,7 +250,10 @@ class MainWindow(QMainWindow):
         left = QWidget()
         left_layout = QVBoxLayout(left)
         left_layout.addWidget(self._target_label)
-        left_layout.addWidget(self._run_button)
+        run_row = QHBoxLayout()
+        run_row.addWidget(self._run_button, stretch=1)
+        run_row.addWidget(self._pivot_button)
+        left_layout.addLayout(run_row)
         left_layout.addWidget(self._task_bar)
         left_layout.addWidget(self._service_tree, stretch=1)
 
@@ -346,6 +369,12 @@ class MainWindow(QMainWindow):
         self._new_action.triggered.connect(self._on_new)
         file_menu.addAction(self._new_action)
 
+        self._edit_project_action = QAction("Edit Project (name / target)...", self)
+        self._edit_project_action.setShortcut("Ctrl+E")
+        self._edit_project_action.setStatusTip("Rename the project or change its target IP / range")
+        self._edit_project_action.triggered.connect(self._on_edit_project)
+        file_menu.addAction(self._edit_project_action)
+
         self._open_action = QAction("Open Scan Profile...", self)
         self._open_action.setShortcut("Ctrl+O")
         self._open_action.triggered.connect(self._on_open)
@@ -399,12 +428,19 @@ class MainWindow(QMainWindow):
         )
         custom_scan_action.triggered.connect(lambda: self._on_custom_scan())
         scan_menu.addAction(custom_scan_action)
-        ligolo_action = QAction("Pivot with Ligolo-ng...", self)
+        presets_dialog_action = QAction("More scan options (nmap presets)...", self)
+        presets_dialog_action.setStatusTip(
+            "Browse situational nmap scans — highlight one to see what it's for, then Load or Run"
+        )
+        presets_dialog_action.triggered.connect(self._on_scan_presets_dialog)
+        scan_menu.addAction(presets_dialog_action)
+        ligolo_action = QAction("🔀 Pivot with Ligolo-ng...", self)
         ligolo_action.setStatusTip("Guided ligolo-ng command-builder to reach an internal network")
         ligolo_action.triggered.connect(self._on_ligolo_helper)
         scan_menu.addAction(ligolo_action)
 
         profile_menu = scan_menu.addMenu("Run recon with profile")
+        profile_menu.setToolTipsVisible(True)  # show the per-profile note on hover
         _PROFILE_HINTS = {
             "quick": "top-1000 TCP only — fastest triage",
             "default": "top-1000 → full -p- → UDP top-100 (standard)",
@@ -420,6 +456,7 @@ class MainWindow(QMainWindow):
             profile_menu.addAction(action)
 
         presets_menu = scan_menu.addMenu("Nmap presets")
+        presets_menu.setToolTipsVisible(True)  # show each preset's "what it's for" note on hover
         for preset in load_manual_commands(_SCAN_PRESETS):
             action = QAction(preset.description, self)
             action.setToolTip(preset.why)
@@ -562,15 +599,19 @@ class MainWindow(QMainWindow):
         return False
 
     def _set_profile(self, profile: Profile) -> None:
-        self._release_lock()  # drop the previously-open profile's edit lock
-        if not profile.read_only:
-            acquired = locks.acquire(profile.directory)
-            if acquired is None:
-                acquired = locks.recover_stale(profile.directory)  # clears a stale/malformed lock
-            if acquired is not None:
-                self._locked_dir = profile.directory
-            else:  # a live / foreign lock we can't take -> fall back to read-only
-                profile.read_only = True
+        # keep the lock we already hold for this exact directory — a rename moves the .lock WITH the
+        # folder (self._locked_dir is re-pointed by the caller), so re-acquiring here would collide
+        # with our own moved lock and wrongly fall back to read-only.
+        if self._locked_dir != profile.directory:
+            self._release_lock()  # drop the previously-open profile's edit lock
+            if not profile.read_only:
+                acquired = locks.acquire(profile.directory)
+                if acquired is None:
+                    acquired = locks.recover_stale(profile.directory)  # clears a stale lock
+                if acquired is not None:
+                    self._locked_dir = profile.directory
+                else:  # a live / foreign lock we can't take -> fall back to read-only
+                    profile.read_only = True
         self._profile = profile
         self._auditor = Auditor(profile.directory, profile.profile_name)
         if not profile.read_only:
@@ -1113,6 +1154,66 @@ class MainWindow(QMainWindow):
         self._tool_panel.append_output(f"[created] {profile.directory}")
         if hostname:
             self._announce_hostname(profile.target)
+
+    def _on_edit_project(self) -> None:
+        # rename the project folder and/or change its target IP / range / hostname. Blocked while a
+        # scan runs (renaming the folder mid-write would break in-flight output paths).
+        if self._profile is None:
+            QMessageBox.information(self, "No project", "Open or create a project first.")
+            return
+        if self._profile.read_only:
+            QMessageBox.information(self, "Read-only", "This project is open read-only.")
+            return
+        if not self._tasks.can_start(exclusive=True):
+            self._tool_panel.append_output(
+                "[busy] finish or Stop running scans before editing the project."
+            )
+            return
+        profile = self._profile
+        dialog = NewProfileDialog(
+            self,
+            title="Edit Project",
+            name=profile.profile_name,
+            ip=profile.target.ip,
+            hostname=profile.target.hostname or "",
+            edit=True,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        new_name, new_ip, new_hostname = dialog.values()
+        if not new_name or not new_ip:
+            QMessageBox.warning(
+                self, "Missing input", "Both a project name and a target are required."
+            )
+            return
+        old_dir = profile.directory
+        # 1) target change first (validates; converting to a /24 range drops the vhost name)
+        try:
+            if new_ip != profile.target.ip or (new_hostname or None) != profile.target.hostname:
+                profile.set_target(new_ip, new_hostname or None)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Invalid target", str(exc))
+            return
+        # 2) rename the folder — moves EVERYTHING (incl. the .lock we hold) to the new path
+        renamed = False
+        if new_name != profile.profile_name:
+            try:
+                new_dir = profile.rename(new_name)
+            except (ValueError, FileExistsError, OSError) as exc:
+                QMessageBox.warning(self, "Rename failed", str(exc))
+                self._set_profile(profile)  # target change may already be saved — refresh anyway
+                return
+            self._locked_dir = new_dir  # our .lock moved with the folder; keep holding it
+            config.forget_recent(old_dir)
+            renamed = True
+        # _set_profile FIRST — it rebuilds the Auditor at the (possibly new) directory, so the audit
+        # below writes into the renamed folder instead of recreating the old one.
+        self._set_profile(profile)  # refresh label / title / header / views + recent
+        self._audit_action("project-edited", target=profile.target.ip, renamed=renamed)
+        detail = profile.target.ip + (
+            f" ({profile.target.hostname})" if profile.target.hostname else ""
+        )
+        self._tool_panel.append_output(f"[edited] project '{profile.profile_name}' → {detail}")
 
     def _on_set_hostname(self) -> None:
         if self._profile is None:
@@ -1678,6 +1779,9 @@ class MainWindow(QMainWindow):
         # export packs the profile dir — gate it so a snapshot isn't taken mid-scan-write
         self._export_project_action.setEnabled(not any_running and self._profile is not None)
         self._save_action.setEnabled(not any_running and not read_only)
+        self._edit_project_action.setEnabled(
+            self._profile is not None and not any_running and not read_only
+        )
         self._recent_menu.setEnabled(not any_running)
         self._run_button.setEnabled(
             self._profile is not None and self._tasks.can_start(exclusive=True) and not read_only
@@ -1802,6 +1906,57 @@ class MainWindow(QMainWindow):
         self._tool_panel.prefill_command(filled)
         self._tool_panel.append_output(f"[preset] loaded: {filled}")
 
+    def _on_scan_presets_dialog(self) -> None:
+        # the browsable nmap-scan chooser — highlight a scan to read what it's for, then Load/Run.
+        if self._profile is None:
+            QMessageBox.information(
+                self, APP_NAME, "Open or create a project first, then browse scan options."
+            )
+            return
+        presets = load_manual_commands(_SCAN_PRESETS)
+        dialog = ScanPresetsDialog(presets, self._profile.target.ip, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        command = dialog.command()
+        if not command:
+            return
+        if dialog.mode() == "run":
+            self._run_preset_scan(command)
+        else:  # "load" — pre-fill the command builder for review, don't run (§7)
+            self._show_recon()
+            self._tool_panel.prefill_command(command)
+            self._tool_panel.append_output(f"[preset] loaded: {command}")
+
+    def _run_preset_scan(self, command: str) -> None:
+        # execute a chosen nmap preset (recon-only). A single-host project parses into
+        # discovered_services; a /24 project streams each live host into the topology.
+        if self._profile is None or self._profile.read_only:
+            return
+        if not self._tasks.can_start(exclusive=True):
+            self._tool_panel.append_output("[busy] a scan is already running — wait or Stop it.")
+            return
+        profile = self._profile
+        target = profile.target.ip
+        is_entry = not profile.target.is_range
+        out_dir = profile.directory / "nmap"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_name = "tcp-versioned.txt" if is_entry else f"scan-{_slug(target)}.txt"
+        output_file = out_dir / out_name
+        self._show_recon()
+        self._tool_panel.append_output(f"[scan] {command}")
+        worker = CustomScanWorker(
+            command, output_file, profile.directory, stream_hosts=not is_entry, pivot_source=""
+        )
+        if not is_entry:
+            worker.host_found.connect(lambda host: self._on_scan_host_found(host, profile))
+        self._start(
+            worker,
+            f"preset:{target}",
+            lambda code: self._on_custom_scan_done(code, profile, is_entry, output_file),
+            exclusive=True,
+        )
+        self._audit_action("preset-scan", target=target, command=command)
+
     def _build_run_menu(self) -> None:
         # the ▾ dropdown on the Run Recon button: every scan profile + a custom/surgical scan +
         # individual nmap presets, so the user chooses exactly how heavy to go instead of being
@@ -1822,13 +1977,21 @@ class MainWindow(QMainWindow):
         custom = menu.addAction("Custom scan / range…")
         custom.setToolTip("Pick exact nmap flags/ports, or scan a whole /24 across your pivot")
         custom.triggered.connect(lambda _checked=False: self._on_custom_scan())
+        more = menu.addAction("More scan options (browse presets)…")
+        more.setToolTip("Browse situational nmap scans — the note tells you what each is for")
+        more.triggered.connect(lambda _checked=False: self._on_scan_presets_dialog())
         presets = menu.addMenu("Nmap presets")
+        presets.setToolTipsVisible(True)  # so each preset's note shows on hover in the dropdown
         for preset in load_manual_commands(_SCAN_PRESETS):
             item = presets.addAction(preset.description)
             item.setToolTip(preset.why)
             item.triggered.connect(
                 lambda _checked=False, cmd=preset.command: self._on_scan_preset(cmd)
             )
+        menu.addSeparator()
+        pivot_item = menu.addAction("🔀 Pivot with Ligolo-ng…")
+        pivot_item.setToolTip("Guided ligolo-ng command-builder to reach an internal network")
+        pivot_item.triggered.connect(lambda _checked=False: self._on_ligolo_helper())
         self._run_button.setMenu(menu)
 
     def _on_run(self) -> None:
@@ -1864,6 +2027,84 @@ class MainWindow(QMainWindow):
             return
         settings = config.load_settings()
         profile_name = scan_profile or settings.scan_profile
+        if settings.preflight_ping:
+            self._start_preflight(profile_name)  # ping first, confirm alive, THEN scan
+        else:
+            self._launch_recon(profile_name)
+
+    def _start_preflight(self, profile_name: str) -> None:
+        # quick nmap host-discovery (no port scan) so the user knows the target answered before
+        # committing to a long recon. The result drives a confirm dialog; the real scan runs after.
+        if self._profile is None:
+            return
+        target = self._profile.target.ip
+        self._tool_panel.append_output(
+            f"[ping] checking if {target} is alive — quick nmap host discovery, no port scan…"
+        )
+        out = self._profile.directory / "nmap" / "ping-check.txt"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        worker = PingWorker(target, out, cwd=self._profile.directory)
+        self._start(
+            worker,
+            "ping",
+            lambda result: self._preflight_done(result, profile_name),
+            exclusive=True,
+        )
+
+    def _preflight_done(self, result: object, profile_name: str) -> None:
+        # confirm the alive result and let the user proceed (or scan a filtered/down host anyway).
+        # A modal dialog here lets the ping worker's slot release before _launch_recon re-checks.
+        if self._profile is None:
+            return
+        if not isinstance(result, alive.AliveResult):
+            self._launch_recon(profile_name)  # parse hiccup — don't block the scan on it
+            return
+        target = self._profile.target
+        if target.is_range:
+            summary = f"{result.count} host(s) answered" if result.up else "no hosts answered"
+            question = (
+                f"{result.count} host(s) answered in {target.ip}.\n\n"
+                f"Start the {profile_name} network scan now?"
+                if result.up
+                else f"No hosts answered the ping sweep of {target.ip}.\n\n"
+                "The range may be firewalled, or you may need a pivot first. Scan anyway?"
+            )
+        else:
+            lat = f" ({result.latency})" if result.latency else ""
+            summary = f"up{lat}" if result.up else "no response"
+            question = (
+                f"✓ {target.ip} is UP{lat}.\n\nStart the {profile_name} recon now?"
+                if result.up
+                else f"⚠ {target.ip} did not answer the ping.\n\n"
+                "Many boxes filter ICMP even when they're up — nmap will still scan. Scan anyway?"
+            )
+        self._tool_panel.append_output(f"[ping] {summary}.")
+        box = QMessageBox(self)
+        box.setWindowTitle("Pre-flight ping")
+        box.setIcon(QMessageBox.Icon.Question if result.up else QMessageBox.Icon.Warning)
+        box.setText(question)
+        start_btn = box.addButton(
+            "Start recon" if result.up else "Scan anyway", QMessageBox.ButtonRole.AcceptRole
+        )
+        box.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is start_btn:
+            self._launch_recon(profile_name)
+        else:
+            self._tool_panel.append_output("[ping] recon cancelled — target not scanned.")
+
+    def _launch_recon(self, profile_name: str) -> None:
+        # the actual scan launch (after the optional pre-flight). A /24 network project runs a
+        # host-discovery sweep into the topology; a single host runs the versioned service battery.
+        if self._profile is None or self._profile.read_only:
+            return
+        if not self._tasks.can_start(exclusive=True):
+            self._tool_panel.append_output("[busy] a scan is already running — wait or Stop it.")
+            return
+        if self._profile.target.is_range:
+            self._launch_network_recon(profile_name)
+            return
+        settings = config.load_settings()
         self._tool_panel.append_output(
             f"[nmap] starting… (scan profile: {profile_name}) — port discovery can take a few "
             "minutes; live output streams below."
@@ -1876,6 +2117,37 @@ class MainWindow(QMainWindow):
             self._profile, udp_full=settings.nmap_udp_full, scan_profile=profile_name
         )
         self._start(worker, "nmap", self._on_scan_done, exclusive=True)
+
+    def _launch_network_recon(self, profile_name: str) -> None:
+        # whole-/24 project: one versioned nmap sweep across the range, each live host streamed into
+        # the pivot topology (reuses the range-scan path). The entry Target is the network itself.
+        if self._profile is None:
+            return
+        profile = self._profile
+        cidr = profile.target.ip
+        command = nmap_scan.network_scan_command(cidr, profile_name)
+        out_dir = profile.directory / "nmap"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        output_file = out_dir / f"network-{_slug(cidr)}.txt"
+        self._tool_panel.append_output(
+            f"[scan] network recon of {cidr} (profile: {profile_name}) — live hosts stream into "
+            f"the topology as found:\n[scan] {command}"
+        )
+        self._service_tree.set_empty_message(
+            f"Scanning network {cidr} — discovering live hosts…\n"
+            "Hosts appear in the topology as nmap finds them."
+        )
+        worker = CustomScanWorker(
+            command, output_file, profile.directory, stream_hosts=True, pivot_source=""
+        )
+        worker.host_found.connect(lambda host: self._on_scan_host_found(host, profile))
+        self._start(
+            worker,
+            f"network:{cidr}",
+            lambda code: self._on_custom_scan_done(code, profile, False, output_file),
+            exclusive=True,
+        )
+        self._audit_action("network-recon", target=cidr, command=command)
 
     def _on_run_command(self, command: str) -> None:
         if self._profile is None:

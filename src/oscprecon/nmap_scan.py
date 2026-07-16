@@ -120,6 +120,33 @@ def _reject_unsafe_field(field: str, value: str) -> None:
             )
 
 
+# port set / timing per scan profile for a whole-network (CIDR) Run Recon — a versioned sweep across
+# the range that streams each live host into the topology. Mirrors modules/nmap.py's single-host
+# battery intent (quick=triage … full=everything) but in ONE range pass so a /24 fills the graph.
+_NETWORK_PROFILE = {
+    "quick": {"ports": "--top-ports 100", "timing": "-T4", "extra": ""},
+    "default": {"ports": "--top-ports 1000", "timing": "-T4", "extra": ""},
+    "exam": {"ports": "--top-ports 1000", "timing": "-T4", "extra": "--min-rate 1000"},
+    "full": {"ports": "-p-", "timing": "-T4", "extra": ""},
+}
+
+
+def network_scan_command(cidr: str, scan_profile: str = "default") -> str:
+    # Build the whole-/24 Run-Recon command. -sV (version) so each host lands with product/version;
+    # connect scan works unprivileged and through a ligolo/SOCKS pivot. Validated via ScanSpec.
+    profile = _NETWORK_PROFILE.get(scan_profile, _NETWORK_PROFILE["default"])
+    return build_nmap_command(
+        ScanSpec(
+            target=cidr,
+            scan_type="connect",
+            ports=profile["ports"],
+            timing=profile["timing"],
+            version=True,
+            extra=profile["extra"],
+        )
+    )
+
+
 def build_nmap_command(spec: ScanSpec) -> str:
     target = validate_scan_target(spec.target)
     _reject_unsafe_field("ports", spec.ports)

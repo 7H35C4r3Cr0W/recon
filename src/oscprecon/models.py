@@ -26,6 +26,35 @@ def validate_host(value: str) -> str:
     raise ValueError(f"invalid target host: {value!r}")
 
 
+def is_cidr_range(value: str) -> bool:
+    # a CIDR with more than one address (a whole /24 project). A /32 or /128 is a single host
+    # written as CIDR, so it is NOT a range.
+    text = value.strip()
+    if "/" not in text or text.startswith("-") or any(ch.isspace() for ch in text):
+        return False
+    try:
+        return ipaddress.ip_network(text, strict=False).num_addresses > 1
+    except ValueError:
+        return False
+
+
+def validate_host_or_range(value: str) -> str:
+    # a project target may be a single IP / hostname OR a whole CIDR range (e.g. 10.10.5.0/24). The
+    # value is interpolated into command lines and shlex-split, so it must never become a separate
+    # argv token — same guard as validate_host, plus a strict CIDR path. A range is normalized to
+    # network address so the graph/subnet label is clean (10.10.5.7/24 -> 10.10.5.0/24).
+    text = value.strip()
+    if not text or text.startswith("-") or any(ch.isspace() for ch in text):
+        raise ValueError(f"invalid target: {value!r}")
+    if "/" in text:
+        try:
+            network = ipaddress.ip_network(text, strict=False)
+        except ValueError as exc:
+            raise ValueError(f"invalid target range: {value!r}") from exc
+        return str(network)
+    return validate_host(text)
+
+
 class Proto(StrEnum):
     TCP = "tcp"
     UDP = "udp"
@@ -40,9 +69,17 @@ class Target:
     os_guess: str | None = None
 
     def __post_init__(self) -> None:
-        validate_host(self.ip)
+        # ip may be a single host OR a whole CIDR range (a /24 network project). A range never has a
+        # hostname (there's no single host to name); host-based recon doesn't apply to a network.
+        object.__setattr__(self, "ip", validate_host_or_range(self.ip))
         if self.hostname:
             validate_host(self.hostname)
+
+    @property
+    def is_range(self) -> bool:
+        # a network project (whole /24) rather than a single host — Run Recon does host-discovery
+        # across the range into the pivot topology instead of the single-host service battery.
+        return is_cidr_range(self.ip)
 
     @property
     def host(self) -> str:

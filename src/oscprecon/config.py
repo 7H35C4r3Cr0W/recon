@@ -128,6 +128,9 @@ class Settings:
     max_concurrency: int
     nmap_udp_full: bool
     scan_profile: str = DEFAULT_SCAN_PROFILE
+    # ON by default: before a full recon, run a quick nmap host-discovery ping and confirm the
+    # target answered (or offer to scan anyway). Uncheck to jump straight into the scan.
+    preflight_ping: bool = True
     # opt-in, OFF BY DEFAULT (CLAUDE.md §2a): unlocks OSCP-legal credential spraying (hydra/medusa/
     # netexec list-spray + password wordlists). With this false the tool is strictly recon-only.
     spray_enabled: bool = False
@@ -156,6 +159,7 @@ class Settings:
             scan_profile=self.scan_profile
             if self.scan_profile in SCAN_PROFILES
             else DEFAULT_SCAN_PROFILE,
+            preflight_ping=bool(self.preflight_ping),
             spray_enabled=bool(self.spray_enabled),
             exploit_enabled=bool(self.exploit_enabled),
             hacktricks_live_enabled=bool(self.hacktricks_live_enabled),
@@ -174,6 +178,7 @@ class Settings:
             "max_concurrency": str(self.max_concurrency),
             "nmap_udp_full": "true" if self.nmap_udp_full else "false",
             "scan_profile": self.scan_profile,
+            "preflight_ping": "true" if self.preflight_ping else "false",
             "spray_enabled": "true" if self.spray_enabled else "false",
             "exploit_enabled": "true" if self.exploit_enabled else "false",
             "hacktricks_live_enabled": "true" if self.hacktricks_live_enabled else "false",
@@ -192,6 +197,7 @@ def default_settings() -> Settings:
         max_concurrency=DEFAULT_MAX_CONCURRENCY,
         nmap_udp_full=False,
         scan_profile=DEFAULT_SCAN_PROFILE,
+        preflight_ping=True,
         spray_enabled=False,
         exploit_enabled=True,
         hacktricks_live_enabled=False,
@@ -216,6 +222,7 @@ def load_settings() -> Settings:
         ),
         nmap_udp_full=_parse_bool(prefs.get("nmap_udp_full"), base.nmap_udp_full),
         scan_profile=prefs.get("scan_profile", base.scan_profile),
+        preflight_ping=_parse_bool(prefs.get("preflight_ping"), base.preflight_ping),
         spray_enabled=_parse_bool(prefs.get("spray_enabled"), base.spray_enabled),
         exploit_enabled=_parse_bool(prefs.get("exploit_enabled"), base.exploit_enabled),
         hacktricks_live_enabled=_parse_bool(
@@ -272,4 +279,11 @@ def add_recent(profile_dir: Path) -> None:
     items = [p for p in recent_profiles() if p != entry]
     items.insert(0, entry)
     del items[RECENT_LIMIT:]
+    _write_json_atomic(_recent_path(), items)
+
+
+def forget_recent(profile_dir: Path) -> None:
+    # drop a path from the recent list — used after a rename/delete so the dead path doesn't linger.
+    entry = str(Path(profile_dir).resolve())
+    items = [p for p in recent_profiles() if p != entry]
     _write_json_atomic(_recent_path(), items)

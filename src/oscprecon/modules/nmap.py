@@ -172,6 +172,11 @@ class NmapModule(Module):
                 # with no product only fills a blank/unknown name.
                 if service.service and (service.product or existing.service in ("", "unknown")):
                     existing.service = service.service
+                # the versioned/-sC scan carries the NSE script block (http-title, ssh-hostkey,
+                # ssl-cert, smb-os-discovery…) the bare port-table sweep never has — fill it so the
+                # report/tree surface those details (#7). Never let a blank re-scan wipe a filled.
+                if service.nmap_scripts_output and not existing.nmap_scripts_output:
+                    existing.nmap_scripts_output = service.nmap_scripts_output
         return sorted(merged.values(), key=lambda s: (s.proto.value, s.port))
 
     def parse(self, raw_outputs: dict[str, str]) -> list[Finding]:
@@ -194,12 +199,41 @@ class NmapModule(Module):
         return []
 
     def _parse_text(self, text: str) -> list[DiscoveredService]:
+        # Block parser: each port row owns the indented NSE script lines that follow it
+        # (`| ssh-hostkey:`, `|_http-title: …`), captured into nmap_scripts_output so the report and
+        # service tree can show the real enum detail — not just product/version (#7).
         services: list[DiscoveredService] = []
-        for line in text.splitlines():
-            service = parse_port_line(line.strip())
+        current: DiscoveredService | None = None
+        script_lines: list[str] = []
+
+        def flush() -> None:
+            if current is not None and script_lines:
+                current.nmap_scripts_output = "\n".join(script_lines).rstrip()
+            script_lines.clear()
+
+        for raw in text.splitlines():
+            service = parse_port_line(raw.strip())
             if service is not None:
+                flush()
                 services.append(service)
+                current = service
+                continue
+            stripped = raw.strip()
+            if current is not None and stripped.startswith("|"):
+                script_lines.append(_clean_script_line(stripped))
+        flush()
         return services
+
+
+def _clean_script_line(line: str) -> str:
+    # strip nmap's NSE gutter marker ("| ", "|_", "|   ") but keep the nested indentation that
+    # follows, so multi-line script output (hostkeys, cert SANs, smb-os-discovery) stays readable.
+    body = line[1:]  # drop the leading '|'
+    if body.startswith("_"):
+        body = body[1:]
+    if body.startswith(" "):
+        body = body[1:]
+    return body.rstrip()
 
 
 def parse_port_line(line: str) -> DiscoveredService | None:

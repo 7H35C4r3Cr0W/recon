@@ -38,6 +38,15 @@ _No open ports discovered yet._
 - **Version:** {{ s.version or "—" }}
 {% if s.hacktricks %}- **HackTricks:** [{{ s.label or s.service }}]({{ s.hacktricks }})
 {% endif %}
+{% if s.scripts %}
+
+_Enumeration detail (nmap scripts):_
+
+```text
+{{ s.scripts }}
+```
+
+{% endif %}
 {% else %}
 
 _Run nmap to populate this section._

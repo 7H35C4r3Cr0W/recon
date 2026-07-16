@@ -4,11 +4,46 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
-from oscprecon import pivot, references, shell
+from oscprecon import alive, pivot, references, shell
 from oscprecon.gui.workers.base import CancellableThread
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
 from oscprecon.references import live_hacktricks
+
+
+class PingWorker(CancellableThread):
+    """Pre-flight 'is it alive?' — a quick nmap host-discovery sweep (exam-legal, no port scan) run
+    BEFORE a full recon so the user knows the target answered. Emits the parsed AliveResult."""
+
+    line = Signal(str)
+    done = Signal(object)  # alive.AliveResult
+    failed = Signal(str)
+
+    def __init__(self, target: str, output_file: Path, cwd: Path | None = None) -> None:
+        super().__init__()
+        self._target = target
+        self._output_file = output_file
+        self._cwd = cwd
+
+    def run(self) -> None:
+        try:
+            command = alive.build_alive_command(self._target)
+            shell.run(
+                command,
+                self._output_file,
+                cwd=self._cwd,
+                cancel=self._cancel,
+                on_line=self.line.emit,
+            )
+            try:
+                text = self._output_file.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                text = ""
+            result = alive.parse_alive(text)
+        except Exception as exc:  # boundary: surface worker failures to the UI thread
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(result)
 
 
 class NmapWorker(CancellableThread):

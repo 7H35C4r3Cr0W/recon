@@ -132,6 +132,7 @@ def test_settings_prefs_hold_only_known_non_secret_keys() -> None:
         "max_concurrency",
         "nmap_udp_full",
         "scan_profile",
+        "preflight_ping",
         "spray_enabled",
         "exploit_enabled",
         "hacktricks_live_enabled",

@@ -13,6 +13,7 @@ from oscprecon.models import (
     DiscoveredService,
     Proto,
     Target,
+    is_cidr_range,
     subnet_of,
 )
 from oscprecon.workspace.models import (
@@ -370,6 +371,40 @@ class Profile:
                 changed = True
         if changed:
             self.save_graph(graph)
+
+    def rename(self, new_name: str) -> Path:
+        # Move <workspace>/<old>/ -> <workspace>/<new>/. The rename is atomic on one filesystem and
+        # carries EVERYTHING inside with it — profile.json, creds.json, graph.json, notes.md, the
+        # nmap/ output tree, the audit log, AND the .lock we hold (so the caller must re-point its
+        # locked-dir at the new path). Refuses an empty/path-bearing name or existing destination.
+        self._ensure_writable()
+        cleaned = new_name.strip()
+        if not cleaned:
+            raise ValueError("project name cannot be empty")
+        if cleaned == self.profile_name:
+            return self.directory  # no-op — nothing to move
+        if "/" in cleaned or "\\" in cleaned or cleaned.startswith(".") or cleaned in (".", ".."):
+            raise ValueError(f"invalid project name: {new_name!r}")
+        new_dir = self.directory.parent / cleaned
+        if new_dir.exists():
+            raise FileExistsError(f"a project named '{cleaned}' already exists")
+        self.directory.rename(new_dir)
+        self.directory = new_dir
+        self.profile_name = cleaned
+        self.save()
+        return new_dir
+
+    def set_target(self, ip: str, hostname: str | None = None) -> None:
+        # change the target IP/hostname, or convert to/from a whole /24 range project. Target's
+        # __post_init__ validates (rejects injection / a malformed CIDR). A range has no vhost
+        # name, so a hostname is dropped when the new target is a network.
+        self._ensure_writable()
+        cleaned_ip = ip.strip()
+        cleaned_host = (hostname or "").strip() or None
+        if is_cidr_range(cleaned_ip):
+            cleaned_host = None
+        self.target = replace(self.target, ip=cleaned_ip, hostname=cleaned_host)
+        self.save()
 
     def set_hostname(self, hostname: str | None) -> None:
         # the vhost name is usually learned AFTER the first scan (a redirect, a cert CN, a contact

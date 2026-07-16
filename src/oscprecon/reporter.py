@@ -143,6 +143,7 @@ class Reporter:
                     "service": service.service,
                     "product": service.product,
                     "version": service.version,
+                    "scripts": service.nmap_scripts_output,
                     "hacktricks": ref.hacktricks if ref else "",
                     "label": ref.label if ref else "",
                 }

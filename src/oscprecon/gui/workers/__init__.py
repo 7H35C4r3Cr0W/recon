@@ -6,6 +6,7 @@ from oscprecon.gui.workers.scans import (
     CustomScanWorker,
     LiveHacktricksWorker,
     NmapWorker,
+    PingWorker,
     SearchsploitWorker,
 )
 from oscprecon.gui.workers.service_recon import (
@@ -34,6 +35,7 @@ __all__ = [
     "LdapReconWorker",
     "NmapWorker",
     "LiveHacktricksWorker",
+    "PingWorker",
     "SearchsploitWorker",
     "SimpleReconResult",
     "SimpleReconWorker",
