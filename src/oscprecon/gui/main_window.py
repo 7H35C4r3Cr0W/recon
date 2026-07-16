@@ -249,6 +249,7 @@ class MainWindow(QMainWindow):
         self._activity_view = ActivityView()
         self._exploit_panel = ExploitPanel(theme.normalize(settings.theme))
         self._exploit_panel.add_credentials.connect(self._on_exploit_loot)
+        self._exploit_panel.run_requested.connect(self._on_exploit_run)
         self._dashboard = WorkspaceDashboard()
         self._dashboard.open_requested.connect(lambda d: self._open_path(Path(str(d))))
         self._dashboard.create_requested.connect(self._on_new)
@@ -792,6 +793,64 @@ class MainWindow(QMainWindow):
             self._profile.add_credential(cred)
         self._audit_action("exploit-loot-added", count=str(len(creds)))
         self._tool_panel.append_output(f"[exploit] added {len(creds)} credential(s) to the vault.")
+
+    def _on_exploit_run(self, command: str, output_rel: str, parses: str) -> None:
+        # Execute one user-selected attack command (§2b). NOTHING here is automatic: the user picked
+        # the action, clicked Run, and must confirm below — and the exploit-mode gate must be on.
+        if self._profile is None or self._profile.read_only:
+            return
+        if not config.load_settings().exploit_enabled:
+            # off by default (exam-legal posture) — offer a one-time enable, never silently run
+            enable = QMessageBox.question(
+                self,
+                "Enable exploitation execution?",
+                "Running attacks is OFF by default (the tab is shown-only). Enable it so the "
+                "Exploitation tab can execute the commands you select?\n\nsqlmap, Metasploit and "
+                "commercial scanners stay blocked. Every run still asks for confirmation.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if enable != QMessageBox.StandardButton.Yes:
+                self._exploit_panel.append_run_output("[exploit] execution is disabled — not run.")
+                self._exploit_panel.set_running(False)
+                return
+            settings = config.load_settings()
+            settings.exploit_enabled = True
+            config.save_settings(settings)
+        target = self._profile.target.ip
+        confirm = QMessageBox.question(
+            self,
+            "Run this attack?",
+            f"Execute against {target}:\n\n{command}\n\nOnly run this against a target you are "
+            "authorized to attack.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            self._exploit_panel.append_run_output("[exploit] cancelled — not run.")
+            self._exploit_panel.set_running(False)
+            return
+        if not self._tasks.can_start():
+            self._exploit_panel.append_run_output("[busy] at capacity — wait or Stop a task.")
+            return
+        out_path = _contained_path(self._profile.directory, output_rel)
+        if out_path is None:
+            self._exploit_panel.append_run_output(f"[blocked] bad output path: {output_rel}")
+            return
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        self._exploit_panel.set_running(True)
+        self._audit_action("exploit-run", command=command)  # redacted by the audit layer
+        prof = self._profile
+        worker = CommandWorker(command, out_path, cwd=prof.directory, exploit=True)
+        signals: Any = worker
+        signals.line.connect(self._exploit_panel.append_run_output)
+        signals.done.connect(lambda _code: self._exploit_panel.run_finished())
+        signals.failed.connect(self._exploit_run_failed)
+        self._launch(worker, "exploit", exclusive=False)
+
+    def _exploit_run_failed(self, message: str) -> None:
+        self._exploit_panel.append_run_output(f"[error] {message}")
+        self._exploit_panel.set_running(False)
 
     def _show_findings(self) -> None:
         self._graph_action.setChecked(False)

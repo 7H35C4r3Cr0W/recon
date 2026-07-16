@@ -131,6 +131,11 @@ class Settings:
     # opt-in, OFF BY DEFAULT (CLAUDE.md §2a): unlocks OSCP-legal credential spraying (hydra/medusa/
     # netexec list-spray + password wordlists). With this false the tool is strictly recon-only.
     spray_enabled: bool = False
+    # opt-in, OFF BY DEFAULT (CLAUDE.md §2b): lets the Exploitation tab EXECUTE the selected attack
+    # command (impacket/evil-winrm/hashcat/responder/certipy…). Every Run still confirms first — no
+    # blind attacks. False = the tab is shown-only (build + copy). sqlmap/Metasploit/scanners stay
+    # hard-blocked in every mode.
+    exploit_enabled: bool = False
     # Live HackTricks fetch/cache (§14a) — OFF by default; offline vendored pages stay the fallback.
     hacktricks_live_enabled: bool = False
     hacktricks_auto_refresh: bool = False  # auto-refresh stale cached pages when live is on
@@ -152,6 +157,7 @@ class Settings:
             if self.scan_profile in SCAN_PROFILES
             else DEFAULT_SCAN_PROFILE,
             spray_enabled=bool(self.spray_enabled),
+            exploit_enabled=bool(self.exploit_enabled),
             hacktricks_live_enabled=bool(self.hacktricks_live_enabled),
             hacktricks_auto_refresh=bool(self.hacktricks_auto_refresh),
             hacktricks_prefer_live=bool(self.hacktricks_prefer_live),
@@ -169,6 +175,7 @@ class Settings:
             "nmap_udp_full": "true" if self.nmap_udp_full else "false",
             "scan_profile": self.scan_profile,
             "spray_enabled": "true" if self.spray_enabled else "false",
+            "exploit_enabled": "true" if self.exploit_enabled else "false",
             "hacktricks_live_enabled": "true" if self.hacktricks_live_enabled else "false",
             "hacktricks_auto_refresh": "true" if self.hacktricks_auto_refresh else "false",
             "hacktricks_prefer_live": "true" if self.hacktricks_prefer_live else "false",
@@ -186,6 +193,7 @@ def default_settings() -> Settings:
         nmap_udp_full=False,
         scan_profile=DEFAULT_SCAN_PROFILE,
         spray_enabled=False,
+        exploit_enabled=False,
         hacktricks_live_enabled=False,
         hacktricks_auto_refresh=False,
         hacktricks_prefer_live=False,
@@ -209,6 +217,7 @@ def load_settings() -> Settings:
         nmap_udp_full=_parse_bool(prefs.get("nmap_udp_full"), base.nmap_udp_full),
         scan_profile=prefs.get("scan_profile", base.scan_profile),
         spray_enabled=_parse_bool(prefs.get("spray_enabled"), base.spray_enabled),
+        exploit_enabled=_parse_bool(prefs.get("exploit_enabled"), base.exploit_enabled),
         hacktricks_live_enabled=_parse_bool(
             prefs.get("hacktricks_live_enabled"), base.hacktricks_live_enabled
         ),
@@ -229,6 +238,12 @@ def load_settings() -> Settings:
 def spray_enabled() -> bool:
     """True when the user has opted into Spray mode (§2a). The single gate the engine reads."""
     return load_settings().spray_enabled
+
+
+def exploit_enabled() -> bool:
+    """True when the user has opted into Exploitation execution (§2b). Off by default; every Run
+    still confirms first, and sqlmap/Metasploit/scanners stay hard-blocked regardless."""
+    return load_settings().exploit_enabled
 
 
 def save_settings(settings: Settings) -> None:

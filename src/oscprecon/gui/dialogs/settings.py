@@ -177,6 +177,16 @@ class SettingsDialog(QDialog):
         )
         spray_note.setWordWrap(True)
         layout.addWidget(spray_note)
+        self._exploit_enabled = QCheckBox("Enable Exploitation execution (attack scripts)")
+        layout.addWidget(self._exploit_enabled)
+        exploit_note = QLabel(
+            "OFF by default. When on, the Exploitation tab can EXECUTE the attack command you pick "
+            "(impacket / evil-winrm / hashcat / responder / certipy…). Every run still confirms "
+            "first — no blind attacks. OSCP-legal manual tooling (§ 2b); sqlmap, Metasploit and "
+            "commercial scanners stay blocked in every mode. Only attack authorized targets."
+        )
+        exploit_note.setWordWrap(True)
+        layout.addWidget(exploit_note)
         layout.addStretch(1)
         return page
 
@@ -302,6 +312,7 @@ class SettingsDialog(QDialog):
         self._scan_profile.setCurrentIndex(prof_idx if prof_idx >= 0 else 0)
         self._udp_full.setChecked(settings.nmap_udp_full)
         self._spray_enabled.setChecked(settings.spray_enabled)
+        self._exploit_enabled.setChecked(settings.exploit_enabled)
         self._ht_live.setChecked(settings.hacktricks_live_enabled)
         self._ht_auto.setChecked(settings.hacktricks_auto_refresh)
         self._ht_prefer.setChecked(settings.hacktricks_prefer_live)
@@ -320,6 +331,7 @@ class SettingsDialog(QDialog):
             nmap_udp_full=self._udp_full.isChecked(),
             scan_profile=str(self._scan_profile.currentData()),
             spray_enabled=self._spray_enabled.isChecked(),
+            exploit_enabled=self._exploit_enabled.isChecked(),
             hacktricks_live_enabled=self._ht_live.isChecked(),
             hacktricks_auto_refresh=self._ht_auto.isChecked(),
             hacktricks_prefer_live=self._ht_prefer.isChecked(),

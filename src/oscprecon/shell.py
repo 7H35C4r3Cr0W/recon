@@ -160,6 +160,88 @@ _FORBIDDEN_FLAGS: frozenset[str] = frozenset({"--continue-on-success", "--passwo
 # (policy_violation(spray=True), i.e. config.spray_enabled). Off everywhere else.
 SPRAY_TOOLS: frozenset[str] = frozenset({"hydra", "medusa"})
 
+# why: manual-exploitation attack tools (CLAUDE.md §2b). Permitted ONLY when a command is launched
+# from the Exploitation tab (policy_violation(exploit=True)). These are OSCP-legal attack SCRIPTS —
+# the exam bans automated-exploitation FRAMEWORKS + AI, not manual tools like impacket/evil-winrm/
+# hashcat/responder/certipy. Each is user-selected and Run one command at a time — never a chain.
+EXPLOIT_TOOLS: frozenset[str] = frozenset(
+    {
+        # impacket exploitation/post-ex (the enum ones are already in ALLOWED_TOOLS)
+        "impacket-secretsdump",
+        "secretsdump.py",
+        "impacket-psexec",
+        "psexec.py",
+        "impacket-wmiexec",
+        "wmiexec.py",
+        "impacket-smbexec",
+        "smbexec.py",
+        "impacket-atexec",
+        "atexec.py",
+        "impacket-dcomexec",
+        "dcomexec.py",
+        "impacket-getTGT",
+        "getTGT.py",
+        "impacket-getST",
+        "getST.py",
+        "impacket-ticketer",
+        "ticketer.py",
+        "impacket-findDelegation",
+        "findDelegation.py",
+        "impacket-addcomputer",
+        "addcomputer.py",
+        "impacket-owneredit",
+        "owneredit.py",
+        "impacket-dacledit",
+        "dacledit.py",
+        "impacket-ntlmrelayx",
+        "ntlmrelayx.py",
+        "impacket-smbserver",
+        "smbserver.py",
+        "impacket-changepasswd",
+        # shells / lateral
+        "evil-winrm",
+        "certipy-ad",
+        "certipy",
+        "responder",
+        # offline cracking (operates on captured hashes, never touches the target)
+        "hashcat",
+        "john",
+        # generic exploit delivery / shells the user drives by hand
+        "nc",
+        "ncat",
+        "socat",
+        "python3",
+        "python",
+        "php",
+        "bash",
+        "sh",
+        "sshpass",
+        "git",
+    }
+)
+
+# why: NEVER run these — even in Exploitation mode. sqlmap + the Metasploit family are the
+# automated-exploitation tools the OSCP exam forbids (Metasploit is limited to one manual use and is
+# out of this tool entirely); commercial scanners are banned. Blocked ahead of every allow-list so a
+# hand-typed or template command can never launch one. (Exploit-DB PoCs stay lookup-only, §14.)
+_HARD_FORBIDDEN_TOOLS: frozenset[str] = frozenset(
+    {
+        "sqlmap",
+        "msfconsole",
+        "msfvenom",
+        "msfdb",
+        "meterpreter",
+        "metasploit",
+        "armitage",
+        "cobaltstrike",
+        "nessus",
+        "openvas",
+        "nexpose",
+        "burpsuite",
+        "acunetix",
+    }
+)
+
 # why: the DB clients are allow-listed for read-only enum (§12), but the custom-command path lets a
 # user hand-type a query — refuse file-write / read / OS-exec / DDL primitives (not recon).
 _DB_CLIENTS: frozenset[str] = frozenset({"mysql", "psql", "mongosh", "mongo", "redis-cli"})
@@ -398,15 +480,25 @@ def _script_values(argv: list[str]) -> list[str]:
     return values
 
 
-def policy_violation(argv: list[str], *, spray: bool = False) -> str | None:
-    # `spray=True` ONLY when the user enabled opt-in Spray mode (§2a) and the command came from the
-    # spray subsystem. It loosens EXACTLY the credential-attempt category (brute/spray tools+flags);
-    # everything else — Metasploit/SQLMap/commercial (not on any list), DB file/OS primitives,
-    # searchsploit PoC copy, ike-scan PSK capture, ntpdate clock-set — stays blocked either way.
+def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = False) -> str | None:
+    # `spray=True` ONLY in opt-in Spray mode (§2a); `exploit=True` ONLY for a command launched from
+    # the Exploitation tab (§2b). Each loosens exactly its own tool category; everything else stays
+    # blocked. Metasploit/SQLMap/commercial scanners are HARD-blocked ahead of every allow-list, so
+    # they can never run in any mode. DB file/OS primitives, searchsploit PoC copy, ike-scan PSK
+    # capture, ntpdate clock-set stay blocked either way.
     if not argv:
         return "empty command"
     tool = argv[0]
-    allowed = ALLOWED_TOOLS | SPRAY_TOOLS if spray else ALLOWED_TOOLS
+    base = os.path.basename(tool).lower()
+    if base in _HARD_FORBIDDEN_TOOLS:
+        return (
+            f"{tool} is a banned automated-exploitation/commercial tool (never run — CLAUDE.md §2)"
+        )
+    allowed = set(ALLOWED_TOOLS)
+    if spray:
+        allowed |= SPRAY_TOOLS
+    if exploit:
+        allowed |= EXPLOIT_TOOLS
     if tool not in allowed:
         return f"{tool} is not on the OSCP-allowed tool list"
     if not spray:
@@ -483,6 +575,7 @@ def run(
     cancel: threading.Event | None = None,
     on_line: Callable[[str], None] | None = None,
     spray: bool = False,
+    exploit: bool = False,
 ) -> ShellResult:
     output_file = Path(output_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -510,7 +603,7 @@ def run(
     tool = argv[0] if argv else ""
     redacted = _redact_cmdline(argv)  # secret-free string for logging / disk
 
-    violation = policy_violation(argv, spray=spray)
+    violation = policy_violation(argv, spray=spray, exploit=exploit)
     if violation is not None:
         message = f"[blocked] {violation}: {redacted}"
         logger.warning(message)

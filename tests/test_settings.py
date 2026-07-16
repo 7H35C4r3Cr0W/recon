@@ -133,6 +133,7 @@ def test_settings_prefs_hold_only_known_non_secret_keys() -> None:
         "nmap_udp_full",
         "scan_profile",
         "spray_enabled",
+        "exploit_enabled",
         "hacktricks_live_enabled",
         "hacktricks_auto_refresh",
         "hacktricks_prefer_live",
@@ -147,6 +148,13 @@ def test_spray_enabled_defaults_off_and_roundtrips() -> None:
     config.save_prefs({"spray_enabled": "true"})
     assert config.load_settings().spray_enabled is True
     assert config.spray_enabled() is True  # the accessor the engine reads
+
+
+def test_exploit_enabled_defaults_off_and_roundtrips() -> None:
+    assert config.default_settings().exploit_enabled is False  # OFF by default (§2b)
+    config.save_prefs({"exploit_enabled": "true"})
+    assert config.load_settings().exploit_enabled is True
+    assert config.exploit_enabled() is True  # the accessor the exec gate reads
 
 
 def test_hacktricks_live_settings_default_off_and_roundtrip() -> None:
