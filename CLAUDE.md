@@ -90,8 +90,9 @@ Rules (non-negotiable):
 - **`runs_on` distinguishes attacker vs victim.** `"attacker"` actions run FROM Kali against the target → **Run** (executes, gated + confirmed). `"victim"` actions are commands you paste into an already-obtained shell ON the target (SUID checks, `sudo -l`, GTFOBins, winPEAS follow-ups) → **copy-only**, never executed here.
 - **Tied to discovered services/ports.** Each `ServiceExploits` declares the `ports` that signal its presence; the tab surfaces the surfaces open on *this* box first (mirrors Recon's service focus).
 - **Parses output into loot, secrets redacted.** Run streams into the output pane (or paste tool output), **Parse** extracts hashes/creds, **Add to vault** writes `creds.json`. Loot secrets are **redacted** (length only) in the table exactly as everywhere else; secrets never hit logs/reports/audit.
-- **Engine lives in `src/oscprecon/exploit/`** (`base.py` registry + `fill_template` + `runs_on`/`ports`, one module per service e.g. `ad.py`/`web.py`/`smb.py`/`linux.py`/`windows.py`, `parsers.py`). Every action cites a `source=` (adpt.py eval / vault cheatsheet). GUI is `gui/widgets/exploit_panel.py`; execution is wired in `main_window._on_exploit_run` (confirm → `CommandWorker(exploit=True)` → stream → auto-parse).
-- **Build out per service in clean chunks** (AD first, then web/HTTP, Linux-privesc, Windows-privesc, SMB, MSSQL, MySQL, FTP, SSH, SNMP, …) from the maintainer's cheatsheet/methodology, each organized like the Recon tab, tied back to its port/service.
+- **Engine lives in `src/oscprecon/exploit/`** (`base.py` registry + `fill_template` + `runs_on`/`ports`, one module per service, `parsers.py`). Every action cites a `source=` (adpt.py eval / vault cheatsheet). GUI is `gui/widgets/exploit_panel.py`; execution is wired in `main_window._on_exploit_run` (confirm → `CommandWorker(exploit=True)` → stream → auto-parse). Headless view: `nabu-cli exploit [service] [-p profile]` (display-only, RUN vs COPY).
+- **Built out (2026-07-16):** 14 services / ~346 actions, mined from the maintainer's vault + standard tooling — `ad`, `web`, `smb`, `mssql`, `mysql`, `ftp`, `ssh`, `snmp`, `redis`, `rdp`, `nfs`, `linux` (privesc, victim-side), `windows` (privesc, victim-side), `shells`. Each `ServiceExploits` declares its `ports`; the picker surfaces services open on the box first. Add a new service by dropping a `exploit/<svc>.py` that `register()`s — `base._load_builtin()` imports it. Keep the tie-back to its port/service and the `source=` provenance.
+- **The exec gate hardens against wrapper bypass:** `shell._effective_tool()` resolves the real command past `sudo`/`env`/`VAR=val`/`proxychains` prefixes, so `_HARD_FORBIDDEN_TOOLS` (sqlmap/Metasploit/scanners) is enforced even as `sudo sqlmap`, and the `EXPLOIT_TOOLS` allow-list matches the real tool. DB file/OS primitives (INTO OUTFILE / xp_cmdshell / load_file) are permitted **only** in exploit mode (they ARE the attack) and stay blocked in recon mode. Credential-brute tools (hydra/medusa/crowbar/ncrack, netexec list-spray) remain **Spray-mode-gated**, not exploit-mode — a brute is spraying (§2a), not single-shot exploitation.
 
 ---
 
@@ -188,6 +189,11 @@ oscp-recon/
 │   │   ├── http.yaml
 │   │   ├── smb.yaml
 │   │   └── ...
+│   ├── exploit/              ← Exploitation tab engine (§ 2b) — command builder, one file per service
+│   │   ├── base.py           ← ExploitAction/ServiceExploits registry + fill_template + runs_on/ports
+│   │   ├── parsers.py        ← parse pasted tool output (secretsdump/kerberos) into loot
+│   │   ├── ad.py  web.py  smb.py  mssql.py  mysql.py  ftp.py  ssh.py  snmp.py
+│   │   └── redis.py  rdp.py  nfs.py  linux.py  windows.py  shells.py
 │   ├── references/           ← service → HackTricks URL + tool hints
 │   │   └── services.yaml
 │   ├── reporter.py           ← markdown report writer (Obsidian-compatible)
@@ -200,6 +206,7 @@ oscp-recon/
 │   │   │   ├── tool_panel.py       ← middle pane (command builder + output + follow-ups)
 │   │   │   ├── reference_pane.py   ← right pane (HackTricks + EDB + tool hints)
 │   │   │   ├── graph_view.py       ← Cytoscape.js graph (Ctrl+G)
+│   │   │   ├── exploit_panel.py    ← Exploitation tab (§ 2b) — build/Run attacks + parse loot
 │   │   │   ├── wordlist_picker.py  ← reusable dropdown widget
 │   │   │   ├── notes_pane.py       ← live-edits <profile>/notes.md
 │   │   │   └── report_preview.py
