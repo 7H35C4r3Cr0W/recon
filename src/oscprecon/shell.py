@@ -37,13 +37,33 @@ _CRED_TOOLS: frozenset[str] = frozenset(
         "mssqlclient",
         "ldapsearch",
         "wpscan",
+        "sshpass",
     }
 )
 _SECRET_VALUE_FLAGS: frozenset[str] = frozenset({"-p", "-a", "-w", "-H", "--hashes"})
 
+# inline creds that aren't flag-values: impacket / URL target forms `[domain/]user:PASSWORD@host`.
+# Mask PASSWORD from ':' to the LAST '@' before the host (so a secret CONTAINING '@' — impacket
+# splits on the last '@' — is fully masked). A bare `host:port` has no '@', so it's untouched.
+_INLINE_CRED_RE = re.compile(r"(:)([^\s'\"]+)(@[\w.-]+)(?=['\"\s/]|$)")
+# smbclient/netexec `-U user%PASSWORD` — mask after '%'. Scoped to a -U/--user value so a URL's %XX
+# percent-encoding is never touched.
+_UNC_CRED_RE = re.compile(r"(-U\s+|--user[ =])([^\s'\"%]+%)([^\s'\"]+)")
+
 
 def _mask(value: str) -> str:
     return f"<redacted len={len(value)}>"
+
+
+def redact_secrets(shell_line: str) -> str:
+    # secret-free rendering of a full command for audit/report/log: flag-value secrets (-p/--pass…)
+    # AND inline user:PASSWORD@host creds are masked. Best-effort; never raises on a weird line.
+    try:
+        redacted = _redact_cmdline(shlex.split(shell_line))
+    except ValueError:
+        redacted = shell_line
+    redacted = _INLINE_CRED_RE.sub(lambda m: f"{m.group(1)}<redacted>{m.group(3)}", redacted)
+    return _UNC_CRED_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}<redacted>", redacted)
 
 
 def _redact_cmdline(argv: list[str]) -> str:
@@ -561,20 +581,61 @@ def _names_forbidden_tool(argv: list[str]) -> str | None:
     return m.group(1) if m is not None else None
 
 
+# wrapper options that take a SEPARATE-token value — their value must be skipped too, or it gets
+# mistaken for the program (`env -u nmap bash` would resolve to 'nmap', spoofing the allow-list).
+_WRAPPER_VALUE_FLAGS = frozenset(
+    {
+        "-u",
+        "-g",
+        "-U",
+        "-p",
+        "-C",
+        "-h",
+        "-r",
+        "-t",
+        "-R",
+        "-D",
+        "-n",
+        "-s",
+        "-k",
+        "-f",
+        "-i",
+        "-o",
+        "-e",
+        "-S",
+        "-P",
+    }
+)
+_DURATION_RE = re.compile(r"^\d+(?:\.\d+)?[smhd]?$")  # timeout's positional DURATION
+
+
 def _effective_tool(argv: list[str]) -> str:
-    # skip leading `VAR=val` env assignments and command wrappers (sudo/env/timeout…) to return the
-    # token of the REAL command. `sudo mount` -> `mount`; `KRB5CCNAME=x impacket-psexec` ->
-    # `impacket-psexec`; `sudo sqlmap` -> `sqlmap` (so the hard-block still catches it).
+    # resolve the token of the REAL program past leading `VAR=val` env assignments and ONE level of
+    # command wrapper (sudo/env/timeout…), correctly skipping each wrapper flag AND any value-taking
+    # value it consumes. `sudo mount`->`mount`; `KRB5CCNAME=x impacket-psexec`->`impacket-psexec`;
+    # `env -u nmap bash -c id`->`bash` (NOT the -u value 'nmap'). Used ONLY in exploit mode — recon/
+    # spray never strip wrappers (policy_violation passes argv[0] there), so a wrapper is just a
+    # non-allowlisted tool and is blocked.
     i = 0
     while i < len(argv):
         tok = argv[i]
         if _ENVVAR_RE.match(tok):
             i += 1
             continue
-        if os.path.basename(tok).lower() in _CMD_WRAPPERS:
+        base = os.path.basename(tok).lower()
+        if base in _CMD_WRAPPERS:
             i += 1
-            while i < len(argv) and argv[i].startswith("-"):  # skip wrapper flags (sudo -u, -n…)
+            if base == "timeout" and i < len(argv) and _DURATION_RE.match(argv[i]):
+                i += 1  # timeout DURATION cmd — DURATION may lead the flags
+            while i < len(argv) and argv[i].startswith("-"):
+                takes_value = argv[i] in _WRAPPER_VALUE_FLAGS  # `-u NAME` etc. — skip NAME too
                 i += 1
+                if takes_value and i < len(argv):
+                    i += 1
+            if i < len(argv) and argv[i] == "--":  # sudo/env end-of-options marker
+                i += 1
+            if base == "timeout" and i < len(argv) and _DURATION_RE.match(argv[i]):
+                i += 1  # …or DURATION follows the flags
             continue
         return tok
     return argv[0] if argv else ""
@@ -593,8 +654,10 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
     forbidden = _names_forbidden_tool(argv)
     if forbidden is not None:
         return f"{forbidden} is a banned automated-exploitation/commercial tool (never run — §2)"
-    # resolve the REAL command past any `sudo`/`env`/`VAR=val` prefix for the allow-list check.
-    tool = _effective_tool(argv)
+    # allow-list check. ONLY exploit mode resolves past sudo/env/VAR= wrappers (attacker perk);
+    # recon/spray judge argv[0] directly, so a wrapper (`env …`, `sudo …`) is a non-allowlisted tool
+    # and is refused — closing the `env -u nmap bash -c …` arbitrary-exec hole in the default mode.
+    tool = _effective_tool(argv) if exploit else argv[0]
     base = os.path.basename(tool).lower()
     allowed = set(ALLOWED_TOOLS)
     if spray:
