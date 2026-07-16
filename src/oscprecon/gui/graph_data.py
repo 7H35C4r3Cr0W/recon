@@ -66,9 +66,19 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
         if sid in node_ids:  # a profile can list the same port twice — keep one node
             continue
         label = f"{svc.port}/{svc.proto.value} {svc.service}".strip()
-        # owner=target so the drill-down can fold the entry host's own services under it too
+        # owner=target so the drill-down can fold the entry host's own services under it too;
+        # service/product/version carried so the detail panel shows them without a recon-tab toggle.
         add_node(
-            sid, "service", label, {"proto": svc.proto.value, "port": svc.port, "owner": "target"}
+            sid,
+            "service",
+            label,
+            {
+                "proto": svc.proto.value,
+                "port": svc.port,
+                "owner": "target",
+                "service": svc.service,
+                "product": f"{svc.product} {svc.version}".strip(),
+            },
         )
         edges.append(_edge("target", sid, "has-service", f"e-has-{sid}"))
         ref = ref_match(svc)
@@ -159,7 +169,13 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
                 hsid,
                 "service",
                 slabel,
-                {"proto": svc.proto.value, "port": svc.port, "owner": host_id},
+                {
+                    "proto": svc.proto.value,
+                    "port": svc.port,
+                    "owner": host_id,
+                    "service": svc.service,
+                    "product": f"{svc.product} {svc.version}".strip(),
+                },
             )
             edges.append(
                 _edge(host_id, hsid, "has-service", f"e-hs-{host.ip}-{svc.port}-{svc.proto.value}")

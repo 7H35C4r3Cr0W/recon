@@ -143,10 +143,11 @@ class GraphDetail(QWidget):
 
         self._title = QLabel("Click a node to see its detail.")
         self._title.setWordWrap(True)
-        self._title.setStyleSheet("font-weight: bold;")
+        self._title.setStyleSheet("font-weight: bold; font-size: 13px;")
         self._info = QLabel("")
         self._info.setWordWrap(True)
-        self._info.setStyleSheet("color: gray;")
+        self._info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._info.setStyleSheet("color: palette(text); line-height: 140%;")
 
         status_box = QGroupBox("Status")
         status_row = QHBoxLayout(status_box)
@@ -193,10 +194,40 @@ class GraphDetail(QWidget):
 
     @staticmethod
     def _describe(data: dict[str, Any]) -> str:
+        # a rich, node-type-aware summary so the graph is self-sufficient — the user never has to flip
+        # back to the recon tab to see an IP, a service/version, or a /24's host count.
         node_type = str(data.get("type", "node"))
-        bits = [f"type: {node_type}"]
-        if node_type == "service":
-            bits.append(f"{data.get('port', '?')}/{data.get('proto', '?')}")
+        bits: list[str] = []
+        if node_type == "target":
+            bits.append("Entry / pivot host")
+            if data.get("ip"):
+                bits.append(f"IP: {data['ip']}")
+            if data.get("os"):
+                bits.append(f"OS: {data['os']}")
+        elif node_type == "subnet":
+            count = data.get("childCount")
+            hosts = f"{count} host{'s' if count != 1 else ''}" if count is not None else "hosts"
+            bits.append(f"Internal network (/24) — {hosts}")
+            via = str(data.get("via", ""))
+            if via:
+                bits.append("reached via: entry host" if via == "target" else f"reached via: {via[5:]}")
+        elif node_type == "host":
+            bits.append("Pivoted host")
+            if data.get("ip"):
+                bits.append(f"IP: {data['ip']}")
+            if data.get("os"):
+                bits.append(f"OS: {data['os']}")
+            count = data.get("childCount")
+            if count is not None:
+                bits.append(f"{count} service{'s' if count != 1 else ''}")
+        elif node_type == "service":
+            bits.append(f"Service — {data.get('port', '?')}/{data.get('proto', '?')} {data.get('service', '')}".strip())
+            if data.get("product"):
+                bits.append(f"product: {data['product']}")
+        elif node_type == "credential":
+            bits.append("Credential")
+        else:
+            bits.append(f"type: {node_type}")
         if data.get("module"):
             bits.append(f"module: {data['module']}")
         if data.get("source"):
@@ -205,7 +236,7 @@ class GraphDetail(QWidget):
             bits.append(str(data["detail"]))
         if data.get("status"):
             bits.append(f"status: {data['status']}")
-        return "  ·  ".join(bits)
+        return "\n".join(bits)
 
     def _set_controls_enabled(self, enabled: bool) -> None:
         self._note.setEnabled(enabled)
