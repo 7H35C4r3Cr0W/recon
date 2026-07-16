@@ -797,7 +797,13 @@ class MainWindow(QMainWindow):
     def _on_exploit_run(self, command: str, output_rel: str, parses: str) -> None:
         # Execute one user-selected attack command (§2b). NOTHING here is automatic: the user picked
         # the action, clicked Run, and must confirm below — and the exploit-mode gate must be on.
-        if self._profile is None or self._profile.read_only:
+        if self._profile is None:
+            return
+        if self._profile.read_only:  # §24 no-silent-failure: tell the user why nothing ran
+            self._exploit_panel.append_run_output(
+                "[read-only] profile is open read-only — not run."
+            )
+            self._exploit_panel.set_running(False)
             return
         if not config.load_settings().exploit_enabled:
             # off by default (exam-legal posture) — offer a one-time enable, never silently run
