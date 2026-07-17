@@ -961,6 +961,7 @@ class MainWindow(QMainWindow):
         self._activity_view.set_theme(theme_name)
         self._dashboard.set_theme(theme_name)
         self._graph_view.set_theme(theme_name)
+        self._exploit_panel.set_theme(theme_name)
 
     def _on_preferences(self) -> None:
         dialog = SettingsDialog(config.load_settings(), self)

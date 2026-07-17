@@ -260,9 +260,9 @@ Default workspace: `~/oscprecon/`. Each profile is a folder:
 ├── notes.md                  ← long-form user notes (editable in-GUI)
 ├── report.md                 ← auto-generated Obsidian-compatible master report
 ├── report-archive/           ← timestamped snapshots of prior report.md
-├── audit.jsonl               ← append-only GUI action audit log — QUEUED (§ 6a, Phase 5)
-├── audit-archive/            ← rotated audit logs, per-day after N MB — QUEUED (§ 6a, Phase 5)
-├── .lock                     ← present while opened for edit; concurrent-copy guard — QUEUED (§ 6b, Phase 5)
+├── audit.jsonl               ← append-only GUI action audit log — BUILT (§ 6a)
+├── audit-archive/            ← rotated audit logs, per-day after N MB — BUILT (§ 6a)
+├── .lock                     ← present while opened for edit; concurrent-copy guard — BUILT (§ 6b)
 ├── nmap/
 │   ├── tcp-top1000.txt
 │   ├── tcp-full.txt
@@ -366,11 +366,12 @@ Default workspace: `~/oscprecon/`. Each profile is a folder:
 }
 ```
 
-### 6a. Audit log — `<profile>/audit.jsonl` — QUEUED (Phase 5)
+### 6a. Audit log — `<profile>/audit.jsonl` — BUILT
 
-**Not built yet — recorded here so it lands in Phase 5.** An append-only, one-JSON-object-per-line
-record of every GUI action, for a complete exam audit trail. Writes are **best-effort — never block
-the UI**. Rotated into `audit-archive/` per day once the live file passes N MB.
+**Built (`audit.py` + `<profile>/audit.jsonl`; feeds the dashboard Activity timeline).** An
+append-only, one-JSON-object-per-line record of every GUI action, for a complete exam audit trail.
+Writes are **best-effort — never block the UI**. Rotated into `audit-archive/` per day once the live
+file passes N MB.
 
 Entry shape:
 
@@ -394,9 +395,10 @@ Entry shape:
 - **Wiring guidance:** add the emit points as each earlier phase's UI lands (cheap backfill), but
   the audit-log subsystem itself is a Phase 5 deliverable.
 
-### 6b. Concurrent copies & profile lock — `<profile>/.lock` — QUEUED (Phase 5)
+### 6b. Concurrent copies & profile lock — `<profile>/.lock` — BUILT
 
-**Not built yet.** The exam workflow may run several GUI instances at once (a second window on a
+**Built (advisory `<profile>/.lock` + read-only prompt + stale-lock reclaim; delivered in the
+Workspace upgrade).** The exam workflow may run several GUI instances at once (a second window on a
 different profile, or the same profile open read-only for reference).
 
 - Opening a profile **for edit** writes `<profile>/.lock` (flock/fcntl, records the owning PID).
@@ -995,17 +997,15 @@ Rewritten every scan event. Prior version archived to `<profile>/report-archive/
  ?: help  q: quit  /: filter  enter: run  Ctrl+G: toggle graph  m: notes
 ```
 
-### Status footer — QUEUED (Phase 2 or Phase 5 QoL, wherever cleanest)
+### Status footer — BUILT
 
-**Not built yet.** A small always-visible strip along the bottom of the main window:
+**Built (`main_window._update_status_footer`).** A small always-visible strip along the bottom of
+the main window:
 
 - App name + version (read from `pyproject.toml`)
 - Active profile name (or `no profile loaded`)
 - Workspace root path
 - Muted text: `recon-only — OSCP exam legal per CLAUDE.md § 2`
-
-Cleanest to add alongside the first module UI work (Phase 2) or with the Phase 5 QoL pass —
-implementer's call.
 
 ### File menu
 
@@ -1019,13 +1019,13 @@ implementer's call.
 | Close Profile | Ctrl+W | |
 | Export Report... | — | Renders `report.md` to HTML |
 | Export to Obsidian Vault... | — | See § 17 |
-| Open by IP... | — | **QUEUED (Phase 5).** Search all `~/oscprecon/` profiles for one whose `profile.json.target.ip` matches; open it. Fast recovery when the name is forgotten |
-| Import Project... | — | **QUEUED (Phase 5).** Extract a `<name>.tar.gz` (or folder) exported elsewhere into `~/oscprecon/<name>/` and open it |
-| Export Project... | — | **QUEUED (Phase 5).** Pack the active profile folder into `<name>.tar.gz` for backup/transfer; **warn that `creds.json` is included** |
+| Open by IP... | — | **BUILT.** Search all `~/oscprecon/` profiles for one whose `profile.json.target.ip` matches; open it. Fast recovery when the name is forgotten |
+| Import Project... | — | **BUILT.** Extract a `<name>.tar.gz` (or folder) exported elsewhere into `~/oscprecon/<name>/` and open it (path-traversal-safe) |
+| Export Project... | — | **BUILT.** Pack the active profile folder into `<name>.tar.gz` for backup/transfer; **warns that `creds.json` is included** |
 | Preferences... | — | Workspace root, wordlist paths, theme |
 | Exit | Ctrl+Q | |
 
-### Project file operations — QUEUED (Phase 5)
+### Project file operations — BUILT (`workspace/portability.py`)
 
 Each `~/oscprecon/<name>/` folder is a self-contained **project file**: opening it restores
 everything — discovered services, notes, audit log (§ 6a), command history, references visited,
