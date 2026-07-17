@@ -1,9 +1,24 @@
+/* Chrome colours are CSS variables driven by the active Nabu theme (window.oscpSetTheme, see app.js);
+   the defaults below are the dark "HTB" ground so the page still reads if no theme is pushed. The
+   SEMANTIC node-type colours (target/service/finding/credential…) live in app.js STYLE and stay
+   fixed per CLAUDE.md §16 — only the canvas/panel/text/edge chrome recolours with the app theme. */
+:root {
+  --g-bg: #0b1622;
+  --g-panel: #12202f;
+  --g-panel2: #1a2c40;
+  --g-border: #26394f;
+  --g-text: #e6eff6;
+  --g-text-muted: #8598ac;
+  --g-hint: #6c7f92;
+  --g-accent: #15e4f1;
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
-  background: #1e1e2e;
-  color: #cdd6f4;
+  background: var(--g-bg);
+  color: var(--g-text);
   font-family: "Segoe UI", system-ui, sans-serif;
 }
 
@@ -13,15 +28,15 @@ body {
   align-items: center;
   gap: 8px;
   padding: 0 8px;
-  background: #181825;
-  border-bottom: 1px solid #313244;
+  background: var(--g-panel);
+  border-bottom: 1px solid var(--g-border);
   box-sizing: border-box;
 }
 
 #toolbar button {
-  background: #313244;
-  color: #cdd6f4;
-  border: 1px solid #45475a;
+  background: var(--g-panel2);
+  color: var(--g-text);
+  border: 1px solid var(--g-border);
   border-radius: 4px;
   padding: 3px 10px;
   cursor: pointer;
@@ -29,7 +44,7 @@ body {
 }
 
 #toolbar button:hover {
-  background: #45475a;
+  background: color-mix(in srgb, var(--g-accent) 22%, var(--g-panel2));
 }
 
 #filters {
@@ -38,13 +53,13 @@ body {
 }
 
 .filter-label {
-  color: #bac2de;
+  color: var(--g-text-muted);
   font-size: 12px;
   cursor: pointer;
 }
 
 #hint {
-  color: #6c7086;
+  color: var(--g-hint);
   font-size: 12px;
   margin-left: auto;
 }
@@ -70,10 +85,10 @@ body {
   z-index: 60;
   max-width: 280px;
   padding: 6px 9px;
-  background: rgba(17, 17, 27, 0.96);
-  border: 1px solid #45475a;
+  background: var(--g-panel);
+  border: 1px solid var(--g-border);
   border-radius: 6px;
-  color: #cdd6f4;
+  color: var(--g-text);
   font-size: 11px;
   line-height: 1.45;
   pointer-events: none;
@@ -91,7 +106,7 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #a6adc8;
+  color: var(--g-text-muted);
   font-size: 14px;
   line-height: 1.5;
   padding: 24px;
@@ -105,19 +120,19 @@ body {
   position: fixed;
   top: 44px;
   left: 12px;
-  background: rgba(24, 24, 37, 0.92);
-  border: 1px solid #45475a;
+  background: var(--g-panel);
+  border: 1px solid var(--g-border);
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 11px;
-  color: #bac2de;
+  color: var(--g-text-muted);
   z-index: 50;
   pointer-events: none;
 }
 
 .legend-title {
   font-weight: 600;
-  color: #cdd6f4;
+  color: var(--g-text);
   margin-bottom: 4px;
 }
 
@@ -159,7 +174,7 @@ body {
 
 .legend-note {
   margin-top: 5px;
-  color: #6c7086;
+  color: var(--g-hint);
   max-width: 190px;
 }
 
@@ -169,8 +184,8 @@ body {
   right: 12px;
   width: 200px;
   height: 150px;
-  background: rgba(24, 24, 37, 0.9);
-  border: 1px solid #45475a;
+  background: var(--g-panel);
+  border: 1px solid var(--g-border);
   border-radius: 4px;
   overflow: hidden;
   z-index: 50;
@@ -178,8 +193,8 @@ body {
 
 #minimap-viewport {
   position: absolute;
-  border: 1.5px solid #cba6f7;
-  background: rgba(203, 166, 247, 0.12);
+  border: 1.5px solid var(--g-accent);
+  background: color-mix(in srgb, var(--g-accent) 12%, transparent);
   pointer-events: none;
   z-index: 51;
 }

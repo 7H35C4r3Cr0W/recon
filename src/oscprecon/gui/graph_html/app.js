@@ -106,21 +106,36 @@
     "dead-end": BADGE["dead-end"],
   };
 
-  var STYLE = [
+  // Chrome colours (canvas bg, node label + outline, edges) follow the active Nabu theme via
+  // oscpSetTheme(); the node-TYPE fills below stay fixed per §16. Defaults = the dark HTB ground so
+  // the page still reads before Qt pushes a theme.
+  var THEME = {
+    canvasBg: "#0b1622",
+    labelColor: "#e6eff6",
+    labelOutline: "#0b1622",
+    edge: "#5b6b7d",
+    edgeLabel: "#8598ac",
+    accent: "#15e4f1",
+    accentText: "#04181c",
+  };
+
+  function buildStyle() {
+    return [
     {
       selector: "node",
       style: {
-        // icon disc + label below (BloodHound-style). Label sits on the dark canvas, so it is light
-        // with an outline for legibility over edges. Default glyph is the service icon.
+        // icon disc + label below (BloodHound-style). Label sits on the canvas, so it takes the
+        // theme text colour with a canvas-coloured outline for legibility over edges (light text on
+        // a dark theme, dark text on the light theme). Default glyph is the service icon.
         label: "data(label)",
         "text-wrap": "wrap",
         "text-valign": "bottom",
         "text-halign": "center",
         "text-margin-y": 4,
         "text-max-width": 130,
-        color: "#cdd6f4",
+        color: THEME.labelColor,
         "text-outline-width": 2,
-        "text-outline-color": "#181825",
+        "text-outline-color": THEME.labelOutline,
         "font-size": 10,
         width: 34,
         height: 34,
@@ -245,8 +260,8 @@
       selector: "edge",
       style: {
         width: 1.5,
-        "line-color": "#585b70",
-        "target-arrow-color": "#585b70",
+        "line-color": THEME.edge,
+        "target-arrow-color": THEME.edge,
         "target-arrow-shape": "triangle",
         "curve-style": "bezier",
       },
@@ -256,7 +271,7 @@
       style: {
         label: "data(label)",
         "font-size": 9,
-        color: "#9399b2",
+        color: THEME.edgeLabel,
         "text-rotation": "autorotate",
       },
     },
@@ -292,7 +307,41 @@
       selector: 'edge[type="contains-host"]',
       style: { "line-color": "#9399b2", width: 1.5, opacity: 0.55, "target-arrow-shape": "none" },
     },
-  ];
+    ];
+  }
+
+  // Qt pushes the active theme's chrome colours here (graph_view.set_theme -> oscpSetTheme). Sets the
+  // CSS variables (toolbar / legend / minimap / tooltip) and re-applies the Cytoscape style so the
+  // canvas, node labels and edges recolour live; node-TYPE fills stay fixed (§16).
+  function setTheme(t) {
+    if (!t || typeof t !== "object") return;
+    var cssVars = {
+      canvasBg: "--g-bg",
+      panel: "--g-panel",
+      panel2: "--g-panel2",
+      border: "--g-border",
+      text: "--g-text",
+      textMuted: "--g-text-muted",
+      hint: "--g-hint",
+      accent: "--g-accent",
+    };
+    var root = document.documentElement;
+    for (var key in cssVars) {
+      if (t[key]) root.style.setProperty(cssVars[key], t[key]);
+    }
+    if (t.canvasBg) {
+      THEME.canvasBg = t.canvasBg;
+      THEME.labelOutline = t.canvasBg;
+    }
+    if (t.text) THEME.labelColor = t.text;
+    if (t.edge) THEME.edge = t.edge;
+    if (t.edgeLabel) THEME.edgeLabel = t.edgeLabel;
+    if (t.accent) THEME.accent = t.accent;
+    if (t.accentText) THEME.accentText = t.accentText;
+    if (cy) cy.style(buildStyle());
+    if (mini) mini.style(buildStyle());
+  }
+  window.oscpSetTheme = setTheme;
 
   // A centered message over the canvas — used for "no services yet" and bridge/parse failures, so an
   // empty graph is never a silent blank. Passing "" hides it.
@@ -501,8 +550,8 @@
     linkMode = on;
     linkSource = null;
     var button = document.getElementById("link-mode");
-    button.style.background = on ? "#cba6f7" : "";
-    button.style.color = on ? "#11111b" : "";
+    button.style.background = on ? THEME.accent : "";
+    button.style.color = on ? THEME.accentText : "";
     document.getElementById("hint").textContent = on
       ? "LINK MODE: click a source node, then a target — creates a relates-to edge"
       : DEFAULT_HINT;
@@ -513,9 +562,9 @@
     var data;
     if (format === "svg") {
       if (typeof cy.svg !== "function") return;
-      data = cy.svg({ full: true, bg: "#1e1e2e" });
+      data = cy.svg({ full: true, bg: THEME.canvasBg });
     } else {
-      data = cy.png({ output: "base64uri", full: true, scale: 2, bg: "#1e1e2e" });
+      data = cy.png({ output: "base64uri", full: true, scale: 2, bg: THEME.canvasBg });
     }
     bridge.export_image(format, data);
   }
@@ -598,7 +647,7 @@
     mini = cytoscape({
       container: container,
       elements: JSON.parse(JSON.stringify(elements)), // clone so the two instances never share state
-      style: STYLE,
+      style: buildStyle(),
       userZoomingEnabled: false,
       userPanningEnabled: false,
       boxSelectionEnabled: false,
@@ -750,7 +799,7 @@
     cy = cytoscape({
       container: document.getElementById("cy"),
       elements: elements,
-      style: STYLE,
+      style: buildStyle(),
     });
     window.cy = cy; // exposed for the web inspector / render checks
     cy.nodes().forEach(applyGlyphs); // corner badges (danger / OS / status / note)

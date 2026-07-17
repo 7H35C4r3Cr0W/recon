@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon.gui.graph_data import build_elements
+from oscprecon.gui.theme import tokens
 from oscprecon.profile import Profile
 
 try:
@@ -41,6 +42,38 @@ _VALID_STATUS = frozenset(_STATUSES)
 
 def _webview_enabled() -> bool:
     return _WEBVIEW_IMPORTED and not os.environ.get("OSCPRECON_DISABLE_WEBVIEW")
+
+
+def _hex_rgb(value: str) -> tuple[int, int, int]:
+    h = value.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def _mix(a: str, b: str, t: float) -> str:
+    # blend hex a toward hex b by fraction t -> "#rrggbb" (subtle borders/edges from the palette)
+    ar, ag, ab = _hex_rgb(a)
+    br, bg, bb = _hex_rgb(b)
+    r, g, bl = round(ar + (br - ar) * t), round(ag + (bg - ag) * t), round(ab + (bb - ab) * t)
+    return f"#{r:02x}{g:02x}{bl:02x}"
+
+
+def graph_theme(pal: tokens.Palette) -> dict[str, str]:
+    # chrome colours pushed to the graph page (window.oscpSetTheme). Node-TYPE fills stay fixed
+    # (§16); only the canvas/panel/text/edge chrome follows the app theme, so the graph reads native
+    # on every theme (a light canvas on the Light theme, not a dark box in a cream app).
+    return {
+        "canvasBg": pal.bg,
+        "panel": pal.surface,
+        "panel2": pal.surface_alt,
+        "border": _mix(pal.text_muted, pal.bg, 0.55),
+        "text": pal.text,
+        "textMuted": pal.text_muted,
+        "hint": _mix(pal.text_muted, pal.bg, 0.3),
+        "accent": pal.accent,
+        "accentText": pal.accent_text,
+        "edge": _mix(pal.text_muted, pal.bg, 0.3),
+        "edgeLabel": pal.text_muted,
+    }
 
 
 class GraphBridge(QObject):
@@ -464,6 +497,7 @@ class GraphView(QWidget):
         self._bridge.node_selected.connect(self._on_node_selected)
         self._web: QWebEngineView | None = None
         self._loaded = False  # the web page has finished its initial load at least once
+        self._theme_json = json.dumps(graph_theme(tokens.active_palette()))
 
         if _webview_enabled():
             try:
@@ -516,6 +550,18 @@ class GraphView(QWidget):
         splitter.setSizes([300, 740])
         QHBoxLayout(self).addWidget(splitter)
 
+    def set_theme(self, theme_name: str) -> None:
+        # recolour the web graph's chrome from the active theme (node-type fills stay fixed, §16)
+        self._theme_json = json.dumps(graph_theme(tokens.palette(theme_name)))
+        self._push_theme()
+
+    def _push_theme(self) -> None:
+        if self._web is None or not self._loaded:
+            return  # a not-yet-loaded page picks it up in _on_load_finished
+        page = self._web.page()
+        if page is not None:
+            page.runJavaScript(f"window.oscpSetTheme && window.oscpSetTheme({self._theme_json});")
+
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
         self._bridge.set_profile(profile)
@@ -551,8 +597,11 @@ class GraphView(QWidget):
             self._canvas_stack.setCurrentWidget(self._web)
             page = self._web.page()
             if page is not None:
-                # guarantee the just-loaded page shows the current profile even if boot() raced
-                # set_profile() (page finished loading before the profile was assigned)
+                # colour the chrome (canvas/toolbar/legend/edges) before the first render so the
+                # graph never flashes the default dark ground on a light theme…
+                self._push_theme()
+                # …then guarantee the just-loaded page shows the current profile even if boot()
+                # raced set_profile() (page finished loading before the profile was assigned)
                 page.runJavaScript("window.oscpRefresh && window.oscpRefresh();")
 
     def _on_render_terminated(self, *_args: object) -> None:
