@@ -43,9 +43,25 @@ oscp-recon = "oscprecon.__main__:main"
 dev = [
     "pytest>=8",
     "pytest-qt>=4",
+    "pytest-cov>=5",
     "mypy>=1.10",
     "ruff",
     "types-pyyaml",
+]
+
+# Coverage is a report, not a hard gate — GUI glue code is legitimately hard to unit-cover, so
+# forcing a % threshold would just churn. Run: `uv run pytest --cov` (add --cov-report=html for a
+# browsable report under htmlcov/).
+[tool.coverage.run]
+source = ["src/oscprecon"]
+omit = ["*/__main__.py"]
+
+[tool.coverage.report]
+skip_covered = false
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
 ]
 
 [tool.hatch.build.targets.wheel]

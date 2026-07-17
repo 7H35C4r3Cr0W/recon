@@ -23,6 +23,13 @@ uv run ruff format --check
 
 CI runs the same four on every push and PR.
 
+Coverage is available as a **report, not a gate**:
+
+```bash
+uv run pytest --cov                       # terminal summary
+uv run pytest --cov --cov-report=html     # browsable report under htmlcov/
+```
+
 ## Ground rules
 
 - **Stay exam-legal by default.** Do not wrap or ship as an action anything on the `CLAUDE.md` §2
