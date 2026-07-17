@@ -93,7 +93,7 @@ def _light_palette() -> QPalette:
     bg = QColor("#f4f1ea")
     base = QColor("#ffffff")
     text = QColor("#1b2230")
-    gold = QColor("#b3891f")
+    gold = QColor("#8f6c15")  # WCAG-AA: matches tokens.LIGHT.accent
     disabled = QColor("#9aa0ab")
     p = QPalette()
     p.setColor(QPalette.ColorRole.Window, bg)
