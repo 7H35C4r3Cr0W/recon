@@ -319,7 +319,7 @@ wheels = [
 
 [[package]]
 name = "oscp-recon"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
