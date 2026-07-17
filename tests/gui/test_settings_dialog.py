@@ -158,7 +158,7 @@ def test_restore_defaults_repopulates_widgets(qtbot: QtBot) -> None:
     d._theme_combo.setCurrentIndex(d._theme_combo.findData("dark"))
     d._concurrency.setValue(15)
     d._restore_defaults()
-    assert d._theme_combo.currentData() == "light"
+    assert d._theme_combo.currentData() == config.DEFAULT_THEME  # HTB / Parrot is the default
     assert d._concurrency.value() == config.DEFAULT_MAX_CONCURRENCY
 
 

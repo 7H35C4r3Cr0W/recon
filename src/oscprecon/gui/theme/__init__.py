@@ -8,7 +8,9 @@ from oscprecon.gui.theme import tokens
 # why: §19/§23 — a dark/light toggle for exam-day comfort. Fusion + a dark QPalette is the robust
 # Qt way (complete coverage of every widget role, no fragile per-widget QSS to maintain).
 THEMES = ("light", "dark", "htb")
-DEFAULT_THEME = "light"
+# HTB / Parrot is the default look (owner request, 2026-07-16) — a deep navy-teal ground with the
+# Parrot cyan-green accent + a light-blue secondary. Light + Dark remain for exam-day comfort.
+DEFAULT_THEME = "htb"
 _LABELS = {"light": "Light", "dark": "Dark", "htb": "HTB"}
 
 
@@ -47,18 +49,18 @@ def _dark_palette() -> QPalette:
 
 
 def _htb_palette() -> QPalette:
-    # HTB / Parrot-OS flavour — dark teal-slate ground, Parrot cyan-green highlight. Mirrors
-    # _dark_palette's roles so every Fusion widget (tables, inputs) reads right on the dark.
-    bg = QColor("#0f171d")
-    base = QColor("#16212a")
-    text = QColor("#e3edf2")
+    # HTB / Parrot-OS flavour (the default) — deep navy-teal ground, Parrot cyan-green highlight,
+    # light-blue links. Mirrors tokens.HTB so every Fusion widget (tables, inputs) reads right.
+    bg = QColor("#0b1622")
+    base = QColor("#12202f")
+    text = QColor("#e6eff6")
     green = QColor("#15e4f1")  # Parrot Security cyan-green
     disabled = QColor("#7f95a3")
     p = QPalette()
     p.setColor(QPalette.ColorRole.Window, bg)
     p.setColor(QPalette.ColorRole.WindowText, text)
     p.setColor(QPalette.ColorRole.Base, base)
-    p.setColor(QPalette.ColorRole.AlternateBase, QColor("#1c2833"))
+    p.setColor(QPalette.ColorRole.AlternateBase, QColor("#1a2c40"))
     p.setColor(QPalette.ColorRole.ToolTipBase, base)
     p.setColor(QPalette.ColorRole.ToolTipText, text)
     p.setColor(QPalette.ColorRole.Text, text)

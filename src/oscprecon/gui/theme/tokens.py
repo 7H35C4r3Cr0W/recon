@@ -72,18 +72,22 @@ LIGHT = Palette(
 # selection / links AND the primary action buttons; amber warnings and a hot-pink error stay
 # legible on the dark so state never rides on the green alone.
 HTB = Palette(
-    bg="#0f171d",
-    surface="#16212a",
-    surface_alt="#1c2833",
-    border="#29373f",
-    text="#e3edf2",
-    text_muted="#8098a3",
-    nav_label="#f5c518",  # bright yellow — pops on the teal rail, distinct from the cyan accent
-    accent="#15e4f1",  # Parrot Security cyan-green
-    accent_text="#04181c",
-    secondary="#5cc8ff",
+    # The DEFAULT theme — a Hack-The-Box / Parrot-OS flavour: a deep navy-teal ground with Parrot
+    # Security's signature cyan-green accent (#15e4f1) and a bright light-blue (#5cc8ff / #6fd6ff)
+    # carrying nav labels, links and secondary emphasis. Gold-free by design; state rides on the
+    # cyan accent + semantic green/amber/pink so a status can never be mistaken for the accent.
+    bg="#0b1622",  # deep navy-teal — richer contrast for the neon accent to sit on
+    surface="#12202f",  # cards / panels
+    surface_alt="#1a2c40",  # inset / alternating rows — a touch lighter for definition
+    border="#26394f",
+    text="#e6eff6",  # crisp near-white
+    text_muted="#8598ac",
+    nav_label="#6fd6ff",  # bright light-blue — nav-rail labels, distinct from the cyan accent
+    accent="#15e4f1",  # Parrot Security cyan-green (the primary "live"/CTA colour)
+    accent_text="#052227",  # legible dark on the neon accent
+    secondary="#5cc8ff",  # light blue — links / secondary emphasis
     focus="#15e4f1",
-    selection="#123138",  # teal-tinted selected row
+    selection="#163241",  # cyan-tinted selected row
     success="#3ddc84",
     warning="#f5c518",
     error="#ff5c7a",
@@ -91,7 +95,7 @@ HTB = Palette(
 )
 
 _PALETTES = {"dark": DARK, "light": LIGHT, "htb": HTB}
-_active_theme = "light"
+_active_theme = "htb"  # HTB / Parrot is the default look (set by theme.apply_theme on startup)
 
 
 def palette(theme: str) -> Palette:

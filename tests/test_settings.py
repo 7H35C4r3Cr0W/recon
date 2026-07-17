@@ -9,7 +9,7 @@ def test_defaults_when_prefs_empty() -> None:
     loaded = config.load_settings()
     defaults = config.default_settings()
     assert loaded == defaults
-    assert loaded.theme == "light"
+    assert loaded.theme == "htb"  # HTB / Parrot is the default look
     assert loaded.font_size == 0
     assert loaded.max_concurrency == config.DEFAULT_MAX_CONCURRENCY
     assert loaded.nmap_udp_full is False
@@ -41,7 +41,7 @@ def test_corrupt_values_fall_back_safely() -> None:
     loaded = config.load_settings()
     assert loaded.font_size == 0  # unparseable → default (no override)
     assert loaded.max_concurrency == config.DEFAULT_MAX_CONCURRENCY
-    assert loaded.theme == "light"  # unknown theme → default
+    assert loaded.theme == "htb"  # unknown theme → default
     assert loaded.nmap_udp_full is False  # unknown bool → default
     assert loaded.wordlist_paths == config.default_settings().wordlist_paths
 
