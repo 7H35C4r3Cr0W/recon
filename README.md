@@ -1,5 +1,8 @@
 # Nabu — Local Recon Workspace
 
+[![CI](https://github.com/7H35C4r3Cr0W/recon/actions/workflows/ci.yml/badge.svg)](https://github.com/7H35C4r3Cr0W/recon/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A **recon-first, OSCP-exam-legal desktop workspace** that orchestrates the standard enumeration
 tools you already use (nmap, feroxbuster/gobuster/ffuf, nikto/whatweb, smbclient/netexec, …),
 structures what they find, links each service to HackTricks and Exploit-DB, draws a BloodHound-style
