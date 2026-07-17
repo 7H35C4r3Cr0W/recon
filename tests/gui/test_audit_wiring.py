@@ -97,7 +97,7 @@ def test_spray_confirmation_is_audited_without_secret(qtbot: QtBot, tmp_path: Pa
     spray_dir.mkdir(parents=True, exist_ok=True)
     out = spray_dir / "smb.txt"
     out.write_text("SMB 10.10.10.5 445 DC [+] corp\\administrator:Winter2024! (Pwn3d!)\n")
-    window._record_spray_success(prof, "smb", out)
+    window._spray_ctl._record_success(prof, "smb", out)
     entries = audit.load_entries(prof.directory)
     conf = next(e for e in entries if e["action"] == "spray-confirmed")
     assert conf["details"]["service"] == "smb" and conf["details"]["count"] == 1

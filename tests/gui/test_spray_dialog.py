@@ -82,8 +82,8 @@ def test_spray_launches_gated_worker_when_enabled(
     prof.add_credential(Credential(username="admin", secret="Password1"))
     window._set_profile(prof)
     _enable_spray()
-    monkeypatch.setattr(mw.SprayDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
-    monkeypatch.setattr(mw.SprayDialog, "selected_services", lambda self: ["smb"])
+    monkeypatch.setattr(SprayDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+    monkeypatch.setattr(SprayDialog, "selected_services", lambda self: ["smb"])
     captured: dict[str, object] = {}
     monkeypatch.setattr(window, "_start", lambda worker, *a, **k: captured.update(worker=worker))
     window._on_credential_spray()
@@ -102,8 +102,8 @@ def test_spray_blocked_when_setting_off(
     prof.add_credential(Credential(username="admin", secret="Password1"))
     window._set_profile(prof)
     # spray mode is OFF (default). Even if a stubbed dialog accepts, the config re-check must block.
-    monkeypatch.setattr(mw.SprayDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
-    monkeypatch.setattr(mw.SprayDialog, "selected_services", lambda self: ["smb"])
+    monkeypatch.setattr(SprayDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+    monkeypatch.setattr(SprayDialog, "selected_services", lambda self: ["smb"])
     launched: list[object] = []
     monkeypatch.setattr(window, "_start", lambda worker, *a, **k: launched.append(worker))
     window._on_credential_spray()

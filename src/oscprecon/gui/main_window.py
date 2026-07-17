@@ -6,7 +6,6 @@ import re
 import socket
 from collections.abc import Callable
 from datetime import UTC, datetime
-from functools import partial
 from importlib import metadata
 from pathlib import Path
 from typing import Any
@@ -30,11 +29,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import alive, config, edb, findings, nmap_scan, references, spray, vault_export
+from oscprecon import alive, config, edb, findings, nmap_scan, references, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.branding import APP_NAME, APP_SUBTITLE, APP_TAGLINE
 from oscprecon.gui import theme
 from oscprecon.gui.assets import ICON, asset_path
+from oscprecon.gui.controllers.spray_controller import SprayController
 from oscprecon.gui.dialogs import (
     AddCredentialDialog,
     AddPivotNetworkDialog,
@@ -47,7 +47,6 @@ from oscprecon.gui.dialogs import (
     NmapScanDialog,
     ScanPresetsDialog,
     SettingsDialog,
-    SprayDialog,
 )
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
@@ -245,7 +244,7 @@ class MainWindow(QMainWindow):
         self._edb_context: tuple[str, str, str] | None = None  # (service label, product, version)
         self._live_request_id = 0
         self._live_workers: set[QThread] = set()
-        self._spray_pending = 0  # launched sprays still running; clean input lists when it hits 0
+        self._spray_ctl = SprayController(self)  # owns the opt-in credential-spray flow (§2a)
         self._pending_visits: list[tuple[str, str]] = []
 
         left = QWidget()
@@ -1727,111 +1726,7 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(f"[scan] done (exit {exit_code}).")
 
     def _on_credential_spray(self) -> None:
-        if self._profile is None:
-            QMessageBox.information(self, "No profile", "Open or create a profile first.")
-            return
-        if self._profile.read_only:
-            QMessageBox.information(self, "Read-only", "This profile is open read-only.")
-            return
-        if self._spray_pending > 0:
-            # a batch is already running against the shared spray/users.txt+passwords.txt lists — a
-            # a second launch would clobber _spray_pending and truncate the in-use lists mid-spray
-            QMessageBox.information(
-                self, "Spray running", "A credential spray is already running — wait or Stop it."
-            )
-            return
-        dialog = SprayDialog(self._profile, config.load_settings().spray_enabled, self)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-        # re-read the setting at launch — the single gate; never pass spray=True otherwise.
-        if not config.load_settings().spray_enabled:
-            return
-        # spray ONLY the user-selected subset of the vault (§2a: the operator picks which creds)
-        users = dialog.selected_users()
-        passwords = dialog.selected_passwords()
-        if not users or not passwords:
-            QMessageBox.warning(
-                self,
-                "No credentials selected",
-                "Select at least one username and password (add them in the Credential Vault).",
-            )
-            return
-        users_path, passwords_path = spray.write_spray_lists(
-            self._profile.directory, users, passwords
-        )
-        profile = self._profile  # capture: results/cleanup always target the ORIGINATING profile
-        target = profile.target.ip
-        redact = spray.make_redactor(passwords)  # mask winning secrets in streamed tool output
-        launched = 0
-        for service in dialog.selected_services():
-            if not self._tasks.can_start():
-                break
-            port = spray.discovered_port(service, profile.discovered_services)
-            command = spray.build_spray_command(service, target, users_path, passwords_path, port)
-            output_file = profile.directory / "spray" / f"{service}.txt"
-            spray.secure_output_file(output_file)  # 0600 — it can hold plaintext secrets
-            self._tool_panel.append_output(f"$ [spray] {command}")
-            self._audit_action("credential-spray", service=service, target=target)
-            worker = CommandWorker(command, output_file, cwd=profile.directory, spray=True)
-            self._start(
-                worker,
-                f"spray:{service}",
-                partial(
-                    self._spray_done, profile=profile, service=service, output_file=output_file
-                ),
-                on_failed=partial(self._spray_failed, profile=profile),
-                line_filter=redact,
-            )
-            launched += 1
-        self._spray_pending = launched  # set before any queued done-callback runs (GUI thread)
-        if launched == 0:
-            # nothing ran (no services selected, or every task slot was busy) — don't leave the
-            # plaintext users/passwords lists orphaned on disk with no worker to clean them [#8]
-            spray.clean_spray_artifacts(profile.directory)
-
-    def _spray_done(self, code: int, profile: Profile, service: str, output_file: Path) -> None:
-        self._record_spray_success(profile, service, output_file)
-        self._command_done(code, None)
-        self._spray_worker_finished(profile)
-
-    def _spray_failed(self, message: str, profile: Profile) -> None:
-        # a spray worker that raised (missing tool, policy refusal) still counts as finished — clean
-        # up on this path too, else _spray_pending never reaches 0 and the plaintext lists leak [#8]
-        self._on_run_failed(message)
-        self._spray_worker_finished(profile)
-
-    def _spray_worker_finished(self, profile: Profile) -> None:
-        self._spray_pending -= 1
-        if self._spray_pending <= 0:  # last spray of this launch finished -> drop the input lists
-            self._spray_pending = 0
-            removed = spray.clean_spray_artifacts(profile.directory)
-            if removed and profile is self._profile:
-                self._tool_panel.append_output(f"[spray] removed input lists: {', '.join(removed)}")
-
-    def _record_spray_success(self, profile: Profile, service: str, output_file: Path) -> None:
-        # ADD-only confirmation into the originating project's creds.json — never removes a
-        # credential, never touches a different active project, never logs the secret.
-        try:
-            output = Path(output_file).read_text(encoding="utf-8")
-        except OSError:
-            return
-        cred_list = profile.credentials()
-        candidates = [(c.username, c.secret) for c in cred_list if c.secret_type == "password"]
-        confirmed = set(spray.parse_spray_success(service, output, candidates))
-        if not confirmed or profile.read_only:
-            return
-        label = f"spray-confirmed:{service}"
-        changed = False
-        for cred in cred_list:
-            if (cred.username, cred.secret) in confirmed and label not in cred.tested_against:
-                cred.tested_against.append(label)
-                changed = True
-        if changed:
-            profile.set_credentials(cred_list)
-            if profile is self._profile:
-                self._tool_panel.append_output(f"[spray] confirmed {len(confirmed)} credential(s)")
-                # audit the OUTCOME (a credential validated) — service + count only, no secret
-                self._audit_action("spray-confirmed", service=service, count=len(confirmed))
+        self._spray_ctl.launch()  # the spray subsystem lives in SprayController
 
     def _on_browse_wordlists(self) -> None:
         dialog = QDialog(self)

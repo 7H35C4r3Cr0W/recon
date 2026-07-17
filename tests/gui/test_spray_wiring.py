@@ -26,7 +26,7 @@ def test_record_spray_success_updates_originating_project_add_only(
         "SMB 10.10.10.5 445 DC [+] corp\\administrator:Winter2024 (Pwn3d!)\n", encoding="utf-8"
     )
 
-    window._record_spray_success(profile, "smb", output)
+    window._spray_ctl._record_success(profile, "smb", output)
 
     reloaded = profile.credentials()
     assert len(reloaded) == 2  # a successful spray never removes a credential
@@ -52,10 +52,10 @@ def test_spray_done_cleans_input_lists_only_after_the_last_worker(
     (spray_dir / "passwords.txt").write_text("b\n", encoding="utf-8")
     (spray_dir / "smb.txt").write_text("out\n", encoding="utf-8")
 
-    window._spray_pending = 2  # two sprays launched
-    window._spray_done(0, profile, "smb", spray_dir / "smb.txt")
+    window._spray_ctl._pending = 2  # two sprays launched
+    window._spray_ctl._done(0, profile, "smb", spray_dir / "smb.txt")
     assert (spray_dir / "users.txt").exists()  # not yet — another spray still running
-    window._spray_done(0, profile, "winrm", spray_dir / "winrm.txt")
+    window._spray_ctl._done(0, profile, "winrm", spray_dir / "winrm.txt")
     assert not (spray_dir / "users.txt").exists()  # last worker -> input lists removed
     assert not (spray_dir / "passwords.txt").exists()
     assert profile.creds_path.exists() or not profile.credentials()  # store never touched

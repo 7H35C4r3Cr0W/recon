@@ -211,6 +211,7 @@ oscp-recon/
 │   ├── gui/
 │   │   ├── app.py            ← QApplication bootstrap
 │   │   ├── main_window.py
+│   │   ├── controllers/      ← cohesive subsystems extracted from main_window (spray_controller.py, …)
 │   │   ├── widgets/
 │   │   │   ├── service_tree.py     ← left pane
 │   │   │   ├── tool_panel.py       ← middle pane (command builder + output + follow-ups)
