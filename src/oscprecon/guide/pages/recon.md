@@ -5,7 +5,7 @@
 | Pane | What it shows |
 | --- | --- |
 | **Left — service tree** | Every discovered port/service. Non-standard HTTP/DB ports get their own node. |
-| **Middle — tool panel** | The command builder for the selected service, a live shell preview, `Run` / `Dry-run`, and the streamed output. |
+| **Middle — tool panel** | The command builder for the selected service, a live shell preview, `Run` / `Dry-run`, the streamed output, and **Tier-2 manual follow-ups** (e.g. the HTTP panel surfaces WebDAV `OPTIONS`/`PROPFIND` + endpoint probes — double-click to run). |
 | **Right — reference pane** | The matched HackTricks page (vendored offline) and version-aware `searchsploit` Exploit-DB hits (lookup only). |
 
 ## Staged nmap discovery

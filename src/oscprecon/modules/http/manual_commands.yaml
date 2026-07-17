@@ -38,6 +38,10 @@
   why: "Misserved auth files leak rewrite rules and password hashes"
   command: "curl -sk {url}.htaccess"
 
+- description: "WebDAV scan (nmap http-webdav-scan)"
+  why: "Confirms WebDAV and reports the exposed methods/paths in one read-only pass"
+  command: "nmap --script http-webdav-scan -p {port} {target}"
+
 - description: "WebDAV PROPFIND"
   why: "PROPFIND confirms WebDAV and lists resources when enabled"
   command: "curl -sk -X PROPFIND {url} -H 'Depth: 1'"

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -15,6 +17,9 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
@@ -24,9 +29,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from oscprecon import manual_commands
 from oscprecon.gui.theme import styles
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import DiscoveredService
+from oscprecon.modules import http as http_mod
 from oscprecon.modules.http import (
     EXTENSION_PRESETS,
     STATUS_PRESETS,
@@ -40,6 +47,10 @@ from oscprecon.modules.http import (
 from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef
 
+_MANUAL_YAML = (
+    Path(http_mod.__file__).parent / "manual_commands.yaml" if http_mod.__file__ else None
+)
+_MANUAL_ROLE = Qt.ItemDataRole.UserRole
 _DEFAULT_WORDLIST = "/usr/share/seclists/Discovery/Web-Content/big.txt"
 _TOOL_LABELS = {
     "feroxbuster": "feroxbuster",
@@ -61,10 +72,14 @@ class HttpPanel(QWidget):
     run_requested = Signal(str, str, str, int)  # command, output_rel, tool, port
     dry_run_requested = Signal(str)
     add_report_requested = Signal(str)
+    manual_requested = Signal(str)  # a Tier-2 follow-up command (WebDAV, endpoints, methods)
 
     def __init__(self) -> None:
         super().__init__()
         self._profile: Profile | None = None
+        self._manual_entries = (
+            manual_commands.load_manual_commands(_MANUAL_YAML) if _MANUAL_YAML else []
+        )
         self._port = 80
         self._wordlist = _DEFAULT_WORDLIST
         self._output_is_custom = False
@@ -165,14 +180,63 @@ class HttpPanel(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setWidget(inner)
 
+        # Tier-2 follow-ups (WebDAV OPTIONS/PROPFIND/nmap-webdav-scan, endpoint + method probes) —
+        # shown, run on double-click through the shell chokepoint like the FTP/SSH/DNS panels.
+        self._manual = QListWidget()
+        self._manual.itemActivated.connect(self._on_manual_activated)
+        self._manual.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._manual.customContextMenuRequested.connect(self._on_manual_menu)
+        self._manual.setMaximumHeight(150)
+        manual_box = QGroupBox(
+            "Manual follow-ups (Tier 2 — double-click to run; WebDAV, endpoints)"
+        )
+        QVBoxLayout(manual_box).addWidget(self._manual)
+
         layout = QVBoxLayout(self)
         layout.addWidget(scroll, stretch=1)
         layout.addWidget(QLabel("Command preview:"))
         layout.addWidget(self._preview)
         layout.addLayout(button_row)
+        layout.addWidget(manual_box)
 
         self._connect_signals()
         self._refresh()
+
+    def _reload_manual(self) -> None:
+        self._manual.clear()
+        if self._profile is None:
+            return
+        target = self._profile.target
+        for entry in self._manual_entries:
+            command = manual_commands.expand(
+                entry.command,
+                target=target.ip,
+                port=self._port,
+                url=self._url.text(),
+                domain=target.hostname or "",
+            )
+            item = QListWidgetItem(f"{entry.description}\n    {command}")
+            item.setData(_MANUAL_ROLE, command)
+            self._manual.addItem(item)
+
+    def _on_manual_activated(self, item: QListWidgetItem) -> None:
+        command = item.data(_MANUAL_ROLE)
+        if isinstance(command, str):
+            self.manual_requested.emit(command)
+
+    def _on_manual_menu(self, pos: QPoint) -> None:
+        item = self._manual.currentItem()
+        viewport = self._manual.viewport()
+        if item is None or viewport is None:
+            return
+        command = item.data(_MANUAL_ROLE)
+        if not isinstance(command, str):
+            return
+        menu = QMenu(self)
+        if menu.addAction("Copy command") == menu.exec(viewport.mapToGlobal(pos)):
+            clipboard = QGuiApplication.clipboard()
+            if clipboard is not None:
+                clipboard.setText(command)
 
     @staticmethod
     def _wrap(inner: Any) -> QWidget:
@@ -192,6 +256,7 @@ class HttpPanel(QWidget):
     def _connect_signals(self) -> None:
         self._tool.currentTextChanged.connect(self._refresh)
         self._url.textChanged.connect(self._refresh)
+        self._url.textChanged.connect(self._reload_manual)  # follow-ups embed the current {url}
         self._custom_exts.textChanged.connect(self._refresh)
         self._threads.valueChanged.connect(self._refresh)
         self._depth.valueChanged.connect(self._refresh)
@@ -209,6 +274,7 @@ class HttpPanel(QWidget):
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
         self._apply_settings(profile.module_settings.get("http", {}))
+        self._reload_manual()
 
     def configure(self, service: DiscoveredService, ref: ServiceRef) -> None:
         self._port = service.port
@@ -219,6 +285,7 @@ class HttpPanel(QWidget):
         self._url.setText(default_url(host, service.port, tls))
         self._output_is_custom = False  # a new port re-derives the default output path
         self._refresh()
+        self._reload_manual()
 
     def set_url(self, url: str) -> None:
         self._url.setText(url)

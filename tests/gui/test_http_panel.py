@@ -149,3 +149,22 @@ def test_contained_path_rejects_escapes(tmp_path: Path) -> None:
     assert _contained_path(tmp_path, "http/80/x.txt") is not None
     assert _contained_path(tmp_path, "/etc/passwd") is None
     assert _contained_path(tmp_path, "../../etc/passwd") is None
+
+
+def test_http_manual_follow_ups_surface_webdav(qtbot: QtBot, tmp_path: Path) -> None:
+    from oscprecon.gui.widgets.http_panel import _MANUAL_ROLE
+
+    prof = Profile.create(tmp_path, "web", Target(ip="10.10.10.9", hostname="box.htb"))
+    svc = DiscoveredService(80, Proto.TCP, "http")
+    prof.set_services([svc])
+    panel = HttpPanel()
+    qtbot.addWidget(panel)
+    panel.set_profile(prof)
+    panel.configure(svc, ServiceRef("HTTP", "", "http", []))
+    cmds = [panel._manual.item(i).data(_MANUAL_ROLE) for i in range(panel._manual.count())]
+    assert cmds, "the (previously orphaned) http follow-ups must now surface"
+    assert any(
+        "http-webdav-scan" in c and " 80 " in c for c in cmds
+    )  # nmap webdav scan, port filled
+    assert any("PROPFIND" in c and "box.htb" in c for c in cmds)  # {url} interpolated
+    assert any("OPTIONS" in c for c in cmds)

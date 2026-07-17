@@ -681,7 +681,7 @@ Each follows the same shape (auto Tier 1, `manual_commands.yaml` for Tier 2). Fu
 | **Redis** | 6379 | Ping → if unauth, `INFO`, `CONFIG GET *`, `CLIENT LIST`, `KEYS *` bounded | Auto if unauth |
 | **MongoDB** | 27017 | `listDatabases`, per-db collections | Auto if unauth |
 | **Memcached** | 11211 | `stats`, `version`, `stats items`, `stats slabs` | Auto |
-| **WebDAV** | 80/443/8080 | `OPTIONS` → `PROPFIND` → `cadaver` listing | Auto if WebDAV verbs allowed |
+| **WebDAV** | 80/443/8080 | `nmap http-webdav-scan`, `curl -X OPTIONS`, `curl -X PROPFIND` — Tier-2 follow-ups surfaced in the HTTP panel (WebDAV is an HTTP property, no separate node); `cadaver` is copy-only | Shown in HTTP follow-ups |
 | **mDNS** | 5353/udp | `nmap --script dns-service-discovery` | Auto |
 | **UPnP/SSDP** | 1900/udp | `nmap --script upnp-info` | Auto |
 | **IPMI** | 623/udp | `nmap --script ipmi-version,ipmi-cipher-zero` | Auto |
