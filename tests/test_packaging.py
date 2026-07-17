@@ -21,6 +21,8 @@ def test_runtime_resources_resolve_package_relative() -> None:
     # vendored HackTricks offline snapshot (index + per-service markdown)
     assert (PKG / "references" / "hacktricks" / "index.json").exists()
     assert len(list((PKG / "references" / "hacktricks" / "pages").glob("*.md"))) >= 18
+    # bundled user guide (GUI Help → Documentation + `nabu-cli docs` read these)
+    assert len(list((PKG / "guide" / "pages").glob("*.md"))) >= 6
     # workspace backend + dashboard GUI packages
     for module in ("index", "search", "health", "locks", "activity", "views", "bulk", "models"):
         assert (PKG / "workspace" / f"{module}.py").exists()
@@ -72,6 +74,7 @@ def test_wheel_bundles_runtime_resources(tmp_path: pathlib.Path) -> None:
 
     assert has("oscprecon/references/services.yaml")
     assert has("oscprecon/references/hacktricks/index.json")
+    assert len([n for n in names if "/guide/pages/" in n and n.endswith(".md")]) >= 6
     assert len([n for n in names if "/hacktricks/pages/" in n and n.endswith(".md")]) >= 18
     assert has("oscprecon/gui/graph_html/index.html")
     assert has("oscprecon/gui/graph_html/cytoscape.min.js")
