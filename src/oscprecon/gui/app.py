@@ -5,13 +5,13 @@ import sys
 
 from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QSplashScreen
+from PySide6.QtWidgets import QApplication
 
 from oscprecon import diagnostics
 from oscprecon.branding import APP_NAME
 from oscprecon.gui.assets import ICON, asset_path
 from oscprecon.gui.main_window import MainWindow
-from oscprecon.gui.splash import make_splash
+from oscprecon.gui.splash import NabuSplash, make_splash
 
 
 def main() -> int:
@@ -34,7 +34,7 @@ def main() -> int:
     app.setApplicationDisplayName(APP_NAME)
     app.setWindowIcon(QIcon(str(asset_path(ICON))))
 
-    splash: QSplashScreen | None = None
+    splash: NabuSplash | None = None
     try:
         splash = make_splash()
         splash.show()
