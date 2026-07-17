@@ -1746,10 +1746,14 @@ class MainWindow(QMainWindow):
         # re-read the setting at launch — the single gate; never pass spray=True otherwise.
         if not config.load_settings().spray_enabled:
             return
-        users, passwords = spray.vault_material(self._profile.credentials())
+        # spray ONLY the user-selected subset of the vault (§2a: the operator picks which creds)
+        users = dialog.selected_users()
+        passwords = dialog.selected_passwords()
         if not users or not passwords:
             QMessageBox.warning(
-                self, "Empty vault", "Add usernames and passwords in the Credential Vault first."
+                self,
+                "No credentials selected",
+                "Select at least one username and password (add them in the Credential Vault).",
             )
             return
         users_path, passwords_path = spray.write_spray_lists(

@@ -39,6 +39,28 @@ def test_preview_builds_selected_service_commands(qtbot: QtBot, tmp_path: Path) 
     assert set(d.selected_services()) == {"smb", "ssh"}
 
 
+def test_per_credential_selection(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = Profile.create(config.workspace_root(), "b", Target(ip="10.0.0.1"))
+    prof.add_credential(Credential(username="admin", secret="Winter2024", source="t"))
+    prof.add_credential(Credential(username="svc", secret="P@ss", source="t"))
+    d = SprayDialog(prof, spray_enabled=True)
+    qtbot.addWidget(d)
+    # all vault creds are selected by default
+    assert set(d.selected_users()) == {"admin", "svc"}
+    assert set(d.selected_passwords()) == {"Winter2024", "P@ss"}
+    # the on-screen password labels are masked, not the plaintext secret
+    labels = [d._pass_list.item(i).text() for i in range(d._pass_list.count())]
+    assert all("•" in lab and "Winter2024" not in lab and "P@ss" not in lab for lab in labels)
+    # unticking a username narrows the spray set
+    from PySide6.QtCore import Qt
+
+    for i in range(d._users_list.count()):
+        if d._users_list.item(i).text() == "svc":
+            d._users_list.item(i).setCheckState(Qt.CheckState.Unchecked)
+    assert d.selected_users() == ["admin"]
+    assert "1 username(s) × 2 password(s) selected" in d._preview.toPlainText()
+
+
 def test_preview_uses_discovered_nonstandard_port(qtbot: QtBot, tmp_path: Path) -> None:
     from oscprecon.models import DiscoveredService, Proto
 
