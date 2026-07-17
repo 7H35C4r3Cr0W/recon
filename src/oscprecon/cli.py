@@ -5,7 +5,7 @@ from pathlib import Path
 
 import typer
 
-from oscprecon import branding, config, diagnostics, vault_export
+from oscprecon import branding, config, diagnostics, guide, vault_export
 from oscprecon import doctor as doctor_mod
 from oscprecon.models import Target
 from oscprecon.orchestrator import Orchestrator
@@ -209,6 +209,42 @@ def doctor(
         echo=typer.echo,
     )
     raise typer.Exit(code)
+
+
+@app.command("docs")
+def docs_cmd(
+    topic: str | None = typer.Argument(
+        None, help="A topic id or title prefix (e.g. 'graph'). Omit to list all topics."
+    ),
+    plain: bool = typer.Option(
+        False, "--plain", help="Print raw markdown instead of terminal-rendered."
+    ),
+) -> None:
+    """Read the bundled user guide — the same content as the GUI's Help -> Documentation."""
+    if topic is None:
+        typer.echo("Nabu documentation — run `nabu-cli docs <topic>`:\n")
+        for entry in guide.topics():
+            typer.echo(f"  {entry.id:16}  {entry.summary}")
+        return
+    resolved = guide.resolve(topic)
+    if resolved is None:
+        typer.echo(
+            f"[docs] no topic matches '{topic}'. Run `nabu-cli docs` to list them.", err=True
+        )
+        raise typer.Exit(1)
+    markdown = guide.load(resolved.id)
+    # pretty-render on a real terminal; fall back to raw markdown when piped or with --plain, so the
+    # output stays clean for scripts and tests.
+    if plain or not sys.stdout.isatty():
+        typer.echo(markdown)
+        return
+    try:
+        from rich.console import Console
+        from rich.markdown import Markdown
+
+        Console().print(Markdown(markdown))
+    except Exception:  # boundary: rich should be present, but never fail `docs` over rendering
+        typer.echo(markdown)
 
 
 @app.command("exploit")
