@@ -49,6 +49,7 @@ from oscprecon.modules import (
     vnc,
     winrm,
     x11,
+    zookeeper,
 )
 from oscprecon.modules.base import Module
 
@@ -235,6 +236,10 @@ def _openvpn_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _rpcbind_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     return [(s.command, s.tool) for s in rpcbind.RpcbindModule().recon_steps(target, port)]
+
+
+def _zookeeper_steps(target: Target, port: int) -> list[tuple[Command, str]]:
+    return [(s.command, s.tool) for s in zookeeper.ZookeeperModule().recon_steps(target, port)]
 
 
 @dataclass(frozen=True)
@@ -632,5 +637,14 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         _manual(rpcbind),
         rpcbind.RpcbindModule,
         _rpcbind_steps,
+    ),
+    "zookeeper": SimpleReconSpec(
+        "zookeeper",
+        "Run ZooKeeper recon (banner)",
+        "ZooKeeper recon — nmap -sV confirms the service + version on 2181; the 4lw stat commands "
+        "(mntr / stat / conf) are Tier-2 follow-ups (nc is copy-only). Read-only.",
+        _manual(zookeeper),
+        zookeeper.ZookeeperModule,
+        _zookeeper_steps,
     ),
 }

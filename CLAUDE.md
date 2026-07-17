@@ -694,7 +694,7 @@ Each follows the same shape (auto Tier 1, `manual_commands.yaml` for Tier 2). Fu
 | **CouchDB** | 5984 | `_all_dbs`, `_membership` | Auto if 200 |
 | **Docker API** | 2375 | `/info`, `/containers/json`, `/version` | Auto if 200 |
 | **Etcd** | 2379, 2380 | `/v2/keys`, `/version` | Auto if 200 |
-| **Zookeeper** | 2181 | `ruok`, `mntr`, `stat` via nc | Auto |
+| **Zookeeper** | 2181 | `nmap -sV` banner (auto, Popen-safe); `ruok`/`mntr`/`stat`/`conf`/`envi` 4lw via `nc` are Tier-2 shown/copy (nc off the allowlist) | Auto banner + shown 4lw |
 | **VNC** | 5900–5906 | `nmap --script vnc-info` — banner + auth types | Auto |
 
 **Hard rule for "auto":** read-only enumeration with finite output bounded by listing protocols. Bulk download, auth-guessing, list-based auth = **Tier 2 or Tier 3**.

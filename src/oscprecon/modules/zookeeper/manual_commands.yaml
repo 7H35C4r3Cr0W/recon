@@ -1,0 +1,25 @@
+# ZooKeeper manual follow-ups (Tier-2 — shown, never auto-run). The 4-letter-word admin commands are
+# unauthenticated, read-only diagnostics; `nc` is copy-to-a-terminal (not on the exec allowlist, so
+# an in-GUI Run safely blocks). {target}/{port} come from the profile. Read-only only — never `set`,
+# `create`, or `rmr`.
+
+- description: "Health check (ruok -> imok)"
+  why: "Confirms ZooKeeper answers the 4lw protocol unauthenticated — read-only"
+  command: "echo ruok | nc {target} {port}"
+
+- description: "Monitoring stats (mntr)"
+  why: "Version, server state (leader/follower/standalone), znode count, latency — read-only"
+  command: "echo mntr | nc {target} {port}"
+
+- description: "Server + client stats (stat)"
+  why: "Version, mode, and the list of connected clients — read-only"
+  command: "echo stat | nc {target} {port}"
+
+- description: "Full configuration (conf)"
+  why: "dataDir, tickTime, and the ensemble config — often leaks topology; read-only"
+  command: "echo conf | nc {target} {port}"
+
+- description: "Environment (envi)"
+  why: "JVM / OS / the user the server runs as — read-only reconnaissance"
+  command: "echo envi | nc {target} {port}"
+# source: HackTricks 2181-pentesting-zookeeper (book.hacktricks.wiki) — standard 4lw recon

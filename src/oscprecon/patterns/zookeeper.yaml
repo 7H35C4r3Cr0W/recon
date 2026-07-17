@@ -1,0 +1,29 @@
+# ZooKeeper (2181/tcp) recon next-steps — read-only 4lw diagnostics (nc is copy-to-a-terminal).
+# Findings the module emits: kind ∈ access | version | mode | znodes | note.
+
+- match:
+    service: zookeeper
+    field: kind
+    value: "access"
+  suggest:
+    - text: "ZooKeeper 2181 answers unauthenticated — run the 4-letter-word commands (`conf`, `envi`, `mntr`) read-only; dataDir / env often leak service topology and credentials. Never `set` / `rmr`."
+      command: "echo conf | nc {target} 2181"
+# source: HackTricks 2181-pentesting-zookeeper (book.hacktricks.wiki) — standard 4lw recon
+
+- match:
+    service: zookeeper
+    field: kind
+    value: "mode"
+  suggest:
+    - text: "ZooKeeper reports mode '{value}' — in an ensemble, enumerate every node (mntr on each); a single writable node lets an attacker steer the cluster. Read the config read-only first."
+      command: "echo mntr | nc {target} 2181"
+# source: HackTricks 2181-pentesting-zookeeper (book.hacktricks.wiki) — ensemble enumeration
+
+- match:
+    service: zookeeper
+    field: kind
+    value: "version"
+  suggest:
+    - text: "ZooKeeper version '{value}' — check searchsploit / advisories for that version, and confirm whether the admin 4lw commands are unrestricted (older builds allow all by default)."
+      command: "searchsploit zookeeper {value}"
+# source: HackTricks 2181-pentesting-zookeeper (book.hacktricks.wiki) — version triage

@@ -238,6 +238,15 @@
   tools:
     - { name: "showmount -e {target}", purpose: "list NFS exports" }
 
+- match: { port: 2181, proto: tcp }
+  label: ZooKeeper
+  module: zookeeper
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/2181-pentesting-zookeeper.html
+  tools:
+    - { name: "nmap -sV -p 2181 {target}", purpose: "confirm ZooKeeper + version (banner)" }
+    - { name: "echo mntr | nc {target} 2181", purpose: "4lw monitoring stats (copy to a terminal)" }
+    - { name: "echo conf | nc {target} 2181", purpose: "4lw config dump (copy to a terminal)" }
+
 - match: { port: 3268, proto: tcp }
   label: LDAP (Global Catalog)
   module: ldap
