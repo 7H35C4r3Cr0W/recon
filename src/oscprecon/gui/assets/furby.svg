@@ -1,36 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Nabu the owl-furby mascot">
-  <!-- why: Nabu's cute owl-furby mascot — the maintainer's mark. On-brand palette (teal body, gold
-       accents, cream belly), no external/copyrighted artwork. Reads well down to ~24px. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 100 100" role="img" aria-label="Nabu — the owl-furby mascot">
   <defs>
-    <linearGradient id="furbyBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#6fa3a8"/>
-      <stop offset="1" stop-color="#4a777c"/>
+    <linearGradient id="nbBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#52a1a8"></stop><stop offset="0.55" stop-color="#37858c"></stop><stop offset="1" stop-color="#235d64"></stop>
+    </linearGradient>
+    <radialGradient id="nbSclera" cx="0.42" cy="0.36" r="0.72">
+      <stop offset="0" stop-color="#f4feff"></stop><stop offset="0.5" stop-color="#86f1f8"></stop><stop offset="1" stop-color="#12c3d4"></stop>
+    </radialGradient>
+    <radialGradient id="nbGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#15e4f1" stop-opacity="0.6"></stop><stop offset="1" stop-color="#15e4f1" stop-opacity="0"></stop>
+    </radialGradient>
+    <linearGradient id="nbTuft" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f5d15a"></stop><stop offset="1" stop-color="#d3a52a"></stop>
     </linearGradient>
   </defs>
-  <!-- feet -->
-  <ellipse cx="38" cy="91" rx="9" ry="6" fill="#c9a227"/>
-  <ellipse cx="62" cy="91" rx="9" ry="6" fill="#c9a227"/>
-  <!-- ears -->
-  <path d="M30 28 Q23 5 42 21 Z" fill="#4a777c"/>
-  <path d="M70 28 Q77 5 58 21 Z" fill="#4a777c"/>
-  <!-- tuft -->
-  <path d="M50 18 q-5 -13 4 -17 q-3 9 5 11 q-6 1 -9 6 Z" fill="#c9a227"/>
-  <!-- body -->
-  <ellipse cx="50" cy="55" rx="34" ry="36" fill="url(#furbyBody)"/>
-  <!-- belly -->
-  <ellipse cx="50" cy="65" rx="20" ry="22" fill="#efe7d2"/>
-  <!-- cheeks -->
-  <circle cx="29" cy="59" r="4.5" fill="#e79aa0" opacity="0.65"/>
-  <circle cx="71" cy="59" r="4.5" fill="#e79aa0" opacity="0.65"/>
-  <!-- eyes (whites) -->
-  <circle cx="39" cy="47" r="11.5" fill="#ffffff" stroke="#3c5f63" stroke-width="1.6"/>
-  <circle cx="61" cy="47" r="11.5" fill="#ffffff" stroke="#3c5f63" stroke-width="1.6"/>
-  <!-- pupils -->
-  <circle cx="41" cy="49" r="5.6" fill="#1b2430"/>
-  <circle cx="59" cy="49" r="5.6" fill="#1b2430"/>
-  <!-- eye highlights -->
-  <circle cx="38.4" cy="45.6" r="2" fill="#ffffff"/>
-  <circle cx="56.4" cy="45.6" r="2" fill="#ffffff"/>
-  <!-- beak -->
-  <path d="M50 57 l-6 7 h12 Z" fill="#c9a227" stroke="#a9861d" stroke-width="1"/>
+  <ellipse cx="39" cy="90" rx="8.5" ry="5.2" fill="#e9c24a"></ellipse>
+  <ellipse cx="61" cy="90" rx="8.5" ry="5.2" fill="#e9c24a"></ellipse>
+  <path d="M34 32 C 27 20 23 9 27 7 C 34 10 41 20 44 30 Z" fill="#2a636a"></path>
+  <path d="M34 30 C 29 21 27 14 29 12 C 33 15 38 22 40 29 Z" fill="#16454b"></path>
+  <path d="M66 32 C 73 20 77 9 73 7 C 66 10 59 20 56 30 Z" fill="#2a636a"></path>
+  <path d="M66 30 C 71 21 73 14 71 12 C 67 15 62 22 60 29 Z" fill="#16454b"></path>
+  <path d="M47 24 C 44 14 47 6 51 5 C 49 10 52 12 55 13 C 51 15 50 20 53 24 Z" fill="url(#nbTuft)"></path>
+  <circle cx="50.5" cy="5.5" r="3" fill="url(#nbGlow)"></circle>
+  <circle cx="50.5" cy="5.5" r="1.5" fill="#3df0fb"></circle>
+  <ellipse cx="50" cy="56" rx="33" ry="37" fill="url(#nbBody)"></ellipse>
+  <ellipse cx="50" cy="56" rx="32.2" ry="36.2" fill="none" stroke="#7fd0d6" stroke-opacity="0.3" stroke-width="1"></ellipse>
+  <ellipse cx="50" cy="66" rx="18.5" ry="20.5" fill="#ece3cb"></ellipse>
+  <circle cx="28.5" cy="62" r="4" fill="#e79aa0" opacity="0.32"></circle>
+  <circle cx="71.5" cy="62" r="4" fill="#e79aa0" opacity="0.32"></circle>
+  <circle cx="38" cy="47" r="12" fill="url(#nbGlow)"></circle>
+  <circle cx="62" cy="47" r="12" fill="url(#nbGlow)"></circle>
+  <circle cx="38" cy="47" r="9.5" fill="url(#nbSclera)" stroke="#1c4f55" stroke-width="1.4"></circle>
+  <circle cx="62" cy="47" r="9.5" fill="url(#nbSclera)" stroke="#1c4f55" stroke-width="1.4"></circle>
+  <circle cx="39.5" cy="48" r="4.6" fill="#08252b"></circle>
+  <circle cx="60.5" cy="48" r="4.6" fill="#08252b"></circle>
+  <circle cx="37" cy="45" r="2" fill="#ffffff"></circle>
+  <circle cx="58" cy="45" r="2" fill="#ffffff"></circle>
+  <circle cx="41.5" cy="50" r="0.9" fill="#ffffff" opacity="0.8"></circle>
+  <circle cx="62.5" cy="50" r="0.9" fill="#ffffff" opacity="0.8"></circle>
+  <g fill="none" stroke-linecap="round" stroke="#153f45" stroke-width="2.6">
+    <path d="M29 34 Q37 33 46 37"></path>
+    <path d="M54 33 Q62 27 71 30"></path>
+    <path d="M41 69 Q50 75.5 61 68" stroke="#0c2b30" stroke-width="2.4"></path>
+  </g>
+  <path d="M50 55 L44.5 62 L55.5 62 Z" fill="url(#nbTuft)" stroke="#b9902a" stroke-width="1" stroke-linejoin="round"></path>
+  <path d="M53.5 69.5 L56.8 69.5 L55.1 73.2 Z" fill="#f4f8f5"></path>
 </svg>

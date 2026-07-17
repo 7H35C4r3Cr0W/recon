@@ -12,7 +12,8 @@ ICON_LIGHT = "icon-light.svg"
 ICON_MONO = "icon-mono.svg"
 SPLASH = "splash.svg"
 EMPTY_WORKSPACE = "empty-workspace.svg"
-FURBY = "furby.svg"  # the Nabu owl-furby mascot (header brand mark)
+FURBY = "furby.svg"  # the Nabu owl-furby mascot (header brand mark; animated by OwlMark)
+TUNNEL = "tunnel.svg"  # WireGuard / pivot-VPN mark (host-to-host tunnel + guard shield)
 
 
 def asset_path(name: str) -> Path:

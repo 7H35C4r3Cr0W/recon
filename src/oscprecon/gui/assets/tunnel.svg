@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Nabu secure tunnel — WireGuard / VPN">
+  <defs>
+    <radialGradient id="ntBg" cx="0.5" cy="0.28" r="0.95">
+      <stop offset="0" stop-color="#1b2c34"></stop><stop offset="1" stop-color="#0b141a"></stop>
+    </radialGradient>
+    <radialGradient id="ntNode" cx="0.4" cy="0.34" r="0.78">
+      <stop offset="0" stop-color="#8bf3fa"></stop><stop offset="0.55" stop-color="#2fd4e2"></stop><stop offset="1" stop-color="#12aab8"></stop>
+    </radialGradient>
+    <linearGradient id="ntTunnel" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#123138"></stop><stop offset="0.5" stop-color="#0a171c"></stop><stop offset="1" stop-color="#123138"></stop>
+    </linearGradient>
+    <linearGradient id="ntShield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7d868"></stop><stop offset="1" stop-color="#cf9f26"></stop>
+    </linearGradient>
+    <radialGradient id="ntGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#15e4f1" stop-opacity="0.5"></stop><stop offset="1" stop-color="#15e4f1" stop-opacity="0"></stop>
+    </radialGradient>
+    <clipPath id="ntSq"><rect x="0" y="0" width="256" height="256" rx="56"></rect></clipPath>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="url(#ntBg)"></rect>
+  <g clip-path="url(#ntSq)" fill="none" stroke="#15e4f1">
+    <circle cx="128" cy="128" r="98" stroke-opacity="0.06"></circle>
+    <circle cx="128" cy="128" r="130" stroke-opacity="0.04"></circle>
+  </g>
+  <rect x="6" y="6" width="244" height="244" rx="50" fill="none" stroke="#15e4f1" stroke-opacity="0.26" stroke-width="1.5"></rect>
+  <rect x="58" y="114" width="140" height="28" rx="14" fill="url(#ntTunnel)" stroke="#15e4f1" stroke-opacity="0.45" stroke-width="2"></rect>
+  <line x1="80" y1="128" x2="176" y2="128" stroke="#15e4f1" stroke-opacity="0.5" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round"></line>
+  <circle cx="60" cy="128" r="24" fill="url(#ntGlow)"></circle>
+  <circle cx="196" cy="128" r="24" fill="url(#ntGlow)"></circle>
+  <circle cx="60" cy="128" r="18" fill="url(#ntNode)" stroke="#06171c" stroke-width="2.5"></circle>
+  <circle cx="60" cy="128" r="9.5" fill="none" stroke="#063039" stroke-width="2" stroke-opacity="0.55"></circle>
+  <circle cx="54.5" cy="122.5" r="4.5" fill="#eafcff" fill-opacity="0.5"></circle>
+  <circle cx="196" cy="128" r="18" fill="url(#ntNode)" stroke="#06171c" stroke-width="2.5"></circle>
+  <circle cx="196" cy="128" r="9.5" fill="none" stroke="#063039" stroke-width="2" stroke-opacity="0.55"></circle>
+  <circle cx="190.5" cy="122.5" r="4.5" fill="#eafcff" fill-opacity="0.5"></circle>
+  <circle cx="128" cy="128" r="32" fill="url(#ntGlow)"></circle>
+  <path d="M128 99 L151 107 V129 C151 143 141 153 128 158 C115 153 105 143 105 129 V107 Z" fill="url(#ntShield)" stroke="#a9861d" stroke-width="1.3" stroke-linejoin="round"></path>
+  <path d="M128 99 L151 107 V129 C151 137 148 143 143 148 C140 132 140 118 139 104 Z" fill="#ffffff" fill-opacity="0.12"></path>
+  <circle cx="128" cy="126" r="4.2" fill="#0d181e"></circle>
+  <path d="M125.4 126 L130.6 126 L129 139 L127 139 Z" fill="#0d181e"></path>
+</svg>

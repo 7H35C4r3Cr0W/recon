@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from PySide6.QtGui import QPalette
+import pytest
+from PySide6.QtGui import QColor, QPalette
 from pytestqt.qtbot import QtBot
 
 from oscprecon import config
@@ -68,4 +69,24 @@ def test_theme_group_has_all_options(qtbot: QtBot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
     labels = {a.text().lower() for a in window._theme_group.actions()}
-    assert labels == {"light", "dark", "htb"}
+    assert labels == {"light", "dark", "htb", "leet", "amber", "synthwave"}
+
+
+@pytest.mark.parametrize("name", ["leet", "amber", "synthwave"])
+def test_extra_themes_apply_via_fusion_palette(qtbot: QtBot, name: str) -> None:
+    # the three brand-kit themes have no hand-written QPalette — they ride the generic
+    # _fusion_palette() branch, so assert apply_theme wires Window/Highlight from their tokens.
+    from PySide6.QtWidgets import QApplication
+
+    from oscprecon.gui.theme import tokens
+
+    app = QApplication.instance()
+    assert app is not None
+    theme.apply_theme(name)
+    window = app.palette().color(QPalette.ColorRole.Window)
+    highlight = app.palette().color(QPalette.ColorRole.Highlight)
+    theme.apply_theme("light")  # restore for other tests
+    pal = tokens.palette(name)
+    assert window == QColor(pal.bg)
+    assert highlight == QColor(pal.accent)
+    assert name in theme.THEMES and name in config.THEMES

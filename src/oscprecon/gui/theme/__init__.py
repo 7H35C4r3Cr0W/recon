@@ -7,11 +7,19 @@ from oscprecon.gui.theme import tokens
 
 # why: §19/§23 — a dark/light toggle for exam-day comfort. Fusion + a dark QPalette is the robust
 # Qt way (complete coverage of every widget role, no fragile per-widget QSS to maintain).
-THEMES = ("light", "dark", "htb")
+THEMES = ("light", "dark", "htb", "leet", "amber", "synthwave")
 # HTB / Parrot is the default look (owner request, 2026-07-16) — a deep navy-teal ground with the
-# Parrot cyan-green accent + a light-blue secondary. Light + Dark remain for exam-day comfort.
+# Parrot cyan-green accent + a light-blue secondary. Light + Dark remain for exam-day comfort;
+# Leet / Amber / Synthwave (Nabu brand kit) ride the RETICLE instrument layer unchanged.
 DEFAULT_THEME = "htb"
-_LABELS = {"light": "Light", "dark": "Dark", "htb": "HTB"}
+_LABELS = {
+    "light": "Light",
+    "dark": "Dark",
+    "htb": "HTB",
+    "leet": "Leet",
+    "amber": "Amber",
+    "synthwave": "Synthwave",
+}
 
 
 def label(name: str) -> str:
@@ -110,6 +118,32 @@ def _light_palette() -> QPalette:
     return p
 
 
+def _fusion_palette(pal: tokens.Palette) -> QPalette:
+    # Build a Fusion QPalette from ANY tokens.Palette, so every current + future theme (Leet / Amber
+    # / Synthwave, …) is covered by one function without a hand-written palette each.
+    p = QPalette()
+    p.setColor(QPalette.ColorRole.Window, QColor(pal.bg))
+    p.setColor(QPalette.ColorRole.WindowText, QColor(pal.text))
+    p.setColor(QPalette.ColorRole.Base, QColor(pal.surface))
+    p.setColor(QPalette.ColorRole.AlternateBase, QColor(pal.surface_alt))
+    p.setColor(QPalette.ColorRole.ToolTipBase, QColor(pal.surface))
+    p.setColor(QPalette.ColorRole.ToolTipText, QColor(pal.text))
+    p.setColor(QPalette.ColorRole.Text, QColor(pal.text))
+    p.setColor(QPalette.ColorRole.Button, QColor(pal.surface))
+    p.setColor(QPalette.ColorRole.ButtonText, QColor(pal.text))
+    p.setColor(QPalette.ColorRole.BrightText, QColor(pal.error))
+    p.setColor(QPalette.ColorRole.Link, QColor(pal.info))
+    p.setColor(QPalette.ColorRole.Highlight, QColor(pal.accent))
+    p.setColor(QPalette.ColorRole.HighlightedText, QColor(pal.accent_text))
+    for role in (
+        QPalette.ColorRole.Text,
+        QPalette.ColorRole.ButtonText,
+        QPalette.ColorRole.WindowText,
+    ):
+        p.setColor(QPalette.ColorGroup.Disabled, role, QColor(pal.text_muted))
+    return p
+
+
 def normalize(name: str) -> str:
     return name if name in THEMES else DEFAULT_THEME
 
@@ -127,8 +161,10 @@ def apply_theme(name: str) -> None:
         app.setPalette(_dark_palette())
     elif normalized == "htb":
         app.setPalette(_htb_palette())
-    else:
+    elif normalized == "light":
         app.setPalette(_light_palette())
+    else:  # leet / amber / synthwave (and any future token-only theme)
+        app.setPalette(_fusion_palette(tokens.palette(normalized)))
     # the RETICLE "precision-instrument" layer — restyles the plain base widgets from the palette
     app.setStyleSheet(styles.app_stylesheet(normalized))
 

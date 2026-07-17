@@ -94,7 +94,74 @@ HTB = Palette(
     info="#5cc8ff",
 )
 
-_PALETTES = {"dark": DARK, "light": LIGHT, "htb": HTB}
+# Three extra RETICLE themes from the Nabu brand kit. Fields match Palette exactly, so the
+# app_stylesheet() instrument layer renders them unchanged — no per-theme QSS needed.
+LEET = Palette(  # matrix green on near-black
+    bg="#050806",
+    surface="#0a120c",
+    surface_alt="#0f1b12",
+    border="#1a3a22",
+    text="#baffc6",
+    text_muted="#5a9b6b",
+    nav_label="#39ff14",
+    accent="#39ff14",
+    accent_text="#041006",
+    secondary="#7dff5a",
+    focus="#39ff14",
+    selection="#0d2c17",
+    success="#39ff14",
+    warning="#d4ff3f",
+    error="#ff5555",
+    info="#7dff5a",
+)
+
+AMBER = Palette(  # amber CRT phosphor
+    bg="#0b0700",
+    surface="#150f04",
+    surface_alt="#1e1607",
+    border="#3d2f0e",
+    text="#ffce88",
+    text_muted="#b3854a",
+    nav_label="#ffb000",
+    accent="#ffb000",
+    accent_text="#150f04",
+    secondary="#ffd89a",
+    focus="#ffb000",
+    selection="#2c2008",
+    success="#c6d84a",
+    warning="#ffb000",
+    error="#ff6a3d",
+    info="#ffd89a",
+)
+
+SYNTHWAVE = Palette(  # neon magenta + cyan on deep violet
+    bg="#150829",
+    surface="#1e0f3d",
+    surface_alt="#281450",
+    border="#3d2170",
+    text="#f6e9ff",
+    text_muted="#a98fce",
+    nav_label="#ffcf40",
+    accent="#ff2fb9",
+    accent_text="#1a0433",
+    secondary="#26f0ff",
+    focus="#ff2fb9",
+    selection="#2f1560",
+    success="#52e39b",
+    warning="#ffcf40",
+    error="#ff5c7a",
+    info="#26f0ff",
+)
+
+
+_PALETTES = {
+    "dark": DARK,
+    "light": LIGHT,
+    "htb": HTB,
+    "leet": LEET,
+    "amber": AMBER,
+    "synthwave": SYNTHWAVE,
+}
 _active_theme = "htb"  # HTB / Parrot is the default look (set by theme.apply_theme on startup)
 
 

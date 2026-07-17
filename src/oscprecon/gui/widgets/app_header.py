@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QToolButton, QVBoxLayout, QWidget
 
-from oscprecon.gui.assets import FURBY, asset_path
 from oscprecon.gui.theme import icons, tokens
 from oscprecon.gui.theme.tokens import Palette
+from oscprecon.gui.widgets.owl_mark import OwlMark
 
 # Compact application header: one consistent strip that always answers "which project, which target,
 # can I edit, is anything running, how do I get back to the workspace". Purely presentational — the
@@ -57,9 +56,7 @@ class AppHeader(QWidget):
         self._brand_name = QLabel("Nabu")
         self._brand_name.setObjectName("hdrBrandName")
         self._brand_name.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self._furby = QSvgWidget(str(asset_path(FURBY)))
-        self._furby.setFixedSize(30, 30)
-        self._furby.setAccessibleName("Nabu mascot")
+        self._furby = OwlMark(34)  # the mascot as a live mark — follows the cursor + blinks
         brand_col.addWidget(self._brand_name, alignment=Qt.AlignmentFlag.AlignHCenter)
         brand_col.addWidget(self._furby, alignment=Qt.AlignmentFlag.AlignHCenter)
 

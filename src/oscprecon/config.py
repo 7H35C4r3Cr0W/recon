@@ -19,7 +19,7 @@ DEFAULT_WORDLIST_PATHS: tuple[Path, ...] = (
 )
 
 # Settings validation bounds + enums (config stays GUI-free; theme.py owns the palette application).
-THEMES = ("light", "dark", "htb")
+THEMES = ("light", "dark", "htb", "leet", "amber", "synthwave")
 # HTB / Parrot is the default look; Light + Dark remain selectable (Preferences / View → Theme).
 DEFAULT_THEME = "htb"
 # Scan profiles govern the nmap discovery battery (see modules/nmap.py):
