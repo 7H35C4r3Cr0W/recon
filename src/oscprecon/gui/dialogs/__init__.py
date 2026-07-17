@@ -3,6 +3,7 @@ from __future__ import annotations
 from oscprecon.gui.dialogs.cred_vault import CredentialVaultDialog
 from oscprecon.gui.dialogs.credential import AddCredentialDialog
 from oscprecon.gui.dialogs.doctor import DoctorDialog
+from oscprecon.gui.dialogs.help_viewer import HelpPopup
 from oscprecon.gui.dialogs.ligolo import LigoloHelperDialog
 from oscprecon.gui.dialogs.log_viewer import LogViewerDialog
 from oscprecon.gui.dialogs.new_profile import NewProfileDialog
@@ -17,6 +18,7 @@ __all__ = [
     "AddPivotNetworkDialog",
     "CredentialVaultDialog",
     "DoctorDialog",
+    "HelpPopup",
     "LigoloHelperDialog",
     "LogViewerDialog",
     "NewProfileDialog",

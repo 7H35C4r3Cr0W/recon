@@ -2,6 +2,7 @@
 
 | Shortcut | Action |
 | --- | --- |
+| `F1` | Open this documentation |
 | `Ctrl+N` | New scan profile |
 | `Ctrl+O` | Open profile |
 | `Ctrl+E` | Edit project |

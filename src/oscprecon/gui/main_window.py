@@ -40,6 +40,7 @@ from oscprecon.gui.dialogs import (
     AddPivotNetworkDialog,
     CredentialVaultDialog,
     DoctorDialog,
+    HelpPopup,
     LigoloHelperDialog,
     LogViewerDialog,
     NewProfileDialog,
@@ -519,6 +520,11 @@ class MainWindow(QMainWindow):
         view_menu.addAction(wordlists_action)
 
         help_menu = self.menuBar().addMenu("&Help")
+        docs_action = QAction("Documentation...", self)
+        docs_action.setShortcut("F1")
+        docs_action.triggered.connect(self._on_documentation)
+        help_menu.addAction(docs_action)
+        help_menu.addSeparator()
         doctor_action = QAction("Doctor (tool status)...", self)
         doctor_action.triggered.connect(self._on_doctor)
         help_menu.addAction(doctor_action)
@@ -537,6 +543,10 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self._on_about)
         help_menu.addAction(about_action)
 
+    def _on_documentation(self) -> None:
+        popup = HelpPopup(theme.normalize(config.load_settings().theme), self)
+        popup.open_centered(self)
+
     def _on_doctor(self) -> None:
         DoctorDialog(self).exec()
 
@@ -545,6 +555,7 @@ class MainWindow(QMainWindow):
 
     def _on_shortcuts(self) -> None:
         rows = [
+            ("F1", "Open the documentation"),
             ("Ctrl+N", "New scan profile"),
             ("Ctrl+O", "Open profile"),
             ("Ctrl+E", "Edit project"),
