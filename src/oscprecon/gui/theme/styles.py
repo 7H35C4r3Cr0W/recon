@@ -97,6 +97,111 @@ def focus_ring(pal: Palette) -> str:
     return f"*:focus {{ outline:none; border:2px solid {pal.focus}; }}"
 
 
+def app_stylesheet(theme_name: str) -> str:
+    """A global 'precision-instrument' QSS (the RETICLE look) applied to the whole QApplication.
+
+    It restyles the PLAIN base widgets (scroll-bars, headers, tables/trees, tabs, inputs, group
+    boxes, menus, tool-tips, splitters, un-styled buttons) to a machined-panel aesthetic derived
+    from the active palette — the accent is rationed to focus/hover/selection/active state. Custom
+    widgets that set their own stylesheet keep their look (widget QSS wins over the app QSS), so
+    this never fights the panels; it only elevates everything Fusion drew plainly."""
+    p = tokens.palette(theme_name)
+    r = tokens.RADIUS_SM
+    accent_soft = _mix(p.accent, p.surface, 0.22)  # a faint accent tint for hover grounds
+    return f"""
+    /* recessed 'wells' — inputs read as milled insets with a cyan focus edge */
+    QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox {{
+        background:{p.surface_alt}; color:{p.text};
+        border:1px solid {p.border}; border-radius:{r}px; padding:3px 6px;
+        selection-background-color:{p.accent}; selection-color:{p.accent_text}; }}
+    QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QAbstractSpinBox:focus {{
+        border:1px solid {p.accent}; }}
+    QComboBox {{
+        background:{p.surface_alt}; color:{p.text}; border:1px solid {p.border};
+        border-radius:{r}px; padding:3px 6px; }}
+    QComboBox:focus, QComboBox:on {{ border:1px solid {p.accent}; }}
+    QComboBox QAbstractItemView {{
+        background:{p.surface}; color:{p.text}; border:1px solid {p.border};
+        selection-background-color:{p.selection}; selection-color:{p.text}; }}
+
+    /* tables / trees — an instrument grid with a cyan-tinted selection */
+    QTreeView, QTableView, QTreeWidget, QTableWidget, QListView, QListWidget {{
+        background:{p.surface}; alternate-background-color:{p.surface_alt};
+        gridline-color:{p.border}; border:1px solid {p.border}; border-radius:{r}px; }}
+    QTreeView::item:selected, QTableView::item:selected, QTreeWidget::item:selected,
+    QTableWidget::item:selected, QListView::item:selected, QListWidget::item:selected {{
+        background:{p.selection}; color:{p.text}; }}
+    QTreeView::item:hover, QTableView::item:hover, QListView::item:hover {{
+        background:{accent_soft}; }}
+    QHeaderView::section {{
+        background:{p.surface_alt}; color:{p.text_muted}; border:none;
+        border-right:1px solid {p.border}; border-bottom:1px solid {p.border};
+        padding:4px 8px; font-weight:600; letter-spacing:1px; }}
+    QTableCornerButton::section {{ background:{p.surface_alt}; border:none; }}
+
+    /* tabs — flat, with a cyan active underline */
+    QTabWidget::pane {{ border:1px solid {p.border}; border-radius:{r}px; top:-1px; }}
+    QTabBar::tab {{
+        background:transparent; color:{p.text_muted}; padding:6px 14px;
+        border:none; border-bottom:2px solid transparent; margin-right:2px; }}
+    QTabBar::tab:selected {{ color:{p.accent}; border-bottom:2px solid {p.accent}; }}
+    QTabBar::tab:hover:!selected {{ color:{p.text}; }}
+
+    /* group boxes — a titled faceplate */
+    QGroupBox {{
+        border:1px solid {p.border}; border-radius:{tokens.RADIUS_MD}px;
+        margin-top:12px; padding-top:8px; }}
+    QGroupBox::title {{
+        subcontrol-origin:margin; subcontrol-position:top left; left:10px; padding:0 5px;
+        color:{p.text_muted}; font-weight:700; }}
+
+    /* base buttons (only where a widget hasn't set its own) */
+    QPushButton {{
+        background:{p.surface}; color:{p.text}; border:1px solid {p.border};
+        border-radius:{r}px; padding:5px 12px; }}
+    QPushButton:hover {{ border-color:{p.accent}; color:{p.accent}; }}
+    QPushButton:pressed {{ background:{p.surface_alt}; }}
+    QPushButton:disabled {{
+        color:{p.text_muted}; border-color:{p.border}; background:transparent; }}
+
+    /* thin instrument scroll-bars — cyan on hover */
+    QScrollBar:vertical {{ background:transparent; width:11px; margin:0; }}
+    QScrollBar:horizontal {{ background:transparent; height:11px; margin:0; }}
+    QScrollBar::handle:vertical {{ background:{p.border}; border-radius:5px; min-height:26px; }}
+    QScrollBar::handle:horizontal {{ background:{p.border}; border-radius:5px; min-width:26px; }}
+    QScrollBar::handle:hover {{ background:{p.accent}; }}
+    QScrollBar::add-line, QScrollBar::sub-line {{ width:0; height:0; }}
+    QScrollBar::add-page, QScrollBar::sub-page {{ background:transparent; }}
+
+    /* menus / bar / tool-tips */
+    QMenuBar {{ background:{p.surface}; color:{p.text}; }}
+    QMenuBar::item {{ padding:4px 10px; background:transparent; }}
+    QMenuBar::item:selected {{ background:{p.selection}; color:{p.accent}; }}
+    QMenu {{ background:{p.surface}; color:{p.text}; border:1px solid {p.border}; }}
+    QMenu::item {{ padding:5px 22px; }}
+    QMenu::item:selected {{ background:{p.selection}; color:{p.accent}; }}
+    QMenu::separator {{ height:1px; background:{p.border}; margin:4px 8px; }}
+    QToolTip {{
+        background:{p.surface_alt}; color:{p.text}; border:1px solid {p.accent}; padding:3px 6px; }}
+
+    /* splitter grip — glows cyan on hover */
+    QSplitter::handle {{ background:{p.border}; }}
+    QSplitter::handle:hover {{ background:{p.accent}; }}
+    """
+
+
+def _mix(a: str, b: str, t: float) -> str:
+    # linear blend a->b by t (0..1) — for faint accent-tinted hover grounds.
+    ah, bh = a.lstrip("#"), b.lstrip("#")
+    if len(ah) != 6 or len(bh) != 6:
+        return b
+    out = []
+    for i in (0, 2, 4):
+        av, bv = int(ah[i : i + 2], 16), int(bh[i : i + 2], 16)
+        out.append(_clamp(round(av * t + bv * (1 - t))))
+    return f"#{out[0]:02x}{out[1]:02x}{out[2]:02x}"
+
+
 def _clamp(v: int) -> int:
     return max(0, min(255, v))
 

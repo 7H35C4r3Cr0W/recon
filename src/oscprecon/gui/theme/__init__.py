@@ -79,24 +79,58 @@ def _htb_palette() -> QPalette:
     return p
 
 
+def _light_palette() -> QPalette:
+    # Light "engineering-drawing" — the cream tokens.LIGHT as a Fusion palette so the instrument QSS
+    # renders consistently across platforms (no OS-native drift), matching dark/htb.
+    bg = QColor("#f4f1ea")
+    base = QColor("#ffffff")
+    text = QColor("#1b2230")
+    gold = QColor("#b3891f")
+    disabled = QColor("#9aa0ab")
+    p = QPalette()
+    p.setColor(QPalette.ColorRole.Window, bg)
+    p.setColor(QPalette.ColorRole.WindowText, text)
+    p.setColor(QPalette.ColorRole.Base, base)
+    p.setColor(QPalette.ColorRole.AlternateBase, QColor("#efeadd"))
+    p.setColor(QPalette.ColorRole.ToolTipBase, base)
+    p.setColor(QPalette.ColorRole.ToolTipText, text)
+    p.setColor(QPalette.ColorRole.Text, text)
+    p.setColor(QPalette.ColorRole.Button, base)
+    p.setColor(QPalette.ColorRole.ButtonText, text)
+    p.setColor(QPalette.ColorRole.BrightText, QColor("#a5342a"))
+    p.setColor(QPalette.ColorRole.Link, QColor("#3f6f74"))
+    p.setColor(QPalette.ColorRole.Highlight, gold)
+    p.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    for role in (
+        QPalette.ColorRole.Text,
+        QPalette.ColorRole.ButtonText,
+        QPalette.ColorRole.WindowText,
+    ):
+        p.setColor(QPalette.ColorGroup.Disabled, role, disabled)
+    return p
+
+
 def normalize(name: str) -> str:
     return name if name in THEMES else DEFAULT_THEME
 
 
 def apply_theme(name: str) -> None:
+    from oscprecon.gui.theme import styles  # lazy: keep styles<-tokens import acyclic at load time
+
     app = QApplication.instance()
     if not isinstance(app, QApplication):
         return
     normalized = normalize(name)
     tokens.set_active_theme(normalized)  # so primary buttons pick up this theme's accent
+    app.setStyle("Fusion")  # a deterministic base so the instrument QSS renders the same everywhere
     if normalized == "dark":
-        app.setStyle("Fusion")
         app.setPalette(_dark_palette())
     elif normalized == "htb":
-        app.setStyle("Fusion")
         app.setPalette(_htb_palette())
     else:
-        app.setPalette(app.style().standardPalette())
+        app.setPalette(_light_palette())
+    # the RETICLE "precision-instrument" layer — restyles the plain base widgets from the palette
+    app.setStyleSheet(styles.app_stylesheet(normalized))
 
 
 _default_point_size: int | None = None
