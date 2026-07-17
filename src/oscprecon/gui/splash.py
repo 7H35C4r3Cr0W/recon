@@ -26,7 +26,8 @@ from oscprecon.gui.theme import tokens
 # security lasers (Mission-Impossible style) while the app boots, with a cyan recon scan sweeping
 # across and a rotating status line below. Native Qt (a single elapsed clock drives every beat) —
 # no QtWebEngine (fragile in the Kali VM), offline, and it degrades gracefully: a splash failure
-# never blocks startup (§27). Recolours from the active palette; laser red stays fixed.
+# never blocks startup (§27). Always the fixed HTB / Parrot look (owner decision 2026-07-17),
+# independent of the app's active theme; laser red stays fixed.
 
 # ---- geometry (card-local px) --------------------------------------------------------------------
 _CARD_W = 640
@@ -162,9 +163,10 @@ class NabuSplash(QWidget):
         self.setFixedSize(_CARD_W + 2 * _MARGIN, _CARD_H + 2 * _MARGIN)
         self._center_on_screen()
 
-        pal = tokens.active_palette()  # recolour from the active theme; laser red stays fixed
+        # why: the boot splash is ONE fixed loading screen — always the HTB / Parrot look (owner
+        # decision, 2026-07-17), independent of the app's active theme. Laser red stays fixed.
+        pal = tokens.palette("htb")
         self._bg = QColor(pal.bg)
-        self._is_light = self._bg.lightnessF() > 0.5  # keep the chamber a dark room on light themes
         self._surface = QColor(pal.surface)
         self._accent = QColor(pal.accent)
         self._secondary = QColor(pal.secondary)
@@ -276,15 +278,7 @@ class NabuSplash(QWidget):
 
     def _paint_chamber(self, p: QPainter, x0: float, top: float, t: float, ms: int) -> None:
         chamber = QRectF(x0, top, _CARD_W, _CHAMBER_H)
-        if self._is_light:
-            # why: over a light card the translucent fill muddies to flat grey and kills the
-            # laser-room drama — paint an opaque dark "chamber floor" so the scope stays crisp.
-            floor = QLinearGradient(x0, top, x0, top + _CHAMBER_H)
-            floor.setColorAt(0.0, QColor(9, 16, 21))
-            floor.setColorAt(1.0, QColor(4, 8, 11))
-            p.fillRect(chamber, floor)
-        else:
-            p.fillRect(chamber, QColor(6, 11, 14, 120))
+        p.fillRect(chamber, QColor(6, 11, 14, 120))
         cx = x0 + _CARD_W / 2
         ring_cy = top + 118
 

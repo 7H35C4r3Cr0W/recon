@@ -1,8 +1,9 @@
 import pytest
+from PySide6.QtGui import QColor
 from pytestqt.qtbot import QtBot
 
 from oscprecon import __version__
-from oscprecon.gui.splash import _MARGIN, _TOPBAR_H, NabuSplash, _kf, make_splash
+from oscprecon.gui.splash import NabuSplash, _kf, make_splash
 from oscprecon.gui.theme import tokens
 
 
@@ -65,31 +66,27 @@ def test_version_string_is_available_for_the_splash() -> None:
     assert __version__
 
 
-def test_light_theme_keeps_a_dark_chamber(qtbot: QtBot) -> None:
-    # the "laser room" must stay a dark scope even under a light app theme — a translucent chamber
-    # fill would muddy to flat grey over a light card. Sample a chamber corner to guard the fix.
-    prev = tokens._active_theme
-    tokens.set_active_theme("light")
-    try:
-        splash = make_splash()
-        qtbot.addWidget(splash)
-        assert splash._is_light is True
-        splash._test_ms = 2600
-        img = splash.grab().toImage()
-        corner = img.pixelColor(_MARGIN + 34, _MARGIN + _TOPBAR_H + 26)
-        assert corner.lightnessF() < 0.30  # a dark laser room, not a muddy grey box
-    finally:
-        tokens.set_active_theme(prev)
-
-
-def test_dark_themes_are_not_flagged_light(qtbot: QtBot) -> None:
-    # the dark-theme branch keeps the owner's original translucent chamber unchanged
+def test_splash_always_uses_the_htb_look_regardless_of_theme(qtbot: QtBot) -> None:
+    # the boot splash is ONE fixed loading screen — always the HTB / Parrot palette, whatever theme
+    # the app is set to (owner decision). Guard that NO palette-derived colour leaks from the active
+    # theme into the splash — check every colour the splash captures, not just a couple.
+    htb = tokens.palette("htb")
+    expected = {
+        "_bg": htb.bg,
+        "_surface": htb.surface,
+        "_accent": htb.accent,
+        "_secondary": htb.secondary,
+        "_text": htb.text,
+        "_muted": htb.text_muted,
+        "_gold": htb.nav_label,
+    }
     prev = tokens._active_theme
     try:
-        for theme in ("dark", "htb", "leet", "amber", "synthwave"):
-            tokens.set_active_theme(theme)
+        for active in ("light", "amber", "dark", "synthwave"):
+            tokens.set_active_theme(active)
             splash = make_splash()
             qtbot.addWidget(splash)
-            assert splash._is_light is False, theme
+            for attr, hexval in expected.items():
+                assert getattr(splash, attr).name() == QColor(hexval).name(), f"{active}:{attr}"
     finally:
         tokens.set_active_theme(prev)

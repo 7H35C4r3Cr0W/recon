@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import os
 import sys
 
@@ -8,9 +7,8 @@ from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from oscprecon import config, diagnostics
+from oscprecon import diagnostics
 from oscprecon.branding import APP_NAME
-from oscprecon.gui import theme
 from oscprecon.gui.assets import ICON, asset_path
 from oscprecon.gui.main_window import MainWindow
 from oscprecon.gui.splash import NabuSplash, make_splash
@@ -35,13 +33,6 @@ def main() -> int:
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)
     app.setWindowIcon(QIcon(str(asset_path(ICON))))
-
-    # why: apply the saved theme BEFORE building the splash — the splash captures active_palette()
-    # in its constructor, so otherwise it always paints the default theme (its light-theme dark
-    # chamber never engages) and un-themed chrome flashes first. Best-effort — a bad prefs file must
-    # never block startup (§27); MainWindow re-applies the theme anyway.
-    with contextlib.suppress(Exception):
-        theme.apply_theme(config.load_settings().theme)
 
     splash: NabuSplash | None = None
     try:
