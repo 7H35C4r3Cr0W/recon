@@ -324,7 +324,7 @@ def test_custom_scan_no_profile_is_safe(qtbot: QtBot, monkeypatch: pytest.Monkey
 def test_remove_host_flows_to_tree_and_graph(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
     from PySide6.QtWidgets import QMessageBox
 
-    from oscprecon.gui.graph_data import build_elements
+    from oscprecon.graph_data import build_elements
     from oscprecon.models import DiscoveredHost
 
     window = MainWindow()
@@ -352,7 +352,7 @@ def test_remove_subnet_flows_to_tree_and_graph(
 ) -> None:
     from PySide6.QtWidgets import QMessageBox
 
-    from oscprecon.gui.graph_data import build_elements
+    from oscprecon.graph_data import build_elements
     from oscprecon.models import DiscoveredHost
 
     window = MainWindow()

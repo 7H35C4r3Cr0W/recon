@@ -116,6 +116,17 @@ _No pattern suggestions yet — sourced `patterns/*.yaml` entries populate this 
 
 {% if notes %}{{ notes }}{% else %}_No notes yet._{% endif %}
 
+## Graph annotations
+
+{% if graph_notes %}
+{% for n in graph_notes %}
+> [!note] {{ n.label }}{% if n.status %} · _{{ n.status }}_{% endif %}
+> {{ n.note }}
+{% endfor %}
+{% else %}
+_No graph notes yet — add one via the Graph view's node detail panel._
+{% endif %}
+
 ## Command log
 
 | # | Module | Command | Exit | Output |

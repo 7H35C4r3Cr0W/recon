@@ -9,6 +9,7 @@ from jinja2 import Environment, FileSystemLoader
 from oscprecon import audit, references
 from oscprecon import edb as edb_mod
 from oscprecon import findings as findings_mod
+from oscprecon.graph_data import build_elements
 from oscprecon.models import DiscoveredHost
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
@@ -104,6 +105,30 @@ def _group_edb(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return [{"service": service, "hits": groups[service]} for service in groups]
+
+
+def _graph_notes(profile: Profile) -> list[dict[str, str]]:
+    # graph node annotations (graph.json node_overrides[*].note) surfaced in the report — the graph
+    # detail panel promises "saved to graph.json, shown in the report", so a note you drop on a node
+    # lands here. Uses the same build_elements() the graph renders, so labels never disagree.
+    try:
+        elements = build_elements(profile)
+    except Exception:  # boundary: a bad graph/profile must never break report generation
+        return []
+    out: list[dict[str, str]] = []
+    for node in elements.get("nodes", []):
+        data = node.get("data", {})
+        note = str(data.get("note", "")).strip()
+        if not note:
+            continue
+        out.append(
+            {
+                "label": str(data.get("label", data.get("id", ""))).replace("\n", " · "),
+                "note": note,
+                "status": str(data.get("status", "")),
+            }
+        )
+    return out
 
 
 def _host_header(host: DiscoveredHost) -> str:
@@ -217,6 +242,7 @@ class Reporter:
             "entry_ip": profile.target.ip,
             "pivot_networks": pivot_networks,
             "pivot_host_count": len(profile.discovered_hosts),
+            "graph_notes": _graph_notes(profile),
             "suggestions": [
                 {
                     "text": s.text,

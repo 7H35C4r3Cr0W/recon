@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon.gui.graph_data import build_elements
+from oscprecon.graph_data import build_elements
 from oscprecon.gui.theme import tokens
 from oscprecon.profile import Profile
 

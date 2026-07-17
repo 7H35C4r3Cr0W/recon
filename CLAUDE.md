@@ -894,10 +894,9 @@ Alternate visual interface to the tree view. Toggle: `View → Graph` (Ctrl+G).
 
 `<profile>/graph.json` — user-drawn edges, node positions, per-node status/notes.
 
-### Presentation & export — QUEUED reinforcements (Phase 4)
+### Presentation & export — BUILT (Phase 4 reinforcements)
 
-The Phase 4 graph must be presentation-quality, not merely functional. Explicit expectations to
-build into the Phase 4 deliverable:
+The Phase 4 graph is presentation-quality, not merely functional. All of the below are built:
 
 - **Full drag-and-drop** node repositioning; positions persist in `graph.json` **across sessions**.
 - **Right-click any node → Add Note** — persists to `graph.json`, shows as a hover tooltip, and

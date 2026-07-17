@@ -43,6 +43,32 @@ def test_report_pivot_topology_empty(tmp_path: Path) -> None:
     assert "No pivoted hosts recorded" in report
 
 
+def test_report_graph_annotations(tmp_path: Path) -> None:
+    # a note dropped on a graph node (graph.json node_overrides) must appear in report.md — the
+    # graph detail panel promises it does, so guard the wire-up.
+    prof = Profile.create(tmp_path, "annot", Target(ip="10.10.10.9", hostname="active.htb"))
+    prof.set_services([DiscoveredService(445, Proto.TCP, "microsoft-ds")])
+    graph = prof.load_graph()
+    graph["node_overrides"]["target"] = {
+        "note": "SMB signing disabled — relay candidate",
+        "status": "investigating",
+    }
+    graph["node_overrides"]["service-445-tcp"] = {"note": "anon share READ ok"}
+    prof.save_graph(graph)
+    report = Reporter(prof).render()
+    assert "## Graph annotations" in report
+    assert "SMB signing disabled — relay candidate" in report
+    assert "investigating" in report
+    assert "anon share READ ok" in report
+
+
+def test_report_graph_annotations_empty(tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "noannot", Target(ip="10.0.0.2"))
+    report = Reporter(prof).render()
+    assert "## Graph annotations" in report
+    assert "No graph notes yet" in report
+
+
 def test_finding_line_kind_value_detail_shape() -> None:
     line = _finding_line({"module": "smb", "kind": "share", "value": "IT", "detail": "READ"})
     assert line == "**share** — IT (READ)"

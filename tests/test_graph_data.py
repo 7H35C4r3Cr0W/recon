@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from oscprecon import findings as findings_mod
-from oscprecon.gui.graph_data import build_elements
+from oscprecon.graph_data import build_elements
 from oscprecon.models import Credential, DiscoveredHost, DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 
