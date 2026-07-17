@@ -102,6 +102,26 @@ def test_run_requested_emits_command_and_target(qtbot: QtBot, tmp_path: Path) ->
     assert command.startswith("feroxbuster -u http://10.0.0.5:8080/")
 
 
+def test_fingerprint_emits_whatweb_through_parse_path(qtbot: QtBot, tmp_path: Path) -> None:
+    # the Fingerprint button runs whatweb with tool="whatweb" so it routes through the http parse
+    # path (structured findings), and targets the discovered HTTPS port (8443) — Unified.
+    prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.5"))
+    panel = HttpPanel()
+    qtbot.addWidget(panel)
+    panel.set_profile(prof)
+    panel.configure(DiscoveredService(8443, Proto.TCP, "https-alt"), _ref())
+    with qtbot.waitSignal(panel.run_requested, timeout=1000) as blocker:
+        panel._on_fingerprint()
+    command, output_rel, tool, port = blocker.args
+    assert tool == "whatweb"  # NOT a dir-bust tool — routes to parse_whatweb
+    assert port == 8443
+    assert output_rel == "http/8443/whatweb.txt"
+    # --log-brief writes the summary where the parser reads it; https + :8443 reach the service
+    assert command == (
+        "whatweb --colour=never --log-brief=http/8443/whatweb.txt https://10.0.0.5:8443/"
+    )
+
+
 def test_settings_persist_to_profile(qtbot: QtBot, tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.5"))
     panel = HttpPanel()

@@ -14,6 +14,10 @@
   why: "Unauthenticated health checks can leak build and dependency info"
   command: "curl -sk {url}health"
 
+- description: "Status / version endpoint (/status)"
+  why: "Many app controllers expose an unauthenticated version at /status (UniFi returns server_version)"
+  command: "curl -sk {url}status"
+
 - description: "well-known security.txt"
   why: "/.well-known/ exposes security.txt, openid config, change-password"
   command: "curl -sk {url}.well-known/security.txt"

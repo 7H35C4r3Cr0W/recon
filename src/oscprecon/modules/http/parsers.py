@@ -325,6 +325,29 @@ def _redirect_findings(
     return out
 
 
+# whatweb plugins whose VALUE is noise, not signal — the value is dropped, the name kept. Country is
+# always RESERVED/ZZ for lab IPs; IP just echoes the target we already know.
+_NOISE_VALUE_PLUGINS = frozenset({"country", "ip"})
+
+
+def _render_plugins(pairs: list[tuple[str, str]]) -> str:
+    # keep the plugin VALUES — the real recon signal (Title[UniFi Network],
+    # HTTPServer[Apache/2.4.38], X-Powered-By[PHP/7.4]) — instead of collapsing every plugin to a
+    # bare name. Preserves whatweb's order, dedupes, and bounds the length so a plugin-heavy page
+    # can't produce a runaway note.
+    parts: list[str] = []
+    seen: set[str] = set()
+    for name, value in pairs:
+        if not name:
+            continue
+        seg = f"{name}[{value}]" if value and name.lower() not in _NOISE_VALUE_PLUGINS else name
+        if seg not in seen:
+            seen.add(seg)
+            parts.append(seg)
+    rendered = ", ".join(parts)
+    return rendered[:299] + "…" if len(rendered) > 300 else rendered
+
+
 def _parse_whatweb_plain(text: str, port: int) -> list[HttpFinding]:
     findings: list[HttpFinding] = []
     for raw in text.splitlines():
@@ -333,15 +356,15 @@ def _parse_whatweb_plain(text: str, port: int) -> list[HttpFinding]:
         if match is None:
             continue
         pairs = [_plugin_name_value(seg) for seg in _split_top_level(match.group("plugins"))]
-        names = sorted({name for name, _ in pairs if name})
         path = _path_of(match.group("url"))
         status = int(match.group("status"))
+        rendered = _render_plugins(pairs)
         findings.append(
             HttpFinding(
                 port=port,
                 path=path,
                 status=status,
-                note=f"whatweb: {', '.join(names)}" if names else "whatweb",
+                note=f"whatweb: {rendered}" if rendered else "whatweb",
             )
         )
         findings += _redirect_findings(pairs, port, path, status)

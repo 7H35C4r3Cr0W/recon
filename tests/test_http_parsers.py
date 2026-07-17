@@ -132,8 +132,27 @@ def test_whatweb_plain_strips_ansi_colour() -> None:
     findings = parse_whatweb(coloured, 80)
     assert len(findings) == 1
     assert findings[0].status == 200
-    # the comma inside Title[Dashboard, home] must not split into a bogus plugin name
-    assert findings[0].note == "whatweb: Apache, Title"
+    # the comma inside Title[Dashboard, home] must not split into a bogus plugin name, and the
+    # plugin VALUES are kept (Apache version, page title) — they are the real recon signal
+    assert findings[0].note == "whatweb: Apache[2.4.38], Title[Dashboard, home]"
+
+
+def test_whatweb_plain_keeps_plugin_values() -> None:
+    # the identifying signal is the plugin VALUE (Title[UniFi Network], HTTPServer[Apache/2.4.38]),
+    # not just the bare plugin name — Unified: whatweb on 8443 must surface "UniFi Network". Country
+    # and IP values are dropped as noise (RESERVED/ZZ, the target IP we already know).
+    line = (
+        "https://10.129.34.143:8443/manage/account/login [200 OK] "
+        "Country[RESERVED][ZZ], HTML5, IP[10.129.34.143], Script, "
+        "Title[UniFi Network], X-Frame-Options[SAMEORIGIN]\n"
+    )
+    findings = parse_whatweb(line, 8443)
+    assert len(findings) == 1
+    note = findings[0].note
+    assert "Title[UniFi Network]" in note  # the app identity is preserved
+    assert "X-Frame-Options[SAMEORIGIN]" in note
+    assert "Country[" not in note and "IP[" not in note  # noise values dropped
+    assert "Country" in note and "IP" in note  # ...but the names are kept
 
 
 def test_wpscan() -> None:

@@ -159,6 +159,11 @@ class HttpPanel(QWidget):
         self._preview = QPlainTextEdit()
         self._preview.setReadOnly(True)
         self._preview.setMaximumHeight(70)
+        fingerprint = QPushButton("Fingerprint")
+        fingerprint.setToolTip(
+            "Run whatweb and record the stack fingerprint (server, title, versions) as findings"
+        )
+        fingerprint.clicked.connect(self._on_fingerprint)
         run = QPushButton("Run")
         run.setStyleSheet(styles.accent_button())  # primary content-discovery action
         run.clicked.connect(self._on_run)
@@ -167,6 +172,7 @@ class HttpPanel(QWidget):
         report = QPushButton("Add to report")
         report.clicked.connect(self._on_add_report)
         button_row = QHBoxLayout()
+        button_row.addWidget(fingerprint)
         button_row.addWidget(run)
         button_row.addWidget(dry)
         button_row.addWidget(report)
@@ -445,6 +451,17 @@ class HttpPanel(QWidget):
         self.run_requested.emit(
             build_command(settings), settings.output_file, settings.tool, self._port
         )
+
+    def _on_fingerprint(self) -> None:
+        # Tier-1 web fingerprint: whatweb → structured findings (server, title, versions), the same
+        # parse path the dir-bust tools use. --log-brief writes the summary to the parsed output
+        # file (whatweb streams to stdout otherwise, which the parser never sees).
+        url = self._url.text().strip()
+        if not url:
+            return
+        output_rel = f"http/{self._port}/whatweb.txt"
+        command = f"whatweb --colour=never --log-brief={output_rel} {url}"
+        self.run_requested.emit(command, output_rel, "whatweb", self._port)
 
     def _on_dry_run(self) -> None:
         self.dry_run_requested.emit(build_command(self._current_settings()))

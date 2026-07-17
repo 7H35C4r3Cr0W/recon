@@ -30,6 +30,7 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 19 | Vaccine | 10.129.33.84 | ftp/21 (vsFTPd 3.0.3, anon) + ssh/22 (OpenSSH 8.0p1) + http/80 (Apache 2.4.41, "MegaCorp Login") | live: FTP Tier-1 anon walk found **`/backup.zip`** + "Anonymous access: allowed" (read-only, **never auto-downloads**); the backup.zip **download is Tier-2** (`curl -s -O ftp://{t}/FILE`, shown/user-filled); HackTricks FTP page finding-jumped to "Anonymous login"; EDB version-matched vsFTPd 3.0.3 → **★ EDB-49719**; raw saved to `ftp/`. zip-crack→MD5→SQLi→os-shell→postgres/vi-GTFOBins root is all manual | none (clean — anon-FTP read-only enum + Tier-2 download boundary held live) | `a6c3aeb` |
 | 20 | **Dante** (HTB Pro Lab) | 10.10.110.100 entry → 172.16.1.0/24 (+172.16.2.0/24) | entry: ftp/21 vsFTPd 3.0.3 (anon, PASV leaks internal .100) + ssh/22 + http/65000 (WordPress); internal /24: **11 hosts live-scanned** (DC01 full-AD, SQL01 MSSQL+NFS, NIX02-04, WS01-03, NIX07 Jenkins, NIX03 Webmin, pfSense) | **first live MULTI-NETWORK PIVOT validation**: entry live-scanned; internal `172.16.1.0/24` **live-scanned through a real pivot** (SSH SOCKS unavailable headless → threaded Python connect-scan run *on* the dual-homed entry box); **delete-intel-then-rescan repopulated the graph from REAL banners** (OpenSSH 8.2p1/7.6p1, Apache 2.4.41/43/54, FileZilla 0.9.60, MariaDB, IIS 8.5); two-hop spider-web (entry→net1, NIX02→net2) renders in tree+graph+report; net2 confirmed firewalled from entry (double-pivot is real). All exploitation (WP RCE, SUID, MSSQL/JuicyPotato, MS17-010, AS-REP, DCSync, BOFs) stays manual/out-of-tool | `full`-profile welded `nmap -sU -p-` into the battery → it ran *before* the versioned scan and stalled the entry scan → deferred UDP-full to run last | `be3e73e` |
 | 21 | **Archetype** (Tier II) | 10.129.34.115 | smb/445 (Win Server 2019, null session → `backups [READ]` → `prod.dtsConfig`) + mssql/1433 (**SQL Server 2017**) + winrm/5985 | first **Tier II** + first **live MSSQL** box: SMB null-session walk surfaced the readable `backups` share + config file; MSSQL parser clean (2017, correctly suppressed the self-domain → standalone); Tier-2 `sa`/`admin:''` shown-not-run; verified recon is **gated to discovered services** (no run-all, `triggers()` vestigial) | **peek was a text-ext allowlist → `.dtsConfig` listed but never previewed**: inverted to a **binary+sensitive denylist** (peek any small data-bearing file; snippet stays bounded so the cred never leaks to findings). Also added an exploit-tab **"service not found" warning** | `068c99f` |
+| 22 | **Unified** (Tier II) | 10.129.34.143 | http/8080 + **8443/https-alt (UniFi Network 6.4.54)** + ssh/22 + 6789/8843/8880 | UniFi/Log4Shell box: 8443 handled as HTTPS on a non-standard port; whatweb identifies `Title[UniFi Network]`; version 6.4.54 lives at the unauth `/status` JSON (searchsploit UniFi empty); drove the money ports without waiting on `-p-`. Log4Shell→rogue-JNDI→Mongo hash swap→SSH root all manual | **whatweb parser dropped plugin VALUES** (`Title[UniFi Network]`→`Title`) **+ HTTP fingerprint produced no findings** (whatweb ran raw, never parsed): fixed the parser to keep values **+ added a Fingerprint button** wiring whatweb into structured findings; added a `/status` Tier-2 follow-up | _pending_ |
 
 ## Per-box notes
 
@@ -377,6 +378,44 @@ odd extensions (`.dtsConfig`) and none at all. Peek anything small that isn't pr
 secret, keep the snippet bounded so no cred leaks into structured findings, and let the raw artifact
 hold the full content. And "surface everything, gate on the human" (the exploit tab) still owes the
 human a clear signal when they're about to act on a service the scan never saw.
+
+**22 · Unified (HTB Starting Point, Tier II) — http (UniFi Network / Log4Shell) — live.**
+`10.129.34.143`. A UniFi Network controller. `default` scan found 22/ssh, 6789/ibm-db2-admin,
+**8080/http-proxy + 8443/https-alt** (the UniFi web, redirects `/`→`/manage`→login), and 8843/8880
+(other UniFi ports, off the top-1000 — the `-p-` sweep caught them). nmap `-sV` fingerprints **no
+product/version** on any of them (UniFi doesn't banner), so Exploit-DB is correctly skipped.
+**Efficiency:** the money ports (8080/8443) are in the top-1000, so I drove HTTP recon on them
+immediately instead of blocking on the ~10-min `-p-` sweep (which only added 8843/8880).
+- **8443 handled as HTTPS on a non-standard port** — `_TLS_PORTS` includes 8443, so recon targets
+  `https://{t}:8443/` with `-k` (self-signed). whatweb follows the redirects and reports
+  `Title[UniFi Network]` on the login page — the app identity.
+- **Bug found + fixed (two compounding, both generalizable):**
+  1. **`parse_whatweb` threw away every plugin VALUE** — `Title[UniFi Network]` collapsed to a bare
+     `Title`, `HTTPServer[Apache/2.4.38]` to `Apache`. The single most identifying signal was dropped
+     on *every* http box. Fixed to keep the values (dropping only `Country`/`IP` noise), bounded +
+     deduped. An existing test that asserted the old name-only note was updated to the value-preserving
+     one.
+  2. **The HTTP fingerprint produced NO structured findings** — unlike SMB/others, whatweb only ran
+     via a generic tool-hint (raw output, no parse); the parse path (`_on_http_run`→`parse_tool`)
+     existed but nothing triggered it with `tool="whatweb"`. Added a **Fingerprint** button to the
+     HTTP panel that runs whatweb through that path (`--log-brief` writes where the parser reads),
+     so the stack fingerprint now lands in `findings.json`/report/graph like every other module.
+     Verified live end-to-end: click Fingerprint on 8443 → structured finding
+     `whatweb: … Title[UniFi Network] …`.
+- **Version 6.4.54 lives at the unauth `/status` JSON** (`{"meta":{"server_version":"6.4.54"}}`), not
+  on the login page whatweb sees, and `searchsploit UniFi` is empty — so the version has no
+  Exploit-DB downstream here. Added a **Tier-2 follow-up** `curl -sk {url}status` (shown, not
+  auto-run) alongside the existing `/api/version` + `/health` probes, so the operator can pull the
+  version with one double-click. Generalizable — many app controllers expose `/status`.
+- Everything past enumeration — the Log4Shell `${jndi:ldap://…}` `remember`-header injection, the
+  rogue-JNDI LDAP server + reverse shell, the MongoDB `x_shadow` hash swap, and the SSH root
+  password — is **manual exploitation, never the tool**.
+
+**Lesson:** a fingerprint you *run* but never *parse* is invisible recon — the HTTP module wrapped
+whatweb but, uniquely among modules, never turned it into findings, and the parser silently discarded
+the one value that mattered (the title). Fingerprint→findings should be a first-class one-click step,
+and a parser must keep the *values*, not just prove a plugin fired. Also: probe the money ports the
+moment discovery returns; don't let a full `-p-` sweep gate the high-value recon.
 
 ## Trends & lessons (adapt going forward)
 
