@@ -160,6 +160,7 @@ class NabuSplash(QWidget):
 
         pal = tokens.active_palette()  # recolour from the active theme; laser red stays fixed
         self._bg = QColor(pal.bg)
+        self._is_light = self._bg.lightnessF() > 0.5  # keep the chamber a dark room on light themes
         self._surface = QColor(pal.surface)
         self._accent = QColor(pal.accent)
         self._secondary = QColor(pal.secondary)
@@ -192,8 +193,9 @@ class NabuSplash(QWidget):
             self._timer.start()
 
     def finish(self, window: QWidget) -> None:
-        # Keep the splash up for at least _MIN_SHOW_MS of animation, then close. When boot already
-        # took longer, it closes immediately — so this only adds latency when startup is fast.
+        # The animation is frozen during boot (the event loop is blocked building MainWindow), so
+        # re-anchor the clock here and play a fresh _MIN_SHOW_MS of animation once the loop is live,
+        # then close — that guarantees the evasion loop is actually seen rather than flashing by.
         self._clock.restart()  # re-anchor so the loop plays from the top during the event loop
         QTimer.singleShot(_MIN_SHOW_MS, self._graceful_close)
 
@@ -270,7 +272,15 @@ class NabuSplash(QWidget):
 
     def _paint_chamber(self, p: QPainter, x0: float, top: float, t: float, ms: int) -> None:
         chamber = QRectF(x0, top, _CARD_W, _CHAMBER_H)
-        p.fillRect(chamber, QColor(6, 11, 14, 120))
+        if self._is_light:
+            # why: over a light card the translucent fill muddies to flat grey and kills the
+            # laser-room drama — paint an opaque dark "chamber floor" so the scope stays crisp.
+            floor = QLinearGradient(x0, top, x0, top + _CHAMBER_H)
+            floor.setColorAt(0.0, QColor(9, 16, 21))
+            floor.setColorAt(1.0, QColor(4, 8, 11))
+            p.fillRect(chamber, floor)
+        else:
+            p.fillRect(chamber, QColor(6, 11, 14, 120))
         cx = x0 + _CARD_W / 2
         ring_cy = top + 118
 

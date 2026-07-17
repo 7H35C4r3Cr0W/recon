@@ -2,7 +2,8 @@ import pytest
 from pytestqt.qtbot import QtBot
 
 from oscprecon import __version__
-from oscprecon.gui.splash import NabuSplash, _kf, make_splash
+from oscprecon.gui.splash import _MARGIN, _TOPBAR_H, NabuSplash, _kf, make_splash
+from oscprecon.gui.theme import tokens
 
 
 def test_make_splash_returns_nabu_splash(qtbot: QtBot) -> None:
@@ -45,3 +46,33 @@ def test_splash_is_still_and_closes_cleanly(qtbot: QtBot) -> None:
 def test_version_string_is_available_for_the_splash() -> None:
     # the splash paints v{__version__}; guard that the symbol it reads stays importable
     assert __version__
+
+
+def test_light_theme_keeps_a_dark_chamber(qtbot: QtBot) -> None:
+    # the "laser room" must stay a dark scope even under a light app theme — a translucent chamber
+    # fill would muddy to flat grey over a light card. Sample a chamber corner to guard the fix.
+    prev = tokens._active_theme
+    tokens.set_active_theme("light")
+    try:
+        splash = make_splash()
+        qtbot.addWidget(splash)
+        assert splash._is_light is True
+        splash._test_ms = 2600
+        img = splash.grab().toImage()
+        corner = img.pixelColor(_MARGIN + 34, _MARGIN + _TOPBAR_H + 26)
+        assert corner.lightnessF() < 0.30  # a dark laser room, not a muddy grey box
+    finally:
+        tokens.set_active_theme(prev)
+
+
+def test_dark_themes_are_not_flagged_light(qtbot: QtBot) -> None:
+    # the dark-theme branch keeps the owner's original translucent chamber unchanged
+    prev = tokens._active_theme
+    try:
+        for theme in ("dark", "htb", "leet", "amber", "synthwave"):
+            tokens.set_active_theme(theme)
+            splash = make_splash()
+            qtbot.addWidget(splash)
+            assert splash._is_light is False, theme
+    finally:
+        tokens.set_active_theme(prev)
