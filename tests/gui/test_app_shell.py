@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from pytestqt.qtbot import QtBot
 
 from oscprecon import audit
@@ -143,6 +144,37 @@ def test_main_window_nav_switches_pages(qtbot: QtBot, tmp_path: Path) -> None:
 
     window._on_navigate("recon")
     assert window._central_stack.currentIndex() == 0
+    window._dashboard.shutdown()
+
+
+def test_theme_switch_restyles_graph_and_exploit_and_help_dialogs(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from oscprecon.gui.theme import tokens
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window._set_profile(_profile(tmp_path))
+
+    # a theme switch must restyle EVERY view without crashing — including the two that used to be
+    # left behind: the Cytoscape graph canvas and the Exploitation tab.
+    window._restyle_shell("light")
+    assert window._exploit_panel._pal.bg == tokens.palette("light").bg
+    assert tokens.palette("light").bg in window._graph_view._theme_json
+    window._restyle_shell("htb")
+    assert window._exploit_panel._pal.bg == tokens.palette("htb").bg
+    assert tokens.palette("htb").bg in window._graph_view._theme_json
+
+    # the two new Help entries produce their reference dialogs (patch the modal so it never blocks)
+    seen: dict[str, str] = {}
+    monkeypatch.setattr(
+        "oscprecon.gui.main_window.QMessageBox.information",
+        lambda _parent, title, text: seen.__setitem__(title, text),
+    )
+    window._on_shortcuts()
+    window._on_constraints()
+    assert "Ctrl+G" in seen["Keyboard Shortcuts"]
+    assert "Recon-only by default" in seen["OSCP Constraints"]
     window._dashboard.shutdown()
 
 

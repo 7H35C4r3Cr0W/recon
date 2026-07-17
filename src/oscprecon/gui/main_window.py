@@ -526,6 +526,13 @@ class MainWindow(QMainWindow):
         log_action.triggered.connect(self._on_view_log)
         help_menu.addAction(log_action)
         help_menu.addSeparator()
+        shortcuts_action = QAction("Keyboard Shortcuts...", self)
+        shortcuts_action.triggered.connect(self._on_shortcuts)
+        help_menu.addAction(shortcuts_action)
+        constraints_action = QAction("OSCP Constraints...", self)
+        constraints_action.triggered.connect(self._on_constraints)
+        help_menu.addAction(constraints_action)
+        help_menu.addSeparator()
         about_action = QAction(f"About {APP_NAME}...", self)
         about_action.triggered.connect(self._on_about)
         help_menu.addAction(about_action)
@@ -535,6 +542,49 @@ class MainWindow(QMainWindow):
 
     def _on_view_log(self) -> None:
         LogViewerDialog(self).exec()
+
+    def _on_shortcuts(self) -> None:
+        rows = [
+            ("Ctrl+N", "New scan profile"),
+            ("Ctrl+O", "Open profile"),
+            ("Ctrl+E", "Edit project"),
+            ("Ctrl+S", "Save profile"),
+            ("Ctrl+0", "Workspace dashboard"),
+            ("Ctrl+G", "Toggle graph view"),
+            ("Ctrl+R", "Report preview"),
+            ("Ctrl+F", "Filter / find in the service tree"),
+            ("Esc", "Clear the filter"),
+            ("Ctrl+,", "Preferences"),
+            ("Ctrl+Q", "Quit"),
+        ]
+        body = "".join(
+            f"<tr><td><code>&nbsp;{k}&nbsp;</code></td><td style='padding-left:14px'>{d}</td></tr>"
+            for k, d in rows
+        )
+        QMessageBox.information(
+            self,
+            "Keyboard Shortcuts",
+            f"<h3>Keyboard shortcuts</h3><table cellspacing='2'>{body}</table>",
+        )
+
+    def _on_constraints(self) -> None:
+        QMessageBox.information(
+            self,
+            "OSCP Constraints",
+            "<h3>OSCP exam compliance</h3>"
+            "<p><b>Recon-only by default — exam-legal.</b> Wraps standard allowed enumeration: "
+            "nmap/NSE, feroxbuster·gobuster·ffuf·dirsearch, nikto·whatweb, <code>wpscan "
+            "--enumerate</code>, enum4linux-ng·smbclient·smbmap·netexec (enum modes), ldapsearch, "
+            "snmpwalk, dnsrecon, impacket enum scripts, and searchsploit (lookup only).</p>"
+            "<p><b>Credential spraying</b> (hydra·medusa·list-driven netexec) is opt-in and "
+            "<b>OFF by default</b> — and only ever against your one authorized target.</p>"
+            "<p><b>Exploitation</b> is manual: every Run is human-selected and confirmed — never "
+            "auto-run or chained. The msfvenom builder is copy-only.</p>"
+            "<p style='color:#c0364f'><b>Never shipped as actions:</b> Metasploit exploit modules, "
+            "SQLMap, commercial scanners (Nessus/Burp Pro), runtime LLM calls, automated exploit "
+            "chains, or Exploit-DB PoC download/execute.</p>"
+            "<p style='color:#8a94a6'>Full detail: CLAUDE.md §2.</p>",
+        )
 
     def _on_about(self) -> None:
         QMessageBox.about(
