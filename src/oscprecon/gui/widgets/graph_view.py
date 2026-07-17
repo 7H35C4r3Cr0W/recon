@@ -327,7 +327,7 @@ class ReconSummaryTree(QWidget):
             "Every discovered service from your scan. Click one to set status / add a note."
         )
         hint.setWordWrap(True)
-        hint.setStyleSheet("color: gray; font-size: 11px;")
+        hint.setStyleSheet(f"color: {tokens.active_palette().text_muted}; font-size: 11px;")
 
         self._tree = QTreeWidget()
         self._tree.setHeaderHidden(True)
@@ -533,7 +533,7 @@ class GraphView(QWidget):
         )
         self._fallback.setWordWrap(True)
         self._fallback.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._fallback.setStyleSheet("color: gray; padding: 24px;")
+        self._fallback.setStyleSheet(f"color: {tokens.active_palette().text_muted}; padding: 24px;")
         if self._web is not None:
             self._canvas_stack.addWidget(self._web)
         self._canvas_stack.addWidget(self._fallback)

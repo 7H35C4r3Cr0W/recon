@@ -51,7 +51,7 @@ from oscprecon.gui.dialogs import (
 )
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.task_manager import TaskManager
-from oscprecon.gui.theme import styles
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.gui.widgets.activity_view import ActivityView
 from oscprecon.gui.widgets.app_header import AppHeader
 from oscprecon.gui.widgets.exploit_panel import ExploitPanel
@@ -326,7 +326,7 @@ class MainWindow(QMainWindow):
         self._status_profile = QLabel()
         self._status_workspace = QLabel()
         legal = QLabel("recon-only — OSCP exam legal per CLAUDE.md §2")
-        legal.setStyleSheet("color: gray;")
+        legal.setStyleSheet(f"color: {tokens.active_palette().text_muted};")
         status = self.statusBar()
         assert status is not None
         status.addWidget(QLabel(f"{APP_NAME} v{_app_version()}"))

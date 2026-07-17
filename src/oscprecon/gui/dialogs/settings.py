@@ -33,6 +33,7 @@ from oscprecon.config import (
     Settings,
 )
 from oscprecon.gui.theme import label as theme_label
+from oscprecon.gui.theme import tokens
 from oscprecon.references import live_hacktricks
 
 # Mandatory, non-negotiable protections (CLAUDE.md §2) surfaced in the Privacy tab as locked-on
@@ -231,7 +232,7 @@ class SettingsDialog(QDialog):
         layout.addLayout(cache_row)
         self._ht_cache_loc = QLabel(f"Cache location: {live_hacktricks.cache_root()}")
         self._ht_cache_loc.setWordWrap(True)
-        self._ht_cache_loc.setStyleSheet("color: gray;")
+        self._ht_cache_loc.setStyleSheet(f"color: {tokens.active_palette().text_muted};")
         layout.addWidget(self._ht_cache_loc)
         footer = QLabel(
             "The vendored offline snapshot always remains available as the reliable fallback. "

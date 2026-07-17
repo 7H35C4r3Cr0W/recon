@@ -92,7 +92,9 @@ class ToolPanel(QWidget):
         super().__init__()
         self._target = ""
 
-        self._header = QLabel("No service selected.")
+        self._header = QLabel(
+            "No service selected — run Recon, then pick a service to build its commands."
+        )
         self._header.setStyleSheet("font-weight: bold;")
 
         # generic page: tool hints + ad-hoc command
@@ -242,7 +244,9 @@ class ToolPanel(QWidget):
     def show_service(self, service: DiscoveredService | None, ref: ServiceRef | None) -> None:
         self._hints.clear()
         if service is None:
-            self._header.setText("No service selected.")
+            self._header.setText(
+                "No service selected — run Recon, then pick a service to build its commands."
+            )
             self._stack.setCurrentIndex(0)
             return
         label = ref.label if ref is not None else service.service

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from oscprecon import ligolo
+from oscprecon.gui.theme import tokens
 
 
 class LigoloHelperDialog(QDialog):
@@ -123,7 +124,7 @@ class LigoloHelperDialog(QDialog):
         if step.note:
             note = QLabel(step.note)
             note.setWordWrap(True)
-            note.setStyleSheet("color: gray; font-size: 11px;")
+            note.setStyleSheet(f"color: {tokens.active_palette().text_muted}; font-size: 11px;")
             outer.addWidget(note)
         return card
 

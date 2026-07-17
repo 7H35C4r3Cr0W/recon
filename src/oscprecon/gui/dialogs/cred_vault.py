@@ -84,7 +84,7 @@ class CredentialVaultDialog(QDialog):
             "are durable project data — they persist until you edit or delete them here."
         )
         note.setWordWrap(True)
-        note.setStyleSheet("color: gray;")
+        note.setStyleSheet(f"color: {tokens.active_palette().text_muted};")
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)

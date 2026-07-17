@@ -112,7 +112,9 @@ class ReferencePane(QWidget):
         self._offline_markdown = ""  # the vendored copy, kept so "Use offline copy" can revert
         self._live_enabled = False
 
-        self._label = QLabel("Select a service to see references.")
+        self._label = QLabel(
+            "Run a scan, then select a service to load its HackTricks page and Exploit-DB hits."
+        )
         self._label.setWordWrap(True)
         self._link = QLabel("")
         self._link.setWordWrap(True)
@@ -124,7 +126,7 @@ class ReferencePane(QWidget):
         self._source_badge.setVisible(False)
         self._source_state = QLabel("")
         self._source_state.setWordWrap(True)
-        self._source_state.setStyleSheet("color: gray;")
+        self._source_state.setStyleSheet(f"color: {tokens.active_palette().text_muted};")
         self._refresh_btn = QPushButton("Refresh")
         self._refresh_btn.setEnabled(False)
         self._refresh_btn.setToolTip("Enable live HackTricks in Preferences → References")
@@ -145,7 +147,7 @@ class ReferencePane(QWidget):
             web_widget = self._web
         else:
             web_widget = QLabel("Web view unavailable — open the link above in a browser.")
-            web_widget.setStyleSheet("color: gray;")
+            web_widget.setStyleSheet(f"color: {tokens.active_palette().text_muted};")
 
         # Offline vendored HackTricks (§2a): rendered natively (no WebEngine, works with no net).
         self._offline = QTextBrowser()
@@ -157,7 +159,9 @@ class ReferencePane(QWidget):
         self._find.returnPressed.connect(self._find_next)
         self._jump_hint = QLabel("")
         self._jump_hint.setWordWrap(True)
-        self._jump_hint.setStyleSheet("color: gray; font-style: italic;")
+        self._jump_hint.setStyleSheet(
+            f"color: {tokens.active_palette().text_muted}; font-style: italic;"
+        )
 
         self._tabs = QTabWidget()
         self._offline_index = self._tabs.addTab(self._offline, "Offline")
