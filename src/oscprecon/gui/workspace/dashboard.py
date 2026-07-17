@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import config
+from oscprecon import config, doctor
 from oscprecon.gui.assets import EMPTY_WORKSPACE, asset_path
 from oscprecon.gui.theme import styles, tokens
 from oscprecon.gui.workspace.index_worker import WorkspaceIndexWorker
@@ -141,6 +141,13 @@ class WorkspaceDashboard(QWidget):
         subtitle.setStyleSheet(f"color:{tokens.palette(self._theme).text_muted};")
         self._empty_subtitle = subtitle
 
+        # first-run friendliness: nudge toward Doctor when required recon tools are missing
+        self._tool_hint = QLabel("")
+        self._tool_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._tool_hint.setWordWrap(True)
+        self._tool_hint.setStyleSheet(f"color:{tokens.palette(self._theme).warning};")
+        self._tool_hint.setVisible(False)
+
         create = QPushButton("New Project…")
         create.setStyleSheet(styles.accent_button())
         create.clicked.connect(self.create_requested.emit)
@@ -150,6 +157,7 @@ class WorkspaceDashboard(QWidget):
             (art, Qt.AlignmentFlag.AlignHCenter),
             (heading, Qt.AlignmentFlag.AlignHCenter),
             (subtitle, Qt.AlignmentFlag.AlignHCenter),
+            (self._tool_hint, Qt.AlignmentFlag.AlignHCenter),
             (create, Qt.AlignmentFlag.AlignHCenter),
         ):
             outer.addWidget(widget, alignment=align)
@@ -168,6 +176,7 @@ class WorkspaceDashboard(QWidget):
         # otherwise renders with the stale window palette after a theme switch.
         self.setStyleSheet(f"#dashboardView {{ background:{pal.bg}; }}")
         self._empty_subtitle.setStyleSheet(f"color:{pal.text_muted};")
+        self._tool_hint.setStyleSheet(f"color:{pal.warning};")
         for btn in self._primary_btns:  # re-tint primary CTAs to the new theme's accent
             btn.setStyleSheet(styles.primary_button(pal))
         self._apply_filters()  # recolour the status cells from memory (no rescan)
@@ -244,9 +253,27 @@ class WorkspaceDashboard(QWidget):
             return set()
         return {str(s.get("service", "")).lower() for s in services if isinstance(s, dict)}
 
+    def _update_tool_hint(self) -> None:
+        try:
+            report = doctor.scan()
+        except Exception:  # boundary: a doctor hiccup must never break the dashboard
+            self._tool_hint.setVisible(False)
+            return
+        required = report.required
+        missing = sum(1 for tool in required if not tool.present)
+        if missing:
+            self._tool_hint.setText(
+                f"⚠ {len(required) - missing} of {len(required)} recon tools found on PATH — "
+                "run Help → Doctor for install commands."
+            )
+        self._tool_hint.setVisible(bool(missing))
+
     def _apply_filters(self) -> None:
         visible = self._visible_summaries()
-        self._stack.setCurrentIndex(1 if not self._summaries else 0)
+        empty = not self._summaries
+        if empty:
+            self._update_tool_hint()  # refresh the first-run tool nudge before the empty state
+        self._stack.setCurrentIndex(1 if empty else 0)
         self._table.setSortingEnabled(False)
         self._table.setRowCount(0)
         for summary in visible:

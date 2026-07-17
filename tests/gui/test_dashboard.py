@@ -27,6 +27,33 @@ def test_empty_workspace_shows_guidance(dashboard: WorkspaceDashboard, qtbot: Qt
     qtbot.waitUntil(lambda: dashboard._stack.currentIndex() == 1, timeout=4000)  # empty page
 
 
+def test_empty_state_nudges_to_doctor_when_tools_missing(
+    dashboard: WorkspaceDashboard, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from oscprecon import doctor
+    from oscprecon.doctor import DoctorReport, ToolStatus
+
+    fake = DoctorReport(
+        (ToolStatus("nmap", True, "x"), ToolStatus("feroxbuster", False, "apt install feroxbuster"))
+    )
+    monkeypatch.setattr(doctor, "scan", lambda: fake)
+    dashboard._update_tool_hint()
+    assert not dashboard._tool_hint.isHidden()  # nudge shown
+    assert "1 of 2" in dashboard._tool_hint.text()
+    assert "Doctor" in dashboard._tool_hint.text()
+
+
+def test_empty_state_hides_nudge_when_all_tools_present(
+    dashboard: WorkspaceDashboard, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from oscprecon import doctor
+    from oscprecon.doctor import DoctorReport, ToolStatus
+
+    monkeypatch.setattr(doctor, "scan", lambda: DoctorReport((ToolStatus("nmap", True, "x"),)))
+    dashboard._update_tool_hint()
+    assert dashboard._tool_hint.isHidden()  # nothing missing => no nudge
+
+
 def test_multiple_profiles_populate(
     tmp_path: Path, dashboard: WorkspaceDashboard, qtbot: QtBot
 ) -> None:
