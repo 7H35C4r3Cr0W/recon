@@ -29,6 +29,7 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 18 | Tactics | 10.129.33.82 | smb/445 (+135 msrpc, 139 netbios) — Windows Server 2019 (blocks ping) | **the -Pn box**: default scan finds 0 (ping-blocked) → the **custom scan dialog with -Pn** found 135/139/445 live; 445→SMB panel; Tier-1 correctly reports "null/guest denied" (not a false empty); the **Tier-2 `administrator:'' ` follow-up** (the foothold — I verified it gives `(Pwn3d!)`, ADMIN$/C$ R/W) is SHOWN pre-filled, never auto-run; HackTricks SMB page finding-jumped to "What is NTLM"; raw output saved to `smb/null-session/*.txt` etc. smbclient-C$/psexec is manual | none (clean — validated the -Pn custom scan + SMB Tier framing on a live ping-blocking Windows box) | `205f3b0` |
 | 19 | Vaccine | 10.129.33.84 | ftp/21 (vsFTPd 3.0.3, anon) + ssh/22 (OpenSSH 8.0p1) + http/80 (Apache 2.4.41, "MegaCorp Login") | live: FTP Tier-1 anon walk found **`/backup.zip`** + "Anonymous access: allowed" (read-only, **never auto-downloads**); the backup.zip **download is Tier-2** (`curl -s -O ftp://{t}/FILE`, shown/user-filled); HackTricks FTP page finding-jumped to "Anonymous login"; EDB version-matched vsFTPd 3.0.3 → **★ EDB-49719**; raw saved to `ftp/`. zip-crack→MD5→SQLi→os-shell→postgres/vi-GTFOBins root is all manual | none (clean — anon-FTP read-only enum + Tier-2 download boundary held live) | `a6c3aeb` |
 | 20 | **Dante** (HTB Pro Lab) | 10.10.110.100 entry → 172.16.1.0/24 (+172.16.2.0/24) | entry: ftp/21 vsFTPd 3.0.3 (anon, PASV leaks internal .100) + ssh/22 + http/65000 (WordPress); internal /24: **11 hosts live-scanned** (DC01 full-AD, SQL01 MSSQL+NFS, NIX02-04, WS01-03, NIX07 Jenkins, NIX03 Webmin, pfSense) | **first live MULTI-NETWORK PIVOT validation**: entry live-scanned; internal `172.16.1.0/24` **live-scanned through a real pivot** (SSH SOCKS unavailable headless → threaded Python connect-scan run *on* the dual-homed entry box); **delete-intel-then-rescan repopulated the graph from REAL banners** (OpenSSH 8.2p1/7.6p1, Apache 2.4.41/43/54, FileZilla 0.9.60, MariaDB, IIS 8.5); two-hop spider-web (entry→net1, NIX02→net2) renders in tree+graph+report; net2 confirmed firewalled from entry (double-pivot is real). All exploitation (WP RCE, SUID, MSSQL/JuicyPotato, MS17-010, AS-REP, DCSync, BOFs) stays manual/out-of-tool | `full`-profile welded `nmap -sU -p-` into the battery → it ran *before* the versioned scan and stalled the entry scan → deferred UDP-full to run last | `be3e73e` |
+| 21 | **Archetype** (Tier II) | 10.129.34.115 | smb/445 (Win Server 2019, null session → `backups [READ]` → `prod.dtsConfig`) + mssql/1433 (**SQL Server 2017**) + winrm/5985 | first **Tier II** + first **live MSSQL** box: SMB null-session walk surfaced the readable `backups` share + config file; MSSQL parser clean (2017, correctly suppressed the self-domain → standalone); Tier-2 `sa`/`admin:''` shown-not-run; verified recon is **gated to discovered services** (no run-all, `triggers()` vestigial) | **peek was a text-ext allowlist → `.dtsConfig` listed but never previewed**: inverted to a **binary+sensitive denylist** (peek any small data-bearing file; snippet stays bounded so the cred never leaks to findings). Also added an exploit-tab **"service not found" warning** | _pending_ |
 
 ## Per-box notes
 
@@ -329,6 +330,53 @@ entered the tool.
 **Lesson:** the pivot model holds with real multi-network data — seed from intel, then *upsert live
 scan over it* and the graph/tree/report stay one connected spider-web. And a "thorough" profile must
 never front-load a slow scan ahead of the high-value one: order recon by yield, defer the grind.
+
+**21 · Archetype (HTB Starting Point, Tier II) — smb + mssql (Windows Server 2019) — live.**
+`10.129.34.115`. First **Tier II** box and first **live MSSQL** box. `default` scan found
+135/msrpc · 139/netbios-ssn · 445/microsoft-ds (Win Server 2019) · 1433/ms-sql-s (**Microsoft SQL
+Server 2017**) · 5985+47001/HTTPAPI (WinRM) · 49664-69/msrpc dynamic. Drove SMB + MSSQL + WinRM
+through the real GUI workers.
+- **SMB Tier-1 held:** null session OK → shares `ADMIN$`, `C$`, `IPC$ [READ]`, `backups [READ]`;
+  signing disabled; anonymous cred auto-captured. The `backups` root listed **`prod.dtsConfig`**
+  (609 B) — the box's whole pivot (a DTS config with a cleartext SQL cred). RID-brute / SAMR over the
+  null session are denied (correctly reported, not a false empty).
+- **Bug found + fixed — peek was a text-extension allowlist, so it listed `prod.dtsConfig` but never
+  previewed it.** `.dtsConfig` wasn't in `peek.py`'s `_TEXT_EXT`, so the readable config was surfaced
+  by *name* only. Per your steer ("peek should look at **anything with data inside it**, not just
+  .txt"), I **inverted the allowlist into a binary+sensitive denylist**: peek any small
+  (≤ 8 KB), non-dir file **except** known-binary/media/archive types (jpg, zip, pdf, exe, …) and
+  secret material (keys, `shadow`, `.htpasswd`, …). Now `prod.dtsConfig` is peeked → snippet
+  `<DTSConfiguration><DTSConfigurationHeading>…`. The bounded 60-char snippet **does not reach the
+  password** (it sits deeper in the XML), so **no secret leaks into `findings.json` / report /
+  graph** — the full file lands only in the raw `smb/peek/*.txt` artifact (the operator's own loot,
+  same as any tool output). Verified live: password present in the raw file, absent from findings.
+- **MSSQL parser — clean on its first live box.** `ms-sql-info` → `Microsoft SQL Server 2017
+  14.00.1000.00`, hostname `ARCHETYPE`, os-build `10.0.17763`. It **correctly suppressed the
+  AD-domain finding**: NTLM's `DNS_Domain_Name`/`NetBIOS_Domain_Name` both equal the host name →
+  standalone box, not domain-joined. Tier-2 `sa`/`sa:sa` default-cred checks shown (impacket/nmap/
+  netexec), never auto-run. HackTricks finding-jumped to the MSSQL page.
+- **Gating audit (your other steer — "only run recon/attacks for services that exist").** Verified
+  end-to-end: the service tree is built **strictly from `discovered_services`**; a panel is shown
+  only for a selected discovered service; recon runs **only** on an explicit per-panel Run, scoped to
+  that service + its discovered port. There is **no run-all / orchestrator loop over modules**, no
+  auto-run on selection (`triggers()` is vestigial — never called). Recon is already properly gated —
+  no change needed.
+- **Exploit side — added a "service not found" guard.** The Exploitation tab (§2b) deliberately lists
+  all 182 services (present ones `●`-marked + first, bound to the real discovered port). It let you
+  Run an action for a *non-present* service with no warning. Per §2b I must **not** add a block-list
+  (owner rule — the human confirm is the guardrail), so I added a **loud, non-blocking warning**:
+  pick FTP against Archetype and a gold banner says *"⚠ FTP was NOT found on this target by the
+  scan…"*; pick MSSQL (present) and there's no warning + the command binds to `:1433`. Run stays
+  enabled. New test locks it in.
+- Everything past enumeration — `mssqlclient` auth with the peeked cred, `xp_cmdshell`, the nc
+  reverse shell, winPEAS, the PS-history Administrator cred, `psexec` — is **manual exploitation,
+  never the tool**.
+
+**Lesson:** a file's *extension* is a bad proxy for "is this worth reading" — recon loot hides behind
+odd extensions (`.dtsConfig`) and none at all. Peek anything small that isn't provably binary or
+secret, keep the snippet bounded so no cred leaks into structured findings, and let the raw artifact
+hold the full content. And "surface everything, gate on the human" (the exploit tab) still owes the
+human a clear signal when they're about to act on a service the scan never saw.
 
 ## Trends & lessons (adapt going forward)
 

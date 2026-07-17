@@ -23,10 +23,16 @@ free-form flags — with a live preview. The target can be a single IP **or a wh
 
 ## Per-service modules & the tier model
 
+A module's panel appears **only for a service the scan actually found** — the tool never runs a
+service's recon for a port that isn't open. You pick a discovered service and click its **Run**; each
+run is scoped to that one service and its discovered port. Nothing fans out or auto-runs.
+
 Each service has a module that runs the right enumeration, gated by a strict safety model:
 
 - **Tier 1 — Auto.** Read-only checks with bounded output (null session, anonymous FTP, `showmount`,
-  SNMP walk on default communities). Runs on one click.
+  SNMP walk on default communities). Runs on one click. When a readable SMB share or anonymous FTP
+  directory is walked, small non-binary files get a **bounded content peek** — a short, safe preview
+  (secret material like keys/hash stores is never previewed) that flags config files worth reading.
 - **Tier 2 — Shown, not auto.** A *single* attempt against a well-known account with an empty/default
   password (`administrator:''`, `sa:sa`). Pre-filled in **Manual follow-ups** — you click Run.
 - **Tier 3 — Gated.** Iterating a list of credentials is **credential spraying** — off by default,

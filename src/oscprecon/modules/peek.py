@@ -3,44 +3,133 @@ from __future__ import annotations
 import re
 
 # Shared bounded content-peek helpers for FTP + SMB (§12: reads are triage, not bulk exfil). Only
-# small, text-like files are ever fetched, capped in number by the caller.
+# small files are ever fetched, capped in number by the caller. The rule is "peek anything that
+# might hold readable data" — NOT a narrow text-extension allowlist (that missed real recon loot
+# like Archetype's prod.dtsConfig). We fetch any small file except (a) known-binary/media/archive
+# types, whose head is just noise, and (b) secret material, whose head must never be dumped. The
+# binary-content guard in peek_snippet() is the final backstop for a binary file we didn't denylist.
 
 PEEK_MAX_BYTES = 8192  # only peek files the listing already shows as this small
 PEEK_MAX_FILES = 8  # at most this many peeks per walk, so it's never a download storm
 
-_TEXT_EXT = frozenset(
+# Known-binary / media / archive / compiled extensions — peeking these yields garbage the
+# binary-guard would only label "(binary or non-text content)", so skip the fetch entirely. Anything
+# NOT in here (any config, log, script, no-extension file, or unknown extension) is worth a peek.
+_BINARY_EXT = frozenset(
     {
-        "txt",
-        "log",
-        "conf",
-        "config",
-        "cfg",
-        "cnf",
-        "ini",
-        "xml",
-        "json",
-        "yaml",
-        "yml",
-        "md",
-        "csv",
-        "sh",
-        "bash",
-        "php",
-        "html",
-        "htm",
-        "js",
-        "py",
-        "sql",
-        "env",
-        "properties",
-        "inc",
-        "bak",
-        "old",
-        "asp",
-        "aspx",
-        "jsp",
-        "pl",
-        "rb",
+        # images
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "bmp",
+        "ico",
+        "tif",
+        "tiff",
+        "webp",
+        "heic",
+        "psd",
+        # archives / compressed
+        "zip",
+        "tar",
+        "gz",
+        "tgz",
+        "bz2",
+        "tbz2",
+        "xz",
+        "7z",
+        "rar",
+        "lz",
+        "lzma",
+        "z",
+        "jar",
+        "war",
+        "ear",
+        "cab",
+        "arj",
+        "iso",
+        "deb",
+        "rpm",
+        "apk",
+        "pkg",
+        "xpi",
+        "crx",
+        # executables / libraries / compiled
+        "exe",
+        "dll",
+        "so",
+        "bin",
+        "msi",
+        "msu",
+        "dmg",
+        "com",
+        "scr",
+        "cpl",
+        "drv",
+        "ocx",
+        "sys",
+        "o",
+        "a",
+        "lib",
+        "obj",
+        "pyc",
+        "pyo",
+        "class",
+        "elf",
+        "wasm",
+        "swf",
+        # audio / video
+        "mp3",
+        "wav",
+        "flac",
+        "ogg",
+        "oga",
+        "aac",
+        "wma",
+        "m4a",
+        "opus",
+        "mid",
+        "midi",
+        "mp4",
+        "avi",
+        "mkv",
+        "mov",
+        "wmv",
+        "flv",
+        "webm",
+        "mpg",
+        "mpeg",
+        "m4v",
+        "3gp",
+        # binary documents / office (zip-container or binary formats)
+        "pdf",
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "ppt",
+        "pptx",
+        "odt",
+        "ods",
+        "odp",
+        # fonts
+        "ttf",
+        "otf",
+        "woff",
+        "woff2",
+        "eot",
+        # databases / disk images
+        "db",
+        "sqlite",
+        "sqlite3",
+        "mdb",
+        "accdb",
+        "vhd",
+        "vhdx",
+        "vmdk",
+        "ova",
+        "img",
+        "qcow2",
     }
 )
 
@@ -79,21 +168,21 @@ def is_sensitive(name: str) -> bool:
     return extension(name) in _SENSITIVE_EXT or name.strip().lower() in _SENSITIVE_NAMES
 
 
-def is_text_like(name: str) -> bool:
-    # a known text extension, or NO extension (often a config/script) — worth a peek, unless it is
-    # known secret material.
+def is_data_bearing(name: str) -> bool:
+    # worth a peek: not secret material, and not a known-binary/media/archive type. Any config,
+    # log, script, no-extension file, or unfamiliar extension qualifies — the point is to read
+    # data, not to guess a text-extension allowlist.
     if is_sensitive(name):
         return False
-    ext = extension(name)
-    return ext == "" or ext in _TEXT_EXT
+    return extension(name) not in _BINARY_EXT
 
 
 def is_peekable(name: str, is_dir: bool, size: int) -> bool:
-    # small (from the listing), non-dir, text-like; size 0/unknown is skipped so we never fetch
+    # small (from the listing), non-dir, data-bearing; size 0/unknown is skipped so we never fetch
     # something we can't bound.
     if is_dir or size <= 0 or size > PEEK_MAX_BYTES:
         return False
-    return is_text_like(name)
+    return is_data_bearing(name)
 
 
 def peek_snippet(text: str, limit: int = 60) -> str:

@@ -131,8 +131,14 @@ def test_is_share_peekable_gates_on_small_text() -> None:
 
     assert is_share_peekable(SmbEntry("web.config", False, 1024)) is True
     assert is_share_peekable(SmbEntry("notes", False, 300)) is True  # no-ext small file
+    # SSIS/DTS package config (Archetype's backups share) — XML, small, worth a triage peek. Any
+    # data-bearing file is peeked now, not just a fixed text-extension allowlist.
+    assert is_share_peekable(SmbEntry("prod.dtsConfig", False, 609)) is True
+    assert is_share_peekable(SmbEntry("unattend.xml", False, 800)) is True  # answer file (text)
     assert is_share_peekable(SmbEntry("uploads", True, 0)) is False  # directory
-    assert is_share_peekable(SmbEntry("backup.zip", False, 500)) is False  # binary ext
+    assert is_share_peekable(SmbEntry("backup.zip", False, 500)) is False  # binary archive
+    assert is_share_peekable(SmbEntry("holiday.png", False, 500)) is False  # binary image
+    assert is_share_peekable(SmbEntry("id_rsa", False, 900)) is False  # secret material
 
 
 def test_smb_share_peek_step_streams_to_stdout() -> None:
