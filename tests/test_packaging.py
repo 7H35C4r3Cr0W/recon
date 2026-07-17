@@ -25,8 +25,18 @@ def test_runtime_resources_resolve_package_relative() -> None:
     for module in ("index", "search", "health", "locks", "activity", "views", "bulk", "models"):
         assert (PKG / "workspace" / f"{module}.py").exists()
     assert (PKG / "gui" / "workspace" / "dashboard.py").exists()
-    # bundled Nabu visual identity (original SVG assets)
-    for asset in ("logo", "icon", "icon-light", "icon-mono", "splash", "empty-workspace"):
+    # bundled Nabu identity (SVG assets) — includes the load-bearing runtime marks: furby.svg (the
+    # mascot for the boot splash + header brand mark) and tunnel.svg (the pivot mark).
+    for asset in (
+        "logo",
+        "icon",
+        "icon-light",
+        "icon-mono",
+        "splash",
+        "empty-workspace",
+        "furby",
+        "tunnel",
+    ):
         assert (PKG / "gui" / "assets" / f"{asset}.svg").exists()
 
 
@@ -67,6 +77,7 @@ def test_wheel_bundles_runtime_resources(tmp_path: pathlib.Path) -> None:
     assert has("oscprecon/gui/graph_html/cytoscape.min.js")
     assert has("oscprecon/gui/assets/icon.svg")
     assert has("oscprecon/gui/assets/logo.svg")
+    assert has("oscprecon/gui/assets/furby.svg")  # load-bearing: boot splash + header brand mark
     assert len([n for n in names if n.endswith("manual_commands.yaml")]) >= 14
     assert len([n for n in names if "/patterns/" in n and n.endswith(".yaml")]) >= 10
     assert len([n for n in names if "/templates/" in n and not n.endswith("/")]) >= 1

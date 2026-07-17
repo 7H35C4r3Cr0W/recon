@@ -38,9 +38,26 @@ def test_splash_is_still_and_closes_cleanly(qtbot: QtBot) -> None:
     splash.show()
     assert splash._live is False  # offscreen => no repeating timer (would hang idle-waiters)
     assert not splash._timer.isActive()
-    splash._graceful_close()  # the finish() close path must stop the timer and hide the widget
+    splash._graceful_close()  # the close primitive must stop the timer and hide the widget
     assert not splash._timer.isActive()
     assert not splash.isVisible()
+
+
+def test_finish_closes_the_splash_after_min_show(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # drive the real finish() path (not just _graceful_close): it schedules _graceful_close after
+    # _MIN_SHOW_MS. Shrink that so the test is fast, then assert the splash truly closes.
+    import oscprecon.gui.splash as splash_mod
+
+    monkeypatch.setattr(splash_mod, "_MIN_SHOW_MS", 20)
+    splash = make_splash()
+    qtbot.addWidget(splash)
+    splash.show()
+    assert splash.isVisible()
+    splash.finish(splash)  # the window arg is unused by design; the splash closes on the timer
+    qtbot.waitUntil(lambda: not splash.isVisible(), timeout=2000)
+    assert not splash._timer.isActive()
 
 
 def test_version_string_is_available_for_the_splash() -> None:

@@ -154,6 +154,10 @@ class NabuSplash(QWidget):
     def __init__(self) -> None:
         super().__init__(None, Qt.WindowType.SplashScreen | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # why: purely decorative chrome — it lingers on top for ~2s after the window is shown, so it
+        # must never intercept clicks meant for the window beneath, nor steal focus on show.
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.setFixedSize(_CARD_W + 2 * _MARGIN, _CARD_H + 2 * _MARGIN)
         self._center_on_screen()
