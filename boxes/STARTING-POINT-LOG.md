@@ -544,6 +544,32 @@ was verifying that live, *improving* it (filter/hide-static), and filling the tr
 finding-label bug). A scrape workflow is best used to separate "already covered" from real gaps, not
 to bulk-add.
 
+**26 · Abducted (HTB, Medium, Linux) — SMB (guest-writable printer → CVE-2026-4480 → polkit/systemd
+root) — recon + attack review — live.** `10.129.40.109`. SSH + Samba only, no web. The chain
+(walkthrough-guided, recon insight only): a **guest-WRITABLE `HP-Reception` printer share** → Samba
+print-command injection CVE-2026-4480 (the foothold — CVE-specific, NEVER wrapped) → rclone obscured
+cred decode → `force user`+`wide links` write an SSH key → a group-writable **systemd `*.service.d`
+drop-in** + polkit-delegated reload → root.
+- **Recon bug found + fixed (landed via autosync `b7abc0f`, content = the 7 files):** the SMB worker
+  listed all 4 shares but **marked none** — `HP-Reception`'s guest **WRITE** (the entire attack
+  surface) rendered identically to a no-access share, was classified as neutral `info`, and was
+  persisted **twice** (smbclient -L blank + netexec WRITE, undeduped). Fixed: `_summarize` marks
+  `[READ]`/`[WRITE]` (live: `HP-Reception [WRITE]`); `finding_severity.classify` escalates a writable
+  share to a **notable exposure** (readable/bare stay info — existing test preserved);
+  `dedup_share_findings` collapses the same share across enum methods, unioning access. The tool also
+  correctly RID-enumerated user **scott** (the pivot account) + the password policy. +tests.
+- **Attack coverage:** the foothold is a **specific CVE** (2026-4480) → stays OUT (recon-first; §21 no
+  CVE exploit logic). The privesc is **generic**: added a **writable systemd service drop-in → root**
+  enum+technique pair to `exploit/linux.py` (victim-side copy-only, HackTricks-sourced, human
+  confirmed) — Abducted's actual root, which the catalog lacked (it had SUID/sudo/cron/cap only).
+- Everything past enumeration — the spoolss print-job injection, rclone decode, the wide-links key
+  write, the systemd drop-in — is **manual exploitation, never the tool**.
+
+**Lesson:** on a write-driven box, "which shares exist" is not the signal — "which shares I can
+**write**" is; a recon tool that flags READ but not WRITE hides the whole attack surface. A
+guest-writable share is a first-class exposure. And when the foothold is a single CVE, the tool's job
+is to surface its *precondition* (the writable printer share), not to ship the exploit.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
