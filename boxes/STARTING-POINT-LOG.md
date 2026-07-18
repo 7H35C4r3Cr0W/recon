@@ -570,6 +570,30 @@ drop-in** + polkit-delegated reload → root.
 guest-writable share is a first-class exposure. And when the foothold is a single CVE, the tool's job
 is to surface its *precondition* (the writable printer share), not to ship the exploit.
 
+**27 · DevArea (HTB, Medium, Linux) — FTP/Java-SOAP/Hoverfly chain — recon + attack review — live.**
+`10.129.244.208`. 21 FTP (anon), 22 SSH, 80 Apache→`devarea.htb`, 8080 Jetty (Java CXF SOAP app),
+8500 Go proxy, 8888 Hoverfly Dashboard. Chain (walkthrough, recon insight only): anon FTP →
+`employee-service.jar` (Apache CXF Aegis **CVE-2024-28752** SSRF/XOP file-read → `/proc/*/cmdline`
+leaks Hoverfly creds) → Hoverfly **CVE-2025-54123** middleware RCE (dev_ryan) → world-readable
+`syswatch.env` SECRET_KEY → Flask session forgery → cmd-injection filter bypass (syswatch) →
+symlink-chain abuse of a root-run log CLI → root SSH key.
+- **Recon: CLEAN, no bug.** The FTP worker lists `/pub/employee-service.jar` (6.4 MB binary — listed,
+  correctly NOT peeked); port-80 whatweb surfaces the **302 → `devarea.htb` vhost** ("add to
+  /etc/hosts"); 8080 fingerprints **Jetty 9.4.27**, 8888 **Title[Hoverfly Dashboard]**, 8500 the Go
+  proxy (500) — all treated as HTTP on their non-standard ports. Everything the operator needs to
+  start is surfaced.
+- **Attack:** the two footholds are **specific CVEs** → stay OUT (§21). **Flask session forgery was
+  already covered** (`werkzeug.py` leak-SECRET_KEY + flask-unsign forge). The genuine gap was the
+  root technique — a **symlink attack on a root-run file reader** — missing from the linux catalog,
+  so added `symlink-root-file-abuse` (victim-side copy-only, HackTricks-sourced, incl. the two-hop
+  chain that defeats single-hop symlink validation, exactly DevArea's root).
+- Everything past enum — the CXF XOP file-read, the Hoverfly RCE, the Flask cookie, the injection
+  bypass, the symlink chain — is **manual exploitation, never the tool**.
+
+**Lesson:** a clean recon pass is a valid result — don't invent a recon bug. On a CVE-chain box the
+review value is (a) confirming the surface surfaces (FTP artifact, vhost, the odd-port web apps) and
+(b) filling the one *generic* privesc the box's root needs (symlink attack) without touching the CVEs.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
