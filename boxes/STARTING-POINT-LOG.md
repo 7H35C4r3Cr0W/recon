@@ -517,6 +517,33 @@ are covered — walk the WHOLE chain, first link included. And "content discover
 useful if the *one* that matters (a leaked `.swp`) is made to stand out — flag source/backup/VCS
 disclosures, don't drown them in font files.
 
+**25b · Base re-drive (live) + recon-tooling upgrades — `10.129.95.184`.** Resumed the box #25 live
+drive after being booted mid-run (the fresh profile had only nmap done). Completed the HTTP recon on
+the real GUI code path headless: whatweb fingerprint (`Apache[2.4.29]`, `Email[info@base.htb]`) +
+feroxbuster content discovery (38 URLs; `/login/login.php.swp` surfaced via link-extraction).
+Verified through the **real widgets** that the Discovered-URLs table fills and the ⚠ source-disclosure
+flag fires on `login.php.swp` (1 flagged); exploit chain (type-juggle → webshell → `sudo find`)
+confirmed present. Clean re-verification — no box bug. Then shipped the owner's recon-tooling requests
+in chunks:
+- **Bug found + fixed (`dfdd429`):** the graph / ReconSummaryTree labelled every http finding as the
+  bare word "finding" (kind/value-only labeller; http findings carry path/status/note) — 38 identical
+  rows on Base. Now `200 /login/login.php.swp`, the whatweb note, `301 … → target`, vhost+status.
+- **Excel-sheet upgrade (`244d203`):** the Discovered-URLs table already accumulated across runs +
+  exported CSV; added a live **Filter** box + **Hide static assets** toggle (Base 38→11 real URLs),
+  cleaned-view CSV. Directly answers "the raw output is a pain to find sites from."
+- **dnsenum (`54935bf`):** added to the vhost module as a subdomain-enum tool (parser+fixture+dropdown).
+- **Course-Ch.6 recon follow-ups (`873c08a`):** a 5-agent scrape of the OSCP course + Obsidian notes
+  found most techniques already covered; added the genuine gaps — DNS `+dnssec` + reverse-/24 sweep,
+  HTTP `http-enum`/`http-methods` NSE + TLS **cert-SAN→vhost pivot**, SNMP system/storage OIDs.
+  Subdomain enum + DNS zone transfer were confirmed already present (vhost tools; `dig AXFR` +
+  `dnsrecon`).
+
+**Lesson:** before building a feature the owner asks for, check whether it already exists — much of
+"add subdomain enum / DNS enum / an excel sheet" was already shipped; the honest, higher-value work
+was verifying that live, *improving* it (filter/hide-static), and filling the true gaps (dnsenum, the
+finding-label bug). A scrape workflow is best used to separate "already covered" from real gaps, not
+to bulk-add.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
