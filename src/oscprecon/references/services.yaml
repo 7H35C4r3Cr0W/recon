@@ -311,6 +311,19 @@
     - { name: "redis-cli -h {target} -p {port} INFO", purpose: "unauth server INFO (version/role/persistence)" }
     - { name: "redis-cli -h {target} -p {port} config get *", purpose: "unauth running-config (dir/dbfilename/requirepass)" }
 
+- match: { port: 10050, proto: tcp }
+  label: Zabbix agent
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+  tools:
+    - { name: "nmap -sV -p {port} {target}", purpose: "Zabbix agent version banner" }
+    - { name: "curl -s http://{target}/", purpose: "find the Zabbix web UI (version in the footer; guest login is often enabled) — usually a zabbix.* vhost, so enumerate subdomains" }
+
+- match: { port: 10051, proto: tcp }
+  label: Zabbix server (trapper)
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/index.html
+  tools:
+    - { name: "nmap -sV -p {port} {target}", purpose: "Zabbix trapper/server version banner" }
+
 - match: { port: 27017, proto: tcp }
   label: MongoDB
   module: mongodb

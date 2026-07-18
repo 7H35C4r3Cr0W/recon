@@ -594,6 +594,31 @@ symlink-chain abuse of a root-run log CLI → root SSH key.
 review value is (a) confirming the surface surfaces (FTP artifact, vhost, the odd-port web apps) and
 (b) filling the one *generic* privesc the box's root needs (symlink attack) without touching the CVEs.
 
+**28 · Watcher (VulnLab, Medium, Linux) — Zabbix → TeamCity — recon + attack review — live.**
+`10.129.234.163`. 22 SSH, 80 Apache→`watcher.vl`, **10050/10051 tcpwrapped (Zabbix agent/server)**.
+Chain (walkthrough, recon insight only): 80 → `watcher.vl` → subdomain enum → `zabbix.watcher.vl`
+(Zabbix 7.0.0alpha1) → guest login → **CVE-2024-22120** RCE → backdoor the zabbix web `index.php`
+(zabbix user owns `/usr/share/zabbix`) to harvest Frank's creds → SSH-forward local **8111 TeamCity**
+(runs as root) → agent-terminal → root.
+- **Recon gap found + fixed (recon/attack asymmetry):** the tool had a Zabbix *exploit* module
+  (ports 10050/10051) but **`services.yaml` had no Zabbix entry** — so the 10050/10051 nodes showed
+  as bare `tcpwrapped` with no reference or tool hints for the box's central tech. Added
+  **10050 (Zabbix agent)** + **10051 (Zabbix server/trapper)** entries (label + HackTricks index +
+  `nmap -sV` / web-UI hints pointing at the guest-login version-footer + the `zabbix.*` vhost).
+  Verified the ref now matches both ports.
+- **Recon otherwise clean:** the default vhost wordlist (top-5000) **does** contain `zabbix`, so the
+  default subdomain sweep finds `zabbix.watcher.vl` (no gap); port-80 `watcher.vl` redirect
+  auto-surfaces as a vhost. No zabbix NSE ships on stock Kali, so hints stay `nmap -sV`/`curl`.
+- **Attack:** the foothold is a **specific CVE** (2024-22120) → out; the Zabbix enum module already
+  exists. The privesc (web-source backdoor, TeamCity agent-terminal) is **app-specific**, not a
+  generic technique worth cataloguing — no addition.
+- Everything past enum — the CVE RCE, the index.php backdoor, the TeamCity agent shell — is
+  **manual exploitation, never the tool**.
+
+**Lesson:** keep the recon and attack sides symmetric — if the Exploitation catalog knows a service
+(Zabbix on 10050/10051), the recon reference map should recognize it too, or the operator selecting
+that port sees nothing. An unlabeled `tcpwrapped` on a known service port is a recon miss.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
