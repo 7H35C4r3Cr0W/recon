@@ -31,6 +31,7 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 20 | **Dante** (HTB Pro Lab) | 10.10.110.100 entry → 172.16.1.0/24 (+172.16.2.0/24) | entry: ftp/21 vsFTPd 3.0.3 (anon, PASV leaks internal .100) + ssh/22 + http/65000 (WordPress); internal /24: **11 hosts live-scanned** (DC01 full-AD, SQL01 MSSQL+NFS, NIX02-04, WS01-03, NIX07 Jenkins, NIX03 Webmin, pfSense) | **first live MULTI-NETWORK PIVOT validation**: entry live-scanned; internal `172.16.1.0/24` **live-scanned through a real pivot** (SSH SOCKS unavailable headless → threaded Python connect-scan run *on* the dual-homed entry box); **delete-intel-then-rescan repopulated the graph from REAL banners** (OpenSSH 8.2p1/7.6p1, Apache 2.4.41/43/54, FileZilla 0.9.60, MariaDB, IIS 8.5); two-hop spider-web (entry→net1, NIX02→net2) renders in tree+graph+report; net2 confirmed firewalled from entry (double-pivot is real). All exploitation (WP RCE, SUID, MSSQL/JuicyPotato, MS17-010, AS-REP, DCSync, BOFs) stays manual/out-of-tool | `full`-profile welded `nmap -sU -p-` into the battery → it ran *before* the versioned scan and stalled the entry scan → deferred UDP-full to run last | `be3e73e` |
 | 21 | **Archetype** (Tier II) | 10.129.34.115 | smb/445 (Win Server 2019, null session → `backups [READ]` → `prod.dtsConfig`) + mssql/1433 (**SQL Server 2017**) + winrm/5985 | first **Tier II** + first **live MSSQL** box: SMB null-session walk surfaced the readable `backups` share + config file; MSSQL parser clean (2017, correctly suppressed the self-domain → standalone); Tier-2 `sa`/`admin:''` shown-not-run; verified recon is **gated to discovered services** (no run-all, `triggers()` vestigial) | **peek was a text-ext allowlist → `.dtsConfig` listed but never previewed**: inverted to a **binary+sensitive denylist** (peek any small data-bearing file; snippet stays bounded so the cred never leaks to findings). Also added an exploit-tab **"service not found" warning** | `068c99f` |
 | 22 | **Unified** (Tier II) | 10.129.34.143 | http/8080 + **8443/https-alt (UniFi Network 6.4.54)** + ssh/22 + 6789/8843/8880 | UniFi/Log4Shell box: 8443 handled as HTTPS on a non-standard port; whatweb identifies `Title[UniFi Network]`; version 6.4.54 lives at the unauth `/status` JSON (searchsploit UniFi empty); drove the money ports without waiting on `-p-`. Log4Shell→rogue-JNDI→Mongo hash swap→SSH root all manual | **whatweb parser dropped plugin VALUES** (`Title[UniFi Network]`→`Title`) **+ HTTP fingerprint produced no findings** (whatweb ran raw, never parsed): fixed the parser to keep values **+ added a Fingerprint button** wiring whatweb into structured findings; added a `/status` Tier-2 follow-up | `79a9e2e` |
+| 23 | **Included** (Tier II) | 10.129.95.185 | **80/tcp (Apache 2.4.29, LFI `?file=`)** + **69/udp TFTP** + 68/udp | First explicit **attack-coverage** pass: whatweb fingerprint surfaces Apache 2.4.29 + the `?file=` LFI sink; UDP scan finds 69/tftp; exploit tab has the full web-LFI chain + `tftp PUT webshell (chain with LFI)`. LFI→TFTP-upload→RCE→`su mike`→lxd root all manual | **exploit present-marker over-matched** (port 80 → ~70 "present" web apps): fixed so a shared web port alone doesn't mark a specific app present (→ 3 present); fixed `tftp`→`ftp` name substring; **added lxd/docker group-membership privesc** (the root, was missing); fixed a false not-found warning on portless privesc catalogs | _pending_ |
 
 ## Per-box notes
 
@@ -416,6 +417,42 @@ whatweb but, uniquely among modules, never turned it into findings, and the pars
 the one value that mattered (the title). Fingerprint→findings should be a first-class one-click step,
 and a parser must keep the *values*, not just prove a plugin fired. Also: probe the money ports the
 moment discovery returns; don't let a full `-p-` sweep gate the high-value recon.
+
+**23 · Included (HTB Starting Point, Tier II) — http LFI + tftp (69/udp) — live.** `10.129.95.185`.
+First box driven with an explicit **attack-coverage** pass (exploit tab), not just recon. `default`
+scan found **80/tcp Apache 2.4.29** and — the box's teaching, a *different transport layer* —
+**69/udp TFTP** (plus 68/udp dhcpc), caught by the UDP top-100 sweep.
+- **Recon validated the Unified whatweb fix on a fresh box:** the Fingerprint on 80 now surfaces
+  `Apache[2.4.29]` + `HTTPServer[Ubuntu Linux][Apache/2.4.29 (Ubuntu)]` **and**
+  `RedirectLocation[…/index.php?file=home.php]` — so the **LFI `?file=` sink is visible** in the
+  fingerprint (before the value-preservation fix it was a bare `Apache`/`RedirectLocation`). nmap
+  also versioned 80 as Apache 2.4.29. TFTP recon runs `tftp-enum` NSE + GETs well-known files.
+- **Attack coverage (the point of this pass):** the exploit tab already had the full **web LFI
+  chain** (`read /etc/passwd`, php://filter, data:// RCE, **log poisoning**, double-encoded
+  traversal) and **`curl PUT webshell into TFTP root (chain with LFI)`** — exactly Included's
+  foothold. **Gap: no `lxd`/`docker` group-membership privesc** (the box's *root*, and one of the
+  most common HTB/OSCP privescs). Added a **Group membership** category to `linux.py` (lxd, docker,
+  disk, + an `id;groups` check), victim-side/copy-only, sourced to HackTricks.
+- **Bug found + fixed — the exploit tab's present-marker was near-useless on any web box.**
+  `services_present` matched by port, so opening **port 80 marked ~70 web-app services present**
+  (drupal, joomla, wordpress, magento, …) — a bare web server is "a web server", not "Drupal". Fixed
+  so a **shared web port (80/443/8080/…) alone never marks a specific app present** — only the
+  generic `web`/`webdav`, a name match, or a service-specific (non-web) port count. Included dropped
+  from **~70 ● to 3** (`web`, `webdav`, `tftp`). Also fixed a **name-fragment substring misfire**
+  (`tftp` matched the `ftp` fragment → `ftp` shown too) by matching the **longest fragment first**.
+- **GUI/UX bug found + fixed on the pass (my own earlier warning):** the "service not found" warning
+  fired for **`linux`/`windows` privesc** — but those are **portless post-ex catalogs**, never
+  "found" by a scan, so the warning was a false positive. Suppressed it for portless services.
+- Everything past enumeration — writing `shell.php` via TFTP, including it through the LFI for RCE,
+  `su mike` with the `.htpasswd` password, and the `lxd` container→root — is **manual exploitation,
+  never the tool**.
+
+**Lesson:** "present on this box" must be a *strong* signal — a shared port shared by 70 services is
+noise, not presence; match on name or a service-specific port, and let the generic `web` stand in for
+"a web server is here." And when you add a UX affordance (the not-found warning), re-check it against
+the *portless* corners of the model (privesc/post-ex catalogs), or it fires where it makes no sense.
+Attack coverage is worth an explicit pass: the recon can be perfect while the box's actual root
+(a group-membership privesc) is simply missing from the catalog.
 
 ## Trends & lessons (adapt going forward)
 
