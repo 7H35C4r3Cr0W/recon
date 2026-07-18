@@ -32,6 +32,7 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 21 | **Archetype** (Tier II) | 10.129.34.115 | smb/445 (Win Server 2019, null session → `backups [READ]` → `prod.dtsConfig`) + mssql/1433 (**SQL Server 2017**) + winrm/5985 | first **Tier II** + first **live MSSQL** box: SMB null-session walk surfaced the readable `backups` share + config file; MSSQL parser clean (2017, correctly suppressed the self-domain → standalone); Tier-2 `sa`/`admin:''` shown-not-run; verified recon is **gated to discovered services** (no run-all, `triggers()` vestigial) | **peek was a text-ext allowlist → `.dtsConfig` listed but never previewed**: inverted to a **binary+sensitive denylist** (peek any small data-bearing file; snippet stays bounded so the cred never leaks to findings). Also added an exploit-tab **"service not found" warning** | `068c99f` |
 | 22 | **Unified** (Tier II) | 10.129.34.143 | http/8080 + **8443/https-alt (UniFi Network 6.4.54)** + ssh/22 + 6789/8843/8880 | UniFi/Log4Shell box: 8443 handled as HTTPS on a non-standard port; whatweb identifies `Title[UniFi Network]`; version 6.4.54 lives at the unauth `/status` JSON (searchsploit UniFi empty); drove the money ports without waiting on `-p-`. Log4Shell→rogue-JNDI→Mongo hash swap→SSH root all manual | **whatweb parser dropped plugin VALUES** (`Title[UniFi Network]`→`Title`) **+ HTTP fingerprint produced no findings** (whatweb ran raw, never parsed): fixed the parser to keep values **+ added a Fingerprint button** wiring whatweb into structured findings; added a `/status` Tier-2 follow-up | `79a9e2e` |
 | 23 | **Included** (Tier II) | 10.129.95.185 | **80/tcp (Apache 2.4.29, LFI `?file=`)** + **69/udp TFTP** + 68/udp | First explicit **attack-coverage** pass: whatweb fingerprint surfaces Apache 2.4.29 + the `?file=` LFI sink; UDP scan finds 69/tftp; exploit tab has the full web-LFI chain + `tftp PUT webshell (chain with LFI)`. LFI→TFTP-upload→RCE→`su mike`→lxd root all manual | **exploit present-marker over-matched** (port 80 → ~70 "present" web apps): fixed so a shared web port alone doesn't mark a specific app present (→ 3 present); fixed `tftp`→`ftp` name substring; **added lxd/docker group-membership privesc** (the root, was missing); fixed a false not-found warning on portless privesc catalogs | `ff19fe3` |
+| 24 | **Markup** (Tier II) | 10.129.34.153 | ssh/22 + **80/443 (Apache 2.4.41 Win64 / PHP 7.2.28, XXE)** | **recon + attack**: fingerprint surfaces the full Apache/PHP stack; EDB apache-2.4 12★; exploit tab present=`[ssh,web,webdav]` with the whole chain covered — web `xxe-file-read` + windows `scheduled-task-hijack` ("overwrite writable task script" = the `job.bat` privesc) + `icacls-path-check`. Graph renders. XXE→SSH-key→job.bat→SYSTEM all manual | **clean box (no bug)** — deliverable was the requested **"Discovered URLs" table**: a sortable Status·Method·Lines·Words·Bytes·URL view of dir-bust results, colour-coded, double-click-to-open, Export CSV; feroxbuster parser now captures method/lines/words | _pending_ |
 
 ## Per-box notes
 
@@ -453,6 +454,35 @@ noise, not presence; match on name or a service-specific port, and let the gener
 the *portless* corners of the model (privesc/post-ex catalogs), or it fires where it makes no sense.
 Attack coverage is worth an explicit pass: the recon can be perfect while the box's actual root
 (a group-membership privesc) is simply missing from the catalog.
+
+**24 · Markup (HTB Starting Point, Tier II) — http XXE (Windows) — recon + attack — live.**
+`10.129.34.153`. A Windows box: 22/ssh (OpenSSH-for-Windows), **80 + 443 (Apache 2.4.41 (Win64) /
+OpenSSL / PHP 7.2.28)**, a web app with an **XXE** in the Order form → read files → daniel's SSH key →
+a **writable scheduled-task `job.bat`** (BUILTIN\Users full control) → SYSTEM.
+- **Recon:** the Fingerprint on 80/443 surfaces the full `Apache[2.4.41]` / `HTTPServer[… PHP/7.2.28]`
+  stack; nmap versioned it too; Exploit-DB matched **apache 2.4 → 31 results, 12 version-matched
+  (★), top 15**. The graph renders correctly (native tree: target → 22/80/443 with the finding
+  nested under 80 → credentials).
+- **Attack — clean coverage, no gap this box.** Exploit tab present = `[ssh, web, webdav]` (focused,
+  post the Included fix). The whole chain is already in the catalog: web **`xxe-file-read`** (the
+  core vuln), windows **`scheduled-task-hijack`** ("Overwrite a writable task script" →
+  `echo …nc.exe… > "{path}"`, *exactly* the `job.bat` technique) + **`icacls-path-check`** (finds
+  the BUILTIN\Users write perm) + `schtasks-enum`. Everything past enum (default-cred login, the XXE
+  payloads, the SSH key, the `job.bat` reverse shell) is **manual exploitation**.
+- **Feature you asked for — a clean "excel-sheet" of discovered URLs.** The raw feroxbuster/gobuster
+  stream is great for watching but a pain to act on. New **"Discovered URLs"** tab beside "Content
+  discovery": a sortable table — **Status · Method · Lines · Words · Bytes · URL** — colour-coded by
+  status, **double-click a row to open it in the browser**, **Export CSV**. It reads the accumulated
+  http findings (grows across runs) and leaves the raw pane untouched. The feroxbuster parser now
+  captures `method`/`lines`/`words` (not just status/size) to fill the columns. Verified live on
+  Markup: 10 URLs (`/index.php`, `/phpmyadmin`, `/server-status`, `/Images/background.jpg`, …) as
+  clean clickable rows.
+
+**Lesson:** a raw tool stream and a *queryable* view of its results are two different products — keep
+the stream (operators read it live) but also parse it into a clean, sortable, clickable, exportable
+table so the findings are something you can *act on*, not just scroll. And when a box is genuinely
+clean (recon + attack both covered), that's a valid outcome — mark it down and move on rather than
+inventing a fix.
 
 ## Trends & lessons (adapt going forward)
 

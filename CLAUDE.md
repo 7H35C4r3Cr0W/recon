@@ -527,6 +527,7 @@ Per-port output folders:
 - **`nikto`**, **`whatweb`**, **`curl -sI`**, snapshots of `/`, `/robots.txt`, `/sitemap.xml`, `/.git/HEAD` check, `/backup/` check.
 - **`wpscan --enumerate vp,vt,tt,cb,dbe,u,m`** when WordPress detected. **Never `--passwords`.**
 - **Last-used HTTP settings** persist per profile in `profile.json.module_settings.http`.
+- **Discovered URLs table** (`gui/widgets/discovered_urls_panel.py`, a "Discovered URLs" tab beside "Content discovery"): a clean, sortable site map of the content-discovery findings for the current web port — one row per URL with **Status · Method · Lines · Words · Bytes · URL** columns, colour-coded status, **double-click a row to open it in the browser** (`QDesktopServices`), and **Export CSV** (the "excel-sheet" view). It reads the accumulated http findings (persisted in `findings.json`, so it grows across runs) and leaves the raw streamed output untouched. The feroxbuster parser captures `method`/`lines`/`words` (in addition to status/size) to feed it.
 
 ---
 

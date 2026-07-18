@@ -41,6 +41,23 @@ def test_feroxbuster_plain_output() -> None:
     assert by_path["/index.html"].size == 10918
 
 
+def test_feroxbuster_captures_method_lines_words() -> None:
+    # the Discovered URLs table needs the method + line/word counts, not just status/size (Markup)
+    sample = (
+        "200      GET     1561l     8361w   679324c http://10.129.34.153/Images/background.jpg\n"
+        "301      GET        9l       30w      340c http://10.129.34.153/Images => "
+        "http://10.129.34.153/Images/\n"
+    )
+    findings = parse_feroxbuster(sample, 80)
+    by_path = {f.path: f for f in findings}
+    bg = by_path["/Images/background.jpg"]
+    assert (bg.method, bg.lines, bg.words, bg.size) == ("GET", 1561, 8361, 679324)
+    assert by_path["/Images"].redirect_to == "http://10.129.34.153/Images/"
+    # the extra columns round-trip through to_dict (persisted to findings.json for the table)
+    d = bg.to_dict("t")
+    assert d["method"] == "GET" and d["lines"] == 1561 and d["words"] == 8361
+
+
 def test_gobuster() -> None:
     findings = parse_gobuster(_read("gobuster.txt"), 80)
     by_path = {f.path: f for f in findings}

@@ -24,11 +24,15 @@ class HttpFinding:
     redirect_to: str = ""
     note: str = ""
     module: str = "http"
+    method: str = ""  # HTTP verb from the dir-buster (GET/POST) — for the Discovered URLs table
+    lines: int = 0  # response line count (feroxbuster -o "8l")
+    words: int = 0  # response word count (feroxbuster -o "22w")
 
     def __post_init__(self) -> None:
         self.path = _clean(self.path)
         self.redirect_to = _clean(self.redirect_to)
         self.note = _clean(self.note)
+        self.method = _clean(self.method)
 
     def to_dict(self, discovered_at: str) -> dict[str, Any]:
         return {
@@ -39,6 +43,9 @@ class HttpFinding:
             "size": self.size,
             "redirect_to": self.redirect_to,
             "note": self.note,
+            "method": self.method,
+            "lines": self.lines,
+            "words": self.words,
             "discovered_at": discovered_at,
         }
 
@@ -81,8 +88,8 @@ def _parse_size(token: str) -> int:
 
 # feroxbuster plain -o line: "301  GET  8l  22w  154c  http://x/admin => /admin/"
 _FEROX_PLAIN = re.compile(
-    r"^(?P<status>\d{3})\s+\w+\s+\d+l\s+\d+w\s+(?P<size>\d+)c\s+(?P<url>\S+)"
-    r"(?:\s+=>\s+(?P<redir>\S+))?"
+    r"^(?P<status>\d{3})\s+(?P<method>\w+)\s+(?P<lines>\d+)l\s+(?P<words>\d+)w\s+"
+    r"(?P<size>\d+)c\s+(?P<url>\S+)(?:\s+=>\s+(?P<redir>\S+))?"
 )
 
 
@@ -108,6 +115,9 @@ def parse_feroxbuster(text: str, port: int) -> list[HttpFinding]:
                     status=_to_int(obj.get("status", 0)),
                     size=_to_int(obj.get("content_length", 0)),
                     redirect_to=redirect,
+                    method=str(obj.get("method", "") or ""),
+                    lines=_to_int(obj.get("line_count", 0)),
+                    words=_to_int(obj.get("word_count", 0)),
                 )
             )
             continue
@@ -120,6 +130,9 @@ def parse_feroxbuster(text: str, port: int) -> list[HttpFinding]:
                     status=int(match.group("status")),
                     size=int(match.group("size")),
                     redirect_to=(match.group("redir") or ""),
+                    method=match.group("method"),
+                    lines=int(match.group("lines")),
+                    words=int(match.group("words")),
                 )
             )
     return findings

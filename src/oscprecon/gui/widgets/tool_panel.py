@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.widgets.banner import Banner
+from oscprecon.gui.widgets.discovered_urls_panel import DiscoveredUrlsPanel
 from oscprecon.gui.widgets.dns_panel import DnsPanel
 from oscprecon.gui.widgets.ftp_panel import FtpPanel
 from oscprecon.gui.widgets.http_panel import HttpPanel
@@ -133,8 +134,10 @@ class ToolPanel(QWidget):
         self._vhost.wildcard_detect_requested.connect(self.wildcard_detect_requested)
         self._vhost.enumerate_as_http_requested.connect(self.enumerate_as_http_requested)
         self._vhost.validation_failed.connect(self.vhost_validation_failed)
+        self._urls = DiscoveredUrlsPanel()
         self._web_tabs = QTabWidget()
         self._web_tabs.addTab(self._http, "Content discovery")
+        self._web_tabs.addTab(self._urls, "Discovered URLs")
         self._web_tabs.addTab(self._vhost, "Vhosts")
 
         # smb page: Tier-1 recon buttons + Tier-2 manual follow-ups + findings
@@ -224,6 +227,11 @@ class ToolPanel(QWidget):
 
     def set_theme(self, theme_name: str) -> None:
         self._banner.restyle(theme_name)
+        self._urls.set_theme(theme_name)
+
+    def refresh_discovered_urls(self) -> None:
+        # called after a content-discovery run parses new findings, so the URL table grows live
+        self._urls.refresh()
 
     def clear_banner(self) -> None:
         self._banner.clear()
@@ -233,6 +241,7 @@ class ToolPanel(QWidget):
 
     def set_profile(self, profile: Profile) -> None:
         self._http.set_profile(profile)
+        self._urls.set_profile(profile)
         self._vhost.set_profile(profile)
         self._smb.set_profile(profile)
         self._ftp.set_profile(profile)
@@ -254,6 +263,7 @@ class ToolPanel(QWidget):
         self._header.setText(f"{service.port}/{service.proto.value} — {label}")
         if ref is not None and ref.module == "http":
             self._http.configure(service, ref)
+            self._urls.configure(service)
             self._vhost.configure(service)
             self._stack.setCurrentWidget(self._web_tabs)
             return

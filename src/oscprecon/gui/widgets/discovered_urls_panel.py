@@ -1,0 +1,226 @@
+from __future__ import annotations
+
+import csv
+
+from PySide6.QtCore import QPoint, Qt, QUrl
+from PySide6.QtGui import QBrush, QColor, QDesktopServices, QGuiApplication
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from oscprecon import findings as findings_mod
+from oscprecon.gui.theme import tokens
+from oscprecon.models import DiscoveredService
+from oscprecon.modules.http import default_url, is_tls
+from oscprecon.profile import Profile
+
+# Clean, sortable "site map" of what a content-discovery run found on the current web port — the
+# excel-sheet view the raw feroxbuster/gobuster stream can't give: one row per URL, real columns,
+# clickable to open in the browser, exportable to CSV. Reads the accumulated http findings
+# (persisted across runs) so it grows as you dir-bust; the raw output pane is untouched.
+_COLUMNS = ("Status", "Method", "Lines", "Words", "Bytes", "URL")
+_URL_COL = 5
+_URL_ROLE = int(Qt.ItemDataRole.UserRole)
+
+
+class DiscoveredUrlsPanel(QWidget):
+    def __init__(self, theme_name: str = "dark") -> None:
+        super().__init__()
+        self._profile: Profile | None = None
+        self._port = 0
+        self._tls = False
+        self._theme = theme_name
+
+        self._count = QLabel("")
+        self._count.setWordWrap(True)
+        self._refresh_btn = QPushButton("Refresh")
+        self._refresh_btn.clicked.connect(self.refresh)
+        self._export_btn = QPushButton("Export CSV")
+        self._export_btn.setToolTip("Save the table as a .csv (opens in Excel / LibreOffice)")
+        self._export_btn.clicked.connect(self._export_csv)
+        self._export_btn.setEnabled(False)
+        top = QHBoxLayout()
+        top.addWidget(self._count, stretch=1)
+        top.addWidget(self._refresh_btn)
+        top.addWidget(self._export_btn)
+
+        self._table = QTableWidget(0, len(_COLUMNS))
+        self._table.setHorizontalHeaderLabels(list(_COLUMNS))
+        self._table.setSortingEnabled(True)
+        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setAlternatingRowColors(True)
+        self._table.verticalHeader().setVisible(False)
+        self._table.cellDoubleClicked.connect(self._open_row)
+        self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(self._show_menu)
+        header = self._table.horizontalHeader()
+        header.setSectionResizeMode(_URL_COL, QHeaderView.ResizeMode.Stretch)
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(top)
+        layout.addWidget(self._table, stretch=1)
+        self._update_count(0)
+
+    # --- wiring -------------------------------------------------------------------------------
+    def set_theme(self, theme_name: str) -> None:
+        self._theme = theme_name
+        self.refresh()
+
+    def set_profile(self, profile: Profile | None) -> None:
+        self._profile = profile
+        self.refresh()
+
+    def configure(self, service: DiscoveredService) -> None:
+        self._port = service.port
+        self._tls = is_tls(service.service, service.port)
+        self.refresh()
+
+    # --- data ---------------------------------------------------------------------------------
+    def refresh(self) -> None:
+        self._table.setSortingEnabled(False)
+        self._table.setRowCount(0)
+        rows = self._collect_rows()
+        pal = tokens.palette(self._theme)
+        for status, method, lines, words, size, url in rows:
+            r = self._table.rowCount()
+            self._table.insertRow(r)
+            self._table.setItem(r, 0, self._status_item(status, pal))
+            self._table.setItem(r, 1, QTableWidgetItem(method))
+            self._table.setItem(r, 2, self._num_item(lines))
+            self._table.setItem(r, 3, self._num_item(words))
+            self._table.setItem(r, 4, self._num_item(size))
+            self._table.setItem(r, _URL_COL, self._url_item(url, pal))
+        self._table.setSortingEnabled(True)
+        # deterministic, recon-useful default: 200s first (found pages), then the rest by status.
+        # The user can re-sort by any column.
+        self._table.sortItems(0, Qt.SortOrder.AscendingOrder)
+        self._update_count(len(rows))
+        self._export_btn.setEnabled(bool(rows))
+
+    def _collect_rows(self) -> list[tuple[int, str, int, int, int, str]]:
+        # one row per discovered URL on the CURRENT web port — the dir-buster findings (status +
+        # path), not the whatweb fingerprint note. Deduped by (status, path); newest run wins.
+        if self._profile is None or self._port == 0:
+            return []
+        host = self._profile.target.host
+        base = default_url(host, self._port, self._tls).rstrip("/")
+        by_key: dict[tuple[int, str], tuple[int, str, int, int, int, str]] = {}
+        for f in findings_mod.load_findings(self._profile.directory):
+            if f.get("module") != "http" or f.get("port") != self._port:
+                continue
+            status = _int(f.get("status"))
+            path = str(f.get("path") or "")
+            if not status or not path:
+                continue
+            if str(f.get("note") or "").startswith("whatweb"):  # a fingerprint, not a found URL
+                continue
+            by_key[(status, path)] = (
+                status,
+                str(f.get("method") or ""),
+                _int(f.get("lines")),
+                _int(f.get("words")),
+                _int(f.get("size")),
+                base + path,
+            )
+        return sorted(by_key.values(), key=lambda r: (r[0], r[_URL_COL]))
+
+    # --- table items --------------------------------------------------------------------------
+    @staticmethod
+    def _num_item(value: int) -> QTableWidgetItem:
+        item = QTableWidgetItem()
+        item.setData(Qt.ItemDataRole.DisplayRole, value)  # int -> numeric sort, not string sort
+        item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        return item
+
+    def _status_item(self, status: int, pal: tokens.Palette) -> QTableWidgetItem:
+        item = self._num_item(status)
+        colour = {2: pal.success, 3: pal.accent, 4: pal.warning, 5: pal.error}.get(status // 100)
+        if colour:
+            item.setForeground(QBrush(QColor(colour)))
+        return item
+
+    def _url_item(self, url: str, pal: tokens.Palette) -> QTableWidgetItem:
+        item = QTableWidgetItem(url)
+        item.setData(_URL_ROLE, url)
+        item.setForeground(QBrush(QColor(pal.accent)))  # looks like a link
+        item.setToolTip("Double-click to open in the browser")
+        return item
+
+    # --- interactions -------------------------------------------------------------------------
+    def _row_url(self, row: int) -> str:
+        item = self._table.item(row, _URL_COL)
+        return str(item.data(_URL_ROLE)) if item is not None else ""
+
+    def _open_row(self, row: int, _col: int) -> None:
+        url = self._row_url(row)
+        if url:
+            QDesktopServices.openUrl(QUrl(url))
+
+    def _show_menu(self, pos: QPoint) -> None:
+        row = self._table.currentRow()
+        if row < 0:
+            return
+        url = self._row_url(row)
+        if not url:
+            return
+        menu = QMenu(self)
+        open_action = menu.addAction("Open in browser")
+        copy_action = menu.addAction("Copy URL")
+        viewport = self._table.viewport()
+        chosen = menu.exec(viewport.mapToGlobal(pos)) if viewport is not None else None
+        if chosen == open_action:
+            QDesktopServices.openUrl(QUrl(url))
+        elif chosen == copy_action:
+            clip = QGuiApplication.clipboard()
+            if clip is not None:
+                clip.setText(url)
+
+    def _export_csv(self) -> None:
+        if self._profile is None:
+            return
+        default = str(self._profile.directory / f"discovered-urls-{self._port}.csv")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export discovered URLs", default, "CSV (*.csv)"
+        )
+        if not path:
+            return
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(_COLUMNS)
+            for status, method, lines, words, size, url in self._collect_rows():
+                writer.writerow([status, method, lines, words, size, url])
+
+    def _update_count(self, n: int) -> None:
+        if n == 0:
+            self._count.setText(
+                "No discovered URLs yet — run feroxbuster / gobuster in Content discovery."
+            )
+        else:
+            self._count.setText(
+                f"{n} discovered URL(s) on port {self._port} — double-click a row to open it in "
+                "the browser, or Export CSV."
+            )
+
+
+def _int(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return 0
+    return 0

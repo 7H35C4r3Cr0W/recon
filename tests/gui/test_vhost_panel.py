@@ -92,7 +92,12 @@ def test_tool_panel_shows_vhost_tab_and_enumerate(qtbot: QtBot, tmp_path: Path) 
     tp.set_profile(_profile(tmp_path))
     tp.show_service(DiscoveredService(80, Proto.TCP, "http"), _ref())
     assert tp._stack.currentWidget() is tp._web_tabs
-    assert tp._web_tabs.count() == 2  # content discovery + vhosts
+    assert tp._web_tabs.count() == 3  # content discovery + discovered URLs + vhosts
+    assert [tp._web_tabs.tabText(i) for i in range(3)] == [
+        "Content discovery",
+        "Discovered URLs",
+        "Vhosts",
+    ]
     tp.enumerate_http("admin.example.com")
     assert tp._web_tabs.currentWidget() is tp._http
     assert "admin.example.com" in tp._http._url.text()

@@ -2216,6 +2216,7 @@ class MainWindow(QMainWindow):
                 self._tool_panel.append_output(
                     f"[findings] +{len(hits)} from {tool} -> findings.json"
                 )
+                self._tool_panel.refresh_discovered_urls()  # grow the URL table live
         if detect_wordpress(text) and profile is self._profile:
             self._tool_panel.append_output(
                 "[wordpress] detected — follow-up: "
