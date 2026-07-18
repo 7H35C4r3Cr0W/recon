@@ -273,6 +273,57 @@ def test_notable_findings_are_flagged(tmp_path: Path) -> None:
     assert finds["user: administrator"]["category"] == "info"
 
 
+def test_http_and_vhost_findings_get_descriptive_labels(tmp_path: Path) -> None:
+    # findings without kind/value (http content-discovery, whatweb fingerprint, vhost) must NOT all
+    # collapse to a bare "finding" in the graph/summary — each gets a distinct, readable label.
+    prof = Profile.create(tmp_path, "b", Target(ip="10.129.95.184"))
+    prof.set_services([DiscoveredService(80, Proto.TCP, "http")])
+    findings_mod.add_findings(
+        prof.directory,
+        [
+            # content-discovery URL: status + path is the signal (note empty)
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/login/login.php.swp",
+                "status": 200,
+                "note": "",
+                "method": "GET",
+                "discovered_at": "t",
+            },
+            # a redirect keeps its target in the label
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/login",
+                "status": 301,
+                "redirect_to": "http://10.129.95.184/login/",
+                "note": "",
+                "discovered_at": "t",
+            },
+            # whatweb fingerprint: status/path are noise ("/"), the note carries the stack
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/",
+                "status": 200,
+                "note": "whatweb: Apache[2.4.29], Email[info@base.htb]",
+                "discovered_at": "t",
+            },
+            # vhost finding: hostname + status
+            {"module": "vhost", "vhost": "admin.base.htb", "status": 200, "discovered_at": "t"},
+        ],
+    )
+    labels = {
+        n["data"]["label"] for n in build_elements(prof)["nodes"] if n["data"]["type"] == "finding"
+    }
+    assert "200 /login/login.php.swp" in labels
+    assert "301 /login → http://10.129.95.184/login/" in labels
+    assert "whatweb: Apache[2.4.29], Email[info@base.htb]" in labels
+    assert "admin.base.htb [200]" in labels
+    assert "finding" not in labels  # no bare fallback
+
+
 def test_edb_reference_finding_is_not_highlighted_as_a_weakness(tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.1"))
     prof.set_services([DiscoveredService(22, Proto.TCP, "ssh")])

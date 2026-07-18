@@ -22,6 +22,33 @@ def _service_id(port: int, proto: str) -> str:
     return f"service-{port}-{proto}"
 
 
+def _finding_label(finding: dict[str, Any]) -> str:
+    # a finding's display label spans several shapes: smb/ftp/ssh/dns carry kind+value
+    # ("share: IT"); vhost carries a hostname (+status); http content-discovery carries status+path
+    # ("200 /login/login.php.swp"); http fingerprint/nikto carry a note. Pick the richest field
+    # available so the graph/summary never shows a wall of indistinguishable "finding" rows.
+    kind = str(finding.get("kind", ""))
+    if kind:
+        return f"{kind}: {finding.get('value', '')}".strip()
+    vhost = str(finding.get("vhost", ""))
+    if vhost:
+        status = finding.get("status")
+        return f"{vhost} [{status}]" if status else vhost
+    # http fingerprint / nikto / wpscan carry the signal in `note` (whatweb plugins, OSVDB message,
+    # "WordPress 5.2"); content-discovery leaves note empty and the status+path IS the signal
+    # ("200 /login/login.php.swp"). So prefer note, then status+path.
+    note = str(finding.get("note", ""))
+    if note:
+        return note
+    path = str(finding.get("path", ""))
+    status = finding.get("status")
+    if path and isinstance(status, int) and status:
+        redirect = str(finding.get("redirect_to", ""))
+        return f"{status} {path} → {redirect}" if redirect else f"{status} {path}"
+    value = str(finding.get("value", ""))
+    return value or path or "finding"
+
+
 def _edge(source: str, target: str, edge_type: str, eid: str, label: str = "") -> dict[str, Any]:
     data: dict[str, Any] = {"id": eid, "source": source, "target": target, "type": edge_type}
     if label:
@@ -91,7 +118,7 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
         value = str(finding.get("value", ""))
         module = str(finding.get("module", ""))
         detail = str(finding.get("detail", ""))
-        label = f"{kind}: {value}" if kind else (value or "finding")
+        label = _finding_label(finding)
         category = finding_severity.classify(kind, value, detail)
         extra: dict[str, Any] = {"module": module, "detail": detail, "category": category}
         if finding_severity.is_notable(category):
