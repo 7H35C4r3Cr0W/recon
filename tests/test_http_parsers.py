@@ -186,3 +186,19 @@ def test_parse_tool_dispatch_and_garbage() -> None:
     assert parse_whatweb("not json", 80) == []
     assert parse_wpscan("[]", 80) == []
     assert detect_wordpress("nginx 1.18") is False
+
+
+def test_is_source_disclosure_flags_swap_backup_vcs() -> None:
+    from oscprecon.modules.http.parsers import is_source_disclosure
+
+    assert is_source_disclosure("/login/login.php.swp")  # HTB Base — the box's key signal
+    assert is_source_disclosure("/index.php.bak")
+    assert is_source_disclosure("/config.old")
+    assert is_source_disclosure("/.git/HEAD")
+    assert is_source_disclosure("/db/dump.sql")
+    assert is_source_disclosure("/app/index.php~")
+    # normal pages / dirs are NOT source disclosures
+    assert not is_source_disclosure("/config.php")  # executes, doesn't leak source
+    assert not is_source_disclosure("/index.php")
+    assert not is_source_disclosure("/login/")
+    assert not is_source_disclosure("/assets/js/main.js")

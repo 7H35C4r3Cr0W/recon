@@ -22,6 +22,7 @@ from oscprecon import findings as findings_mod
 from oscprecon.gui.theme import tokens
 from oscprecon.models import DiscoveredService
 from oscprecon.modules.http import default_url, is_tls
+from oscprecon.modules.http.parsers import is_source_disclosure
 from oscprecon.profile import Profile
 
 # Clean, sortable "site map" of what a content-discovery run found on the current web port — the
@@ -92,7 +93,7 @@ class DiscoveredUrlsPanel(QWidget):
         self._table.setRowCount(0)
         rows = self._collect_rows()
         pal = tokens.palette(self._theme)
-        for status, method, lines, words, size, url in rows:
+        for status, method, lines, words, size, url, is_src in rows:
             r = self._table.rowCount()
             self._table.insertRow(r)
             self._table.setItem(r, 0, self._status_item(status, pal))
@@ -100,22 +101,23 @@ class DiscoveredUrlsPanel(QWidget):
             self._table.setItem(r, 2, self._num_item(lines))
             self._table.setItem(r, 3, self._num_item(words))
             self._table.setItem(r, 4, self._num_item(size))
-            self._table.setItem(r, _URL_COL, self._url_item(url, pal))
+            self._table.setItem(r, _URL_COL, self._url_item(url, pal, is_src))
         self._table.setSortingEnabled(True)
         # deterministic, recon-useful default: 200s first (found pages), then the rest by status.
         # The user can re-sort by any column.
         self._table.sortItems(0, Qt.SortOrder.AscendingOrder)
-        self._update_count(len(rows))
+        self._update_count(len(rows), sum(1 for row in rows if row[6]))
         self._export_btn.setEnabled(bool(rows))
 
-    def _collect_rows(self) -> list[tuple[int, str, int, int, int, str]]:
+    def _collect_rows(self) -> list[tuple[int, str, int, int, int, str, bool]]:
         # one row per discovered URL on the CURRENT web port — the dir-buster findings (status +
-        # path), not the whatweb fingerprint note. Deduped by (status, path); newest run wins.
+        # path), not the whatweb fingerprint note. Deduped by (status, path); newest run wins. The
+        # trailing bool marks a source/backup/VCS disclosure (.swp/.bak/.git/~) — flagged loud.
         if self._profile is None or self._port == 0:
             return []
         host = self._profile.target.host
         base = default_url(host, self._port, self._tls).rstrip("/")
-        by_key: dict[tuple[int, str], tuple[int, str, int, int, int, str]] = {}
+        by_key: dict[tuple[int, str], tuple[int, str, int, int, int, str, bool]] = {}
         for f in findings_mod.load_findings(self._profile.directory):
             if f.get("module") != "http" or f.get("port") != self._port:
                 continue
@@ -132,6 +134,7 @@ class DiscoveredUrlsPanel(QWidget):
                 _int(f.get("words")),
                 _int(f.get("size")),
                 base + path,
+                is_source_disclosure(path),
             )
         return sorted(by_key.values(), key=lambda r: (r[0], r[_URL_COL]))
 
@@ -150,11 +153,18 @@ class DiscoveredUrlsPanel(QWidget):
             item.setForeground(QBrush(QColor(colour)))
         return item
 
-    def _url_item(self, url: str, pal: tokens.Palette) -> QTableWidgetItem:
-        item = QTableWidgetItem(url)
+    def _url_item(self, url: str, pal: tokens.Palette, is_src: bool = False) -> QTableWidgetItem:
+        # source/backup/VCS disclosures (login.php.swp, .git/, *.bak) get a ⚠ + warning colour so
+        # they stand out among ordinary 200s; the plain URL still opens/copies via the role.
+        item = QTableWidgetItem(f"⚠ {url}" if is_src else url)
         item.setData(_URL_ROLE, url)
-        item.setForeground(QBrush(QColor(pal.accent)))  # looks like a link
-        item.setToolTip("Double-click to open in the browser")
+        item.setForeground(QBrush(QColor(pal.warning if is_src else pal.accent)))
+        item.setToolTip(
+            "⚠ source / backup / VCS disclosure — download and read it (may leak source or "
+            "credentials). Double-click to open."
+            if is_src
+            else "Double-click to open in the browser"
+        )
         return item
 
     # --- interactions -------------------------------------------------------------------------
@@ -198,19 +208,24 @@ class DiscoveredUrlsPanel(QWidget):
         with open(path, "w", newline="", encoding="utf-8") as fh:
             writer = csv.writer(fh)
             writer.writerow(_COLUMNS)
-            for status, method, lines, words, size, url in self._collect_rows():
+            for status, method, lines, words, size, url, _is_src in self._collect_rows():
                 writer.writerow([status, method, lines, words, size, url])
 
-    def _update_count(self, n: int) -> None:
+    def _update_count(self, n: int, source_disclosures: int = 0) -> None:
         if n == 0:
             self._count.setText(
                 "No discovered URLs yet — run feroxbuster / gobuster in Content discovery."
             )
-        else:
-            self._count.setText(
-                f"{n} discovered URL(s) on port {self._port} — double-click a row to open it in "
-                "the browser, or Export CSV."
-            )
+            return
+        extra = (
+            f"  —  ⚠ {source_disclosures} source/backup file(s) flagged"
+            if source_disclosures
+            else ""
+        )
+        self._count.setText(
+            f"{n} discovered URL(s) on port {self._port} — double-click a row to open it in "
+            f"the browser, or Export CSV.{extra}"
+        )
 
 
 def _int(value: object) -> int:

@@ -95,3 +95,45 @@ def test_export_csv_writes_the_rows(qtbot: QtBot, tmp_path: Path, monkeypatch) -
     rows = list(csv.reader(out.open()))
     assert rows[0] == ["Status", "Method", "Lines", "Words", "Bytes", "URL"]
     assert ["200", "GET", "377", "738", "12100", "http://10.129.34.153/index.php"] in rows
+
+
+def test_source_disclosure_row_is_flagged(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = Profile.create(tmp_path, "b", Target(ip="10.129.95.184"))
+    findings_mod.add_findings(
+        prof.directory,
+        [
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/login/login.php.swp",
+                "status": 200,
+                "size": 3210,
+                "method": "GET",
+                "discovered_at": "t",
+            },
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/index.php",
+                "status": 200,
+                "discovered_at": "t",
+            },
+        ],
+    )
+    panel = DiscoveredUrlsPanel("dark")
+    qtbot.addWidget(panel)
+    panel.set_profile(prof)
+    panel.configure(DiscoveredService(80, Proto.TCP, "http"))
+
+    # the .swp row is marked source-disclosure (7th tuple element); index.php is not
+    rows = {r[5]: r[6] for r in panel._collect_rows()}
+    assert rows["http://10.129.95.184/login/login.php.swp"] is True
+    assert rows["http://10.129.95.184/index.php"] is False
+
+    # displayed with a ⚠ prefix, but the plain URL still opens/copies
+    swp_row = next(
+        r for r in range(panel._table.rowCount()) if panel._row_url(r).endswith("login.php.swp")
+    )
+    assert panel._table.item(swp_row, 5).text().startswith("⚠")
+    assert panel._row_url(swp_row) == "http://10.129.95.184/login/login.php.swp"
+    assert "source/backup" in panel._count.text()

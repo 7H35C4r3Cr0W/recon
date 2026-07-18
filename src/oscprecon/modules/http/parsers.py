@@ -54,6 +54,42 @@ def _path_of(url: str) -> str:
     return urlsplit(url).path or "/"
 
 
+# a discovered file whose mere presence is a source / backup / VCS disclosure — worth flagging loud
+# (HTB Base: /login/login.php.swp leaks the login source). Matched on the last extension
+# (login.php.swp -> swp), a trailing ~ (editor backup), or a .git/.svn/.hg path.
+_SOURCE_DISCLOSURE_EXT = frozenset(
+    {
+        "swp",
+        "swo",
+        "swn",
+        "bak",
+        "old",
+        "orig",
+        "save",
+        "sav",
+        "backup",
+        "phps",
+        "inc",
+        "dist",
+        "sql",
+    }
+)
+_VCS_MARKERS = ("/.git", "/.svn", "/.hg", "/.bzr")
+
+
+def is_source_disclosure(path: str) -> bool:
+    low = path.lower().rstrip("/")
+    if not low or low == "/":
+        return False
+    if low.endswith("~"):
+        return True
+    if any(marker in low for marker in _VCS_MARKERS):
+        return True
+    name = low.rsplit("/", 1)[-1]
+    ext = name.rsplit(".", 1)[-1] if "." in name else ""
+    return ext in _SOURCE_DISCLOSURE_EXT
+
+
 _SIZE_UNITS = (("KB", 1024), ("MB", 1024 * 1024), ("GB", 1024 * 1024 * 1024), ("B", 1))
 
 

@@ -33,6 +33,7 @@ matching the official write-up, and the result is checked pane-by-pane.
 | 22 | **Unified** (Tier II) | 10.129.34.143 | http/8080 + **8443/https-alt (UniFi Network 6.4.54)** + ssh/22 + 6789/8843/8880 | UniFi/Log4Shell box: 8443 handled as HTTPS on a non-standard port; whatweb identifies `Title[UniFi Network]`; version 6.4.54 lives at the unauth `/status` JSON (searchsploit UniFi empty); drove the money ports without waiting on `-p-`. Log4Shell→rogue-JNDI→Mongo hash swap→SSH root all manual | **whatweb parser dropped plugin VALUES** (`Title[UniFi Network]`→`Title`) **+ HTTP fingerprint produced no findings** (whatweb ran raw, never parsed): fixed the parser to keep values **+ added a Fingerprint button** wiring whatweb into structured findings; added a `/status` Tier-2 follow-up | `79a9e2e` |
 | 23 | **Included** (Tier II) | 10.129.95.185 | **80/tcp (Apache 2.4.29, LFI `?file=`)** + **69/udp TFTP** + 68/udp | First explicit **attack-coverage** pass: whatweb fingerprint surfaces Apache 2.4.29 + the `?file=` LFI sink; UDP scan finds 69/tftp; exploit tab has the full web-LFI chain + `tftp PUT webshell (chain with LFI)`. LFI→TFTP-upload→RCE→`su mike`→lxd root all manual | **exploit present-marker over-matched** (port 80 → ~70 "present" web apps): fixed so a shared web port alone doesn't mark a specific app present (→ 3 present); fixed `tftp`→`ftp` name substring; **added lxd/docker group-membership privesc** (the root, was missing); fixed a false not-found warning on portless privesc catalogs | `ff19fe3` |
 | 24 | **Markup** (Tier II) | 10.129.34.153 | ssh/22 + **80/443 (Apache 2.4.41 Win64 / PHP 7.2.28, XXE)** | **recon + attack**: fingerprint surfaces the full Apache/PHP stack; EDB apache-2.4 12★; exploit tab present=`[ssh,web,webdav]` with the whole chain covered — web `xxe-file-read` + windows `scheduled-task-hijack` ("overwrite writable task script" = the `job.bat` privesc) + `icacls-path-check`. Graph renders. XXE→SSH-key→job.bat→SYSTEM all manual | **clean box (no bug)** — deliverable was the requested **"Discovered URLs" table**: a sortable Status·Method·Lines·Words·Bytes·URL view of dir-bust results, colour-coded, double-click-to-open, Export CSV; feroxbuster parser now captures method/lines/words | `0ae71f5` |
+| 25 | **Base** (Tier II) | 10.129.95.184 | ssh/22 + **80 (Apache 2.4.29, PHP; listable /login → login.php.swp)** | **recon + attack** (2-agent Workflow + live): fingerprint surfaces Apache 2.4.29 + `Email[info@base.htb]`; listable `/login/` exposes `login.php.swp`; attack chain covered except the **strcmp type-juggling foothold**. strcmp-bypass→webshell→config.php→ssh john→`sudo find` root all manual | **added the missing foothold** (`php-type-juggle-array-auth-bypass` + magic-hash sibling, new Auth-bypass category) + **source-disclosure flag** (`is_source_disclosure`: `.swp`/`.bak`/`.git`/`~` → ⚠ in the Discovered URLs table). Plus wrote **`BOX-REVIEW-SOP.md`** | _pending_ |
 
 ## Per-box notes
 
@@ -483,6 +484,38 @@ the stream (operators read it live) but also parse it into a clean, sortable, cl
 table so the findings are something you can *act on*, not just scroll. And when a box is genuinely
 clean (recon + attack both covered), that's a valid outcome — mark it down and move on rather than
 inventing a fix.
+
+**25 · Base (HTB Starting Point, Tier II) — http PHP (strcmp bypass → webshell → sudo find) — recon
++ attack — live.** `10.129.95.184`. Linux: 22/ssh + **80 (Apache 2.4.29 (Ubuntu), PHP)**. The chain:
+a **listable `/login/`** dir exposes **`login.php.swp`** (Vim swap → source disclosure) → the source
+shows a `strcmp()==0` login → **type-juggling array bypass** (`username[]=admin&password[]=x`) → PHP
+upload webshell → RCE → `config.php` creds → SSH as john → **`sudo find` GTFOBins** → root. Verified
+the code with a 2-agent **Workflow** (attack-coverage + recon-angles) alongside the live drive.
+- **Recon:** the Fingerprint surfaces `Apache[2.4.29]` + **`Email[info@base.htb]`** (value-preservation
+  fix again); the listable `/login/` autoindex directly exposes `config.php` + `login.php.swp` (both
+  200). Content discovery fills the Discovered URLs table (94 URLs on Base).
+- **Attack — one real gap, filled.** The webshell chain (`upload-php-webshell-file` →
+  `upload-curl-multipart` → `webshell-trigger-rce`) and **`sudo-find`** (`sudo find . -exec /bin/sh \;
+  -quit`) were already in the catalog. **Missing: the strcmp/type-juggling auth bypass — Base's
+  foothold and a recurring PHP/OSCP pattern.** Added **`php-type-juggle-array-auth-bypass`**
+  (`curl … --data "username[]=admin&password[]=x"`) + a **`php-magic-hash-type-juggle`** sibling
+  (0e loose-`==`), both a new **Auth bypass** category in `web.py`, victim-side/copy-only, sourced to
+  HackTricks.
+- **Recon fix — flag leaked source.** Nothing marked a `.swp`/`.bak`/`.git` as notable — `login.php.swp`
+  looked like any 200. Added **`is_source_disclosure()`** (swap/backup/VCS extensions + `~` + `.git`
+  paths) and the **Discovered URLs table now flags those rows with a ⚠ + warning colour** and a
+  count ("⚠ 1 source/backup file(s) flagged") so the leaked-source file jumps out. The plain URL still
+  opens/copies.
+- **New deliverable:** wrote **`boxes/BOX-REVIEW-SOP.md`** — the standing box-review procedure (the
+  recon→attack→bugs→UI/graph→fix→mark-down→docs→gates→commit loop + every standing preference) so
+  the owner doesn't have to repeat the instructions each box.
+- Everything past enum — the type-juggling login bypass, the webshell upload, the `config.php` creds,
+  the SSH-as-john, the `sudo find` root — is **manual exploitation**.
+
+**Lesson:** the box's *foothold* technique can be missing even when the flashy steps (webshell, privesc)
+are covered — walk the WHOLE chain, first link included. And "content discovery found 94 URLs" is only
+useful if the *one* that matters (a leaked `.swp`) is made to stand out — flag source/backup/VCS
+disclosures, don't drown them in font files.
 
 ## Trends & lessons (adapt going forward)
 
