@@ -8,12 +8,12 @@
 
 - description: "Single root:'' login (mysql client)"
   why: "one attempt with root + empty password — best run in a terminal, no wordlist"
-  command: "mysql -h {target} -u root"
+  command: "mysql -h {target} -P {port} -u root"
 # source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
 
 - description: "Single root:root default-cred check (mysql client)"
   why: "one attempt with the classic default credential — not a list"
-  command: "mysql -h {target} -u root -proot"
+  command: "mysql -h {target} -P {port} -u root -proot"
 # source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)
 
 - description: "Server variables (nmap NSE, needs creds)"
@@ -30,6 +30,6 @@
 
 - description: "List databases (requires working creds)"
   why: "read-only SQL query once a login works — confirms what we can read, not exploitation"
-  command: "mysql -h {target} -u {user} -p{password} -e 'SHOW DATABASES;'"
+  command: "mysql -h {target} -P {port} -u {user} -p{password} -e 'SHOW DATABASES;'"
   requires: ["creds"]
 # source: Obsidian: 0.01 Cheatsheets/All_In_One (ports/services goldmine)

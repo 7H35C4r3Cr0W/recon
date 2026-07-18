@@ -85,7 +85,7 @@ You can enumerate domain users through MSSQL by brute-forcing RIDs (Relative Ide
 nxc mssql <IP> --local-auth -u <username> -p '<password>' --rid-brute 5000
 
 # Examples:
-nxc mssql 10.129.234.50 --local-auth -u sqlguest -p 'zDPBpaF4FywlqIv11vii' --rid-brute 5000
+nxc mssql <IP> --local-auth -u sqlsvc -p '<password>' --rid-brute 5000
 nxc mssql 10.10.10.59 -u sa -p 'P@ssw0rd' --rid-brute 10000
 
 # Without --local-auth for domain accounts
@@ -96,12 +96,12 @@ Expected output:
 
 ```
 [snippet]
-MSSQL                    10.129.234.50   1433   DC               1104: REDELEGATE\Christine.Flanders
-MSSQL                    10.129.234.50   1433   DC               1105: REDELEGATE\Marie.Curie
-MSSQL                    10.129.234.50   1433   DC               1106: REDELEGATE\Helen.Frost
-MSSQL                    10.129.234.50   1433   DC               1107: REDELEGATE\Michael.Pontiac
-MSSQL                    10.129.234.50   1433   DC               1108: REDELEGATE\Mallory.Roberts
-MSSQL                    10.129.234.50   1433   DC               1109: REDELEGATE\James.Dinkleberg
+MSSQL                    <IP>            1433   DC               1104: CORP\jsmith
+MSSQL                    <IP>            1433   DC               1105: CORP\adunn
+MSSQL                    <IP>            1433   DC               1106: CORP\svc_sql
+MSSQL                    <IP>            1433   DC               1107: CORP\bwilson
+MSSQL                    <IP>            1433   DC               1108: CORP\mpatel
+MSSQL                    <IP>            1433   DC               1109: CORP\svc_backup
 [snippet]
 ```
 

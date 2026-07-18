@@ -3,6 +3,8 @@ from pathlib import Path
 from oscprecon import manual_commands
 from oscprecon.modules import ftp as ftp_pkg
 from oscprecon.modules import http as http_pkg
+from oscprecon.modules import mssql as mssql_pkg
+from oscprecon.modules import mysql as mysql_pkg
 from oscprecon.modules import smb as smb_pkg
 from oscprecon.modules import vhost as vhost_pkg
 
@@ -10,6 +12,8 @@ HTTP_YAML = Path(http_pkg.__file__).parent / "manual_commands.yaml"
 VHOST_YAML = Path(vhost_pkg.__file__).parent / "manual_commands.yaml"
 SMB_YAML = Path(smb_pkg.__file__).parent / "manual_commands.yaml"
 FTP_YAML = Path(ftp_pkg.__file__).parent / "manual_commands.yaml"
+MSSQL_YAML = Path(mssql_pkg.__file__).parent / "manual_commands.yaml"
+MYSQL_YAML = Path(mysql_pkg.__file__).parent / "manual_commands.yaml"
 
 
 def test_http_manual_commands_load() -> None:
@@ -71,6 +75,26 @@ def test_ftp_manual_commands_are_tier2_legal() -> None:
     # only §2-allowed clients
     for tool in ("hydra", "medusa", "ncrack"):
         assert tool not in joined
+
+
+def test_db_client_follow_ups_bind_the_discovered_port() -> None:
+    # regression: a DB on a NON-standard port (e.g. MSSQL 49932, a named-instance dynamic port) must
+    # be reached on THAT port — every netexec/impacket-mssqlclient / mysql-client follow-up must
+    # carry {port}, else it silently falls back to the tool's default (1433 / 3306) and the real
+    # login is never tested.
+    for yaml_path, client_tokens in (
+        (MSSQL_YAML, ("netexec mssql", "impacket-mssqlclient")),
+        (MYSQL_YAML, ("mysql -h",)),
+    ):
+        for cmd in (c.command for c in manual_commands.load_manual_commands(yaml_path)):
+            if any(tok in cmd for tok in client_tokens):
+                assert "{port}" in cmd, cmd
+        # a concrete non-standard port must actually appear once expanded
+        expanded = [
+            manual_commands.expand(c.command, target="10.0.0.5", port=49932)
+            for c in manual_commands.load_manual_commands(yaml_path)
+        ]
+        assert any("49932" in e for e in expanded)
 
 
 def test_load_missing(tmp_path: Path) -> None:

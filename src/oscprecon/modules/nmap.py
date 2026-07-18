@@ -124,9 +124,13 @@ class NmapModule(Module):
                 top1000,
                 Command(
                     "nmap",
-                    f"nmap -p- {host}",
-                    "Full 65535-port TCP sweep — catches services on odd ports.",
-                    "5-15 min",
+                    # -T4 keeps the full sweep from crawling on a remote target (a plain `-p-` over
+                    # a VPN can run 20-40 min) while staying reliable on a lab link — the money port
+                    # is sometimes ONLY here (e.g. MSSQL 1433 outside the top-1000). Exam-legal:
+                    # timing only, no --script. `exam` adds --min-rate 1000 for maximum speed.
+                    f"nmap -p- -T4 {host}",
+                    "Full 65535-port TCP sweep — catches services on odd ports (speed-tuned).",
+                    "3-10 min",
                     "nmap/tcp-full.txt",
                 ),
                 udp_top100,
