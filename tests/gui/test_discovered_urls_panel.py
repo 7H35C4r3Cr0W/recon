@@ -97,6 +97,97 @@ def test_export_csv_writes_the_rows(qtbot: QtBot, tmp_path: Path, monkeypatch) -
     assert ["200", "GET", "377", "738", "12100", "http://10.129.34.153/index.php"] in rows
 
 
+def _mixed_profile(tmp_path: Path) -> Profile:
+    prof = Profile.create(tmp_path, "mix", Target(ip="10.129.95.184"))
+    findings_mod.add_findings(
+        prof.directory,
+        [
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/login.php",
+                "status": 200,
+                "discovered_at": "t",
+            },
+            {"module": "http", "port": 80, "path": "/admin", "status": 403, "discovered_at": "t"},
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/assets/style.css",
+                "status": 200,
+                "discovered_at": "t",
+            },
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/assets/app.js",
+                "status": 200,
+                "discovered_at": "t",
+            },
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/img/logo.png",
+                "status": 200,
+                "discovered_at": "t",
+            },
+        ],
+    )
+    return prof
+
+
+def _visible_urls(panel: DiscoveredUrlsPanel) -> set[str]:
+    return {
+        panel._row_url(r) for r in range(panel._table.rowCount()) if not panel._table.isRowHidden(r)
+    }
+
+
+def test_hide_static_assets_toggle(qtbot: QtBot, tmp_path: Path) -> None:
+    panel = DiscoveredUrlsPanel("dark")
+    qtbot.addWidget(panel)
+    panel.set_profile(_mixed_profile(tmp_path))
+    panel.configure(DiscoveredService(80, Proto.TCP, "http"))
+
+    assert panel._table.rowCount() == 5  # rows are never removed, only hidden
+    assert len(_visible_urls(panel)) == 5
+
+    panel._hide_static.setChecked(True)
+    visible = _visible_urls(panel)
+    assert visible == {"http://10.129.95.184/login.php", "http://10.129.95.184/admin"}
+    assert "2 of 5 (filtered)" in panel._count.text()  # css/js/png hidden
+
+
+def test_filter_box_narrows_rows(qtbot: QtBot, tmp_path: Path) -> None:
+    panel = DiscoveredUrlsPanel("dark")
+    qtbot.addWidget(panel)
+    panel.set_profile(_mixed_profile(tmp_path))
+    panel.configure(DiscoveredService(80, Proto.TCP, "http"))
+
+    panel._filter.setText(".php")
+    assert _visible_urls(panel) == {"http://10.129.95.184/login.php"}
+
+    panel._filter.setText("403")  # filter matches the status column too
+    assert _visible_urls(panel) == {"http://10.129.95.184/admin"}
+
+
+def test_export_csv_respects_cleaned_view(qtbot: QtBot, tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    panel = DiscoveredUrlsPanel("dark")
+    qtbot.addWidget(panel)
+    panel.set_profile(_mixed_profile(tmp_path))
+    panel.configure(DiscoveredService(80, Proto.TCP, "http"))
+    panel._hide_static.setChecked(True)
+
+    out = tmp_path / "clean.csv"
+    monkeypatch.setattr(
+        "oscprecon.gui.widgets.discovered_urls_panel.QFileDialog.getSaveFileName",
+        lambda *a, **k: (str(out), "CSV (*.csv)"),
+    )
+    panel._export_csv()
+    exported = {row[5] for row in csv.reader(out.open())}
+    assert "http://10.129.95.184/login.php" in exported
+    assert "http://10.129.95.184/assets/style.css" not in exported  # static rows excluded
+
+
 def test_source_disclosure_row_is_flagged(qtbot: QtBot, tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.129.95.184"))
     findings_mod.add_findings(

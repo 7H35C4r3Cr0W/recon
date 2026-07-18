@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import csv
+from urllib.parse import urlsplit
 
 from PySide6.QtCore import QPoint, Qt, QUrl
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QMenu,
     QPushButton,
     QTableWidget,
@@ -28,10 +31,31 @@ from oscprecon.profile import Profile
 # Clean, sortable "site map" of what a content-discovery run found on the current web port — the
 # excel-sheet view the raw feroxbuster/gobuster stream can't give: one row per URL, real columns,
 # clickable to open in the browser, exportable to CSV. Reads the accumulated http findings
-# (persisted across runs) so it grows as you dir-bust; the raw output pane is untouched.
+# (persisted across runs) so it grows as you dir-bust; the raw output pane is untouched. A live
+# Filter box and a "hide static assets" toggle make the interesting URLs easy to find in a sea of
+# js/css/image rows (the operator's real pain — "finding sites in the raw output is a pain").
 _COLUMNS = ("Status", "Method", "Lines", "Words", "Bytes", "URL")
 _URL_COL = 5
 _URL_ROLE = int(Qt.ItemDataRole.UserRole)
+
+# a discovered path whose extension is a static web asset (script/style/image/font/media) — noise
+# when you are hunting for app endpoints, so the "hide static assets" toggle drops these rows.
+_STATIC_EXT = frozenset(
+    {
+        "js", "mjs", "cjs", "jsx", "ts", "map",
+        "css", "scss", "less",
+        "png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "tif", "tiff",
+        "woff", "woff2", "ttf", "eot", "otf",
+        "mp4", "webm", "mp3", "ogg", "wav", "avi", "mov",
+    }
+)  # fmt: skip
+
+
+def _is_static_asset(url: str) -> bool:
+    path = (urlsplit(url).path or "").lower().rstrip("/")
+    name = path.rsplit("/", 1)[-1]
+    ext = name.rsplit(".", 1)[-1] if "." in name else ""
+    return ext in _STATIC_EXT
 
 
 class DiscoveredUrlsPanel(QWidget):
@@ -41,19 +65,35 @@ class DiscoveredUrlsPanel(QWidget):
         self._port = 0
         self._tls = False
         self._theme = theme_name
+        self._flagged_total = 0
 
         self._count = QLabel("")
         self._count.setWordWrap(True)
         self._refresh_btn = QPushButton("Refresh")
         self._refresh_btn.clicked.connect(self.refresh)
         self._export_btn = QPushButton("Export CSV")
-        self._export_btn.setToolTip("Save the table as a .csv (opens in Excel / LibreOffice)")
+        self._export_btn.setToolTip("Save the shown rows as a .csv (opens in Excel / LibreOffice)")
         self._export_btn.clicked.connect(self._export_csv)
         self._export_btn.setEnabled(False)
         top = QHBoxLayout()
         top.addWidget(self._count, stretch=1)
         top.addWidget(self._refresh_btn)
         top.addWidget(self._export_btn)
+
+        # find-a-site controls: a live substring filter (URL / status / method) + a noise toggle
+        self._filter = QLineEdit()
+        self._filter.setClearButtonEnabled(True)
+        self._filter.setPlaceholderText("Filter URLs… (e.g. .php, admin, 200, login)")
+        self._filter.textChanged.connect(self._apply_visibility)
+        self._hide_static = QCheckBox("Hide static assets (js/css/img/fonts)")
+        self._hide_static.setToolTip(
+            "Hide script/style/image/font/media rows so app endpoints stand out"
+        )
+        self._hide_static.toggled.connect(self._apply_visibility)
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel("Filter:"))
+        filter_row.addWidget(self._filter, stretch=1)
+        filter_row.addWidget(self._hide_static)
 
         self._table = QTableWidget(0, len(_COLUMNS))
         self._table.setHorizontalHeaderLabels(list(_COLUMNS))
@@ -70,8 +110,9 @@ class DiscoveredUrlsPanel(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addLayout(top)
+        layout.addLayout(filter_row)
         layout.addWidget(self._table, stretch=1)
-        self._update_count(0)
+        self._set_count_text(0, 0, 0)
 
     # --- wiring -------------------------------------------------------------------------------
     def set_theme(self, theme_name: str) -> None:
@@ -106,8 +147,34 @@ class DiscoveredUrlsPanel(QWidget):
         # deterministic, recon-useful default: 200s first (found pages), then the rest by status.
         # The user can re-sort by any column.
         self._table.sortItems(0, Qt.SortOrder.AscendingOrder)
-        self._update_count(len(rows), sum(1 for row in rows if row[6]))
+        self._flagged_total = sum(1 for row in rows if row[6])
         self._export_btn.setEnabled(bool(rows))
+        self._apply_visibility()
+
+    def _passes(self, status: str, method: str, url: str) -> bool:
+        # visibility predicate shared by the table (hide/show) and the CSV export (cleaned view).
+        if self._hide_static.isChecked() and _is_static_asset(url):
+            return False
+        needle = self._filter.text().strip().lower()
+        return not needle or needle in f"{status} {method} {url}".lower()
+
+    def _apply_visibility(self) -> None:
+        visible = 0
+        flagged_visible = 0
+        for r in range(self._table.rowCount()):
+            status_item = self._table.item(r, 0)
+            method_item = self._table.item(r, 1)
+            status = status_item.text() if status_item else ""
+            method = method_item.text() if method_item else ""
+            url = self._row_url(r)
+            show = self._passes(status, method, url)
+            self._table.setRowHidden(r, not show)
+            if show:
+                visible += 1
+                item = self._table.item(r, _URL_COL)
+                if item is not None and item.text().startswith("⚠"):
+                    flagged_visible += 1
+        self._set_count_text(self._table.rowCount(), visible, flagged_visible)
 
     def _collect_rows(self) -> list[tuple[int, str, int, int, int, str, bool]]:
         # one row per discovered URL on the CURRENT web port — the dir-buster findings (status +
@@ -205,26 +272,28 @@ class DiscoveredUrlsPanel(QWidget):
         )
         if not path:
             return
+        # export the CLEANED view: only rows the current filter + hide-static toggle keep, so the
+        # exported sheet matches what the operator is looking at.
         with open(path, "w", newline="", encoding="utf-8") as fh:
             writer = csv.writer(fh)
             writer.writerow(_COLUMNS)
             for status, method, lines, words, size, url, _is_src in self._collect_rows():
-                writer.writerow([status, method, lines, words, size, url])
+                if self._passes(str(status), method, url):
+                    writer.writerow([status, method, lines, words, size, url])
 
-    def _update_count(self, n: int, source_disclosures: int = 0) -> None:
-        if n == 0:
+    def _set_count_text(self, total: int, visible: int, flagged_visible: int) -> None:
+        if total == 0:
             self._count.setText(
                 "No discovered URLs yet — run feroxbuster / gobuster in Content discovery."
             )
             return
-        extra = (
-            f"  —  ⚠ {source_disclosures} source/backup file(s) flagged"
-            if source_disclosures
-            else ""
+        flagged = (
+            f"  —  ⚠ {flagged_visible} source/backup file(s) flagged" if flagged_visible else ""
         )
+        shown = f"{visible}" if visible == total else f"{visible} of {total} (filtered)"
         self._count.setText(
-            f"{n} discovered URL(s) on port {self._port} — double-click a row to open it in "
-            f"the browser, or Export CSV.{extra}"
+            f"{shown} discovered URL(s) on port {self._port} — double-click a row to open it in "
+            f"the browser, or Export CSV.{flagged}"
         )
 
 
