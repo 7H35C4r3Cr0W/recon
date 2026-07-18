@@ -104,3 +104,13 @@
   why: "A second discovery engine surfaces paths the raft sweep misses"
   command: "dirsearch -e php,asp,aspx,jsp,txt,conf,config,bak,backup,old,db,sql -u {url}"
 # source: Obsidian: 0.00 Methdology/.../OSCP Random/Random Cheat Sheet.md
+
+- description: "HTTP NSE bundle (title, headers, methods, known-app paths)"
+  why: "http-enum fingerprints known apps/CMSes by path with no wordlist; +title/headers/methods in one read-only pass"
+  command: "nmap -sV --script http-title,http-headers,http-methods,http-enum -p {port} {target}"
+# source: Obsidian: OSCP/Chapter 6 - Information Gathering/Ports and tools.md
+
+- description: "TLS certificate CN/SAN (vhost pivot)"
+  why: "A cert's Subject/SAN often leaks extra internal hostnames — add them to /etc/hosts and enumerate as vhosts"
+  command: "nmap -sV --script ssl-cert -p {port} {target}"
+# source: Obsidian: OSCP/6.2.6 Security Headers and SSL-TLS.md

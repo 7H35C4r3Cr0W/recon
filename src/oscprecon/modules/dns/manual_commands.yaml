@@ -27,6 +27,16 @@
   why: "Map an IP back to a hostname to expand the target picture — recon"
   command: "dig @{target} -x TARGET_IP"
 
+- description: "Reverse-PTR sweep across the /24"
+  why: "PTR records across the subnet reveal internal hostnames + naming conventions — recon"
+  command: "dnsrecon -r {target}/24 -n {target}"
+# source: Obsidian: OSCP/6.3.1 DNS Enumeration.md
+
+- description: "DNSSEC signing check (DNSKEY / RRSIG)"
+  why: "Shows whether the zone is DNSSEC-signed — a quick DNS-deployment fingerprint — recon"
+  command: "dig @{target} {domain} +dnssec +noall +answer"
+# source: Obsidian: OSCP/6.3.1 DNS Enumeration.md
+
 - description: "DC-locator: enumerate every domain controller in the forest"
   why: "The _ldap._tcp.dc._msdcs SRV record lists all DCs — key AD recon"
   command: "dig @{target} _ldap._tcp.dc._msdcs.{domain} SRV +short"
