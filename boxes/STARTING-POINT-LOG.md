@@ -619,6 +619,49 @@ Chain (walkthrough, recon insight only): 80 → `watcher.vl` → subdomain enum 
 (Zabbix on 10050/10051), the recon reference map should recognize it too, or the operator selecting
 that port sees nothing. An unlabeled `tcpwrapped` on a known service port is a recon miss.
 
+**29 · Redelegate (HTB, Hard, Windows AD) — anon-FTP KeePass → MSSQL → ACL/constrained-delegation →
+DCSync — recon + attack review — engine work (no live drive).** `10.129.40.149`, domain
+`redelegate.vl`. A DC with the non-default extras that make the box: **21 anon FTP** (leaks a KeePass
+`.kdbx`), **1433 + a high dynamic MSSQL port** (outside the top-1000), and the usual AD battery
+(53/88/135/139/389/445/464/593/636/3268/3389/5985/9389). Chain (walkthrough, recon insight only — no
+creds reproduced): anon FTP → crack the KeePass DB offline → a stored cred is a **local** MSSQL login
+→ MSSQL-on-a-DC SID/RID enumeration → password-spray reuse → a HelpDesk member with
+**ForceChangePassword** over a second user who can WinRM the DC → that user holds
+**SeEnableDelegationPrivilege** + **GenericAll over the FS01$ machine account** → set
+`msDS-AllowedToDelegateTo` + `TRUSTED_TO_AUTH_FOR_DELEGATION` → **S4U constrained delegation** for a
+CIFS ticket as the DC → **DCSync** → Administrator.
+
+- **Attack-engine build (exam-legal manual tooling):** the walkthrough drives this with Metasploit's
+  `mssql_enum_domain_accounts` (forbidden §2) + BloodyAD. Replaced the MSF RID-brute with **manual
+  T-SQL** — `SUSER_SID` (domain-SID base) → `SUSER_SNAME` (RID→account), the manual
+  `mssql_enum_domain_accounts`, copy-only. Added the AD **ACL + constrained-delegation** surface as
+  generic technique templates: `bloodyAD get writable` / ForceChangePassword (bloodyAD + Samba
+  `net rpc`) / GenericAll add-groupMember / WriteDACL `dacledit` / set-`msDS-AllowedToDelegateTo` /
+  add-`TRUSTED_TO_AUTH_FOR_DELEGATION` / RBCD `rbcd.py`. All single Popen-safe attacker Runs, no
+  CVE/creds, human-confirm guardrail intact. Nmap full sweep `-p- -T4` (the money MSSQL port sits
+  outside the top-1000).
+- **Adversarial review (6 confirmed fixes, find→verify workflow):** (1) `services_present` marked a
+  product-specific module ● present off a bare **shared protocol port** (21/25/110/143…) — extended
+  the web-port weak-signal guard to FTP/SMTP/POP3/IMAP/IPP so a specific product (ProFTPD/Exim/…)
+  needs a name/fingerprint match (§2b strong-signal rule); (2) `ncacn_http`/`http-rpc-epmap` (593
+  RPC-over-HTTP) no longer misclassified as `web`; (3) the exploit panel **auto-parse wiped unsaved
+  loot** after any run (gated on a real parser key + never clears on an empty parse); (4) re-entering
+  the tab **lost the selected service+action** (now preserved); (5) `_run` cleared the output pane
+  **before** the confirm, destroying pasted-but-unparsed output on a cancelled run (deferred to
+  launch); (6) MSSQL/MySQL Tier-2 client follow-ups **omitted `{port}`** → hit default 1433/3306
+  (Redelegate's MSSQL is off-1433). +6 regression tests.
+- **Policy leak scrubbed:** the vendored HackTricks `mssql.md` had **live Redelegate data injected** —
+  the box IP, a real `sqlguest` password, and a `REDELEGATE\<users>` dump — genericized to
+  placeholders (§21: never reproduce a walkthrough's creds/IPs). *The secret remains in git history
+  (commit 37f0d68); a history rewrite is out of scope against pushed/autosync'd commits.*
+- Everything past enumeration — the KeePass crack, the spray, the ACL-abuse Runs, the delegation
+  attack, DCSync — is **manual / human-confirmed, never auto-run**.
+
+**Lesson:** "presence" must stay a strong signal on *every* protocol, not just web — a bare shared
+port (21/25/…) means "a server of this kind", not a specific product. And vendored references are
+still project output: a walkthrough's live creds must never ride in on them. Code changes landed via
+autosync `d2e6a54`; this entry records them.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
