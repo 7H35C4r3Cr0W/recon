@@ -45,6 +45,11 @@ def classify(kind: str, value: str = "", detail: str = "") -> str:
     value_l = value.lower()
     text = f"{value_l} {detail}".lower()
 
+    # a share's mere existence is neutral info, but a guest/anon-WRITABLE share is a real exposure
+    # (upload / print-job / wide-link write vector — HTB Abducted's foothold) — escalate on write.
+    if kind == "share":
+        return EXPOSURE if "write" in text else INFO
+
     # explicit informational / reference kinds win first — never escalate these
     if kind in _INFO_KINDS:
         return INFO

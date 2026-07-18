@@ -233,3 +233,32 @@ def parse_smb_tool(tool: str, text: str) -> list[SmbFinding]:
 
 def readable_shares(findings: list[SmbFinding]) -> list[str]:
     return [f.value for f in findings if f.kind == "share" and "READ" in f.detail]
+
+
+def writable_shares(findings: list[SmbFinding]) -> list[str]:
+    # a guest/anon-WRITABLE share is a real exposure (upload / print-job / wide-link write vector),
+    # surfaced distinctly from a merely-readable one (HTB Abducted: guest-writable printer share).
+    return [f.value for f in findings if f.kind == "share" and "WRITE" in f.detail]
+
+
+def dedup_share_findings(findings: list[SmbFinding]) -> list[SmbFinding]:
+    # the same share is listed by two enum methods — `smbclient -L` (name only, no perms) and
+    # `netexec --shares` (name + READ/WRITE) — so a share otherwise appears twice, once blank and
+    # once with its access. Collapse by name, unioning the access tokens so the WRITE/READ a single
+    # method saw is never lost and the graph/report shows one node per share.
+    access: dict[str, set[str]] = {}
+    order: list[str] = []
+    others: list[SmbFinding] = []
+    for f in findings:
+        if f.kind != "share":
+            others.append(f)
+            continue
+        if f.value not in access:
+            access[f.value] = set()
+            order.append(f.value)
+        access[f.value].update(t for t in re.split(r"[,\s]+", f.detail) if t in ("READ", "WRITE"))
+    merged = [
+        SmbFinding("share", name, ",".join(t for t in ("READ", "WRITE") if t in access[name]))
+        for name in order
+    ]
+    return others + merged

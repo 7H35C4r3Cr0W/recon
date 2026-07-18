@@ -37,12 +37,14 @@ from oscprecon.modules.smb import (
     SmbModule,
     SmbStep,
     anon_credential,
+    dedup_share_findings,
     is_share_peekable,
     netexec_auth_ok,
     parse_smb_tool,
     parse_smbclient_ls,
     readable_shares,
     strip_smbclient_noise,
+    writable_shares,
 )
 from oscprecon.modules.ssh import SshFinding, SshModule, parse_ssh_tool
 from oscprecon.parsing import run_parser
@@ -142,6 +144,9 @@ class SmbReconWorker(CancellableThread):
             # readable share can appear twice — list each once (dict.fromkeys preserves order).
             collected += self._walk_shares(target, method, readable_shares(collected))
 
+        # collapse the same share seen by smbclient -L (name only) + netexec --shares (name + perms)
+        # into one finding, unioning READ/WRITE — else it persists twice (blank + WRITE). [Abducted]
+        collected = dedup_share_findings(collected)
         self._write_findings(collected)
         return SmbReconResult(self._summarize(collected, method), creds)
 
@@ -191,8 +196,11 @@ class SmbReconWorker(CancellableThread):
         if share_findings:
             names = sorted({f.value for f in share_findings})
             readable = set(readable_shares(collected))
+            writable = set(writable_shares(collected))
             summary.append(f"Shares ({len(names)}):")
-            summary.extend(f"  {n}{' [READ]' if n in readable else ''}" for n in names)
+            for n in names:
+                access = [a for a, s in (("READ", readable), ("WRITE", writable)) if n in s]
+                summary.append(f"  {n}" + (f" [{','.join(access)}]" if access else ""))
         share_files = [f.value for f in collected if f.kind == "file"]
         if share_files:
             summary.append(f"Share files ({len(share_files)}):")

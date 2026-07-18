@@ -13,11 +13,13 @@ from oscprecon.modules.peek import peek_snippet as peek_snippet  # re-export
 from oscprecon.modules.smb.parsers import (
     SmbEntry,
     SmbFinding,
+    dedup_share_findings,
     netexec_auth_ok,
     parse_smb_tool,
     parse_smbclient_ls,
     readable_shares,
     strip_smbclient_noise,
+    writable_shares,
 )
 
 __all__ = [
@@ -34,10 +36,12 @@ __all__ = [
     "is_share_peekable",
     "netexec_auth_ok",
     "parse_smb_tool",
+    "dedup_share_findings",
     "parse_smbclient_ls",
     "peek_snippet",
     "readable_shares",
     "strip_smbclient_noise",
+    "writable_shares",
     "to_backslash_command",
     "to_escaped_command",
 ]

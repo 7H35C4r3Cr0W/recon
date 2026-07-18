@@ -59,3 +59,12 @@ def test_world_readable_and_writable_are_exposure() -> None:
 def test_username_and_share_name_are_info() -> None:
     assert sev.classify("user", "administrator") == sev.INFO
     assert sev.classify("share", "IT") == sev.INFO
+
+
+def test_guest_writable_share_is_exposure_but_readable_is_info() -> None:
+    # a guest/anon-WRITABLE share is a real exposure (upload / print-job / wide-link write vector),
+    # while a merely readable or bare share stays info (HTB Abducted: guest-writable HP-Reception).
+    writable = sev.classify("share", "HP-Reception", "WRITE")
+    assert writable == sev.EXPOSURE and sev.is_notable(writable)
+    assert sev.classify("share", "IT", "READ") == sev.INFO
+    assert sev.classify("share", "projects", "") == sev.INFO

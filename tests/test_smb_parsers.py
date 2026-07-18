@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from oscprecon.modules.smb.parsers import (
+    SmbFinding,
+    dedup_share_findings,
     netexec_auth_ok,
     parse_netexec_passpol,
     parse_netexec_ridbrute,
@@ -10,6 +12,7 @@ from oscprecon.modules.smb.parsers import (
     parse_smb_tool,
     parse_smbclient_shares,
     readable_shares,
+    writable_shares,
 )
 
 FIX = Path(__file__).parent / "fixtures" / "smb"
@@ -52,6 +55,22 @@ def test_netexec_share_read_write_and_multiword() -> None:
     assert shares["Data"] == "READ,WRITE"  # both perms survive (was parsed as no-access)
     assert shares["Team Share"] == "READ"  # multi-word name intact (was truncated to "Team")
     assert set(readable_shares(parse_netexec_shares(text))) == {"Data", "Team Share"}
+
+
+def test_dedup_share_findings_unions_access_across_enum_methods() -> None:
+    # smbclient -L lists the share with no perms; netexec --shares lists it with WRITE. Collapse to
+    # one finding that keeps the WRITE (HTB Abducted: guest-writable HP-Reception printer).
+    collected = [
+        SmbFinding("signing", "disabled"),
+        SmbFinding("share", "HP-Reception", ""),  # from smbclient -L
+        SmbFinding("share", "HP-Reception", "WRITE"),  # from netexec --shares
+        SmbFinding("share", "projects", ""),
+    ]
+    merged = dedup_share_findings(collected)
+    shares = {f.value: f.detail for f in merged if f.kind == "share"}
+    assert shares == {"HP-Reception": "WRITE", "projects": ""}  # one HP-Reception, WRITE kept
+    assert writable_shares(merged) == ["HP-Reception"]
+    assert any(f.kind == "signing" for f in merged)  # non-share findings preserved
 
 
 def test_netexec_users() -> None:
