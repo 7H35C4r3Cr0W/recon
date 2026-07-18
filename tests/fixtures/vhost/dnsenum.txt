@@ -1,0 +1,41 @@
+dnsenum VERSION:1.2.6
+
+
+-----   example.com   -----
+
+
+Host's addresses:
+__________________
+
+example.com.                             300      IN    A        10.10.10.5
+
+
+Name Servers:
+______________
+
+ns1.example.com.                         300      IN    A        10.10.10.5
+
+
+Mail (MX) Servers:
+___________________
+
+mail.example.com.                        300      IN    A        10.10.10.6
+
+
+Trying Zone Transfers and getting Bind Versions:
+_________________________________________________
+
+
+Trying Zone Transfer for example.com on ns1.example.com ...
+AXFR record query failed: REFUSED
+
+
+Brute forcing with /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt:
+_____________________________________________________________________________________
+
+admin.example.com.                       300      IN    A        10.10.10.10
+dev.example.com.                         300      IN    A        10.10.10.20
+internal.example.com.                    300      IN    CNAME    internal-host.example.com.
+
+
+done.

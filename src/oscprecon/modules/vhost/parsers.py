@@ -122,6 +122,34 @@ def parse_dnsrecon(text: str) -> list[VhostFinding]:
     return findings
 
 
+# dnsenum record row — the host/NS/MX, brute-force and zone-transfer sections all share this shape:
+# "admin.example.htb.   5   IN   A   10.10.10.10" (hostname + optional trailing dot, TTL, IN, type).
+_DNSENUM = re.compile(
+    r"^(?P<host>[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+)\.?\s+\d+\s+IN\s+"
+    r"(?P<type>A|AAAA|CNAME)\s+(?P<data>\S+)\s*$"
+)
+
+
+def parse_dnsenum(text: str) -> list[VhostFinding]:
+    findings: list[VhostFinding] = []
+    seen: set[str] = set()
+    for line in text.splitlines():
+        match = _DNSENUM.match(line.strip())
+        if match is None:
+            continue
+        host = match.group("host").rstrip(".")
+        # the dotted pattern also matches a stray version-ish token — require a real hostname shape,
+        # and dedup so the same host appearing in both the record + brute sections lists once.
+        if not is_vhost_host(host) or host in seen:
+            continue
+        seen.add(host)
+        # A/AAAA data is the IP; a CNAME's data is the canonical hostname, not an address — leave ip
+        # empty there (the discovered subdomain itself is the finding).
+        ip = match.group("data").rstrip(".") if match.group("type") in ("A", "AAAA") else ""
+        findings.append(VhostFinding(vhost=host, ip=ip, note="dnsenum"))
+    return findings
+
+
 # wfuzz default line: '000023:   200   7 L   11 W   162 Ch   "admin"' (older uses 'C=200').
 _WFUZZ = re.compile(
     r'^\d+:\s+(?:C=)?(?P<status>\d{3})\s+\d+ L\s+\d+ W\s+(?P<size>\d+) Ch\s+"(?P<payload>[^"]*)"'
@@ -152,6 +180,8 @@ def parse_vhost_tool(tool: str, text: str, domain: str = "") -> list[VhostFindin
         return parse_gobuster_dns(text)
     if tool == "dnsrecon":
         return parse_dnsrecon(text)
+    if tool == "dnsenum":
+        return parse_dnsenum(text)
     if tool == "wfuzz":
         return parse_wfuzz(text, domain)
     return []

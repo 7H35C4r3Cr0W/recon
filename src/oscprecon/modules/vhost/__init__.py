@@ -29,6 +29,7 @@ TOOL_LABELS = {
     "gobuster vhost": "gobuster-vhost",
     "gobuster dns": "gobuster-dns",
     "dnsrecon": "dnsrecon",
+    "dnsenum": "dnsenum",
     "wfuzz": "wfuzz",
 }
 
@@ -125,6 +126,19 @@ def _build_dnsrecon(s: VhostScanSettings) -> str:
     return " ".join(parts)
 
 
+def _build_dnsenum(s: VhostScanSettings) -> str:
+    # dnsenum: DNS-based subdomain brute (-f wordlist) plus NS/MX/host record enumeration and an
+    # AXFR attempt against every nameserver it finds. Point it at the target's DNS server (or an
+    # explicit one), skip the slow reverse-netblock scan (--noreverse, avoids external internet),
+    # and disable colour so the streamed output parses. Streams to stdout — no -o (that writes XML).
+    server = s.dns_server or s.target
+    parts = ["dnsenum", "--nocolor", "--noreverse", "-f", _q(s.wordlist)]
+    if server:
+        parts += ["--dnsserver", server]
+    parts += ["--threads", str(s.threads), s.domain]
+    return " ".join(parts)
+
+
 def _build_wfuzz(s: VhostScanSettings) -> str:
     parts = ["wfuzz", "-c", "-w", _q(s.wordlist), "-H", f'"Host: FUZZ.{s.domain}"']
     if s.filter_size is not None:
@@ -140,6 +154,8 @@ def build_command(settings: VhostScanSettings) -> str:
         return _build_gobuster_dns(settings)
     if settings.tool == "dnsrecon":
         return _build_dnsrecon(settings)
+    if settings.tool == "dnsenum":
+        return _build_dnsenum(settings)
     if settings.tool == "wfuzz":
         return _build_wfuzz(settings)
     return _build_ffuf(settings)

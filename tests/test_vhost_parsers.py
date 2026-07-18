@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from oscprecon.modules.vhost.parsers import (
+    parse_dnsenum,
     parse_dnsrecon,
     parse_ffuf_vhost,
     parse_gobuster_dns,
@@ -59,6 +60,20 @@ def test_wfuzz() -> None:
     assert by_vhost["dev.example.com"].status == 403
 
 
+def test_dnsenum() -> None:
+    findings = parse_dnsenum(_read("dnsenum.txt"))
+    by_vhost = {f.vhost: f for f in findings}
+    # host/NS/MX records and the brute-force hits all become vhosts
+    assert by_vhost["example.com"].ip == "10.10.10.5"
+    assert by_vhost["ns1.example.com"].ip == "10.10.10.5"
+    assert by_vhost["mail.example.com"].ip == "10.10.10.6"
+    assert by_vhost["admin.example.com"].ip == "10.10.10.10"
+    assert by_vhost["dev.example.com"].ip == "10.10.10.20"
+    assert by_vhost["internal.example.com"].note == "dnsenum"  # CNAME target row
+    # the "AXFR record query failed" line is not a record and must not become a vhost
+    assert not any("REFUSED" in v for v in by_vhost)
+
+
 def test_ffuf_vhost_non_numeric_status_is_defensive() -> None:
     # a non-int status must not raise (would otherwise wedge the GUI worker)
     findings = parse_ffuf_vhost(
@@ -72,5 +87,6 @@ def test_dispatch_and_garbage() -> None:
     assert parse_ffuf_vhost("not json", "d") == []
     assert parse_vhost_tool("ffuf", _read("ffuf-vhost.json"), "example.com")
     assert parse_vhost_tool("dnsrecon", _read("dnsrecon.txt"))
+    assert parse_vhost_tool("dnsenum", _read("dnsenum.txt"))
     assert parse_vhost_tool("gobuster-dns", _read("gobuster-dns.txt"))
     assert parse_vhost_tool("wfuzz", _read("wfuzz.txt"), "example.com")
