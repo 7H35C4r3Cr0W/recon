@@ -44,4 +44,4 @@ def test_run_button_menu_offers_scan_options(qtbot: QtBot) -> None:
         assert any(profile in t for t in texts), profile
     assert any("custom" in t for t in texts)
     # the main click runs a QUICK scan (fast) — never the heavy full battery by surprise
-    assert window._run_button.accessibleName() == "Run full recon"
+    assert window._run_button.accessibleName() == "Run quick recon (menu for profiles/custom)"

@@ -22,7 +22,7 @@ def _profile(tmp_path: Path) -> Profile:
 def test_key_controls_have_accessible_names(qtbot: QtBot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window._run_button.accessibleName() == "Run full recon"
+    assert window._run_button.accessibleName() == "Run quick recon (menu for profiles/custom)"
     assert window._service_tree.accessibleName() == "Discovered services"
     assert window._tool_panel._output.accessibleName() == "Command output"
     assert window._tool_panel._command.accessibleName() == "Command to run"
