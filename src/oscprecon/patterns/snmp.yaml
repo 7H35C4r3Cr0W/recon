@@ -9,3 +9,27 @@
     - text: "Community '{value}' valid — walk the full MIB with it (system, users, processes, software)"
       command: "snmpwalk -v2c -c {value} {target} 1"
 # source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md
+
+- match:
+    service: snmp
+    field: kind
+    value: "community"
+  suggest:
+    - text: "Enumerate user accounts via the LanMgr/host MIB (Windows users often leak here)"
+      command: "snmpwalk -v2c -c {value} {target} 1.3.6.1.4.1.77.1.2.25"
+    - text: "List running processes and their full command lines (spot creds passed as args)"
+      command: "snmpwalk -v2c -c {value} {target} 1.3.6.1.2.1.25.4.2.1.4"
+    - text: "List installed software (versions to fingerprint / look up)"
+      command: "snmpwalk -v2c -c {value} {target} 1.3.6.1.2.1.25.6.3.1.2"
+    - text: "List listening TCP ports the host exposes internally"
+      command: "snmpwalk -v2c -c {value} {target} 1.3.6.1.2.1.6.13.1.3"
+# source: Obsidian: 0.01 Cheatsheets .../Other/161 _ SNMP.md; HackTricks pentesting-snmp
+
+- match:
+    service: snmp
+  suggest:
+    - text: "Confirm the community string(s) with a quick onesixtyone sweep of the common names"
+      command: "onesixtyone {target} public,private,community,manager"
+    - text: "Bulk-walk the whole tree with snmpbulkwalk (much faster than snmpwalk on big MIBs)"
+      command: "snmpbulkwalk -v2c -c {community} {target} ."
+# source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md

@@ -9,3 +9,21 @@
     - text: "Export '{value}' is world-readable — mount it read-only and inspect, then unmount (copy to a terminal — needs root)"
       command: "sudo mkdir -p /mnt/nfs && sudo mount -t nfs -o ro,nolock {target}:{value} /mnt/nfs && ls -laR /mnt/nfs"
 # source: Obsidian: 0.01 Cheatsheets .../Other/2049 _ NFS.md
+
+- match:
+    service: nfs
+  suggest:
+    - text: "List all NFS exports and which hosts/networks may mount them (the map for everything else)"
+      command: "showmount -e {target}"
+    - text: "Enumerate the NFS/mountd/rpcbind versions via nmap (v3 leaks more than v4)"
+      command: "nmap -p 111,2049 -sV --script nfs-showmount,nfs-ls,rpcinfo {target}"
+# source: Obsidian: 0.01 Cheatsheets .../Other/2049 _ NFS.md
+
+- match:
+    service: nfs
+    field: kind
+    value: "export"
+  suggest:
+    - text: "Export '{value}' — after mounting, note file ownership by UID; a no_root_squash export lets a matching local UID read/write as that user (recon: observe, don't modify)"
+      command: "ls -lan /mnt/nfs"
+# source: Obsidian: 0.01 Cheatsheets .../Other/2049 _ NFS.md

@@ -9,3 +9,16 @@
     - text: "Read the on-disk write path (RCE-adjacent recon — note only, don't write)"
       command: "redis-cli -h {target} -p 6379 CONFIG GET dir"
 # source: Obsidian: 0.01 Cheatsheets .../3306/Redis.md
+
+- match:
+    service: redis
+    field: value
+    value: "^unauth$"
+  suggest:
+    - text: "Dump server INFO — version, role (master/replica), config path, and connected clients"
+      command: "redis-cli -h {target} -p 6379 INFO"
+    - text: "List the databases in use, then dump a db's keys to see what data is exposed"
+      command: "redis-cli -h {target} -p 6379 INFO keyspace"
+    - text: "Show the full running config (spot 'requirepass', 'dir', 'dbfilename', module load paths)"
+      command: "redis-cli -h {target} -p 6379 CONFIG GET '*'"
+# source: Obsidian: 0.01 Cheatsheets .../3306/Redis.md; HackTricks pentesting-redis

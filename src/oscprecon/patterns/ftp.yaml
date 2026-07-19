@@ -9,3 +9,23 @@
     - text: "Anonymous FTP works — mirror the whole tree locally (faster/more complete than one-file gets)"
       command: "wget -r \"ftp://{target}/\""
 # source: Obsidian: 0.01 Cheatsheets .../21 (FTP)/21 (FTP).md
+
+- match:
+    service: ftp
+    field: kind
+    value: "banner"
+  suggest:
+    - text: "FTP banner '{value}' — check known issues for this exact daemon/version (display-only lookup, nothing is run)"
+      command: "searchsploit {value}"
+    - text: "Run the safe FTP NSE scripts — anonymous login, SYST/STATUS, and bounce check"
+      command: "nmap -sV -p 21 --script ftp-anon,ftp-syst,ftp-bounce {target}"
+# source: Obsidian: 0.00 Methodology .../Other Services/21 (FTP)/21 (FTP).md
+
+- match:
+    service: ftp
+    field: kind
+    value: "note"
+  suggest:
+    - text: "FTP note '{value}' — if it's a writable dir, confirm current contents (recon: verify access, don't stage payloads)"
+      command: "curl -s \"ftp://{target}/\" --user 'anonymous:anon'"
+# source: Obsidian: 0.00 Methodology .../Other Services/21 (FTP)/21 (FTP).md

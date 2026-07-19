@@ -8,3 +8,21 @@
     - text: "VRFY/EXPN supported — enumerate valid users with nmap's RCPT/VRFY check (usernames feed SMB/SSH/kerberos)"
       command: "nmap --script smtp-enum-users -p 25 {target}"
 # source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md
+
+- match:
+    service: smtp
+  suggest:
+    - text: "Enumerate the SMTP command set + server software (STARTTLS, AUTH mechs, relay hints)"
+      command: "nmap -p 25 -sV --script smtp-commands {target}"
+    - text: "Grab the banner and EHLO capabilities by hand (fingerprint + spot open relay/auth)"
+      command: "printf 'EHLO x\\r\\nQUIT\\r\\n' | nc -nv {target} 25"
+# source: Obsidian: 0.00 Methodology .../Other Services/Other/25 _ SMTP/User enum.md
+
+- match:
+    service: smtp
+    field: kind
+    value: "open-relay"
+  suggest:
+    - text: "Open-relay hint — confirm the relay path with a single swaks test (recon confirmation, not mass mail)"
+      command: "swaks --server {target} --from test@{domain} --to test@{domain} --header 'Subject: relay-check' --body check"
+# source: Obsidian: 0.00 Methodology .../Other Services/Other/25 _ SMTP/User enum.md
