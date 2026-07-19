@@ -335,8 +335,17 @@ class MainWindow(QMainWindow):
         # Ctrl+1..9 jump to a nav destination (Ctrl+0 = Workspace is a menu item); Ctrl+Enter runs
         # recon, Ctrl+. stops every running scan. Browser-tab-style, so muscle memory transfers.
         for digit, key in enumerate(
-            ("recon", "exploit", "pivot", "graph", "findings", "credentials", "notes", "report",
-             "activity"),
+            (
+                "recon",
+                "exploit",
+                "pivot",
+                "graph",
+                "findings",
+                "credentials",
+                "notes",
+                "report",
+                "activity",
+            ),
             start=1,
         ):
             sc = QShortcut(QKeySequence(f"Ctrl+{digit}"), self)

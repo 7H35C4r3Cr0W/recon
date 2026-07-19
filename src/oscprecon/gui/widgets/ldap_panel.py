@@ -113,9 +113,7 @@ class LdapPanel(QWidget):
         basedn = ldap_mod.sanitize_basedn(self._basedn.text()) or ""
         # pre-fill {user}/{password}/{domain} from the first collected password credential so the
         # netexec-ldap module follow-ups come ready to run (still reviewed before running).
-        cred = next(
-            (c for c in self._profile.credentials() if c.secret_type == "password"), None
-        )
+        cred = next((c for c in self._profile.credentials() if c.secret_type == "password"), None)
         user = cred.username if cred is not None else ""
         password = cred.secret if cred is not None else ""
         domain = (cred.domain if cred is not None and cred.domain else "") or target.hostname or ""

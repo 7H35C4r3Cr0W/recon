@@ -95,9 +95,7 @@ class SmbPanel(QWidget):
         target = self._profile.target
         # pre-fill {user}/{password}/{domain} from the first collected password credential so the
         # netexec/CME follow-ups come ready to run (the user still reviews before running).
-        cred = next(
-            (c for c in self._profile.credentials() if c.secret_type == "password"), None
-        )
+        cred = next((c for c in self._profile.credentials() if c.secret_type == "password"), None)
         user = cred.username if cred is not None else ""
         password = cred.secret if cred is not None else ""
         domain = (cred.domain if cred is not None and cred.domain else "") or target.hostname or ""
