@@ -14,6 +14,22 @@ def test_allows_recon_commands() -> None:
         )
         is None
     )
+    # oracle-sid-brute enumerates SID identifiers (needed before any auth), not passwords — recon,
+    # like RID cycling. The tool suggests it (oracle pattern + manual_commands), so it must Run.
+    assert (
+        shell.policy_violation(["nmap", "-p", "1521", "--script", "oracle-sid-brute", "x"]) is None
+    )
+    assert shell.policy_violation(["nmap", "--script=oracle-sid-brute", "x"]) is None
+
+
+def test_oracle_credential_brute_still_blocked() -> None:
+    # only SID enumeration is carved out; oracle-brute (tries CREDENTIALS against a SID) stays
+    # blocked, and a combined script list is blocked if ANY member is a credential brute
+    assert shell.policy_violation(["nmap", "--script", "oracle-brute", "x"]) is not None
+    assert (
+        shell.policy_violation(["nmap", "--script", "oracle-sid-brute,ssh-brute", "x"]) is not None
+    )
+    assert shell.policy_violation(["nmap", "--script", "brute", "x"]) is not None  # whole category
 
 
 def test_blocks_forbidden_tools_and_flags() -> None:

@@ -198,6 +198,11 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
 # a blanket 'brute' match. In opt-in Spray mode (policy_violation(spray=True)) these are permitted.
 _FORBIDDEN_FLAGS: frozenset[str] = frozenset({"--continue-on-success", "--passwords"})
 
+# why: nmap NSE scripts whose name contains "brute" but which enumerate a non-credential IDENTIFIER
+# (a service SID), not passwords — pure recon, the prerequisite for any auth, like the allowed
+# --rid-brute (§11). Everything else matching "brute" (ssh-brute, http-*-brute, …) stays blocked.
+_NMAP_RECON_BRUTE: frozenset[str] = frozenset({"oracle-sid-brute"})
+
 # why: OSCP-legal credential-spraying binaries (§2a). Permitted ONLY in Spray mode
 # (policy_violation(spray=True), i.e. config.spray_enabled). Off everywhere else.
 SPRAY_TOOLS: frozenset[str] = frozenset({"hydra", "medusa"})
@@ -472,8 +477,10 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
     # slip past a `tool == "netexec"` check, letting list-driven spray / brute run in recon mode.
     if base == "nmap":
         for value in _script_values(argv):
-            if "brute" in value.lower() and not spray:
-                return f"nmap --script {value} is credential brute (off by default — Spray mode)"
+            for script in value.split(","):  # --script takes a comma list; judge each name
+                name = script.strip().lower()
+                if "brute" in name and name not in _NMAP_RECON_BRUTE and not spray:
+                    return f"nmap --script {name} is credential brute (off by default — Spray mode)"
     if base == "searchsploit":
         for token in argv[1:]:
             if token in _SEARCHSPLOIT_FORBIDDEN:
