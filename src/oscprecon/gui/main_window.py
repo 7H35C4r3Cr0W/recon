@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
         self._auditor: Auditor | None = None
         self._locked_dir: Path | None = None  # the profile dir we currently hold an edit-lock on
         self._tasks = TaskManager(settings.max_concurrency)
-        self._task_bar = TaskStatusBar(self._tasks)
+        self._task_bar = TaskStatusBar(self._tasks, theme.normalize(settings.theme))
         self._recent_menu: QMenu
         self._new_action: QAction
         self._open_action: QAction
@@ -185,7 +185,7 @@ class MainWindow(QMainWindow):
         self._run_button.setToolTip(
             "Click: quick scan (fast). ▾: choose a profile / custom / preset."
         )
-        self._run_button.clicked.connect(lambda: self._start_recon("quick"))
+        self._run_button.clicked.connect(self._on_run_button)
         self._build_run_menu()
 
         # the pivot workflow now lives in its own nav tab (PivotPanel); its post-tunnel actions wire
@@ -1009,9 +1009,10 @@ class MainWindow(QMainWindow):
         normalized = theme.normalize(theme_name)
         self._header.restyle(normalized)
         self._nav.restyle(normalized)
+        self._task_bar.restyle(normalized)
         self._tool_panel.set_theme(normalized)
-        self._run_button.setStyleSheet(styles.accent_button())  # theme accent
         self._restyle_views(normalized)
+        self._refresh_busy()  # re-applies the Run/Stop button style for the new theme
 
     def _restyle_views(self, theme_name: str) -> None:
         self._reference_pane.set_theme(theme_name)
@@ -1737,6 +1738,18 @@ class MainWindow(QMainWindow):
         self._tool_panel.append_output("[busy] at capacity — wait or Stop a task.")
         return True
 
+    def _main_recon_running(self) -> bool:
+        # the main Run button owns the EXCLUSIVE recon task (full nmap) — true while one runs
+        return any(task.exclusive for task in self._tasks.tasks())
+
+    def _on_run_button(self) -> None:
+        # one button, two roles: Run when idle, Stop while the main recon is running
+        if self._main_recon_running():
+            self._tasks.cancel_all()
+            self._tool_panel.append_output("[stop] cancelling recon…")
+        else:
+            self._start_recon("quick")
+
     def _refresh_busy(self) -> None:
         # why: profile-lifecycle actions (New/Open/Save) replace the shared Profile, so they lock
         # while ANY task runs. Launching new recon is gated by the bound: the Run button (full nmap)
@@ -1755,9 +1768,22 @@ class MainWindow(QMainWindow):
             self._profile is not None and not any_running and not read_only
         )
         self._recent_menu.setEnabled(not any_running)
-        self._run_button.setEnabled(
-            self._profile is not None and self._tasks.can_start(exclusive=True) and not read_only
-        )
+        # while the main recon runs, the primary button becomes a STOP so a long scan is always
+        # killable right where it was launched (per-panel scans get their Stop in the task bar).
+        if self._main_recon_running():
+            self._run_button.setText("⏹  Stop")
+            self._run_button.setToolTip("Stop the running recon scan")
+            self._run_button.setStyleSheet(styles.danger_button(tokens.active_palette()))
+            self._run_button.setEnabled(True)
+        else:
+            self._run_button.setText("Run Recon")
+            self._run_button.setToolTip("Click: quick scan (fast). ▾: profile / custom / preset.")
+            self._run_button.setStyleSheet(styles.accent_tool_button())
+            self._run_button.setEnabled(
+                self._profile is not None
+                and self._tasks.can_start(exclusive=True)
+                and not read_only
+            )
         # why: keep the tree browseable (selecting a service is read-only) — only the launch
         # buttons in the tool panel are gated on capacity, via set_running. A read-only profile
         # disables every recon launch (a worker would write findings/creds -> ReadOnlyError).
