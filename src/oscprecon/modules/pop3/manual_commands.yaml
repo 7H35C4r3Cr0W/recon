@@ -14,3 +14,14 @@
   why: "openssl -starttls pop3 upgrades 110 then reads the encrypted CAPA — read-only"
   command: "openssl s_client -connect {target}:110 -starttls pop3 -quiet"
 # source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+
+- description: "List messages (with a credential)"
+  why: "curl LISTs the mailbox — message numbers + sizes — read-only; the cred goes in the URL so it's redacted in logs."
+  command: "curl -sk 'pop3s://{user}:{password}@{target}/'"
+  requires: ["creds"]
+# source: CPTS: Footprinting — IMAP/POP3
+- description: "Retrieve a message (with a credential)"
+  why: "curl RETRs message 1 (change the trailing number) so you can read email bodies for reused creds / hints — read-only."
+  command: "curl -sk 'pop3s://{user}:{password}@{target}/1'"
+  requires: ["creds"]
+# source: CPTS: Footprinting — IMAP/POP3
