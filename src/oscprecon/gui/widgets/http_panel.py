@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QSlider,
     QSpinBox,
     QSplitter,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -168,6 +169,7 @@ class HttpPanel(QWidget):
         run = QPushButton("Run")
         run.setStyleSheet(styles.accent_button())  # primary content-discovery action
         run.clicked.connect(self._on_run)
+        self._run_btn = run
         dry = QPushButton("Dry-run")
         dry.clicked.connect(self._on_dry_run)
         report = QPushButton("Add to report")
@@ -292,6 +294,9 @@ class HttpPanel(QWidget):
         self._rate_enabled.toggled.connect(self._on_rate_toggled)
         self._skip_tls.toggled.connect(self._refresh)
         self._status_csv.textChanged.connect(self._refresh)
+        self._status_csv.textChanged.connect(
+            self._sync_status_combo
+        )  # keep the preset combo honest
         self._status_preset.currentTextChanged.connect(self._on_status_preset)
         self._output.textChanged.connect(self._on_output_changed)
         self._wide_net.toggled.connect(self._refresh)
@@ -331,6 +336,19 @@ class HttpPanel(QWidget):
         if name in STATUS_PRESETS:
             self._status_csv.setText(",".join(str(c) for c in STATUS_PRESETS[name]))
         self._refresh()
+
+    def _sync_status_combo(self) -> None:
+        # keep the preset dropdown honest: after a profile load or a hand-edited CSV, show the
+        # preset whose codes match, else "Custom" — so the combo never misrepresents the status set.
+        current = [t for t in re.split(r"[,\s]+", self._status_csv.text().strip()) if t]
+        match = "Custom"
+        for preset_name, codes in STATUS_PRESETS.items():
+            if [str(c) for c in codes] == current:
+                match = preset_name
+                break
+        self._status_preset.blockSignals(True)  # setting text must not re-fire _on_status_preset
+        self._status_preset.setCurrentText(match)
+        self._status_preset.blockSignals(False)
 
     def _choose_wordlist(self) -> None:
         dialog = QDialog(self)
@@ -463,11 +481,19 @@ class HttpPanel(QWidget):
             for group, box in self._group_boxes.items():
                 box.setChecked(group in groups)
         self._loading = False
+        self._sync_status_combo()  # restore the preset dropdown to match the loaded CSV
         self._refresh()
 
     def _on_run(self) -> None:
         settings = self._current_settings()
         if not settings.url or not settings.wordlist:
+            # don't fail silently — tell the operator which field the Run button needs
+            missing = "a target URL" if not settings.url else "a wordlist"
+            QToolTip.showText(
+                self._run_btn.mapToGlobal(QPoint(0, self._run_btn.height())),
+                f"Set {missing} first.",
+                self._run_btn,
+            )
             return
         self.run_requested.emit(
             build_command(settings), settings.output_file, settings.tool, self._port

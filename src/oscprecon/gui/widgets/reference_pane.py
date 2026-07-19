@@ -186,8 +186,9 @@ class ReferencePane(QWidget):
         self._exploits.setTextElideMode(Qt.TextElideMode.ElideRight)
         self._exploits.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._exploits.setAlternatingRowColors(True)
+        # single-click loads the EDB page; do NOT also connect itemActivated — a double-click would
+        # then fire the handler twice (two network loads + a redundant profile.save()).
         self._exploits.itemClicked.connect(self._on_exploit_activated)
-        self._exploits.itemActivated.connect(self._on_exploit_activated)
         self._edb_header = QLabel("")
         self._edb_header.setWordWrap(True)
         self._edb_header.setTextFormat(Qt.TextFormat.RichText)
@@ -425,6 +426,10 @@ class ReferencePane(QWidget):
     def _find_next(self) -> None:
         text = self._find.text().strip()
         if not text:
+            return
+        # search whichever tab is showing — the Live web page, not just the offline doc behind it
+        if self._web is not None and self._tabs.currentIndex() == self._live_index:
+            self._web.findText(text)
             return
         if not self._offline.find(text):  # not found ahead → wrap to the top and retry
             self._offline.moveCursor(QTextCursor.MoveOperation.Start)

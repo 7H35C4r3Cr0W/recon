@@ -239,6 +239,7 @@ class MainWindow(QMainWindow):
         self._edb_context: tuple[str, str, str] | None = None  # (service label, product, version)
         self._live_request_id = 0
         self._live_workers: set[QThread] = set()
+        self._current_service: DiscoveredService | None = None  # for reload after the cred vault
         self._spray_ctl = SprayController(self)  # owns the opt-in credential-spray flow (§2a)
         self._pending_visits: list[tuple[str, str]] = []
 
@@ -1134,6 +1135,7 @@ class MainWindow(QMainWindow):
 
     def _on_service_selected(self, service: object) -> None:
         selected = service if isinstance(service, DiscoveredService) else None
+        self._current_service = selected  # remember it so the cred vault can reload this panel
         ref = references.match(selected) if selected is not None else None
         self._tool_panel.show_service(selected, ref)
         # findings for this service feed the reference pane's finding-aware HackTricks jump
@@ -1575,6 +1577,10 @@ class MainWindow(QMainWindow):
         dialog.exec()
         self._audit_action("credential-vault-opened")
         self._refresh_suggestions()  # has_credential may have changed
+        # reload the current service panel so its Tier-2 follow-ups pick up any newly-added creds
+        # (they interpolate {user}/{password} at show_service time, not live)
+        if self._current_service is not None:
+            self._on_service_selected(self._current_service)
 
     def _on_add_pivot_network(self) -> None:
         if self._profile is None:
