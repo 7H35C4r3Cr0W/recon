@@ -124,6 +124,12 @@
   requires: ["creds"]
 # source: HTB AD Path/Using CrackMapExec
 
+- description: "Active network connections on the host"
+  why: "netexec smb -M get_netconnections lists the target's current TCP/UDP connections — maps who it talks to and internal services to pivot toward. Read-only."
+  command: "netexec smb {target} -u '{user}' -p '{password}' -M get_netconnections"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec/Additional CME Functionality.md
+
 - description: "Find SMB-signing-disabled hosts (relay targets)"
   why: "--gen-relay-list writes hosts with SMB signing OFF to a file — the target list for an NTLM relay. Edit {target} to a /24. Read-only enumeration."
   command: "netexec smb {target}/24 --gen-relay-list relay_targets.lst"

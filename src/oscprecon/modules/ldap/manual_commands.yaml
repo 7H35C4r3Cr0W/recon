@@ -102,6 +102,12 @@
   requires: ["creds"]
 # source: HTB AD Path/Using CrackMapExec
 
+- description: "User descriptions — tune the flagged keywords"
+  why: "-o KEYWORDS=… (msfvenom-style) overrides the module's default match list, so a desc holding 'pwd'/'key'/'admin' surfaces instead of hiding in the full dump. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M user-desc -o 'KEYWORDS=pwd,pass,key,admin'"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec/Working with Modules.md
+
 - description: "All user descriptions (get-desc-users)"
   why: "netexec ldap -M get-desc-users lists descriptions for all users — a superset dump to grep for creds. Read-only."
   command: "netexec ldap {target} -u '{user}' -p '{password}' -M get-desc-users"
