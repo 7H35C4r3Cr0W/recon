@@ -190,7 +190,8 @@ def doctor(
     report = doctor_mod.scan()
     required = report.required
     req_missing = [tool for tool in required if not tool.present]
-    opt_missing = [tool for tool in report.optional if not tool.present]
+    spray_missing = [tool for tool in report.spray if not tool.present]
+    exploit_missing = [tool for tool in report.exploit if not tool.present]
     typer.echo(
         f"[doctor] {len(required) - len(req_missing)}/{len(required)} wrapped tools found on PATH"
     )
@@ -205,9 +206,15 @@ def doctor(
         )
     else:
         typer.echo("[doctor] all wrapped tools present — exam-ready.")
-    if opt_missing:
+    if spray_missing:
         typer.echo("\n[doctor] Spray-mode tools (only needed if you enable Spray mode, §2a):")
-        for tool in opt_missing:
+        for tool in spray_missing:
+            typer.echo(f"  {tool.name:24}  {tool.hint}")
+    if exploit_missing:
+        typer.echo(
+            "\n[doctor] Exploitation-tab tools (§2b — needed only when you run manual attacks):"
+        )
+        for tool in exploit_missing:
             typer.echo(f"  {tool.name:24}  {tool.hint}")
     if not req_missing:
         return

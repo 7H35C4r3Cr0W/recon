@@ -22,7 +22,8 @@ class ToolStatus:
     name: str
     present: bool
     hint: str
-    optional: bool = False  # True = only needed when opt-in Spray mode (§2a) is on
+    optional: bool = False  # True = not needed for default recon (Spray-mode or Exploitation tab)
+    category: str = "recon"  # "recon" | "spray" | "exploit"
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,14 @@ class DoctorReport:
     @property
     def optional(self) -> list[ToolStatus]:
         return [tool for tool in self.tools if tool.optional]
+
+    @property
+    def spray(self) -> list[ToolStatus]:
+        return [tool for tool in self.tools if tool.category == "spray"]
+
+    @property
+    def exploit(self) -> list[ToolStatus]:
+        return [tool for tool in self.tools if tool.category == "exploit"]
 
 
 # Interchangeable tools: if ANY member is on PATH, the others aren't real gaps. The FIRST member is
@@ -84,6 +93,28 @@ def effective_missing(report: DoctorReport) -> list[ToolStatus]:
     return result
 
 
+# Exploitation-tab (§2b) tools: they run only in the human-confirmed exploit mode (which bypasses
+# the recon allow-list), so they are NOT in ALLOWED_TOOLS and the doctor would otherwise never tell
+# you they're missing. Reported as optional/informational — a recon-only user isn't missing
+# anything, but an exam-prep user wants to know these are present before they need them. Never
+# auto-installed (they span apt/pipx/gem); the hints are shown so you install the ones you use.
+# Binary names are the Kali defaults; the impacket-* group is one `impacket-scripts`/pipx install.
+_EXPLOIT_TOOLS: tuple[tuple[str, str], ...] = (
+    ("impacket-secretsdump", "apt install impacket-scripts   (or: pipx install impacket)"),
+    ("impacket-psexec", "apt install impacket-scripts"),
+    ("impacket-wmiexec", "apt install impacket-scripts"),
+    ("impacket-smbexec", "apt install impacket-scripts"),
+    ("impacket-ntlmrelayx", "apt install impacket-scripts"),
+    ("evil-winrm", "gem install evil-winrm   (or: apt install evil-winrm)"),
+    ("certipy", "pipx install certipy-ad"),
+    ("responder", "apt install responder"),
+    ("hashcat", "apt install hashcat"),
+    ("john", "apt install john"),
+    ("bloodhound-python", "pipx install bloodhound"),
+    ("nc", "apt install netcat-traditional"),
+)
+
+
 def scan() -> DoctorReport:
     # shutil.which resolved at call time so a test/global monkeypatch of shutil.which takes effect.
     # Spray-mode tools (hydra/medusa) are scanned too but flagged optional — a recon-only user isn't
@@ -93,10 +124,14 @@ def scan() -> DoctorReport:
         for name in sorted(shell.ALLOWED_TOOLS)
     )
     spray = tuple(
-        ToolStatus(name, shutil.which(name) is not None, shell.install_hint(name), optional=True)
+        ToolStatus(name, shutil.which(name) is not None, shell.install_hint(name), True, "spray")
         for name in sorted(shell.SPRAY_TOOLS)
     )
-    return DoctorReport(required + spray)
+    exploit = tuple(
+        ToolStatus(name, shutil.which(name) is not None, hint, True, "exploit")
+        for name, hint in _EXPLOIT_TOOLS
+    )
+    return DoctorReport(required + spray + exploit)
 
 
 @dataclass(frozen=True)

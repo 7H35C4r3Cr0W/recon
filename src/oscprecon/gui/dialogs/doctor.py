@@ -74,8 +74,9 @@ class DoctorDialog(QDialog):
     def _refresh_report(self) -> None:
         report = doctor.scan()
         needed = doctor.effective_missing(report)
-        req_missing = [t for t in needed if not t.optional]
-        spray_missing = [t for t in needed if t.optional]  # hydra/medusa — Spray mode only (§2a)
+        req_missing = [t for t in needed if t.category == "recon"]
+        spray_missing = [t for t in needed if t.category == "spray"]  # hydra/medusa — §2a
+        exploit_missing = [t for t in needed if t.category == "exploit"]  # §2b attack tools
         required_found = len([t for t in report.found if not t.optional])
         required_total = len(report.required)
         self._plan = doctor.install_plan(report)
@@ -84,7 +85,7 @@ class DoctorDialog(QDialog):
             f"<b>{required_found}/{required_total}</b> wrapped tools found on PATH"
             + (" — all essentials present, exam-ready." if not req_missing else ".")
         )
-        self._view.setHtml(self._html(req_missing, spray_missing, report.found))
+        self._view.setHtml(self._html(req_missing, spray_missing, exploit_missing, report.found))
 
         have_pkgs = bool(self._plan.packages)
         self._install_btn.setEnabled(have_pkgs)
@@ -165,6 +166,7 @@ class DoctorDialog(QDialog):
     def _html(
         req_missing: list[doctor.ToolStatus],
         spray_missing: list[doctor.ToolStatus],
+        exploit_missing: list[doctor.ToolStatus],
         found: list[doctor.ToolStatus],
     ) -> str:
         parts: list[str] = []
@@ -175,6 +177,12 @@ class DoctorDialog(QDialog):
         if spray_missing:
             parts.append("<h4>Spray-mode tools (only needed if Spray mode is on)</h4><ul>")
             parts.extend(f"<li><b>{t.name}</b> — <code>{t.hint}</code></li>" for t in spray_missing)
+            parts.append("</ul>")
+        if exploit_missing:
+            parts.append("<h4>Exploitation-tab tools (§2b — for manual attacks)</h4><ul>")
+            parts.extend(
+                f"<li><b>{t.name}</b> — <code>{t.hint}</code></li>" for t in exploit_missing
+            )
             parts.append("</ul>")
         parts.append("<h4>Present</h4><ul>")
         parts.extend(f"<li>&#10003; {t.name}</li>" for t in found)

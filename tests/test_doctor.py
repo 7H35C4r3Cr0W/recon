@@ -10,6 +10,27 @@ def test_scan_marks_present_and_missing(monkeypatch: pytest.MonkeyPatch) -> None
     assert report.missing and all(t.hint for t in report.missing)
 
 
+def test_exploit_tools_reported_but_never_auto_installed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # §2b exploit-tab tools (evil-winrm/certipy/impacket-secretsdump/…) run in exploit mode, which
+    # bypasses the recon allow-list, so the doctor must still report them — but as an informational
+    # 'exploit' category that NEVER enters the apt auto-install plan (they span apt/pipx/gem).
+    monkeypatch.setattr(doctor.shutil, "which", lambda t: None)  # everything missing
+    report = doctor.scan()
+    exploit = {t.name for t in report.exploit}
+    assert {"evil-winrm", "certipy", "impacket-secretsdump", "responder"} <= exploit
+    assert all(t.optional and t.category == "exploit" for t in report.exploit)
+    # they must not inflate the "required" (recon) count or the auto-install package list
+    assert exploit.isdisjoint({t.name for t in report.required})
+    plan = doctor.install_plan(report)
+    assert not any(
+        n in p
+        for n in ("evil-winrm", "certipy", "impacket-secretsdump", "responder")
+        for p in plan.packages
+    )
+
+
 def test_install_plan_is_alternative_aware_and_separates_manual(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

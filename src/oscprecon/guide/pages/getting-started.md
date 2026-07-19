@@ -15,7 +15,10 @@ nabu-cli doctor         # prints an install hint for anything missing
 ```
 
 `doctor` only reports — it never installs behind your back. `doctor --install` will offer to
-`apt install` the missing **allow-listed** tools, asking first.
+`apt install` the missing **allow-listed** (recon) tools, asking first. It also lists — but never
+auto-installs — the **Spray-mode** (§2a) and **Exploitation-tab** (§2b) tools (evil-winrm, certipy,
+impacket-secretsdump, responder, hashcat, …) with their install hints, so you can confirm your
+attack tools are present before exam day. Those span apt/pipx/gem, so you install the ones you use.
 
 ## Launch
 
