@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import random
 import re
 
@@ -9,6 +10,7 @@ from PySide6.QtGui import (
     QCursor,
     QGuiApplication,
     QHideEvent,
+    QMouseEvent,
     QPainter,
     QPainterPath,
     QPaintEvent,
@@ -35,6 +37,21 @@ _PUPIL = QColor("#08252b")
 _HL = QColor("#ffffff")
 _HL2 = QColor(255, 255, 255, 205)
 
+# easter egg: clicking the mascot plays one of these little reactions (motion + a mood tint). Purely
+# cosmetic personality — no state, no network, ends on its own. Durations in ms.
+_REACTIONS: tuple[tuple[str, int], ...] = (
+    ("spin", 700),
+    ("backflip", 800),
+    ("bounce", 700),
+    ("mad", 650),
+    ("wobble", 700),
+    ("smile", 700),
+    ("dance", 1100),
+    ("dizzy", 1200),
+    ("cry", 1200),
+    ("nod", 700),
+)
+
 
 def _base_svg() -> bytes:
     # the mascot minus its pupils (#08252b) + highlights (#ffffff) — OwlMark paints those live.
@@ -52,9 +69,24 @@ class OwlMark(QWidget):
         self.setFixedSize(size, size)
         self.setToolTip("Nabu — Local Recon Workspace")
         self.setAccessibleName("Nabu mascot")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)  # subtle hint that it's clickable
         self._renderer = QSvgRenderer(QByteArray(_base_svg()))
         self._gaze = QPointF(0.0, 0.0)
         self._blink = 0.0  # 0 = open, 1 = shut
+
+        # easter-egg reaction state (applied as a transform + tint in paintEvent)
+        self._reaction = ""
+        self._angle = 0.0
+        self._scale = 1.0
+        self._dx = 0.0
+        self._dy = 0.0
+        self._tear = 0.0
+        self._tint = QColor(0, 0, 0, 0)
+        self._react_anim = QVariantAnimation(self)
+        self._react_anim.setStartValue(0.0)
+        self._react_anim.setEndValue(1.0)
+        self._react_anim.valueChanged.connect(self._on_react)
+        self._react_anim.finished.connect(self._reset_reaction)
 
         self._blink_anim = QVariantAnimation(self)
         self._blink_anim.setDuration(190)
@@ -114,9 +146,81 @@ class OwlMark(QWidget):
             self._gaze = QPointF(gx, gy)
             self.update()
 
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.play_reaction()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def play_reaction(self, name: str | None = None) -> None:
+        # pick (or force) a reaction and animate it once. Idempotent: a click mid-reaction restarts.
+        choices = [r for r in _REACTIONS if name is None or r[0] == name]
+        if not choices:
+            return
+        reaction, duration = random.choice(choices)
+        self._reaction = reaction
+        self._react_anim.stop()
+        self._react_anim.setDuration(duration)
+        if self._live:
+            self._react_anim.start()
+        else:  # offscreen (tests): no event loop to drive frames — just settle at rest
+            self._reset_reaction()
+
+    def _on_react(self, value: object) -> None:
+        t = float(value) if isinstance(value, int | float) else 0.0
+        r = self._reaction
+        self._angle = self._dx = self._dy = self._tear = 0.0
+        self._scale = 1.0
+        self._tint = QColor(0, 0, 0, 0)
+        pi = math.pi
+        if r == "spin":
+            self._angle = 360.0 * t
+        elif r == "backflip":
+            self._angle = -360.0 * t
+            self._dy = -16.0 * math.sin(pi * t)
+        elif r == "bounce":
+            self._dy = -18.0 * abs(math.sin(2 * pi * t)) * (1.0 - 0.3 * t)
+        elif r == "mad":
+            self._dx = 4.0 * math.sin(24 * pi * t) * (1.0 - t)
+            self._tint = QColor(255, 60, 40, int(75 * math.sin(pi * t)))
+        elif r == "wobble":
+            self._angle = 16.0 * math.sin(6 * pi * t) * (1.0 - t)
+        elif r == "smile":
+            self._scale = 1.0 + 0.22 * math.sin(pi * t)
+            self._tint = QColor(255, 200, 60, int(55 * math.sin(pi * t)))
+        elif r == "dance":
+            self._dx = 7.0 * math.sin(6 * pi * t)
+            self._dy = -7.0 * abs(math.sin(4 * pi * t))
+            self._angle = 9.0 * math.sin(6 * pi * t)
+        elif r == "dizzy":
+            self._angle = 720.0 * t * t
+            self._scale = 1.0 - 0.08 * math.sin(pi * t)
+        elif r == "cry":
+            self._dy = 3.0 * math.sin(pi * t)
+            self._tint = QColor(60, 140, 255, int(55 * math.sin(pi * t)))
+            self._tear = t
+        elif r == "nod":
+            self._dy = 6.0 * math.sin(6 * pi * t) * (1.0 - 0.5 * t)
+        self.update()
+
+    def _reset_reaction(self) -> None:
+        self._reaction = ""
+        self._angle = self._dx = self._dy = self._tear = 0.0
+        self._scale = 1.0
+        self._tint = QColor(0, 0, 0, 0)
+        self.update()
+
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        # easter-egg transform: spin / flip / bounce / scale about the mascot's centre
+        c = self.width() / 2.0
+        painter.save()
+        painter.translate(c + self._dx, c + self._dy)
+        painter.rotate(self._angle)
+        painter.scale(self._scale, self._scale)
+        painter.translate(-c, -c)
         self._renderer.render(painter, QRectF(0, 0, float(self.width()), float(self.height())))
         s = self.width() / 100.0
         painter.setPen(Qt.PenStyle.NoPen)
@@ -140,4 +244,15 @@ class OwlMark(QWidget):
                     _LID,
                 )
                 painter.restore()
+        painter.restore()  # end the easter-egg transform — mood overlays draw in widget coords
+
+        if self._tint.alpha() > 0:  # a mood wash (mad=red · smile=gold · cry=blue)
+            painter.fillRect(self.rect(), self._tint)
+        if self._tear > 0.0:  # a falling tear for the "cry" reaction
+            ex, ey = _EYES[0]
+            tx = ex * s
+            ty = (ey + 8.0) * s + self._tear * self.height() * 0.55
+            painter.setBrush(QColor(90, 170, 255, 220))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(QPointF(tx, ty), 2.2 * s, 3.0 * s)
         painter.end()

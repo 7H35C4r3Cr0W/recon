@@ -1,6 +1,8 @@
+from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtGui import QMouseEvent
 from pytestqt.qtbot import QtBot
 
-from oscprecon.gui.widgets.owl_mark import OwlMark, _base_svg
+from oscprecon.gui.widgets.owl_mark import _REACTIONS, OwlMark, _base_svg
 
 
 def test_base_svg_strips_pupils_and_highlights() -> None:
@@ -36,3 +38,49 @@ def test_owl_mark_is_still_under_offscreen(qtbot: QtBot) -> None:
     assert widget._live is False
     assert not widget._follow.isActive()
     assert not widget._next_blink.isActive()
+
+
+def test_owl_reactions_transform_and_render(qtbot: QtBot) -> None:
+    # easter egg: each reaction drives a transform/tint and renders without error
+    owl = OwlMark(60)
+    qtbot.addWidget(owl)
+    assert len(_REACTIONS) == 10
+
+    owl._reaction = "spin"
+    owl._on_react(0.25)
+    assert abs(owl._angle - 90.0) < 1e-6  # quarter of a full spin
+
+    owl._reaction = "cry"
+    owl._on_react(0.5)
+    assert owl._tear > 0.0 and owl._tint.alpha() > 0  # tear + blue mood wash
+
+    for name, _dur in _REACTIONS:
+        owl._reaction = name
+        for t in (0.0, 0.5, 1.0):
+            owl._on_react(t)
+            owl.grab()
+
+    owl._reset_reaction()
+    assert owl._reaction == "" and owl._angle == 0.0 and owl._tint.alpha() == 0
+
+
+def test_owl_left_click_plays_a_reaction(qtbot: QtBot) -> None:
+    owl = OwlMark(60)
+    qtbot.addWidget(owl)
+    played: list[str | None] = []
+    orig = owl.play_reaction
+
+    def spy(name: str | None = None) -> None:
+        played.append(name)
+        orig(name)
+
+    owl.play_reaction = spy  # type: ignore[method-assign]
+    ev = QMouseEvent(
+        QEvent.Type.MouseButtonPress,
+        QPointF(5, 5),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    owl.mousePressEvent(ev)
+    assert played  # a left click triggered a reaction
