@@ -111,9 +111,23 @@ class LdapPanel(QWidget):
         # why: {basedn} is interpolated into a runnable ldapsearch command, so sanitize it (drop it
         # if it isn't DN-syntax) before it reaches the command line — never trust the raw field.
         basedn = ldap_mod.sanitize_basedn(self._basedn.text()) or ""
+        # pre-fill {user}/{password}/{domain} from the first collected password credential so the
+        # netexec-ldap module follow-ups come ready to run (still reviewed before running).
+        cred = next(
+            (c for c in self._profile.credentials() if c.secret_type == "password"), None
+        )
+        user = cred.username if cred is not None else ""
+        password = cred.secret if cred is not None else ""
+        domain = (cred.domain if cred is not None and cred.domain else "") or target.hostname or ""
         for entry in manual_commands.load_manual_commands(_MANUAL_YAML):
             command = manual_commands.expand(
-                entry.command, target=target.ip, port=self._port, basedn=basedn
+                entry.command,
+                target=target.ip,
+                port=self._port,
+                basedn=basedn,
+                user=user,
+                password=password,
+                domain=domain,
             )
             item = QListWidgetItem(f"{entry.description}\n    {command}")
             item.setData(_COMMAND_ROLE, command)

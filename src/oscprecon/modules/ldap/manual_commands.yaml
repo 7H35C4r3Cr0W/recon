@@ -93,3 +93,83 @@
   why: "netexec ldap-checker reports whether LDAP signing + channel binding are enforced — read-only relay-susceptibility recon, no attack"
   command: "netexec ldap {target} -u '' -p '' -M ldap-checker"
 # source: AD-toolkit eval (netexec ldap enum modules — read-only)
+
+# --- netexec LDAP modules — credentialed AD enum (HTB AD Path) ------------------------------------
+# {user}/{password} pre-fill from the first collected credential. All read-only enumeration.
+- description: "User descriptions (often contain passwords)"
+  why: "netexec ldap -M user-desc dumps every user's description field — admins hide passwords/hints here. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M user-desc"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "All user descriptions (get-desc-users)"
+  why: "netexec ldap -M get-desc-users lists descriptions for all users — a superset dump to grep for creds. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M get-desc-users"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "LAPS local-admin passwords (readable ones)"
+  why: "netexec ldap -M laps reads every LAPS-managed local admin password your account can read — instant local admin. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M laps"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "MachineAccountQuota (can you add computers?)"
+  why: "netexec ldap -M maq reads ms-DS-MachineAccountQuota — >0 means you can add a machine account (RBCD/shadow-cred prep). Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M maq"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Find ADCS PKI services + templates"
+  why: "netexec ldap -M adcs lists Enrollment Services and certificate template names — the recon step before certipy ESC checks. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M adcs"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Group membership of a user"
+  why: "netexec ldap -M groupmembership shows which groups a user belongs to (spot Domain Admins / Server Operators). Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M groupmembership -o USER={user}"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "AD Sites & Subnets"
+  why: "netexec ldap -M subnets maps the AD sites/subnets — internal-network layout for pivoting. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M subnets"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "All DNS records (get-network)"
+  why: "netexec ldap -M get-network dumps every DNS record + IP from the domain — host inventory without a zone transfer. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M get-network"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Kerberoastable accounts → TGS hashes"
+  why: "netexec --kerberoasting requests TGS hashes for SPN-set accounts (crack offline). Enumeration of roastable users; same as GetUserSPNs. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' --kerberoasting kerberoast.txt"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "AS-REP-roastable accounts → AS-REP hashes"
+  why: "netexec --asreproast finds accounts with pre-auth disabled and grabs their AS-REP hashes (crack offline). Same as GetNPUsers. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' --asreproast asrep.txt"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Pre-created (pre-2k) computer accounts"
+  why: "netexec ldap -M pre2k finds pre-created computer accounts whose password equals the lowercased name — an easy foothold. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M pre2k"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Read a DACL (who can write to an object)"
+  why: "netexec ldap -M daclread reads an object's DACL to find ACL-abuse edges (WriteDACL/GenericAll). Read-only (backup)."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' -M daclread -o TARGET={user} ACTION=read"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "BloodHound collection via netexec (LDAP)"
+  why: "netexec ldap --bloodhound runs the collector over LDAP and drops the JSON zip for BloodHound — the map of the whole domain. Read-only."
+  command: "netexec ldap {target} -u '{user}' -p '{password}' --bloodhound --collection All --dns-server {target}"
+  requires: ["creds"]
+# source: HTB AD Path/Active Directory Bloodhound

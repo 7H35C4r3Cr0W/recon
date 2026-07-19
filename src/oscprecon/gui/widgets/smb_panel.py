@@ -93,9 +93,17 @@ class SmbPanel(QWidget):
         if self._profile is None:
             return
         target = self._profile.target
+        # pre-fill {user}/{password}/{domain} from the first collected password credential so the
+        # netexec/CME follow-ups come ready to run (the user still reviews before running).
+        cred = next(
+            (c for c in self._profile.credentials() if c.secret_type == "password"), None
+        )
+        user = cred.username if cred is not None else ""
+        password = cred.secret if cred is not None else ""
+        domain = (cred.domain if cred is not None and cred.domain else "") or target.hostname or ""
         for entry in manual_commands.load_manual_commands(_MANUAL_YAML):
             command = manual_commands.expand(
-                entry.command, target=target.ip, domain=target.hostname or ""
+                entry.command, target=target.ip, domain=domain, user=user, password=password
             )
             item = QListWidgetItem(f"{entry.description}\n    {command}")
             item.setData(_COMMAND_ROLE, command)

