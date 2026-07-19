@@ -194,7 +194,29 @@ class Profile:
     def load(cls, directory: Path) -> Profile:
         directory = Path(directory)
         _ensure_service_dirs(directory)
-        raw: dict[str, Any] = json.loads((directory / "profile.json").read_text(encoding="utf-8"))
+        path = directory / "profile.json"
+        # a corrupt / hand-edited / foreign profile.json (Import Project) must fail with a clear
+        # error, not a raw traceback — and every field is coerced defensively, mirroring the
+        # per-entry try/except used for services/hosts, so one bad key can't crash the open.
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"{path} is missing or not valid JSON: {exc}") from exc
+        if not isinstance(raw, dict):
+            raise ValueError(f"{path} is not a profile object (got {type(raw).__name__})")
+
+        def _list(key: str) -> list[Any]:
+            v = raw.get(key)
+            return v if isinstance(v, list) else []
+
+        def _map(key: str) -> dict[str, Any]:
+            v = raw.get(key)
+            return dict(v) if isinstance(v, dict) else {}
+
+        try:
+            schema_version = int(raw.get("schema_version", SCHEMA_VERSION))
+        except (TypeError, ValueError):
+            schema_version = SCHEMA_VERSION
         # normalize organization on load (safe defaults for old/hand-edited profiles). Tags have ONE
         # source of truth: organization.tags. Seed it from the legacy top-level `tags` on first load
         # so pre-feature tags survive + still reach the report/Obsidian frontmatter, which reads
@@ -205,24 +227,24 @@ class Profile:
         return cls(
             directory=directory,
             profile_name=str(raw.get("profile_name", directory.name)),
-            target=_target_from_dict(raw.get("target", {})),
-            status=dict(raw.get("status", {})),
+            target=_target_from_dict(_map("target")),
+            status=_map("status"),
             discovered_services=[
                 s
-                for s in (_service_from_dict(s) for s in raw.get("discovered_services", []))
+                for s in (_service_from_dict(s) for s in _list("discovered_services"))
                 if s is not None
             ],
             discovered_hosts=[
-                h
-                for h in (_host_from_dict(h) for h in raw.get("discovered_hosts", []))
-                if h is not None
+                h for h in (_host_from_dict(h) for h in _list("discovered_hosts")) if h is not None
             ],
-            command_history=[dict(c) for c in raw.get("command_history", [])],
-            references_visited=[dict(r) for r in raw.get("references_visited", [])],
-            module_settings=dict(raw.get("module_settings", {})),
+            command_history=[dict(c) for c in _list("command_history") if isinstance(c, dict)],
+            references_visited=[
+                dict(r) for r in _list("references_visited") if isinstance(r, dict)
+            ],
+            module_settings=_map("module_settings"),
             tags=list(org.tags),  # mirror of organization.tags (the authoritative store)
             organization=org.to_dict(),
-            schema_version=int(raw.get("schema_version", SCHEMA_VERSION)),
+            schema_version=schema_version,
         )
 
     def _ensure_writable(self) -> None:

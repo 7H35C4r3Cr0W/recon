@@ -34,6 +34,28 @@ def test_record_redacts_secret_values(tmp_path: Path) -> None:
     assert entry["details"]["username"] == "svc"  # non-secret fields survive
 
 
+def test_record_scrubs_credentials_embedded_in_a_command(tmp_path: Path) -> None:
+    # regression: a whole command can hide a cred (impacket user:pass@host, -p …); the key-name
+    # redactor never touches the `command` value, so it reached audit.jsonl + report.md in cleartext
+    audit.record(
+        tmp_path,
+        "b",
+        "run-command",
+        details={
+            "module": "smb",
+            "command": "impacket-secretsdump 'CORP/svc:SuperSecret123@10.10.10.10'",
+        },
+    )
+    text = audit.audit_path(tmp_path).read_text(encoding="utf-8")
+    assert "SuperSecret123" not in text
+    entry = audit.load_entries(tmp_path)[0]
+    assert "<redacted len=" in entry["details"]["command"]
+    assert entry["details"]["module"] == "smb"  # non-secret detail survives
+    # a netexec Tier-2 -p is masked; nmap ports are NOT (nmap is not a credential tool)
+    assert "RealPass" not in audit._redact({"command": "netexec smb x -u a -p RealPass"})["command"]
+    assert audit._redact({"command": "nmap -p 80,443 x"})["command"] == "nmap -p 80,443 x"
+
+
 def test_record_is_best_effort_on_bad_details(tmp_path: Path) -> None:
     # a non-JSON-serialisable value must not raise — audit is best-effort (§6a)
     audit.record(tmp_path, "b", "weird", details={"obj": object()})

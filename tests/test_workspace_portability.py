@@ -29,6 +29,44 @@ def _add_bytes(tar: tarfile.TarFile, name: str, data: bytes = b"x") -> None:
     tar.addfile(info, io.BytesIO(data))
 
 
+def test_profile_load_rejects_malformed_json_cleanly(tmp_path: Path) -> None:
+    # regression: Import Project of a corrupt/hand-edited profile.json crashed with a raw traceback
+    # (JSONDecodeError / AttributeError / TypeError / ValueError). It must raise a clean ValueError.
+    for content in ("", "[]", "not json", '{"schema_version": 1'):
+        d = tmp_path / f"p{hash(content) & 0xFFFF}"
+        d.mkdir()
+        (d / "profile.json").write_text(content, encoding="utf-8")
+        with pytest.raises(ValueError):
+            Profile.load(d)
+
+
+def test_profile_load_coerces_bad_field_types(tmp_path: Path) -> None:
+    # a valid target but junk in status/schema_version/command_history must degrade to safe
+    # defaults, not crash (mirrors the per-entry defensive parsing for services/hosts)
+    import json
+
+    from oscprecon.profile import SCHEMA_VERSION
+
+    d = tmp_path / "coerce"
+    d.mkdir()
+    (d / "profile.json").write_text(
+        json.dumps(
+            {
+                "target": {"ip": "10.0.0.5"},
+                "status": ["bad"],
+                "schema_version": None,
+                "command_history": {"x": 1},
+            }
+        ),
+        encoding="utf-8",
+    )
+    prof = Profile.load(d)
+    assert prof.status == {}
+    assert prof.schema_version == SCHEMA_VERSION
+    assert prof.command_history == []
+    assert prof.target.ip == "10.0.0.5"
+
+
 # ---- export / import round-trip -------------------------------------------------------------
 
 
