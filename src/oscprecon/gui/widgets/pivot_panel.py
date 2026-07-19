@@ -179,6 +179,16 @@ class PivotPanel(QWidget):
         )
         for step in steps:
             self._steps_layout.addWidget(self._step_card(step))
+        # the full "pick your flavor" reference: serve the agent / pull it onto the target
+        # (Windows+Linux) / tunnel reverse shells + files / fileless transfer / console commands
+        ref_sep = QLabel("──  Ligolo reference — serve · transfer · tunnel · console  ──")
+        ref_sep.setStyleSheet(f"color:{tokens.active_palette().text_muted}; padding-top:10px;")
+        ref_sep.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self._steps_layout.addWidget(ref_sep)
+        for section in ligolo.ligolo_reference_sections(
+            self._ip.text().strip(), port=port, agent_os=self._agent_os()
+        ):
+            self._steps_layout.addWidget(self._ref_section_card(section))
         # quick reference for the other pivot methods (SSH -L/-R/-D, chisel, sshuttle, socat, plink)
         sep = QLabel("──  Other pivot methods (when ligolo isn't an option)  ──")
         sep.setStyleSheet(f"color:{tokens.active_palette().text_muted}; padding-top:8px;")
@@ -212,6 +222,40 @@ class PivotPanel(QWidget):
         copy.clicked.connect(lambda _=False, t=text: self._copy(t))
         row.addWidget(copy, alignment=Qt.AlignmentFlag.AlignTop)
         outer.addLayout(row)
+        return card
+
+    def _ref_section_card(self, section: ligolo.RefSection) -> QWidget:
+        pal = tokens.active_palette()
+        card = QFrame()
+        card.setFrameShape(QFrame.Shape.StyledPanel)
+        card.setStyleSheet(
+            f"QFrame {{ background:{pal.surface}; border:1px solid {pal.border};"
+            f" border-radius:{tokens.RADIUS_SM}px; }}"
+        )
+        outer = QVBoxLayout(card)
+        title = QLabel(f"<b>{section.title}</b>")
+        title.setWordWrap(True)
+        outer.addWidget(title)
+        sub = QLabel(section.subtitle)
+        sub.setWordWrap(True)
+        sub.setStyleSheet(f"color:{pal.text_muted}; font-size:11px;")
+        outer.addWidget(sub)
+        for item in section.items:
+            label = QLabel(f"• {item.label}")
+            label.setWordWrap(True)
+            label.setStyleSheet(f"color:{pal.text_muted}; font-size:11px; padding-top:4px;")
+            outer.addWidget(label)
+            body = QPlainTextEdit(item.command)
+            body.setReadOnly(True)
+            body.setFont(QFont("monospace"))
+            body.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+            body.setFixedHeight(22 + 18 * (item.command.count("\n") + 1))
+            row = QHBoxLayout()
+            row.addWidget(body, stretch=1)
+            copy = QPushButton("Copy")
+            copy.clicked.connect(lambda _=False, t=item.command: self._copy(t))
+            row.addWidget(copy, alignment=Qt.AlignmentFlag.AlignTop)
+            outer.addLayout(row)
         return card
 
     def _step_card(self, step: ligolo.LigoloStep) -> QWidget:

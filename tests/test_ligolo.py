@@ -30,3 +30,42 @@ def test_build_steps_placeholder_when_no_route() -> None:
 
 def test_detect_tun_ip_returns_empty_for_unknown_iface() -> None:
     assert detect_tun_ip("definitely-no-such-iface-xyz") == ""
+
+
+def test_download_step_matches_agent_os() -> None:
+    from oscprecon.ligolo import LIGOLO_DL_VERSION, build_ligolo_steps
+
+    v = LIGOLO_DL_VERSION
+    win = "\n".join(
+        c for s in build_ligolo_steps("10.0.0.1", agent_os="windows") for c in s.commands
+    )
+    assert f"ligolo-ng_proxy_{v}_linux_amd64.tar.gz" in win  # proxy is always Linux (runs on Kali)
+    assert f"ligolo-ng_agent_{v}_windows_amd64.zip" in win  # agent matches the WINDOWS pivot
+    lin = "\n".join(c for s in build_ligolo_steps("10.0.0.1", agent_os="linux") for c in s.commands)
+    assert f"ligolo-ng_agent_{v}_linux_amd64.tar.gz" in lin
+
+
+def test_steps_are_renumbered_sequentially() -> None:
+    from oscprecon.ligolo import build_ligolo_steps
+
+    steps = build_ligolo_steps("10.0.0.1", routes=["172.16.1.0/24"])
+    assert [s.n for s in steps] == list(range(len(steps)))  # 0..N, no gaps despite optional steps
+    assert steps[0].title.startswith("Download")  # the flow starts at downloading off GitHub
+
+
+def test_reference_sections_cover_serve_transfer_tunnel() -> None:
+    from oscprecon.ligolo import ligolo_reference_sections
+
+    secs = {s.title: s for s in ligolo_reference_sections("10.10.14.7", agent_os="windows")}
+    titles = " ".join(secs)
+    assert "Serve" in titles and "WINDOWS" in titles and "LINUX" in titles
+    assert "tunnel" in titles.lower() and "console" in titles.lower() and "Fileless" in titles
+    # a Windows pivot lists its transfers before the Linux ones
+    order = list(secs)
+    assert order.index([t for t in order if "WINDOWS" in t][0]) < order.index(
+        [t for t in order if "LINUX" in t][0]
+    )
+    # the reverse-shell listener + certutil transfer are present with the real IP filled
+    flat = "\n".join(i.command for s in secs.values() for i in s.items)
+    assert "listener_add --addr 0.0.0.0:9091 --to 127.0.0.1:443" in flat
+    assert "http://10.10.14.7:8000/agent.exe" in flat

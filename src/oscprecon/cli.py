@@ -431,6 +431,15 @@ def pivot_cmd(
         if step.note:
             typer.echo(f"  # {step.note}")
         typer.echo("")
+    typer.echo("# ═══ Ligolo reference — serve · transfer · tunnel · console ═══\n")
+    for section in ligolo.ligolo_reference_sections(ip, port=port, agent_os=agent_os):
+        typer.echo(f"── {section.title} ──")
+        typer.echo(f"  # {section.subtitle}")
+        for item in section.items:
+            typer.echo(f"  • {item.label}")
+            for line in item.command.split("\n"):
+                typer.echo(f"      {line}")
+        typer.echo("")
     typer.echo("# ── Other pivot methods (when ligolo isn't an option) ──")
     for method in ligolo.PIVOT_METHODS:
         typer.echo(f"── {method.name}  —  {method.when} ──")

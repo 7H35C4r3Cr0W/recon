@@ -15,10 +15,17 @@ It runs **offline** and makes **no LLM calls at runtime**.
 - **Exploitation (separate tab, owner-authorized).** A human-driven attack console: it *builds* the
   exact command, *runs* it only when **you** press **Run** and confirm the target, and *parses* the
   output into loot. Nothing auto-runs, nothing chains. See **Exploitation & spraying**.
-- **Pivot (separate tab).** A guided **ligolo-ng** command-builder for reaching an internal network
-  from a foothold — a **Linux ↔ Windows** switch swaps the agent delivery, the steps update live, and
-  inline how-to + GitHub/releases links keep it current. Nabu never runs ligolo; you copy and run each
-  command. Once the route is up, *scan a host / range* through the tunnel from the same tab.
+- **Pivot (separate tab).** A guided, **end-to-end ligolo-ng** command-builder for reaching an
+  internal network from a foothold — the whole flow, spelled out for beginners: **download the
+  binaries off GitHub → find your tun0 IP → start the proxy → serve + pull the agent onto the target
+  → build the tunnel → scan through it**. A **Linux ↔ Windows** switch swaps the agent delivery and
+  reorders the transfer menus; the steps fill your tun0 IP + routes live. A **reference section**
+  lists *every* way to serve the agent (python/php/ruby/busybox/updog/SMB), pull it onto a Windows or
+  Linux target (IWR / WebClient / certutil / curl / bitsadmin / SMB · wget / curl), tunnel reverse
+  shells + files back through the pivot (`listener_add`), transfer filelessly in a stripped shell
+  (base64), and the ligolo console command reference — plus SSH/chisel/sshuttle/socat/plink for when
+  ligolo isn't an option. Nabu never runs ligolo; you copy each command. `nabu-cli pivot` prints the
+  same thing headless.
 
 ## The shape of a session
 
