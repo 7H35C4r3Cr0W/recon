@@ -1137,7 +1137,9 @@ class MainWindow(QMainWindow):
         selected = service if isinstance(service, DiscoveredService) else None
         self._current_service = selected  # remember it so the cred vault can reload this panel
         ref = references.match(selected) if selected is not None else None
-        self._tool_panel.show_service(selected, ref)
+        # a service under a pivoted host must build commands against THAT host, not the entry target
+        host_ip = self._service_tree.selected_service_host_ip()
+        self._tool_panel.show_service(selected, ref, host_ip=host_ip)
         # findings for this service feed the reference pane's finding-aware HackTricks jump
         service_findings = None
         if selected is not None and ref is not None and self._profile is not None:

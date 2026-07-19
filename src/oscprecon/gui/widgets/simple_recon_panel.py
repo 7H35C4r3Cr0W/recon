@@ -32,6 +32,7 @@ class SimpleReconPanel(QWidget):
         super().__init__()
         self._spec = spec
         self._profile: Profile | None = None
+        self._host_ip = ""  # a pivoted host's IP; "" = the entry target
         self._port = 0
 
         self._recon = QPushButton(spec.label)
@@ -67,7 +68,8 @@ class SimpleReconPanel(QWidget):
         self._profile = profile
         self._reload_manual()
 
-    def configure(self, service: DiscoveredService) -> None:
+    def configure(self, service: DiscoveredService, host_ip: str = "") -> None:
+        self._host_ip = host_ip
         self._port = service.port
         self._reload_manual()
 
@@ -85,7 +87,9 @@ class SimpleReconPanel(QWidget):
             return
         target = self._profile.target
         for entry in manual_commands.load_manual_commands(self._spec.manual_yaml):
-            command = manual_commands.expand(entry.command, target=target.ip, port=self._port)
+            command = manual_commands.expand(
+                entry.command, target=(self._host_ip or target.ip), port=self._port
+            )
             item = QListWidgetItem(f"{entry.description}\n    {command}")
             item.setData(_COMMAND_ROLE, command)
             self._manual.addItem(item)

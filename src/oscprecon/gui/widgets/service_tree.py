@@ -155,6 +155,19 @@ class ServiceTree(QTreeWidget):
             parent = parent.parent()
         return False
 
+    def selected_service_host_ip(self) -> str:
+        # the IP the CURRENT service belongs to: a pivoted host's IP (walk up to its host row) or ""
+        # for an entry-target service. Lets the tool panels build commands against the right host
+        # instead of always the entry box.
+        item = self.currentItem()
+        parent = item.parent() if item is not None else None
+        while parent is not None:
+            host = parent.data(0, _HOST_ROLE)
+            if isinstance(host, DiscoveredHost):
+                return host.ip
+            parent = parent.parent()
+        return ""
+
     def populate(
         self,
         services: list[DiscoveredService],

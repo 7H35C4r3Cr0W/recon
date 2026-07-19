@@ -32,6 +32,7 @@ class FtpPanel(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._profile: Profile | None = None
+        self._host_ip = ""  # a pivoted host's IP; "" = the entry target
         self._port = 21
 
         self._full = QPushButton("Run full FTP recon (bounded walk)")
@@ -69,8 +70,9 @@ class FtpPanel(QWidget):
         self._profile = profile
         self._reload_manual()
 
-    def configure(self, service: DiscoveredService) -> None:
+    def configure(self, service: DiscoveredService, host_ip: str = "") -> None:
         self._port = service.port
+        self._host_ip = host_ip
         self._reload_manual()
 
     def set_running(self, running: bool) -> None:
@@ -89,7 +91,8 @@ class FtpPanel(QWidget):
         target = self._profile.target
         # the manual templates write ftp://{target}/... — fold a non-default port into the host
         # authority so every follow-up hits the real port (curl would otherwise default to :21).
-        host = target.ip if self._port == 21 else f"{target.ip}:{self._port}"
+        ip = self._host_ip or target.ip
+        host = ip if self._port == 21 else f"{ip}:{self._port}"
         for entry in manual_commands.load_manual_commands(_MANUAL_YAML):
             command = manual_commands.expand(entry.command, target=host, port=self._port)
             item = QListWidgetItem(f"{entry.description}\n    {command}")

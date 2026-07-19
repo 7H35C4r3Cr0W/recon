@@ -251,7 +251,11 @@ class ToolPanel(QWidget):
         for panel in self._simple.values():
             panel.set_profile(profile)
 
-    def show_service(self, service: DiscoveredService | None, ref: ServiceRef | None) -> None:
+    def show_service(
+        self, service: DiscoveredService | None, ref: ServiceRef | None, host_ip: str = ""
+    ) -> None:
+        # host_ip != "" when the service belongs to a PIVOTED host — every panel then targets that
+        # host instead of the entry box (else feroxbuster/smb/etc. would recon the wrong machine).
         self._hints.clear()
         if service is None:
             self._header.setText(
@@ -260,36 +264,37 @@ class ToolPanel(QWidget):
             self._stack.setCurrentIndex(0)
             return
         label = ref.label if ref is not None else service.service
-        self._header.setText(f"{service.port}/{service.proto.value} — {label}")
+        pivot = f"  ·  pivot host {host_ip}" if host_ip else ""
+        self._header.setText(f"{service.port}/{service.proto.value} — {label}{pivot}")
         if ref is not None and ref.module == "http":
-            self._http.configure(service, ref)
-            self._urls.configure(service)
-            self._vhost.configure(service)
+            self._http.configure(service, ref, host_ip)
+            self._urls.configure(service, host_ip)
+            self._vhost.configure(service, host_ip)
             self._stack.setCurrentWidget(self._web_tabs)
             return
         if ref is not None and ref.module == "smb":
-            self._smb.configure(service)
+            self._smb.configure(service, host_ip)
             self._stack.setCurrentWidget(self._smb)
             return
         if ref is not None and ref.module == "ftp":
-            self._ftp.configure(service)
+            self._ftp.configure(service, host_ip)
             self._stack.setCurrentWidget(self._ftp)
             return
         if ref is not None and ref.module == "ssh":
-            self._ssh.configure(service)
+            self._ssh.configure(service, host_ip)
             self._stack.setCurrentWidget(self._ssh)
             return
         if ref is not None and ref.module == "dns":
-            self._dns.configure(service)
+            self._dns.configure(service, host_ip)
             self._stack.setCurrentWidget(self._dns)
             return
         if ref is not None and ref.module == "ldap":
-            self._ldap.configure(service)
+            self._ldap.configure(service, host_ip)
             self._stack.setCurrentWidget(self._ldap)
             return
         if ref is not None and ref.module in self._simple:
             panel = self._simple[ref.module]
-            panel.configure(service)
+            panel.configure(service, host_ip)
             self._stack.setCurrentWidget(panel)
             return
         self._stack.setCurrentIndex(0)
@@ -297,7 +302,10 @@ class ToolPanel(QWidget):
             return
         for hint in ref.tools:
             expanded = expand_hint(
-                hint.name, target=self._target, port=service.port, proto=service.proto.value
+                hint.name,
+                target=host_ip or self._target,
+                port=service.port,
+                proto=service.proto.value,
             )
             item = QListWidgetItem(f"{expanded}\n    {hint.purpose}")
             item.setData(_COMMAND_ROLE, expanded)

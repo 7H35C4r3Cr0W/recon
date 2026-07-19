@@ -62,6 +62,7 @@ class DiscoveredUrlsPanel(QWidget):
     def __init__(self, theme_name: str = "dark") -> None:
         super().__init__()
         self._profile: Profile | None = None
+        self._host_ip = ""  # a pivoted host's IP; "" = the entry target
         self._port = 0
         self._tls = False
         self._theme = theme_name
@@ -123,8 +124,9 @@ class DiscoveredUrlsPanel(QWidget):
         self._profile = profile
         self.refresh()
 
-    def configure(self, service: DiscoveredService) -> None:
+    def configure(self, service: DiscoveredService, host_ip: str = "") -> None:
         self._port = service.port
+        self._host_ip = host_ip
         self._tls = is_tls(service.service, service.port)
         self.refresh()
 
@@ -182,7 +184,7 @@ class DiscoveredUrlsPanel(QWidget):
         # trailing bool marks a source/backup/VCS disclosure (.swp/.bak/.git/~) — flagged loud.
         if self._profile is None or self._port == 0:
             return []
-        host = self._profile.target.host
+        host = self._host_ip or self._profile.target.host
         base = default_url(host, self._port, self._tls).rstrip("/")
         by_key: dict[tuple[int, str], tuple[int, str, int, int, int, str, bool]] = {}
         for f in findings_mod.load_findings(self._profile.directory):

@@ -308,12 +308,15 @@ class HttpPanel(QWidget):
         self._apply_settings(profile.module_settings.get("http", {}))
         self._reload_manual()
 
-    def configure(self, service: DiscoveredService, ref: ServiceRef) -> None:
+    def configure(self, service: DiscoveredService, ref: ServiceRef, host_ip: str = "") -> None:
         self._port = service.port
         tls = is_tls(service.service, service.port)
-        host = self._profile.target.ip if self._profile is not None else ""
-        if self._profile is not None and self._profile.target.hostname:
-            host = self._profile.target.hostname
+        if host_ip:  # a pivoted host — target its IP, not the entry box (no hostname for it)
+            host = host_ip
+        else:
+            host = self._profile.target.ip if self._profile is not None else ""
+            if self._profile is not None and self._profile.target.hostname:
+                host = self._profile.target.hostname
         self._url.setText(default_url(host, service.port, tls))
         self._output_is_custom = False  # a new port re-derives the default output path
         self._refresh()

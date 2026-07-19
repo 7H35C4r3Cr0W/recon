@@ -35,6 +35,7 @@ class LdapPanel(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._profile: Profile | None = None
+        self._host_ip = ""  # a pivoted host's IP; "" = the entry target
         self._port = 389
 
         self._basedn = QLineEdit()
@@ -84,7 +85,8 @@ class LdapPanel(QWidget):
                 self._basedn.setText(derived)
         self._reload_manual()
 
-    def configure(self, service: DiscoveredService) -> None:
+    def configure(self, service: DiscoveredService, host_ip: str = "") -> None:
+        self._host_ip = host_ip
         self._port = service.port
         self._reload_manual()
 
@@ -120,7 +122,7 @@ class LdapPanel(QWidget):
         for entry in manual_commands.load_manual_commands(_MANUAL_YAML):
             command = manual_commands.expand(
                 entry.command,
-                target=target.ip,
+                target=(self._host_ip or target.ip),
                 port=self._port,
                 basedn=basedn,
                 user=user,

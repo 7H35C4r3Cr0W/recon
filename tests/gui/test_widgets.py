@@ -173,6 +173,36 @@ def test_service_tree_host_and_subnet_roles(qtbot: QtBot) -> None:
     assert subnet_item.data(0, _SUBNET_ROLE) == "10.10.5.0/24"  # type: ignore[attr-defined]
 
 
+def test_tool_panel_targets_pivot_host_not_entry(qtbot: QtBot, tmp_path: object) -> None:
+    # regression: a service under a pivoted host built every command against the ENTRY target.
+    # With host_ip passed through show_service, the panels must target that host instead.
+    from pathlib import Path
+
+    from oscprecon.profile import Profile
+
+    panel = ToolPanel()
+    qtbot.addWidget(panel)
+    prof = Profile.create(Path(str(tmp_path)), "dante", Target(ip="10.10.110.100"))
+    panel.set_profile(prof)
+    svc = DiscoveredService(80, Proto.TCP, "http")
+    ref = references.match(svc)
+    panel.show_service(svc, ref, host_ip="172.16.1.5")
+    assert panel._http._url.text() == "http://172.16.1.5/"  # the pivot host, not the entry
+    assert "pivot host 172.16.1.5" in panel._header.text()
+    panel.show_service(svc, ref, host_ip="")  # an entry-target service still uses the entry IP
+    assert panel._http._url.text() == "http://10.10.110.100/"
+    # a generic hint also honours the pivot host
+    gref = references.ServiceRef(
+        label="Generic",
+        hacktricks="https://book.hacktricks.wiki/x",
+        module="genericsvc",
+        tools=[references.ToolHint(name="nmap -sV {target}", purpose="version scan")],
+    )
+    panel.show_service(DiscoveredService(9999, Proto.TCP, "genericsvc"), gref, host_ip="172.16.1.5")
+    panel._on_hint_activated(panel._hints.item(0))
+    assert "172.16.1.5" in panel._command.text()
+
+
 def test_tool_panel_populates_hints_and_expands(qtbot: QtBot) -> None:
     panel = ToolPanel()
     qtbot.addWidget(panel)

@@ -32,6 +32,7 @@ class SshPanel(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self._profile: Profile | None = None
+        self._host_ip = ""  # a pivoted host's IP; "" = the entry target
         self._port = 22
 
         self._recon = QPushButton("Run full SSH recon (banner, algos, host keys, auth methods)")
@@ -65,8 +66,9 @@ class SshPanel(QWidget):
         self._profile = profile
         self._reload_manual()
 
-    def configure(self, service: DiscoveredService) -> None:
+    def configure(self, service: DiscoveredService, host_ip: str = "") -> None:
         self._port = service.port
+        self._host_ip = host_ip
         self._reload_manual()
 
     def set_running(self, running: bool) -> None:
@@ -85,7 +87,9 @@ class SshPanel(QWidget):
         # ssh uses `-p PORT user@host`, not host:port — keep {target} a bare host and let {port}
         # carry the port into every template (both the nmap and the ssh follow-ups).
         for entry in manual_commands.load_manual_commands(_MANUAL_YAML):
-            command = manual_commands.expand(entry.command, target=target.ip, port=self._port)
+            command = manual_commands.expand(
+                entry.command, target=(self._host_ip or target.ip), port=self._port
+            )
             item = QListWidgetItem(f"{entry.description}\n    {command}")
             item.setData(_COMMAND_ROLE, command)
             self._manual.addItem(item)

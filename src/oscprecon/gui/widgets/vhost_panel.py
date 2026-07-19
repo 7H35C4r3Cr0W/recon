@@ -143,7 +143,9 @@ class VhostPanel(QWidget):
         self._loading = False
         self._apply_settings(profile.module_settings.get("vhost", {}))
 
-    def configure(self, service: DiscoveredService) -> None:
+    def configure(self, service: DiscoveredService, host_ip: str = "") -> None:
+        if host_ip:
+            self._target = host_ip  # a pivoted host — fuzz vhosts against its IP
         self._loading = True
         self._scheme.setCurrentText("https" if is_tls(service.service, service.port) else "http")
         self._loading = False
