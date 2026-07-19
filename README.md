@@ -45,8 +45,13 @@ shipped as actions.
   hits ranked first, capped to the top 15 with a "showing top N of M" note — linkout only, never run).
 - **Surgical recon, not all-or-nothing** — the **Run Recon** split-button chooses how heavy to go: a
   single click runs a fast **Quick** scan (top-1000 TCP), and its ▾ menu offers every profile
-  (Quick / Default / Full / Exam), a custom scan, and individual nmap presets. Each service panel is
-  likewise granular (e.g. SMB: full recon, or just null-session / guest / shares).
+  (Quick / Default / Full / Exam), a custom scan, and **category-grouped nmap presets** (Fast /
+  Full-TCP / Version / UDP / Firewall-IDS-evasion / AD-Windows / Service / Host-discovery / OS-Vuln,
+  filterable, each with a "what it's for" note). Each service panel is likewise granular (e.g. SMB:
+  full recon, or just null-session / guest / shares).
+- **Stop any scan** — while recon runs, the **Run** button becomes a red **⏹ Stop**, and a status
+  bar shows every in-flight scan with its own **⏹ Stop** (plus Stop-all) so a long scan is never
+  something you're stuck watching. `Ctrl+.` stops everything.
 - **Custom & range scanning** — a "Scan a host / range" dialog with full nmap-flag control (scan type
   `-sT`/`-sS`/`-sU`/`-sn`, `-Pn`, ports, timing, NSE, free-form extra flags) and a live preview + raw-edit
   escape hatch. Target can be a single IP **or a whole `/24`**.
@@ -74,11 +79,13 @@ shipped as actions.
   exact attack command pre-filled from the profile + a chosen vault credential. **Nothing auto-runs**:
   you pick an action and press **Run ▸**, which confirms the target before executing **one** command
   (never a chain), then **Parse** extracts dumped hashes/creds into the vault. Attacker-side actions get
-  a Run button; victim-side privesc/reverse-shells are copy-only. Includes a **🎯 msfvenom payload
-  builder** — pick platform → payload → format, fill LHOST/LPORT, and copy the exact `msfvenom` command
-  **plus its matching listener** (exam-safe non-meterpreter default; meterpreter flagged as one-use).
-  Exam-legal by the OSCP+ guide (manual attack scripts allowed); SQLmap/Metasploit-modules are never
-  shipped as actions.
+  a Run button; victim-side privesc/reverse-shells are copy-only. The **Active Directory** service is
+  exhaustively covered (130+ actions: PowerView/LOTL/BloodHound enum, Kerberos incl. Rubeus, ADCS ESC,
+  coercion, delegation/ACL abuse, DCSync/gMSA/DPAPI, DCOM/winrs lateral, noPac/PrintNightmare/Zerologon,
+  SCCM). Two copy-only helpers: a **🔍 GTFOBins** lookup (search a SUID/sudo binary → the break-out)
+  and a **🎯 msfvenom payload builder** (platform → payload → format → the command **plus its listener**;
+  exam-safe non-meterpreter default). Exam-legal by the OSCP+ guide (manual attack scripts allowed);
+  SQLmap/Metasploit-modules are never shipped as actions.
 - **Workspace dashboard** — searchable/filterable table of every project, with locking, health checks,
   and portable `<name>.tar.gz` import/export.
 - **Light / dark theme**, offline splash, and a **diagnostics log** (Help → View Diagnostics Log).
