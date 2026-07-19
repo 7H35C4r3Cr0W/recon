@@ -16,6 +16,7 @@ _ITEMS: tuple[tuple[str, str, str, bool, str], ...] = (
     ("workspace", "Workspace", "home", False, "Ctrl+0"),
     ("recon", "Recon", "target", False, ""),
     ("exploit", "Exploitation", "bolt", False, ""),
+    ("pivot", "Pivot", "pivot", False, ""),
     ("graph", "Graph", "graph", False, "Ctrl+G"),
     ("findings", "Findings", "flag", False, ""),
     ("credentials", "Credentials", "key", True, ""),

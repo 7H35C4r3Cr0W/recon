@@ -41,7 +41,6 @@ from oscprecon.gui.dialogs import (
     CredentialVaultDialog,
     DoctorDialog,
     HelpPopup,
-    LigoloHelperDialog,
     LogViewerDialog,
     NewProfileDialog,
     NmapScanDialog,
@@ -58,6 +57,7 @@ from oscprecon.gui.widgets.findings_view import FindingsView
 from oscprecon.gui.widgets.graph_view import GraphView
 from oscprecon.gui.widgets.nav_rail import NavRail
 from oscprecon.gui.widgets.notes_pane import NotesPane
+from oscprecon.gui.widgets.pivot_panel import PivotPanel
 from oscprecon.gui.widgets.reference_pane import ReferencePane
 from oscprecon.gui.widgets.report_view import ReportView
 from oscprecon.gui.widgets.service_tree import ServiceTree
@@ -188,23 +188,11 @@ class MainWindow(QMainWindow):
         self._run_button.clicked.connect(lambda: self._start_recon("quick"))
         self._build_run_menu()
 
-        # a visible Pivot control so ligolo-ng isn't buried in a menu — one click to the helper,
-        # plus importing a pivot scan / scanning a range across the tunnel.
-        self._pivot_button = QToolButton()
-        self._pivot_button.setText("🔀 Pivot…")
-        self._pivot_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        self._pivot_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self._pivot_button.setToolTip(
-            "Pivot into an internal network — Ligolo-ng helper, import a pivot scan, scan a /24"
-        )
-        pivot_menu = QMenu(self._pivot_button)
-        lig = pivot_menu.addAction("🔀 Ligolo-ng helper…")
-        lig.triggered.connect(self._on_ligolo_helper)
-        addnet = pivot_menu.addAction("Add pivoted network (import a scan)…")
-        addnet.triggered.connect(self._on_add_pivot_network)
-        scanrange = pivot_menu.addAction("Scan a host / range…")
-        scanrange.triggered.connect(lambda: self._on_custom_scan())
-        self._pivot_button.setMenu(pivot_menu)
+        # the pivot workflow now lives in its own nav tab (PivotPanel); its post-tunnel actions wire
+        # back to these same handlers.
+        self._pivot_panel = PivotPanel()
+        self._pivot_panel.add_network_requested.connect(self._on_add_pivot_network)
+        self._pivot_panel.scan_range_requested.connect(lambda: self._on_custom_scan())
 
         self._service_tree = ServiceTree()
         self._service_tree.service_selected.connect(self._on_service_selected)
@@ -252,7 +240,6 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self._target_label)
         run_row = QHBoxLayout()
         run_row.addWidget(self._run_button, stretch=1)
-        run_row.addWidget(self._pivot_button)
         left_layout.addLayout(run_row)
         left_layout.addWidget(self._task_bar)
         left_layout.addWidget(self._service_tree, stretch=1)
@@ -288,6 +275,7 @@ class MainWindow(QMainWindow):
         self._central_stack.addWidget(self._findings_view)  # 4: findings
         self._central_stack.addWidget(self._activity_view)  # 5: activity / audit
         self._central_stack.addWidget(self._exploit_panel)  # 6: exploitation (copy-and-run builder)
+        self._central_stack.addWidget(self._pivot_panel)  # 7: pivot (ligolo-ng workflow)
 
         # app shell: compact header on top, primary nav rail on the left, central stack in the body
         theme_name = theme.normalize(settings.theme)
@@ -435,8 +423,8 @@ class MainWindow(QMainWindow):
         presets_dialog_action.triggered.connect(self._on_scan_presets_dialog)
         scan_menu.addAction(presets_dialog_action)
         ligolo_action = QAction("🔀 Pivot with Ligolo-ng...", self)
-        ligolo_action.setStatusTip("Guided ligolo-ng command-builder to reach an internal network")
-        ligolo_action.triggered.connect(self._on_ligolo_helper)
+        ligolo_action.setStatusTip("Open the Pivot tab — guided ligolo-ng command-builder")
+        ligolo_action.triggered.connect(lambda _checked=False: self._show_pivot())
         scan_menu.addAction(ligolo_action)
 
         profile_menu = scan_menu.addMenu("Run recon with profile")
@@ -842,6 +830,7 @@ class MainWindow(QMainWindow):
         4: "findings",
         5: "activity",
         6: "exploit",
+        7: "pivot",
     }
 
     def _sync_nav(self) -> None:
@@ -856,6 +845,8 @@ class MainWindow(QMainWindow):
             self._show_recon()
         elif key == "exploit":
             self._show_exploit()
+        elif key == "pivot":
+            self._show_pivot()
         elif key == "graph":
             self._graph_action.setChecked(True)
         elif key == "report":
@@ -893,6 +884,13 @@ class MainWindow(QMainWindow):
         self._report_action.setChecked(False)
         self._exploit_panel.set_profile(self._profile)  # refresh target/cred picker on entry
         self._central_stack.setCurrentWidget(self._exploit_panel)
+        self._sync_nav()
+
+    def _show_pivot(self) -> None:
+        self._graph_action.setChecked(False)
+        self._report_action.setChecked(False)
+        self._pivot_panel.set_profile(self._profile)  # seed routes from discovered subnets on entry
+        self._central_stack.setCurrentWidget(self._pivot_panel)
         self._sync_nav()
 
     def _on_exploit_loot(self, creds: list[Credential]) -> None:
@@ -1578,16 +1576,6 @@ class MainWindow(QMainWindow):
     def _on_scan_host_requested(self, ip: str) -> None:
         self._on_custom_scan(default_target=ip)  # re-scan this pivoted host deeper
 
-    def _on_ligolo_helper(self) -> None:
-        # a guided ligolo-ng command-builder — pre-seed the route with known subnets so the scan
-        # step points at something concrete. Nabu never runs ligolo; the user copies + runs them.
-        subnets = (
-            sorted({h.subnet for h in self._profile.discovered_hosts if h.subnet})
-            if self._profile
-            else []
-        )
-        LigoloHelperDialog(subnets, self).exec()
-
     def _on_remove_host(self, ip: str) -> None:
         if self._profile is None or self._profile.read_only:
             return
@@ -1974,8 +1962,8 @@ class MainWindow(QMainWindow):
             )
         menu.addSeparator()
         pivot_item = menu.addAction("🔀 Pivot with Ligolo-ng…")
-        pivot_item.setToolTip("Guided ligolo-ng command-builder to reach an internal network")
-        pivot_item.triggered.connect(lambda _checked=False: self._on_ligolo_helper())
+        pivot_item.setToolTip("Open the Pivot tab — guided ligolo-ng command-builder")
+        pivot_item.triggered.connect(lambda _checked=False: self._show_pivot())
         self._run_button.setMenu(menu)
 
     def _on_run(self) -> None:

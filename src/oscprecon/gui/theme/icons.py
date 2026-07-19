@@ -30,6 +30,9 @@ _GLYPHS: dict[str, str] = {
     '<path d="M9 15 V17 M12 11 V17 M15 8 V17"/>',
     "pulse": '<path d="M3 12 H8 L10 6 L14 18 L16 12 H21"/>',
     "bolt": '<path d="M13 2 L4 14 H11 L10 22 L20 9 H13 Z"/>',  # exploitation tab
+    # pivot tab: one foothold node branching into two internal hosts (reach an internal network)
+    "pivot": '<circle cx="5" cy="12" r="2.2"/><circle cx="19" cy="6" r="2.2"/>'
+    '<circle cx="19" cy="18" r="2.2"/><path d="M7.1 11 L16.8 6.9 M7.1 13 L16.8 17.1"/>',
 }
 
 

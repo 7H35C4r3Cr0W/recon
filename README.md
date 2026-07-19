@@ -50,10 +50,15 @@ shipped as actions.
 - **Custom & range scanning** — a "Scan a host / range" dialog with full nmap-flag control (scan type
   `-sT`/`-sS`/`-sU`/`-sn`, `-Pn`, ports, timing, NSE, free-form extra flags) and a live preview + raw-edit
   escape hatch. Target can be a single IP **or a whole `/24`**.
-- **Pivot topology** — for a CTF/AD engagement that starts at one host and pivots inward (you tunnel with
-  ligolo-ng): scan an internal `/24` and hosts **stream** into the recon tree and the graph as they're
-  found, grouped by subnet with the pivot source they were reached through. Right-click to remove a host
-  or subnet, or re-scan a host deeper — the tree and graph stay in sync.
+- **Pivot tab** — a dedicated, guided **ligolo-ng** command-builder for reaching an internal network from
+  a foothold. Fill in your tun0 IP / port / interface / routes and the copy-paste steps update live, with
+  a **Linux ↔ Windows** switch that swaps the agent delivery (wget+chmod vs PowerShell `iwr`/certutil).
+  Inline how-to + GitHub / releases / docs links + a version-currency note (ligolo-ng changes often). Nabu
+  never runs ligolo — it's the "shown, you run it" model. From the same tab: *import a pivot scan* or
+  *scan a host / range* through the tunnel.
+- **Pivot topology** — scan an internal `/24` and hosts **stream** into the recon tree and the graph as
+  they're found, grouped by subnet with the pivot source they were reached through. Right-click to remove
+  a host or subnet, or re-scan a host deeper — the tree and graph stay in sync.
 - **BloodHound-style graph** (`Ctrl+G`) — icon nodes with corner glyphs (danger / OS / status / note),
   a **progressive drill-down** pivot topology: it opens centred on one node (the entry) and expands on
   **double-click** (`entry → /24 → host → service`, all connected by lines), re-laying-out into a clean

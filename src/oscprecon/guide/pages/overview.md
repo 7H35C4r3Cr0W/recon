@@ -15,6 +15,10 @@ It runs **offline** and makes **no LLM calls at runtime**.
 - **Exploitation (separate tab, owner-authorized).** A human-driven attack console: it *builds* the
   exact command, *runs* it only when **you** press **Run** and confirm the target, and *parses* the
   output into loot. Nothing auto-runs, nothing chains. See **Exploitation & spraying**.
+- **Pivot (separate tab).** A guided **ligolo-ng** command-builder for reaching an internal network
+  from a foothold — a **Linux ↔ Windows** switch swaps the agent delivery, the steps update live, and
+  inline how-to + GitHub/releases links keep it current. Nabu never runs ligolo; you copy and run each
+  command. Once the route is up, *scan a host / range* through the tunnel from the same tab.
 
 ## The shape of a session
 
