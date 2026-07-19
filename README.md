@@ -270,15 +270,25 @@ If the GUI or CLI misbehaves, Nabu writes a diagnostic log (crashes, errors, Qt 
 `~/.local/state/oscprecon/logs/nabu.log`. Open it in-app via **Help → View Diagnostics Log…** (with
 buttons to reveal the folder or clear it). On a CLI crash the log path is printed to stderr.
 
-## Kali app menu / taskbar icon
+## Kali app menu / taskbar icon / Desktop launcher
+
+One idempotent script installs everything — no root required (everything lands under `$HOME`):
 
 ```bash
-cp packaging/nabu.desktop ~/.local/share/applications/
-cp packaging/nabu.png ~/.local/share/icons/
-update-desktop-database ~/.local/share/applications/
+packaging/install-desktop.sh        # reverse with packaging/uninstall-desktop.sh
 ```
 
-`Nabu` then appears under the Network/Security app menu (swap `Icon=` in the `.desktop` for your own).
+It installs:
+
+- a **Nabu** launcher (GUI) in the Network/Security app menu — pin it to the taskbar; the running
+  window's `WM_CLASS` matches the launcher so it groups under the pinned icon;
+- a **Nabu CLI** launcher that opens the headless CLI in a terminal;
+- **Desktop icons** for both (marked trusted);
+- hicolor icons at every size, so `Icon=nabu` resolves in any theme;
+- `nabu` and `nabu-cli` symlinks in `~/.local/bin` (already on the Kali PATH), so both run from any
+  terminal.
+
+(A single `packaging/nabu.desktop` with `Exec=nabu` also exists for AppImage/global installs.)
 
 ## Development
 

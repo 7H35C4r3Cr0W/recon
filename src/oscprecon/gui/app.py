@@ -32,6 +32,9 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setApplicationDisplayName(APP_NAME)
+    # why: match the installed `nabu.desktop` so the X11 WM_CLASS lines up — the taskbar/panel then
+    # groups the running window under its pinned launcher instead of a generic "python" entry.
+    app.setDesktopFileName("nabu")
     app.setWindowIcon(QIcon(str(asset_path(ICON))))
 
     splash: NabuSplash | None = None

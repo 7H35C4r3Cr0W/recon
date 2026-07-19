@@ -662,6 +662,42 @@ port (21/25/…) means "a server of this kind", not a specific product. And vend
 still project output: a walkthrough's live creds must never ride in on them. Code changes landed via
 autosync `d2e6a54`; this entry records them.
 
+**30 · Dump (VulnLab, Hard, Linux) — http PHP pcap app (zip arg-injection) → sudo tcpdump → update-motd.d — recon + attack + desktop — live.**
+`10.129.234.97` (`dump.vl`). Two ports: 22/ssh (OpenSSH 8.4p1) + 80/http (Apache **2.4.65**), a
+custom PHP packet-capture app with upload/download/view of pcaps. Ran the full loop live.
+- **Recon (clean):** whatweb fingerprint kept the plugin *values* — `Apache[2.4.65]`,
+  `Title[hdmpll?]`, `PasswordField[password]`, `HTTPServer[Debian Linux]` — matching the writeup
+  exactly. Content discovery surfaced the whole app surface (`index.php`, `upload.php`,
+  `download.php`, `view.php`, `delete.php`, `logout.php`, `downloads/`) and the feroxbuster parser
+  filled the **Discovered URLs** table cleanly (Status·Method·Lines·Words·Bytes·URL). No recon bug.
+- **Attack — added the box's privesc chain (was missing):** the exploit tab present-list was correct
+  (`[ssh, web, webdav]`), but the **`linux` privesc catalog lacked both of Dump's root primitives**.
+  Added two copy-only/victim actions (generic GTFOBins/HackTricks primitives, `source=` cited): 
+  **`sudo-tcpdump`** — GTFOBins tcpdump `-z` postrotate exec, with the AppArmor-bypass pivot to
+  arbitrary file write via `-w …`+`-Z <user>` in the `why`; and **`writable-motd`** — writable
+  `/etc/update-motd.d/` runs as root on the next SSH login → SUID bash. The zip argument-injection
+  foothold + SQLite-cleartext-cred lateral stay **manual** (recon-only default; §21 — no box-specific
+  exploit logic wired in).
+- **GUI bug → fix:** opening the Exploitation tab on a fresh box **landed on "Apache ActiveMQ"** — a
+  service the scan never found — instead of a present one. The ordering was right (present services
+  sort first, ●-marked), but `_populate_services` restored the *incidental init-time* selection as if
+  the user had picked it. Fixed: track a genuine pick via the combo's `activated` signal (fires only
+  on interaction) and, on a fresh load, land on the first present service (● SSH / ● Web). Regression
+  test added; the re-entry-preserves-selection test made faithful (a real dropdown pick emits
+  `activated`).
+- **Desktop deliverable (owner-requested):** `packaging/install-desktop.sh` (+ `uninstall-desktop.sh`)
+  installs a **taskbar/menu launcher** for the GUI, a **terminal launcher** for the headless CLI,
+  **Desktop icons**, hicolor icons, and `~/.local/bin` PATH symlinks (`nabu` / `nabu-cli`). `gui/app.py`
+  now sets `setDesktopFileName("nabu")` so the running window's **WM_CLASS matches `nabu.desktop`** and
+  the panel groups it under its pinned launcher. Validated live on XFCE: GUI launches via the exact
+  `Exec`, `WM_CLASS(STRING) = "nabu","Nabu"`, both `.desktop` files pass `desktop-file-validate`, and
+  `nabu-cli` runs from a clean shell.
+
+**Lesson:** the attack tab must **default to a service discovery actually found** — "keep the user's
+pick across a rebuild" must not treat the incidental alphabetical default as a pick. And a box's root
+primitives that are *generic* techniques (GTFOBins tcpdump, writable update-motd.d) belong in the
+`linux` catalog as copy-only actions — box-specific exploit code does not.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,
