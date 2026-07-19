@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
 
 from oscprecon.gui.task_manager import TaskManager
 from oscprecon.gui.theme import icons, tokens
@@ -35,6 +35,8 @@ class TaskStatusBar(QWidget):
             f" border:1px solid {pal.warning}; border-radius:{tokens.RADIUS_SM}px; }}"
             f"#taskBar QLabel {{ color:{pal.text}; }}"
             f"#taskBar QLabel#taskIdle {{ color:{pal.text_muted}; }}"
+            f"#taskBar QFrame#taskChip {{ background:{pal.surface};"
+            f" border:1px solid {pal.warning}; border-radius:{tokens.RADIUS_SM}px; }}"
             "#taskBar QPushButton {"
             f" color:#ffffff; background:{pal.warning}; border:none; font-weight:700;"
             f" border-radius:{tokens.RADIUS_SM}px; padding:2px {tokens.SPACE_SM}px; }}"
@@ -74,14 +76,21 @@ class TaskStatusBar(QWidget):
         self._row.addWidget(spinner)
         self._row.addWidget(QLabel(f"{len(tasks)} scan{'s' if len(tasks) != 1 else ''} running:"))
         for task in tasks:
-            self._row.addWidget(QLabel(task.label))
+            # each scan is its own bordered chip (label + its Stop) so pairs never blur together
+            chip = QFrame()
+            chip.setObjectName("taskChip")
+            chip_row = QHBoxLayout(chip)
+            chip_row.setContentsMargins(tokens.SPACE_SM, 1, 3, 1)
+            chip_row.setSpacing(tokens.SPACE_XS)
+            chip_row.addWidget(QLabel(task.label))
             button = QPushButton(" Stop")
             button.setIcon(icons.get_icon("stop", "#ffffff", tokens.ICON_SM))
             button.setIconSize(QSize(tokens.ICON_SM, tokens.ICON_SM))
             button.setToolTip(f"Stop {task.label}")
             button.setCursor(Qt.CursorShape.PointingHandCursor)
             button.clicked.connect(lambda _checked=False, worker=task.worker: self._cancel(worker))
-            self._row.addWidget(button)
+            chip_row.addWidget(button)
+            self._row.addWidget(chip)
         if len(tasks) > 1:
             stop_all = QPushButton(" Stop all")
             stop_all.setIcon(icons.get_icon("stop", "#ffffff", tokens.ICON_SM))

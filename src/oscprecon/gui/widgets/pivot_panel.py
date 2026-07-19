@@ -134,8 +134,8 @@ class PivotPanel(QWidget):
             tokens.SPACE_MD, tokens.SPACE_MD, tokens.SPACE_MD, tokens.SPACE_MD
         )
         layout.addLayout(header)
+        layout.addLayout(os_row)  # the OS switch changes every step, so it sits above the inputs
         layout.addLayout(form)
-        layout.addLayout(os_row)
         layout.addWidget(QLabel("Steps:"))
         layout.addWidget(scroll, stretch=1)
         layout.addLayout(actions)

@@ -178,7 +178,7 @@ class MainWindow(QMainWindow):
         self._run_button = QToolButton()
         self._run_button.setText("Run Recon")
         self._run_button.setStyleSheet(styles.accent_tool_button())  # primary recon action
-        self._run_button.setAccessibleName("Run full recon")
+        self._run_button.setAccessibleName("Run quick recon (menu for profiles/custom)")
         self._run_button.setEnabled(False)
         self._run_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         self._run_button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)

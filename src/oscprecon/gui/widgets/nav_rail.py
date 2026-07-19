@@ -11,18 +11,19 @@ from oscprecon.gui.theme.tokens import Palette
 # (notes, credentials) trigger a surface without owning a persistent page. The rail never decides
 # what a destination does; it only announces `navigate(key)` and the MainWindow routes it.
 
-# (key, label, icon, is_action, shortcut-hint)
+# (key, label, icon, is_action, shortcut-hint) — hints match the Ctrl+0..9 bindings that
+# MainWindow._install_nav_shortcuts registers, so every tooltip advertises the real key.
 _ITEMS: tuple[tuple[str, str, str, bool, str], ...] = (
     ("workspace", "Workspace", "home", False, "Ctrl+0"),
-    ("recon", "Recon", "target", False, ""),
-    ("exploit", "Exploitation", "bolt", False, ""),
-    ("pivot", "Pivot", "pivot", False, ""),
-    ("graph", "Graph", "graph", False, "Ctrl+G"),
-    ("findings", "Findings", "flag", False, ""),
-    ("credentials", "Credentials", "key", True, ""),
-    ("notes", "Notes", "note", True, ""),
-    ("report", "Report", "chart", False, "Ctrl+R"),
-    ("activity", "Activity", "pulse", False, ""),
+    ("recon", "Recon", "target", False, "Ctrl+1"),
+    ("exploit", "Exploitation", "bolt", False, "Ctrl+2"),
+    ("pivot", "Pivot", "pivot", False, "Ctrl+3"),
+    ("graph", "Graph", "graph", False, "Ctrl+4 · Ctrl+G"),
+    ("findings", "Findings", "flag", False, "Ctrl+5"),
+    ("credentials", "Credentials", "key", True, "Ctrl+6"),
+    ("notes", "Notes", "note", True, "Ctrl+7"),
+    ("report", "Report", "chart", False, "Ctrl+8 · Ctrl+R"),
+    ("activity", "Activity", "pulse", False, "Ctrl+9"),
 )
 
 PAGE_KEYS = tuple(key for key, _, _, is_action, _ in _ITEMS if not is_action)
