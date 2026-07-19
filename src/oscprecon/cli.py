@@ -414,6 +414,12 @@ def pivot_cmd(
         if step.note:
             typer.echo(f"  # {step.note}")
         typer.echo("")
+    typer.echo("# ── Other pivot methods (when ligolo isn't an option) ──")
+    for method in ligolo.PIVOT_METHODS:
+        typer.echo(f"── {method.name}  —  {method.when} ──")
+        for line in method.commands:
+            typer.echo(f"  {line}")
+        typer.echo("")
     raise typer.Exit(0)
 
 

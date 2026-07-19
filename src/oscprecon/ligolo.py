@@ -36,6 +36,62 @@ class LigoloStep:
     note: str = ""
 
 
+@dataclass(frozen=True)
+class PivotMethod:
+    name: str
+    when: str  # one-line "use this when…"
+    commands: list[str]
+
+
+# Quick reference for the OTHER common pivot methods (CPTS: Pivoting, Tunneling & Port Forwarding) —
+# when ligolo isn't an option (no root for a tun, only SSH, only a web-RCE, a Windows foothold, …).
+# Copy-paste; edit the <ANGLE> placeholders. Recon-only relays/proxies, nothing exploits.
+PIVOT_METHODS: tuple[PivotMethod, ...] = (
+    PivotMethod(
+        "SSH local forward (-L)",
+        "reach ONE internal service through an SSH foothold",
+        ["ssh -L <LPORT>:<INTERNAL_IP>:<PORT> <user>@<pivot>   # then hit 127.0.0.1:<LPORT>"],
+    ),
+    PivotMethod(
+        "SSH dynamic SOCKS (-D)",
+        "proxy ALL your tools into the internal net over SSH",
+        [
+            "ssh -D 9050 -fN <user>@<pivot>",
+            "# add 'socks5 127.0.0.1 9050' to /etc/proxychains.conf, then: proxychains <tool> <ip>",
+        ],
+    ),
+    PivotMethod(
+        "SSH reverse forward (-R)",
+        "expose YOUR listener to the internal net (catch a shell / serve a file)",
+        ["ssh -R <pivot_port>:127.0.0.1:<LPORT> <user>@<pivot>"],
+    ),
+    PivotMethod(
+        "chisel SOCKS (no SSH)",
+        "SOCKS tunnel when you only have web/RCE — no SSH creds",
+        [
+            "./chisel server -p 1234 --reverse --socks5              # on Kali",
+            "./chisel client <KALI>:1234 R:socks                     # on the pivot -> SOCKS :1080",
+            "# proxychains (socks5 127.0.0.1 1080) then run your tools",
+        ],
+    ),
+    PivotMethod(
+        "sshuttle (no proxychains)",
+        "VPN-like: route a whole subnet over SSH, no proxychains",
+        ["sshuttle -r <user>@<pivot> 172.16.5.0/23       # add -x <pivot_ip> to avoid loops"],
+    ),
+    PivotMethod(
+        "socat port relay",
+        "relay a single internal port through the pivot host",
+        ["socat TCP4-LISTEN:<LPORT>,fork TCP4:<INTERNAL_IP>:<PORT>    # run on the pivot"],
+    ),
+    PivotMethod(
+        "plink (Windows pivot)",
+        "dynamic SOCKS from a Windows foothold (PuTTY's plink)",
+        ["plink -ssh -D 9050 <user>@<pivot>"],
+    ),
+)
+
+
 def detect_tun_ip(iface: str = "tun0") -> str:
     # best-effort: the VPN/tunnel IP the agent should dial back to. Linux-only ioctl; "" on failure
     # (non-Linux, no such iface) so the dialog just leaves the field blank for the user to fill.

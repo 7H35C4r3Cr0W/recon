@@ -179,7 +179,40 @@ class PivotPanel(QWidget):
         )
         for step in steps:
             self._steps_layout.addWidget(self._step_card(step))
+        # quick reference for the other pivot methods (SSH -L/-R/-D, chisel, sshuttle, socat, plink)
+        sep = QLabel("──  Other pivot methods (when ligolo isn't an option)  ──")
+        sep.setStyleSheet(f"color:{tokens.active_palette().text_muted}; padding-top:8px;")
+        sep.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        self._steps_layout.addWidget(sep)
+        for method in ligolo.PIVOT_METHODS:
+            self._steps_layout.addWidget(self._method_card(method))
         self._steps_layout.addStretch(1)
+
+    def _method_card(self, method: ligolo.PivotMethod) -> QWidget:
+        pal = tokens.active_palette()
+        card = QFrame()
+        card.setFrameShape(QFrame.Shape.StyledPanel)
+        card.setStyleSheet(
+            f"QFrame {{ background:{pal.surface}; border:1px solid {pal.border};"
+            f" border-radius:{tokens.RADIUS_SM}px; }}"
+        )
+        outer = QVBoxLayout(card)
+        head = QLabel(f"<b>{method.name}</b> — <i>{method.when}</i>")
+        head.setWordWrap(True)
+        outer.addWidget(head)
+        text = "\n".join(method.commands)
+        body = QPlainTextEdit(text)
+        body.setReadOnly(True)
+        body.setFont(QFont("monospace"))
+        body.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        body.setFixedHeight(22 + 18 * max(1, len(method.commands)))
+        row = QHBoxLayout()
+        row.addWidget(body, stretch=1)
+        copy = QPushButton("Copy")
+        copy.clicked.connect(lambda _=False, t=text: self._copy(t))
+        row.addWidget(copy, alignment=Qt.AlignmentFlag.AlignTop)
+        outer.addLayout(row)
+        return card
 
     def _step_card(self, step: ligolo.LigoloStep) -> QWidget:
         pal = tokens.active_palette()
