@@ -53,6 +53,7 @@ def scan(
     ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
+    """Run the staged nmap recon against a target and save findings to a profile."""
     root = workspace if workspace is not None else config.workspace_root()
     profile_choice = (
         scan_profile if scan_profile is not None else config.load_settings().scan_profile
@@ -107,6 +108,7 @@ def export_vault_cmd(
     ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
+    """Export a profile to an Obsidian vault as linked markdown (creds redacted)."""
     root = workspace if workspace is not None else config.workspace_root()
     directory = Path(root) / profile
     if not (directory / "profile.json").exists():
