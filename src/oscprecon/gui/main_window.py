@@ -1980,8 +1980,17 @@ class MainWindow(QMainWindow):
         more.triggered.connect(lambda _checked=False: self._on_scan_presets_dialog())
         presets = menu.addMenu("Nmap presets")
         presets.setToolTipsVisible(True)  # so each preset's note shows on hover in the dropdown
+        # group presets into per-category submenus (Fast / Stealth / UDP / AD / …) so the operator
+        # drills into a kind of scan and picks among several of the same type.
+        submenus: dict[str, QMenu] = {}
         for preset in load_manual_commands(_SCAN_PRESETS):
-            item = presets.addAction(preset.description)
+            cat = preset.category or "Other"
+            sub = submenus.get(cat)
+            if sub is None:
+                sub = presets.addMenu(cat)
+                sub.setToolTipsVisible(True)
+                submenus[cat] = sub
+            item = sub.addAction(preset.description)
             item.setToolTip(preset.why)
             item.triggered.connect(
                 lambda _checked=False, cmd=preset.command: self._on_scan_preset(cmd)

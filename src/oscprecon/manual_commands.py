@@ -12,6 +12,7 @@ class ManualCommand:
     why: str
     command: str
     requires: list[str] = field(default_factory=list)
+    category: str = ""  # optional grouping (used by the nmap scan-preset chooser)
 
 
 def load_manual_commands(path: Path) -> list[ManualCommand]:
@@ -33,6 +34,7 @@ def load_manual_commands(path: Path) -> list[ManualCommand]:
                 why=str(entry.get("why", "")),
                 command=str(entry.get("command", "")),
                 requires=requires,
+                category=str(entry.get("category", "")),
             )
         )
     return commands

@@ -1,124 +1,178 @@
 # Nmap scan presets (§8, §2-allowed) surfaced under Scan -> Nmap presets and the "More scan
-# options…" chooser. Each pre-fills the command builder with {target} filled from the active
-# profile (or opens the chooser where the note is shown before you Run). Recon-only, exam-legal:
-# plain nmap, no brute (`--script *brute*`), no spoofing (no -D decoy / -S spoofed-source /
-# --spoof-mac). The `why` line is the note shown when you highlight the scan.
+# options…" chooser, GROUPED BY `category` so you can pick the right kind of scan for the situation
+# (and see more of the same kind together). Each pre-fills the command builder with {target} filled
+# from the active profile. Recon-only, exam-legal: plain nmap, no brute (`--script *brute*`), no
+# spoofing (no -D decoy / -S spoofed-source / --spoof-mac). The `why` line is the note shown when you
+# highlight the scan.
 
-# --- Triage / first look --------------------------------------------------------------------------
-- description: "Quick triage — top 100 ports"
+# =================================================================================================
+# Fast / triage — confirm it's alive and get a first look quickly
+# =================================================================================================
+- category: "Fast / triage"
+  description: "Quick triage — top 100 ports"
   why: "Fastest possible first look — the 100 most common ports. Confirm it's alive, then go deeper."
   command: "nmap --top-ports 100 -T4 {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
 
-- description: "Common ports, versioned (one fast pass)"
+- category: "Fast / triage"
+  description: "Fast scan (-F, top 100) + versions"
+  why: "The -F shortcut (100 common ports) with service versions — a quick 'what's here' in one pass."
+  command: "nmap -F -sV -T4 {target}"
+
+- category: "Fast / triage"
+  description: "Common ports, versioned (one fast pass)"
   why: "Top-1000 ports WITH service versions in a single fast pass — good default when time is short."
   command: "nmap -sV --top-ports 1000 -T4 {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
 
-# --- Full TCP -------------------------------------------------------------------------------------
-- description: "Full TCP sweep, speed-tuned"
+# =================================================================================================
+# Full TCP — every one of the 65535 ports
+# =================================================================================================
+- category: "Full TCP"
+  description: "Full TCP sweep, speed-tuned"
   why: "All 65535 TCP ports, rate-boosted to finish fast under exam time pressure. No versions yet."
   command: "nmap -p- --min-rate 2000 -T4 {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
 
-- description: "Full TCP sweep, host assumed up (-Pn)"
+- category: "Full TCP"
+  description: "Full TCP sweep, host assumed up (-Pn)"
   why: "Windows/filtered hosts that drop ICMP echo would otherwise scan as down — -Pn skips the ping."
   command: "nmap -p- -Pn {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Initial Recon.md
 
-# --- Version / deep enumeration -------------------------------------------------------------------
-- description: "Default scripts + version (-sC -sV)"
+- category: "Full TCP"
+  description: "Full TCP, no ping, no DNS (fastest raw sweep)"
+  why: "Skip host-discovery and reverse-DNS entirely — the leanest all-ports sweep for a known-up host."
+  command: "nmap -p- -Pn -n --min-rate 2000 {target}"
+
+# =================================================================================================
+# Version & scripts — identify services and run safe default NSE
+# =================================================================================================
+- category: "Version & scripts"
+  description: "Default scripts + version (-sC -sV)"
   why: "The standard 'what is this?' scan — service versions plus safe default NSE on the open ports."
   command: "nmap -sC -sV {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Initial Recon.md
 
-- description: "Aggressive scan (-A: OS · version · scripts · traceroute)"
+- category: "Version & scripts"
+  description: "Aggressive scan (-A: OS · version · scripts · traceroute)"
   why: "Everything at once — OS guess, versions, default scripts and traceroute. Thorough but loud."
   command: "nmap -A {target}"
-# source: Obsidian: Courses/HTB/.../CPTS/Review-Cheatsheet/Network Enumeration with NMAP.md
 
-- description: "Max-intensity version detection"
+- category: "Version & scripts"
+  description: "Max-intensity version detection"
   why: "For stubborn/unknown services the default -sV can't identify — probes harder at every port."
   command: "nmap -sV --version-intensity 9 {target}"
-# source: Obsidian: Courses/HTB/.../CPTS/Review-Cheatsheet/Network Enumeration with NMAP.md
 
-# --- UDP ------------------------------------------------------------------------------------------
-- description: "UDP quick triage (top 20)"
+- category: "Version & scripts"
+  description: "Banner grab (lightweight NSE)"
+  why: "Just the banner script on open ports — cheap service identification when -sV is too slow/loud."
+  command: "nmap -sV --script banner {target}"
+
+# =================================================================================================
+# UDP — SNMP / DNS / TFTP / NTP / NetBIOS hide here (TCP scans never see them)
+# =================================================================================================
+- category: "UDP"
+  description: "UDP quick triage (top 20)"
   why: "Fast UDP look — SNMP/DNS/TFTP/NTP/NetBIOS hide here and TCP scans never see them."
   command: "nmap -sU --top-ports 20 -T4 {target}"
-# source: Obsidian: 0.01 Cheatsheets/All_In_One/Linux/1.4-Linux-Scanning.md
 
-- description: "UDP top-100, versioned + default scripts"
+- category: "UDP"
+  description: "UDP top-100, versioned + default scripts"
   why: "The module's UDP pass has no -sV/-sC; this versions the common UDP services and runs safe NSE."
   command: "nmap -sU -sV -sC --top-ports 100 {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
 
-# --- Firewall / IDS evasion (packet-level, no spoofing) -------------------------------------------
-- description: "Connect scan (works through a proxychains/SOCKS pivot)"
+# =================================================================================================
+# Firewall / IDS evasion — packet-level, NO spoofing (exam-legal)
+# =================================================================================================
+- category: "Firewall / IDS evasion"
+  description: "Connect scan (works through a proxychains/SOCKS pivot)"
   why: "SYN scans can't traverse a SOCKS proxy; -sT full-handshake does. Use over a ligolo tunnel."
   command: "nmap -sT -Pn -n {target}"
-# source: Obsidian: Courses/HTB/.../OSCP/Plan/Chapter 6/6.3.3. Port Scanning with Nmap.md
 
-- description: "Source-port 53 full sweep (firewall bypass)"
-  why: "Slip past stateless firewalls that trust source port 53 (DNS) — no identity spoofing."
-  command: "nmap -p- -Pn --source-port 53 {target}"
-# source: Obsidian: Courses/HTB/.../CPTS/Review-Cheatsheet/Network Enumeration with NMAP.md
-
-- description: "Fragmented packets (-f, firewall evasion)"
-  why: "Split probes into tiny IP fragments to slip past simple packet filters. Slower, no spoofing."
-  command: "nmap -f -Pn {target}"
-# source: Obsidian: Courses/HTB/.../CPTS/Review-Cheatsheet/Network Enumeration with NMAP.md
-
-- description: "Slow / stealthy timing (-T2)"
+- category: "Firewall / IDS evasion"
+  description: "Slow / stealthy timing (-T2)"
   why: "Gentle timing for fragile services or an IDS-sensitive network — fewer probes per second."
   command: "nmap -sV -T2 {target}"
-# source: Obsidian: Courses/HTB/.../CPTS/Review-Cheatsheet/Network Enumeration with NMAP.md
 
-# --- Active Directory / Windows ------------------------------------------------------------------
-- description: "AD signature-port profile (is it a DC?)"
+- category: "Firewall / IDS evasion"
+  description: "Paranoid timing (-T1, very slow)"
+  why: "One probe at a time with long waits — for the most IDS-sensitive targets. Very slow; use sparingly."  # noqa
+  command: "nmap -sS -T1 -Pn {target}"
+
+- category: "Firewall / IDS evasion"
+  description: "Source-port 53 full sweep (firewall bypass)"
+  why: "Slip past stateless firewalls that trust source port 53 (DNS) — no identity spoofing."
+  command: "nmap -p- -Pn --source-port 53 {target}"
+
+- category: "Firewall / IDS evasion"
+  description: "Fragmented packets (-f, firewall evasion)"
+  why: "Split probes into tiny IP fragments to slip past simple packet filters. Slower, no spoofing."
+  command: "nmap -f -Pn {target}"
+
+- category: "Firewall / IDS evasion"
+  description: "Random data padding (--data-length)"
+  why: "Append random bytes so probes don't match a fixed nmap signature. No spoofing; just padding."
+  command: "nmap -sS -Pn --data-length 25 {target}"
+
+# =================================================================================================
+# Active Directory / Windows
+# =================================================================================================
+- category: "Active Directory / Windows"
+  description: "AD signature-port profile (is it a DC?)"
   why: "Confirm a Domain Controller fast from its signature ports (LDAP/Kerberos/SMB/global-catalog)."
   command: "nmap -p 53,88,135,139,389,445,464,593,636,3268,3269,5985 {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
 
-- description: "AD/DC full port profile, versioned + scripts"
+- category: "Active Directory / Windows"
+  description: "AD/DC full port profile, versioned + scripts"
   why: "Version + default NSE across every AD port — domain, KDC, LDAP(S), WinRM, ADWS in one pass."
   command: "nmap -sV -sC -p 53,88,135,139,389,445,464,593,636,3268,3269,5985,9389 {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
 
-# --- Service-focused sweeps ----------------------------------------------------------------------
-- description: "Web ports sweep (all common HTTP/HTTPS), versioned"
-  why: "Just the common web ports, versioned — find every HTTP/HTTPS surface (incl. 8080/8443/3000)."
-  command: "nmap -sV -p 80,443,8000,8008,8080,8081,8443,8888,9000,9090,3000,5000 {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
-
-- description: "Windows / SMB surface, versioned + scripts"
+- category: "Active Directory / Windows"
+  description: "Windows / SMB surface, versioned + scripts"
   why: "Version + default NSE on the Windows/SMB ports (RPC, NetBIOS, SMB, RDP, WinRM)."
   command: "nmap -sV -sC -p 135,139,445,3389,5985 {target}"
-# source: Obsidian: 0.00 Methdology/.../Other Services/445 (SMB).md
 
-- description: "Database ports, versioned"
+- category: "Active Directory / Windows"
+  description: "SMB vuln NSE (EternalBlue etc., detection only)"
+  why: "Runs the safe smb-vuln-* NSE scripts to flag MS17-010 and friends — detection, never exploit."
+  command: "nmap -p 445 --script 'smb-vuln-*' {target}"
+
+# =================================================================================================
+# Service-focused — just the ports for one class of service
+# =================================================================================================
+- category: "Service-focused"
+  description: "Web ports sweep (all common HTTP/HTTPS), versioned"
+  why: "Just the common web ports, versioned — find every HTTP/HTTPS surface (incl. 8080/8443/3000)."
+  command: "nmap -sV -p 80,443,8000,8008,8080,8081,8443,8888,9000,9090,3000,5000 {target}"
+
+- category: "Service-focused"
+  description: "Database ports, versioned"
   why: "MSSQL/Oracle/MySQL/Postgres/Redis/Mongo in one versioned pass — spot an exposed DB fast."
   command: "nmap -sV -p 1433,1521,3306,5432,6379,27017 {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Ports and tools.md
 
-# --- Host discovery (single host or a whole /24) --------------------------------------------------
-- description: "Ping-sweep host discovery (edit to a subnet for pivoting)"
+- category: "Service-focused"
+  description: "Mail ports, versioned + scripts"
+  why: "SMTP/POP3/IMAP (+ submission/secure variants) versioned with safe NSE — user-enum surface."
+  command: "nmap -sV -sC -p 25,110,143,465,587,993,995 {target}"
+
+# =================================================================================================
+# Host discovery — single host or a whole /24 (pivoting)
+# =================================================================================================
+- category: "Host discovery"
+  description: "Ping-sweep host discovery (edit to a subnet for pivoting)"
   why: "Find live hosts across a range when pivoting into an internal/AD network. Edit {target} to a /24."
   command: "nmap -sn -n {target}"
-# source: Obsidian: 0.01 Cheatsheets/All_In_One/Linux/1.4-Linux-Scanning.md
 
-- description: "Host discovery, ICMP + TCP (beats filtered hosts)"
-  why: "Find live hosts even when ICMP is filtered — TCP-pings common ports too. Same idea as the pre-flight check."
+- category: "Host discovery"
+  description: "Host discovery, ICMP + TCP (beats filtered hosts)"
+  why: "Find live hosts even when ICMP is filtered — TCP-pings common ports too. Same idea as the pre-flight check."  # noqa
   command: "nmap -sn -PE -PS21,22,80,443,445,3389 -PA80,443 -n {target}"
-# source: Obsidian: 0.01 Cheatsheets/All_In_One/Linux/1.4-Linux-Scanning.md
 
-# --- OS / vulnerability ---------------------------------------------------------------------------
-- description: "OS fingerprint (needs root)"
+# =================================================================================================
+# OS & vulnerability
+# =================================================================================================
+- category: "OS & vulnerability"
+  description: "OS fingerprint (needs root)"
   why: "TCP/IP stack fingerprint steers Linux-vs-Windows follow-ups. Needs raw sockets (root)."
   command: "nmap -O --osscan-guess {target}"
-# source: Obsidian: Courses/HTB/.../OSCP/Plan/Chapter 6/6.3.3. Port Scanning with Nmap.md
 
-- description: "Vuln NSE category sweep (opt-in, slow/noisy)"
+- category: "OS & vulnerability"
+  description: "Vuln NSE category sweep (opt-in, slow/noisy)"
   why: "§8 allows --script vuln — flags known service weaknesses, detection only (never exploits)."
   command: "nmap -sV --script vuln {target}"
-# source: Obsidian: 0.00 Methdology/.../1. Initial Recon/Initial Recon.md
