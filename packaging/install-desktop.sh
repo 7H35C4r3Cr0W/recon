@@ -90,15 +90,23 @@ Keywords=nabu;oscp;recon;cli;nmap;pentest;
 StartupNotify=false
 EOF
 
-# --- Desktop icons (copy + mark trusted/executable so XFCE shows them, not a "?" ) ---------------
+# --- Desktop icons (copy + mark trusted/executable so the DE launches them without a prompt) -----
+# Two DIFFERENT trust mechanisms — set both so the launcher is trusted whether the box runs XFCE
+# (Kali default) or GNOME:
+#   * XFCE / xfdesktop 4.16+ trusts a launcher only when metadata::xfce-exe-checksum equals the
+#     file's SHA-256 (this is what clicking "Launch Anyway" stores). metadata::trusted is IGNORED by
+#     XFCE, so without the checksum xfdesktop shows "Untrusted application launcher" on EVERY click.
+#   * GNOME / Nautilus uses metadata::trusted=true.
+# The checksum is content-only, so compute it AFTER the copy (chmod does not change file content).
 for d in "$GUI_DESKTOP" "$CLI_DESKTOP"; do
   cp -f "$d" "$DESKTOP_DIR/"
   base="$DESKTOP_DIR/$(basename "$d")"
   chmod +x "$base"
-  # XFCE/GNOME "trusted launcher" metadata — suppresses the untrusted-launcher prompt.
-  gio set "$base" metadata::trusted true 2>/dev/null || true
+  sum="$(sha256sum "$base" | cut -d' ' -f1)"
+  gio set -t string "$base" metadata::xfce-exe-checksum "$sum" 2>/dev/null || true  # XFCE
+  gio set "$base" metadata::trusted true 2>/dev/null || true                        # GNOME/Nautilus
 done
-echo "    desktop:  launchers copied to $DESKTOP_DIR"
+echo "    desktop:  launchers copied to $DESKTOP_DIR (marked trusted for XFCE + GNOME)"
 
 # --- refresh caches -----------------------------------------------------------------------------
 update-desktop-database "$APPS_DIR" 2>/dev/null || true
