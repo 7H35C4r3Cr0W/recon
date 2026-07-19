@@ -1,5 +1,15 @@
 # Elasticsearch manual follow-ups (Tier-2 — shown, never auto-run). Unauth read-only HTTP GETs;
 # {target}/{port} filled from the active profile. No document writes / no mapping changes.
+- description: "List all indices (do this first — the map)"
+  why: "_cat/indices?v is the single most useful ES call: every index with doc count + size, so you pick which to read — read-only"
+  command: "curl -s http://{target}:{port}/_cat/indices?v"
+# source: HackTricks 9200-pentesting-elasticsearch (book.hacktricks.wiki)
+
+- description: "Cluster health + name"
+  why: "_cluster/health names the cluster and reports shard status — confirms an open, reachable node — read-only"
+  command: "curl -s http://{target}:{port}/_cluster/health?pretty"
+# source: HackTricks 9200-pentesting-elasticsearch (book.hacktricks.wiki)
+
 - description: "Node list + versions"
   why: "_cat/nodes shows the cluster nodes and their versions — read-only"
   command: "curl -s http://{target}:{port}/_cat/nodes?v"
