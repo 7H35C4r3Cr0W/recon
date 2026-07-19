@@ -8,7 +8,7 @@ tools you already use (nmap, feroxbuster/gobuster/ffuf, nikto/whatweb, smbclient
 structures what they find, links each service to HackTricks and Exploit-DB, draws a BloodHound-style
 attack-surface graph, and produces Obsidian-friendly reports. It runs **offline** and makes **no LLM
 calls at runtime**. Recon is **exam-legal by default**; a separate, **owner-authorized Exploitation
-tab** lets you build and Run **human-confirmed** attacks by hand — **182 services / 2,200+ actions**
+tab** lets you build and Run **human-confirmed** attacks by hand — **182 services / 3,400+ actions**
 (impacket, evil-winrm, netexec, public PoCs, port-80 web attacks) plus an **msfvenom payload
 builder** — nothing auto-runs, you confirm every command, and SQLmap/Metasploit-modules are never
 shipped as actions.
@@ -74,7 +74,7 @@ shipped as actions.
   render, a **credential vault** (masked, `0600`, click-away autosave), **audit trail**, and an
   **Obsidian-ready `report.md`** with a pivot-topology section.
 - **Exploitation tab** (owner-authorized, human-driven) — clearly separated from Recon. It surfaces the
-  services found on *this* box first and, across **182 services / 2,200+ attacker actions** mined from
+  services found on *this* box first and, across **182 services / 2,300+ attacker actions** mined from
   the vault (AD, web/port-80, SMB, databases, mail, app servers, CVE-technique targets, …), shows the
   exact attack command pre-filled from the profile + a chosen vault credential. **Nothing auto-runs**:
   you pick an action and press **Run ▸**, which confirms the target before executing **one** command
