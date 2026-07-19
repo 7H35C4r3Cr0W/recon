@@ -356,6 +356,34 @@ def payload_cmd(
     raise typer.Exit(0)
 
 
+@app.command("gtfobins")
+def gtfobins_cmd(
+    binary: str | None = typer.Argument(
+        None,
+        help="Binary or technique to search (e.g. find, tar, sudo, suid, capabilities). "
+        "Omit to list every binary.",
+    ),
+) -> None:
+    """Offline GTFOBins lookup — SUID/sudo/capability abuse for a Unix binary (display-only)."""
+    from oscprecon.references import gtfobins as gtfo
+
+    results = gtfo.search(binary or "")
+    if not results:
+        typer.echo(f"[no match] '{binary}' — try a binary or function (sudo/suid/…)", err=True)
+        raise typer.Exit(1)
+    if binary is None:
+        typer.echo("GTFOBins (use `nabu-cli gtfobins <binary>` for the techniques):\n")
+        for b in results:
+            typer.echo(f"  {b.name:14} {', '.join(b.functions)}")
+        raise typer.Exit(0)
+    for b in results:
+        typer.echo(f"# {b.name}  —  {b.url}")
+        for tech in b.techniques:
+            typer.echo(f"  [{tech.func}] {tech.code}")
+        typer.echo("")
+    raise typer.Exit(0)
+
+
 def main() -> None:
     app()
 

