@@ -93,3 +93,15 @@ def test_manual_commands_are_recon_only() -> None:
         # placeholders resolve to a policy-clean argv (no forbidden flags smuggled in)
         resolved = command.replace("{target}", "10.10.10.14").replace("{port}", "27017")
         assert shell.policy_violation(shlex.split(resolved)) is None
+
+
+def test_version_parser_rejects_ip_octets() -> None:
+    # regression: a dotted IP in the output was matched as a MongoDB version ("10.10.10")
+    from oscprecon.modules.mongodb.parsers import parse_mongo_version
+
+    assert parse_mongo_version("Connected to 10.10.10.5 successfully") == []
+    assert parse_mongo_version("bound to 192.168.1.100 port 27017") == []
+    assert [f.value for f in parse_mongo_version("build version: 4.4.2")] == ["4.4.2"]
+    assert [f.value for f in parse_mongo_version("MongoDB server version v3.6.3-ubuntu")] == [
+        "3.6.3-ubuntu"
+    ]

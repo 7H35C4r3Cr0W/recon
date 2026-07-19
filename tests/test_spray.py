@@ -150,3 +150,15 @@ def test_discovered_port_matches_by_nmap_service_name() -> None:
     assert spray.discovered_port("ldap", services) == 636
     assert spray.discovered_port("ftp", services) is None  # not discovered -> default
     assert spray.discovered_port("bogus", services) is None
+
+
+def test_ftp_spray_uses_control_port_not_data_port() -> None:
+    # regression: "ftp-data" (port 20) in the FTP nmap_names made discovered_port pick the DATA
+    # port, so hydra sprayed :20 and silently failed. Only the control service (21) is sprayable.
+    from oscprecon.models import DiscoveredService, Proto
+
+    services = [
+        DiscoveredService(20, Proto.TCP, "ftp-data"),  # listed first (ascending) — the trap
+        DiscoveredService(21, Proto.TCP, "ftp"),
+    ]
+    assert spray.discovered_port("ftp", services) == 21

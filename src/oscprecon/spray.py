@@ -66,7 +66,9 @@ SPRAY_SERVICES: tuple[SprayService, ...] = (
         "FTP (hydra)",
         "hydra{port_opt} -L {users} -P {passwords} ftp://{target}",
         21,
-        frozenset({"ftp", "ftp-data"}),
+        # NOT "ftp-data" (port 20) — that would make discovered_port() pick the data port and spray
+        # the wrong port; only the control service ("ftp", 21) is sprayable.
+        frozenset({"ftp"}),
         "hydra",
     ),
     SprayService(

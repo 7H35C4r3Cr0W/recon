@@ -76,7 +76,11 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
             if isinstance(note, str) and note:
                 data["note"] = note
             position = override.get("position")
-            if isinstance(position, list) and len(position) == 2:
+            if (
+                isinstance(position, list)
+                and len(position) == 2
+                and all(isinstance(c, (int, float)) and not isinstance(c, bool) for c in position)
+            ):  # a hand-edited graph.json could carry non-numeric coords — don't pass them on
                 node["position"] = {"x": position[0], "y": position[1]}
         nodes.append(node)
         node_ids.add(node_id)

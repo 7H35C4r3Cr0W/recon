@@ -343,3 +343,21 @@ def test_edb_reference_finding_is_not_highlighted_as_a_weakness(tmp_path: Path) 
     assert edb["category"] == "reference"  # a reference, not a vuln
     assert "notable" not in edb  # never gets the danger ring
     assert "notable" not in finds["product: OpenSSH 8.4p1"]  # a version banner is never notable
+
+
+def test_malformed_node_position_is_ignored(tmp_path: Path) -> None:
+    # regression: a hand-edited graph.json with non-numeric coords was passed straight to Cytoscape
+    import json
+
+    prof = Profile.create(tmp_path, "ctf", Target(ip="10.0.0.1"))
+    (prof.directory / "graph.json").write_text(
+        json.dumps({"node_overrides": {"target": {"position": ["a", "b"]}}}), encoding="utf-8"
+    )
+    target = next(n for n in build_elements(prof)["nodes"] if n["data"]["id"] == "target")
+    assert "position" not in target  # non-numeric coords dropped, not forwarded
+
+    (prof.directory / "graph.json").write_text(
+        json.dumps({"node_overrides": {"target": {"position": [12, 34]}}}), encoding="utf-8"
+    )
+    target = next(n for n in build_elements(prof)["nodes"] if n["data"]["id"] == "target")
+    assert target["position"] == {"x": 12, "y": 34}  # valid numeric coords still applied

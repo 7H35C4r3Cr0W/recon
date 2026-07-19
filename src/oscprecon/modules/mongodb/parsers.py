@@ -47,7 +47,10 @@ _CONN = re.compile(
 )
 # OSCP boxes run old MongoDB (3.6, wire v6); modern mongosh refuses it — retry with legacy mongo.
 _WIRE = re.compile(r"maximum wire version|requires at least|wireVersion", re.IGNORECASE)
-_VERSION = re.compile(r"\bv?(\d+\.\d+\.\d+(?:-[\w.]+)?)")
+# a 3-part version, but NOT an octet slice of an IPv4: reject a preceding digit/dot AND any trailing
+# digit/dot (which would mean it's a 4-octet IP, or the greedy match was cut short mid-octet). So
+# "Connected to 10.10.10.5" yields no version, while "v4.4.2" / "3.6.3-ubuntu" still parse.
+_VERSION = re.compile(r"(?<![\d.])v?(\d+\.\d+\.\d+(?:-[\w.]+)?)(?![\d.])")
 # our own `print('DB '+n)` prefix is unambiguous, so capture the whole name (spaces/unicode/symbols
 # are legal in Mongo names). For collections the db part stays a restricted token (no dots/spaces),
 # so an error stack line like `_getErrorWithCode@utils.js:25` can't masquerade as `db.collection`.
