@@ -1,12 +1,22 @@
 # Docker API manual follow-ups (Tier-2 — shown, never auto-run). Unauth read-only GET endpoints only;
 # {target}/{port} filled from the active profile. Container create/exec is code execution — NOT here.
+- description: "Daemon info (host OS, kernel, container count)"
+  why: "/info fingerprints the host and shows how many containers/images exist — the first read-only call"
+  command: "curl -s http://{target}:{port}/info"
+# source: HackTricks 2375-pentesting-docker (book.hacktricks.wiki)
+
+- description: "List running containers (get the ids)"
+  why: "/containers/json enumerates running containers + their ids — read-only; use an id below to inspect one"
+  command: "curl -s http://{target}:{port}/containers/json"
+# source: HackTricks 2375-pentesting-docker (book.hacktricks.wiki)
+
 - description: "List images"
   why: "/images/json enumerates the images present on the host — read-only"
   command: "curl -s http://{target}:{port}/images/json"
 # source: HackTricks 2375-pentesting-docker (book.hacktricks.wiki)
 
 - description: "Inspect a container (read-only)"
-  why: "/containers/{id}/json returns a container's config incl. mounts/env — read-only"
+  why: "/containers/{id}/json returns a container's config incl. mounts/env — read-only; get <id> from the list above"
   command: "curl -s http://{target}:{port}/containers/<id>/json"
 # source: HackTricks 2375-pentesting-docker (book.hacktricks.wiki)
 
