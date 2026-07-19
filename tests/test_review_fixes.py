@@ -40,6 +40,37 @@ def test_redact_leaves_nmap_port_flag_alone() -> None:
     assert "80,443" in line
 
 
+def test_redact_masks_credential_token_shapes() -> None:
+    # the URI / impacket-positional / -U user%pass forms the tool SHIPS as Tier-2 recon commands —
+    # these carry the secret INSIDE one argv token, invisible to the flag-based masking
+    uri = _redact_cmdline(["psql", "postgresql://svc:S3cretPass@10.0.0.5:5432/db"])
+    assert "S3cretPass" not in uri and "svc:" in uri and "@10.0.0.5:5432/db" in uri
+    # impacket positional — GetADUsers.py is not even a cred-tool, but domain/user:pass must mask
+    imp = _redact_cmdline(["GetADUsers.py", "corp.local/bob:S3cretPass", "-dc-ip", "10.0.0.5"])
+    assert "S3cretPass" not in imp and "corp.local/bob:" in imp
+    imp2 = _redact_cmdline(["impacket-secretsdump", "corp.local/bob:S3cretPass@10.0.0.5"])
+    assert "S3cretPass" not in imp2 and "@10.0.0.5" in imp2
+    # -U user%pass (split flag+value, and concatenated) — smbclient/rpcclient
+    u1 = _redact_cmdline(["smbclient", "//10.0.0.5/share", "-U", "svc%S3cretPass"])
+    assert "S3cretPass" not in u1 and "svc%" in u1
+    u2 = _redact_cmdline(["rpcclient", "-Uadmin%Passw0rd", "10.0.0.5"])
+    assert "Passw0rd" not in u2
+
+
+def test_redact_masks_all_trailing_nargs_after_secret_flag() -> None:
+    # -p with several inline values (blocked spray) must mask EVERY password, not just the first,
+    # since the blocked-command message is written to the profile's output file on disk
+    line = _redact_cmdline(["netexec", "smb", "10.0.0.1", "-u", "admin", "-p", "pw1", "pw2", "pw3"])
+    assert "pw1" not in line and "pw2" not in line and "pw3" not in line
+
+
+def test_redact_does_not_touch_benign_tokens() -> None:
+    # a -U with no password, a UNC path, and a plain URL must be left intact
+    assert _redact_cmdline(["smbclient", "-L", "//10.0.0.5/", "-U", "guest"]).endswith("guest")
+    assert "//10.0.0.5/" in _redact_cmdline(["smbclient", "-L", "//10.0.0.5/", "-N"])
+    assert "http://10.0.0.5/" in _redact_cmdline(["feroxbuster", "-u", "http://10.0.0.5/"])
+
+
 # --- #3 product starting with a digit -----------------------------------------------------------
 def test_parse_port_line_digit_product_keeps_version() -> None:
     svc = parse_port_line("8080/tcp open http 3proxy 0.8.13")

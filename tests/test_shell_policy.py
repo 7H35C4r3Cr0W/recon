@@ -25,6 +25,22 @@ def test_blocks_forbidden_tools_and_flags() -> None:
     assert shell.policy_violation(["netexec", "smb", "x", "--continue-on-success"]) is not None
 
 
+def test_path_qualified_tool_does_not_bypass_per_tool_checks() -> None:
+    # regression: the allow-list matched on the basename but the per-tool sub-checks compared the
+    # raw argv[0], so an absolute/relative path slipped past them and ran brute/spray in recon mode
+    assert shell.policy_violation(["/usr/bin/nmap", "--script", "ssh-brute", "x"]) is not None
+    assert shell.policy_violation(["./nmap", "--script=http-wordpress-brute", "x"]) is not None
+    assert shell.policy_violation(["/usr/bin/wpscan", "--url", "http://x", "-P", "l"]) is not None
+    assert (
+        shell.policy_violation(["/usr/bin/netexec", "smb", "x", "-u", "a", "-p", "b", "c"])
+        is not None
+    )
+    assert shell.policy_violation(["/usr/bin/ntpdate", "10.0.0.1"]) is not None  # sets the clock
+    assert shell.policy_violation(["/bin/psql", "svc", "-c", "COPY t TO PROGRAM 'id'"]) is not None
+    # a path-qualified *legit recon* command still runs
+    assert shell.policy_violation(["/usr/bin/nmap", "-sCV", "10.0.0.5"]) is None
+
+
 def test_run_refuses_forbidden_without_executing(tmp_path: Path) -> None:
     out = tmp_path / "o.txt"
     result = shell.run("hydra -l a -P list 10.10.10.5", out)

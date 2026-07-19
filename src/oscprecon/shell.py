@@ -47,6 +47,36 @@ def _mask(value: str) -> str:
     return f"<redacted len={len(value)}>"
 
 
+# why: secrets also travel INSIDE a single argv token in the credential shapes this tool ships as
+# Tier-2 recon commands — `scheme://user:PASS@host` (psql/ftp URIs), bare `DOMAIN/USER:PASS[@tgt]`
+# (impacket positionals like GetADUsers.py), and `-U user%PASS` (smbclient/rpcclient). These are
+# masked regardless of the tool, since the flag-based logic below never sees them. Over-masking a
+# port/host in a log is harmless; leaking a cleartext password is the bug (CLAUDE.md §6).
+_URI_CRED_RE = re.compile(r"^([A-Za-z][\w+.-]*://[^:/@\s]+):([^@\s]+)@")
+_USER_PCT_RE = re.compile(r"^(--user=|-U)([^%\s]+)%(.+)$")
+_IMPACKET_CRED_RE = re.compile(r"^([^/\s:]+/[^/\s:]+):([^@\s]+)(@.*)?$")
+
+
+def _mask_userpct(value: str) -> str:
+    # `[DOMAIN\]user%PASSWORD` -> mask only the password after `%` (smbclient/rpcclient/netexec -U)
+    user, sep, pw = value.partition("%")
+    return f"{user}%{_mask(pw)}" if sep and pw else value
+
+
+def _mask_secret_shapes(tok: str) -> str:
+    m = _URI_CRED_RE.match(tok)
+    if m:
+        return tok[: m.start(2)] + _mask(m.group(2)) + tok[m.end(2) :]
+    m = _USER_PCT_RE.match(tok)
+    if m:
+        return f"{m.group(1)}{m.group(2)}%{_mask(m.group(3))}"
+    if "://" not in tok:
+        m = _IMPACKET_CRED_RE.match(tok)
+        if m:
+            return f"{m.group(1)}:{_mask(m.group(2))}{m.group(3) or ''}"
+    return tok
+
+
 def _redact_cmdline(argv: list[str]) -> str:
     if not argv:
         return ""
@@ -60,11 +90,22 @@ def _redact_cmdline(argv: list[str]) -> str:
         next_is_secret = (head in ("--password", "--pass")) or (
             cred_tool and tok in _SECRET_VALUE_FLAGS
         )
-        if "=" in tok and head in ("--password", "--pass"):
+        if head in ("-U", "--user") and "=" in tok:  # --user=DOMAIN\user%PASS
+            out.append(f"{head}={_mask_userpct(tok.split('=', 1)[1])}")
+        elif tok in ("-U", "--user") and i + 1 < len(argv):  # -U DOMAIN\user%PASS (split token)
+            out += [tok, _mask_userpct(argv[i + 1])]
+            i += 2
+            continue
+        elif "=" in tok and head in ("--password", "--pass"):
             out.append(f"{head}={_mask(tok.split('=', 1)[1])}")
         elif next_is_secret and i + 1 < len(argv):
-            out += [tok, _mask(argv[i + 1])]
-            i += 2
+            # mask the flag's value AND any trailing non-flag tokens (nargs spray: -p p1 p2 p3)
+            out.append(tok)
+            j = i + 1
+            while j < len(argv) and not argv[j].startswith("-"):
+                out.append(_mask(argv[j]))
+                j += 1
+            i = j
             continue
         elif (
             cred_tool
@@ -74,7 +115,7 @@ def _redact_cmdline(argv: list[str]) -> str:
         ):
             out.append(f"{tok[:2]}{_mask(tok[2:])}")
         else:
-            out.append(tok)
+            out.append(_mask_secret_shapes(tok))
         i += 1
     return " ".join(out)
 
@@ -426,39 +467,42 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
                 return (
                     f"{token} is a credential brute/spray flag (off by default — enable Spray mode)"
                 )
-    if tool == "nmap":
+    # why: drive EVERY per-tool sub-check off `base` (the lowercased basename), NOT the raw argv[0].
+    # An absolute/relative path (/usr/bin/netexec, ./nmap) passes the allow-list via `base` but
+    # slip past a `tool == "netexec"` check, letting list-driven spray / brute run in recon mode.
+    if base == "nmap":
         for value in _script_values(argv):
             if "brute" in value.lower() and not spray:
                 return f"nmap --script {value} is credential brute (off by default — Spray mode)"
-    if tool == "searchsploit":
+    if base == "searchsploit":
         for token in argv[1:]:
             if token in _SEARCHSPLOIT_FORBIDDEN:
                 return f"searchsploit {token} is not display-only (forbidden)"
-    if tool == "aws":
+    if base == "aws":
         aws_violation = _aws_violation(argv)
         if aws_violation is not None:
             return aws_violation
-    if tool == "wpscan" and not spray:
+    if base == "wpscan" and not spray:
         for token in argv[1:]:
             if token in _WPSCAN_FORBIDDEN:
                 return f"wpscan {token} is credential brute (off by default — enable Spray mode)"
-    if tool in _NETEXEC_TOOLS and not spray:
+    if base in _NETEXEC_TOOLS and not spray:
         netexec_violation = _netexec_violation(argv)
         if netexec_violation is not None:
             return netexec_violation
-    if tool == "ike-scan":
+    if base == "ike-scan":
         ike_violation = _ike_scan_violation(argv)
         if ike_violation is not None:
             return ike_violation
-    if tool == "ntpdate" and "-q" not in argv[1:]:
+    if base == "ntpdate" and "-q" not in argv[1:]:
         # why: ntpdate WITHOUT -q SETS the local clock (modifies local state, needs root). Recon is
         # query-only — the module always passes -q; back-stop it here for the custom-command path.
         return "ntpdate without -q sets the local clock (forbidden — recon-only)"
-    if tool in _DB_CLIENTS and not exploit:
+    if base in _DB_CLIENTS and not exploit:
         # the DB file/OS primitives (INTO OUTFILE, xp_cmdshell, load_file…) are BLOCKED in recon
         # (query-only), but they ARE the attack in Exploitation mode — permit them there (user opted
         # in + confirmed). The hard-forbidden block above still applies.
-        db_violation = _db_primitive_violation(tool, argv)
+        db_violation = _db_primitive_violation(base, argv)
         if db_violation is not None:
             return db_violation
     return None
