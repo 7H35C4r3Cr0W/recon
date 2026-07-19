@@ -15,6 +15,8 @@ logger = logging.getLogger("oscprecon.audit")
 _MAX_BYTES = 5 * 1024 * 1024
 # why: §6a/§6 — the secret VALUE is never written; only field names + a redacted length.
 _REDACT_KEYS = frozenset({"secret", "password", "pass", "cpassword", "secret_value"})
+# command strings are scrubbed by value (not by key name) — a cred can hide inside the command
+_COMMAND_KEYS = frozenset({"command", "shell_line"})
 
 
 def audit_path(profile_dir: Path) -> Path:
@@ -26,10 +28,17 @@ def _now_iso() -> str:
 
 
 def _redact(details: dict[str, Any]) -> dict[str, Any]:
+    from oscprecon import shell  # local import: shell is heavy-ish and only needed for command keys
+
     out: dict[str, Any] = {}
     for key, value in details.items():
         if key.lower() in _REDACT_KEYS and isinstance(value, str):
             out[key] = f"<redacted len={len(value)}>"
+        elif key.lower() in _COMMAND_KEYS and isinstance(value, str):
+            # a whole command can embed a vault credential (impacket user:pass@host, -p …); the
+            # key-name redactor above never touches it, so it would reach audit.jsonl + report.md
+            # in cleartext. Scrub the command string itself (§6/§18).
+            out[key] = shell.redact_command(value)
         else:
             out[key] = value
     return out

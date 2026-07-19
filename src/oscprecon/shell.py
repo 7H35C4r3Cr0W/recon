@@ -120,6 +120,20 @@ def _redact_cmdline(argv: list[str]) -> str:
     return " ".join(out)
 
 
+def redact_command(command: str) -> str:
+    """Mask secrets in a full shell-line string before it is logged/audited/reported (§6/§18).
+
+    Best-effort: a recon Tier-2 or custom command can embed a vault credential (impacket
+    domain/user:pass@host, -p …), and the audit layer only redacts by key-name — so scrub the
+    command string itself here. The returned string is for display only (quoting is not preserved).
+    """
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        argv = command.split()  # unbalanced quotes — fall back to a whitespace split
+    return _redact_cmdline(argv)
+
+
 # why: shell.run is the sole exec chokepoint, so it is where CLAUDE.md §2 exam-legality is
 # enforced. Only these binaries may run; anything else is refused before execution.
 ALLOWED_TOOLS: frozenset[str] = frozenset(
