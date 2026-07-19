@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSlider,
     QSpinBox,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -158,7 +159,7 @@ class HttpPanel(QWidget):
 
         self._preview = QPlainTextEdit()
         self._preview.setReadOnly(True)
-        self._preview.setMaximumHeight(70)
+        self._preview.setMinimumHeight(48)  # a floor; the splitter sizes it from here up
         fingerprint = QPushButton("Fingerprint")
         fingerprint.setToolTip(
             "Run whatweb and record the stack fingerprint (server, title, versions) as findings"
@@ -186,24 +187,44 @@ class HttpPanel(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setWidget(inner)
 
+        # command preview + action buttons — kept together and NON-collapsible so Run is always
+        # reachable even when the form and follow-ups panes are dragged shut.
+        preview_pane = QWidget()
+        preview_layout = QVBoxLayout(preview_pane)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.addWidget(QLabel("Command preview:"))
+        preview_layout.addWidget(self._preview, stretch=1)
+        preview_layout.addLayout(button_row)
+
         # Tier-2 follow-ups (WebDAV OPTIONS/PROPFIND/nmap-webdav-scan, endpoint + method probes) —
         # shown, run on double-click through the shell chokepoint like the FTP/SSH/DNS panels.
         self._manual = QListWidget()
         self._manual.itemActivated.connect(self._on_manual_activated)
         self._manual.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._manual.customContextMenuRequested.connect(self._on_manual_menu)
-        self._manual.setMaximumHeight(150)
         manual_box = QGroupBox(
             "Manual follow-ups (Tier 2 — double-click to run; WebDAV, endpoints)"
         )
         QVBoxLayout(manual_box).addWidget(self._manual)
 
+        # a vertical splitter so the three regions (settings form · command preview · follow-ups)
+        # are drag-resizable — the form/follow-ups can be collapsed to give the other panes room,
+        # fixing the old cramped, unresizable stack of fixed-height widgets.
+        self._split = QSplitter(Qt.Orientation.Vertical)
+        self._split.addWidget(scroll)
+        self._split.addWidget(preview_pane)
+        self._split.addWidget(manual_box)
+        self._split.setCollapsible(0, True)  # form can be tucked away
+        self._split.setCollapsible(1, False)  # keep the preview + Run visible
+        self._split.setCollapsible(2, True)  # follow-ups can be tucked away
+        self._split.setStretchFactor(0, 5)
+        self._split.setStretchFactor(1, 2)
+        self._split.setStretchFactor(2, 2)
+        self._split.setSizes([420, 150, 130])
+
         layout = QVBoxLayout(self)
-        layout.addWidget(scroll, stretch=1)
-        layout.addWidget(QLabel("Command preview:"))
-        layout.addWidget(self._preview)
-        layout.addLayout(button_row)
-        layout.addWidget(manual_box)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._split)
 
         self._connect_signals()
         self._refresh()

@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import QButtonGroup, QToolButton, QVBoxLayout, QWidget
 
+from oscprecon import config
 from oscprecon.gui.theme import icons, tokens
 from oscprecon.gui.theme.tokens import Palette
 
@@ -26,6 +27,11 @@ _ITEMS: tuple[tuple[str, str, str, bool, str], ...] = (
 PAGE_KEYS = tuple(key for key, _, _, is_action, _ in _ITEMS if not is_action)
 ACTION_KEYS = tuple(key for key, _, _, is_action, _ in _ITEMS if is_action)
 
+# wide enough that the longest label ("Exploitation") never elides; collapsed shows icons only.
+_WIDTH_EXPANDED = 184
+_WIDTH_COLLAPSED = 54
+_PREF_COLLAPSED = "nav_collapsed"
+
 
 class NavRail(QWidget):
     navigate = Signal(str)
@@ -34,13 +40,21 @@ class NavRail(QWidget):
         super().__init__(parent)
         self.setObjectName("navRail")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # so QSS bg actually paints
-        self.setFixedWidth(148)
+        self._collapsed = config.load_prefs().get(_PREF_COLLAPSED) == "1"
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
             tokens.SPACE_SM, tokens.SPACE_MD, tokens.SPACE_SM, tokens.SPACE_MD
         )
         layout.setSpacing(tokens.SPACE_XS)
+
+        # collapse/expand toggle — a chevron at the top; tooltips keep labels reachable collapsed
+        self._toggle = QToolButton()
+        self._toggle.setObjectName("navToggle")
+        self._toggle.setAutoRaise(True)
+        self._toggle.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._toggle.clicked.connect(self._toggle_collapsed)
+        layout.addWidget(self._toggle)
 
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
@@ -63,6 +77,30 @@ class NavRail(QWidget):
             layout.addWidget(button)
         layout.addStretch(1)
         self.restyle(theme_name)
+        self._apply_collapsed()
+
+    def _apply_collapsed(self) -> None:
+        # icon-only + narrow when collapsed; icon+label + wide when expanded. Tooltips stay on so a
+        # collapsed rail is still navigable.
+        style = (
+            Qt.ToolButtonStyle.ToolButtonIconOnly
+            if self._collapsed
+            else Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        for button in self._buttons.values():
+            button.setToolButtonStyle(style)
+        self.setFixedWidth(_WIDTH_COLLAPSED if self._collapsed else _WIDTH_EXPANDED)
+        self._toggle.setText("»" if self._collapsed else "«")
+        self._toggle.setToolTip("Expand sidebar" if self._collapsed else "Collapse sidebar")
+        self._toggle.setAccessibleName(self._toggle.toolTip())
+
+    def _toggle_collapsed(self) -> None:
+        self._collapsed = not self._collapsed
+        self._apply_collapsed()
+        # persist (load-merge-save keeps unrelated prefs intact, like save_settings does)
+        prefs = config.load_prefs()
+        prefs[_PREF_COLLAPSED] = "1" if self._collapsed else "0"
+        config.save_prefs(prefs)
 
     def restyle(self, theme_name: str) -> None:
         pal: Palette = tokens.palette(theme_name)
@@ -77,6 +115,9 @@ class NavRail(QWidget):
             f" font-weight:600; }}"
             f" QToolButton:focus {{ border:2px solid {pal.focus}; }}"
             f" QToolButton:disabled {{ color:{pal.border}; }}"
+            f" #navToggle {{ color:{pal.nav_label}; font-size:16px; font-weight:700;"
+            f" text-align:center; }}"
+            f" #navToggle:hover {{ color:{pal.accent}; background:{pal.surface_alt}; }}"
         )
         for key, _, icon, _, _ in _ITEMS:
             self._buttons[key].setIcon(icons.get_icon(icon, pal.nav_label, tokens.ICON_MD))

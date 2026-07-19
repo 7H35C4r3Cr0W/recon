@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, QEventLoop, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -99,6 +100,40 @@ class CredentialVaultDialog(QDialog):
             self._add.setEnabled(False)
         self._refresh()
         self._update_actions()
+
+    def exec(self) -> int:
+        # run NON-modally so a click outside dismisses the vault (click-away-to-close), while still
+        # blocking the caller via a local loop until it closes. The vault holds no unsaved input
+        # (adds/edits persist through their own dialog), so a click-away loses nothing.
+        self.setWindowModality(Qt.WindowModality.NonModal)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        loop = QEventLoop()
+        self.finished.connect(loop.quit)
+        loop.exec()
+        return self.result()
+
+    def event(self, e: QEvent) -> bool:
+        # defer the decision one tick so QApplication.activeWindow() has settled onto whatever the
+        # user clicked (or onto a child dialog we just opened).
+        if e.type() == QEvent.Type.WindowDeactivate and self.isVisible():
+            QTimer.singleShot(0, self._maybe_close_on_click_away)
+        return super().event(e)
+
+    def _maybe_close_on_click_away(self) -> None:
+        if not self.isVisible():
+            return
+        # a combo popup, or a child dialog we spawned (Add/Edit/delete-confirm — all parented to us)
+        # is NOT a click-away; only a click onto an unrelated window dismisses the vault.
+        if QApplication.activePopupWidget() is not None:
+            return
+        w = QApplication.activeWindow()
+        while w is not None:
+            if w is self:
+                return  # focus is on us or a dialog we own
+            w = w.parentWidget()
+        self.reject()
 
     def _update_actions(self) -> None:
         # row actions need a selected credential; mutation also needs a writable profile

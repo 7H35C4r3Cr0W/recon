@@ -29,6 +29,29 @@ def _all_cell_text(dialog: CredentialVaultDialog) -> str:
     return " ".join(texts)
 
 
+def test_vault_click_away_closes_but_child_dialog_keeps_it_open(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PySide6.QtWidgets import QApplication, QWidget
+
+    d = CredentialVaultDialog(_profile(tmp_path))
+    qtbot.addWidget(d)
+    d.show()
+
+    # a child dialog we spawned (parented to the vault) is NOT a click-away → stays open
+    child = QWidget(d)
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: child))
+    d._maybe_close_on_click_away()
+    assert d.isVisible()
+
+    # a click onto an unrelated window dismisses the vault (it holds no unsaved input)
+    unrelated = QWidget()
+    qtbot.addWidget(unrelated)
+    monkeypatch.setattr(QApplication, "activeWindow", staticmethod(lambda: unrelated))
+    d._maybe_close_on_click_away()
+    assert not d.isVisible()
+
+
 def test_vault_table_shows_masked_secrets(qtbot: QtBot, tmp_path: Path) -> None:
     d = CredentialVaultDialog(_profile(tmp_path))
     qtbot.addWidget(d)
