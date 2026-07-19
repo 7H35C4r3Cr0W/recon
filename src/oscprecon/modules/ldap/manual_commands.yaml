@@ -173,3 +173,47 @@
   command: "netexec ldap {target} -u '{user}' -p '{password}' --bloodhound --collection All --dns-server {target}"
   requires: ["creds"]
 # source: HTB AD Path/Active Directory Bloodhound
+
+# --- LDAP search filters — AD attack-surface queries (HTB AD Path / AD LDAP) ----------------------
+# {user}/{password}/{basedn} pre-fill from the profile + first credential. Read-only ldapsearch.
+- description: "Accounts with password NOT required (PASSWD_NOTREQD)"
+  why: "userAccountControl bit 32 — these accounts may have an EMPTY password; try a null bind/spray. Read-only enumeration."
+  command: "ldapsearch -x -H ldap://{target} -D '{user}@{domain}' -w '{password}' -b '{basedn}' '(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=32))' sAMAccountName"
+  requires: ["creds"]
+# source: HTB AD Path/Active Directory LDAP
+
+- description: "Unconstrained-delegation objects (TRUSTED_FOR_DELEGATION)"
+  why: "UAC bit 524288 — hosts you can coerce a DC toward to steal its TGT. Read-only enumeration."
+  command: "ldapsearch -x -H ldap://{target} -D '{user}@{domain}' -w '{password}' -b '{basedn}' '(userAccountControl:1.2.840.113556.1.4.803:=524288)' sAMAccountName dNSHostName"
+  requires: ["creds"]
+# source: HTB AD Path/Active Directory LDAP
+
+- description: "Constrained-delegation objects (TRUSTED_TO_AUTH)"
+  why: "UAC bit 16777216 — protocol-transition (S4U) delegation targets. Cross-check msDS-AllowedToDelegateTo. Read-only."
+  command: "ldapsearch -x -H ldap://{target} -D '{user}@{domain}' -w '{password}' -b '{basedn}' '(userAccountControl:1.2.840.113556.1.4.803:=16777216)' sAMAccountName msDS-AllowedToDelegateTo"
+  requires: ["creds"]
+# source: HTB AD Path/Active Directory LDAP
+
+- description: "Privileged accounts (adminCount=1)"
+  why: "adminCount=1 marks accounts in/formerly-in protected groups (Domain/Enterprise Admins etc.) — the high-value targets. Read-only."
+  command: "ldapsearch -x -H ldap://{target} -D '{user}@{domain}' -w '{password}' -b '{basedn}' '(&(objectClass=user)(adminCount=1))' sAMAccountName memberOf"
+  requires: ["creds"]
+# source: HTB AD Path/Active Directory LDAP
+
+- description: "Disabled accounts (ACCOUNTDISABLE)"
+  why: "userAccountControl bit 2 — filter these OUT of a spray list, or spot a re-enable target. Read-only enumeration."
+  command: "ldapsearch -x -H ldap://{target} -D '{user}@{domain}' -w '{password}' -b '{basedn}' '(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=2))' sAMAccountName"
+  requires: ["creds"]
+# source: HTB AD Path/Active Directory LDAP
+
+- description: "Domain trusts via LDAP (trustedDomain)"
+  why: "Enumerate trust relationships as objects — flags/direction show cross-domain/forest attack paths. Read-only."
+  command: "ldapsearch -x -H ldap://{target} -D '{user}@{domain}' -w '{password}' -b '{basedn}' '(objectClass=trustedDomain)' cn trustDirection trustAttributes flatName"
+  requires: ["creds"]
+# source: HTB AD Path/Active Directory LDAP
+
+- description: "LAPS passwords readable via LDAP (ms-Mcs-AdmPwd)"
+  why: "If your account can read ms-Mcs-AdmPwd, this dumps the LAPS local-admin password directly from LDAP — instant local admin. Read-only."
+  command: "ldapsearch -x -H ldap://{target} -D '{user}@{domain}' -w '{password}' -b '{basedn}' '(ms-Mcs-AdmPwd=*)' sAMAccountName ms-Mcs-AdmPwd"
+  requires: ["creds"]
+# source: HTB AD Path/Active Directory LDAP
