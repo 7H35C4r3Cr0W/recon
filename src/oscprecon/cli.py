@@ -384,6 +384,39 @@ def gtfobins_cmd(
     raise typer.Exit(0)
 
 
+@app.command("pivot")
+def pivot_cmd(
+    lhost: str = typer.Option(
+        "", "--lhost", "-l", help="Your VPN/tun0 IP (the agent dials back here). Auto from tun0."
+    ),
+    routes: str = typer.Option("", "--routes", "-r", help="Internal /24(s), comma-separated."),
+    agent_os: str = typer.Option("linux", "--os", help="Pivot host OS: linux | windows."),
+    port: int = typer.Option(11601, "--port", "-P", help="Proxy listen port."),
+    iface: str = typer.Option("ligolo", "--iface", help="Tun interface name."),
+) -> None:
+    """Show the ligolo-ng pivot workflow as copy-paste steps (display-only; same as the Pivot tab)."""  # noqa: E501
+    from oscprecon import ligolo
+
+    ip = lhost.strip() or ligolo.detect_tun_ip("tun0") or ligolo.detect_tun_ip("tun1")
+    route_list = [r.strip() for r in routes.replace(";", ",").split(",") if r.strip()]
+    typer.echo(f"# ligolo-ng — reach an internal network ({agent_os} pivot)")
+    typer.echo(f"# GitHub: {ligolo.LIGOLO_GITHUB}  ·  Releases: {ligolo.LIGOLO_RELEASES}")
+    typer.echo(
+        f"# syntax checked vs {ligolo.LIGOLO_REF_VERSION} ({ligolo.LIGOLO_REF_VERIFIED}) — "
+        "check releases if stale\n"
+    )
+    for step in ligolo.build_ligolo_steps(
+        ip, port=port, iface=iface, routes=route_list, agent_os=agent_os
+    ):
+        typer.echo(f"── {step.n}. {step.title}  (on {step.where}) ──")
+        for line in step.commands:
+            typer.echo(f"  {line}")
+        if step.note:
+            typer.echo(f"  # {step.note}")
+        typer.echo("")
+    raise typer.Exit(0)
+
+
 def main() -> None:
     app()
 

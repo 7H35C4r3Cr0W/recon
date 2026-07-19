@@ -145,8 +145,11 @@ PORT     STATE SERVICE       VERSION
 # → results saved under ~/oscprecon/htb-active/nmap/*.txt and recorded in profile.json
 ```
 
-Reopen the same folder in the GUI (or `--resume` on the CLI) and the whole state comes back. Other
-commands: `nabu-cli doctor` (host readiness), `nabu-cli export-vault` / `export-project` /
+Reopen the same folder in the GUI (or `--resume` on the CLI) and the whole state comes back. The CLI
+mirrors the GUI's reference/helper surfaces so nothing is GUI-only: `nabu-cli doctor` (host readiness,
+`--install` to apt-install the missing ones), `nabu-cli exploit [service]` (the Exploitation catalog),
+`nabu-cli payload` (msfvenom builder), `nabu-cli gtfobins [binary]` (GTFOBins lookup), `nabu-cli pivot`
+(the ligolo-ng workflow, `--os linux|windows`), `nabu-cli docs`, and `export-vault` / `export-project` /
 `import-project` (see `nabu-cli --help`).
 
 **Scan profiles** — `quick` (top-1000 only), `default`, `full` (adds the slow full UDP sweep), or
