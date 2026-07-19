@@ -126,5 +126,5 @@
 
 - description: "Find SMB-signing-disabled hosts (relay targets)"
   why: "--gen-relay-list writes hosts with SMB signing OFF to a file — the target list for an NTLM relay. Edit {target} to a /24. Read-only enumeration."
-  command: "netexec smb {target}/24 --gen-relay-list relay_targets.txt"
+  command: "netexec smb {target}/24 --gen-relay-list relay_targets.lst"
 # source: HTB AD Path/Using CrackMapExec
