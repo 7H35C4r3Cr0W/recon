@@ -328,7 +328,25 @@ class MainWindow(QMainWindow):
         find_sc.activated.connect(self._on_find)
         esc_sc = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
         esc_sc.activated.connect(self._on_escape)
+        self._install_nav_shortcuts()
         self._load_last_profile()
+
+    def _install_nav_shortcuts(self) -> None:
+        # Ctrl+1..9 jump to a nav destination (Ctrl+0 = Workspace is a menu item); Ctrl+Enter runs
+        # recon, Ctrl+. stops every running scan. Browser-tab-style, so muscle memory transfers.
+        for digit, key in enumerate(
+            ("recon", "exploit", "pivot", "graph", "findings", "credentials", "notes", "report",
+             "activity"),
+            start=1,
+        ):
+            sc = QShortcut(QKeySequence(f"Ctrl+{digit}"), self)
+            sc.activated.connect(lambda k=key: self._on_navigate(k))
+        run_sc = QShortcut(QKeySequence("Ctrl+Return"), self)
+        run_sc.activated.connect(self._on_run_button)
+        run_sc2 = QShortcut(QKeySequence("Ctrl+Enter"), self)  # keypad Enter
+        run_sc2.activated.connect(self._on_run_button)
+        stop_sc = QShortcut(QKeySequence("Ctrl+."), self)
+        stop_sc.activated.connect(self._tasks.cancel_all)
 
     def _on_find(self) -> None:
         # focus the search of whatever view is showing; the reference-pane find only exists on the
@@ -547,7 +565,18 @@ class MainWindow(QMainWindow):
             ("Ctrl+O", "Open profile"),
             ("Ctrl+E", "Edit project"),
             ("Ctrl+S", "Save profile"),
+            ("Ctrl+Enter", "Run recon (⏎ again / Stop toggles)"),
+            ("Ctrl+.", "Stop all running scans"),
             ("Ctrl+0", "Workspace dashboard"),
+            ("Ctrl+1", "Recon"),
+            ("Ctrl+2", "Exploitation"),
+            ("Ctrl+3", "Pivot"),
+            ("Ctrl+4", "Graph"),
+            ("Ctrl+5", "Findings"),
+            ("Ctrl+6", "Credentials"),
+            ("Ctrl+7", "Notes"),
+            ("Ctrl+8", "Report"),
+            ("Ctrl+9", "Activity"),
             ("Ctrl+G", "Toggle graph view"),
             ("Ctrl+R", "Report preview"),
             ("Ctrl+F", "Filter / find in the service tree"),
