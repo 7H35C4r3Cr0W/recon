@@ -35,6 +35,8 @@ class PingWorker(CancellableThread):
                 cancel=self._cancel,
                 on_line=self.line.emit,
             )
+            if self._cancel.is_set():
+                return  # Stop pressed mid-ping: suppress done so the confirm dialog never pops
             try:
                 text = self._output_file.read_text(encoding="utf-8", errors="replace")
             except OSError:

@@ -147,6 +147,23 @@ def test_main_window_nav_switches_pages(qtbot: QtBot, tmp_path: Path) -> None:
     window._dashboard.shutdown()
 
 
+def test_nav_shortcuts_gated_without_profile(qtbot: QtBot) -> None:
+    # no profile → the rail buttons are disabled, but Ctrl+1..9 call _on_navigate directly, so the
+    # gate must be enforced there too: page destinations are refused, Workspace stays reachable
+    window = MainWindow()
+    qtbot.addWidget(window)
+    assert window._profile is None
+    start = window._central_stack.currentIndex()
+    for key in ("recon", "exploit", "pivot", "findings", "activity", "report"):
+        window._on_navigate(key)
+        assert window._central_stack.currentIndex() == start, key
+    window._on_navigate("graph")
+    assert (
+        not window._graph_action.isChecked()
+    )  # graph is a profile view — shortcut must not open it
+    window._dashboard.shutdown()
+
+
 def test_theme_switch_restyles_graph_and_exploit_and_help_dialogs(
     qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

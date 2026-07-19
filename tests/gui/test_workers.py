@@ -3,6 +3,7 @@ from the new location, keep their signal signatures, and remain re-exported from
 
 from pathlib import Path
 
+import pytest
 from PySide6.QtCore import QThread
 from pytestqt.qtbot import QtBot
 
@@ -88,6 +89,23 @@ def test_cancel_sets_the_shared_event(qtbot: QtBot, tmp_path: Path) -> None:
     assert not worker._cancel.is_set()
     worker.cancel()
     assert worker._cancel.is_set()  # cancel() still threads into shell.run(cancel=...)
+
+
+def test_pingworker_suppresses_done_when_cancelled(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # regression: shell.run RETURNS on cancel (doesn't raise), so a Stop during the pre-flight ping
+    # must not still emit `done` — otherwise the "scan anyway?" dialog pops and can launch the scan
+    from oscprecon.gui.workers import PingWorker
+    from oscprecon.gui.workers import scans as scans_mod
+
+    monkeypatch.setattr(scans_mod.shell, "run", lambda *a, **k: None)
+    worker = PingWorker("10.10.10.5", tmp_path / "ping.txt")
+    fired: list[object] = []
+    worker.done.connect(fired.append)
+    worker._cancel.set()  # simulate Stop pressed mid-ping
+    worker.run()  # execute the body directly on this thread
+    assert fired == []  # done must be suppressed after a cancel
 
 
 def test_worker_retains_its_own_profile(tmp_path: Path) -> None:

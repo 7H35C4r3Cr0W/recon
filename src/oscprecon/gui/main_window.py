@@ -877,6 +877,9 @@ class MainWindow(QMainWindow):
     def _on_navigate(self, key: str) -> None:
         # page destinations switch the central view; action destinations trigger a surface and let
         # the highlight bounce back to the current page
+        if key != "workspace" and self._profile is None:
+            return  # gated to a loaded profile — mirror NavRail.set_enabled_keys; the Ctrl+1..9
+            # shortcuts call here directly, bypassing the disabled buttons, so re-check here
         if key == "workspace":
             self._show_workspace()
         elif key == "recon":
