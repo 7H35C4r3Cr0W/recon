@@ -93,8 +93,68 @@ def test_export_csv_writes_the_rows(qtbot: QtBot, tmp_path: Path, monkeypatch) -
     )
     panel._export_csv()
     rows = list(csv.reader(out.open()))
-    assert rows[0] == ["Status", "Method", "Lines", "Words", "Bytes", "URL"]
-    assert ["200", "GET", "377", "738", "12100", "http://10.129.34.153/index.php"] in rows
+    assert rows[0] == ["Status", "Method", "Lines", "Words", "Bytes", "URL", "Important"]
+    # a normal page exports with an empty Important cell
+    assert ["200", "GET", "377", "738", "12100", "http://10.129.34.153/index.php", ""] in rows
+
+
+def test_export_csv_flags_important_source_disclosures(
+    qtbot: QtBot,
+    tmp_path: Path,
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    # the whole point of the "excel sheet": the important URLs (leaked source/backup/VCS files)
+    # must be identifiable in the export, not just coloured in the GUI and dropped on the way out
+    prof = Profile.create(tmp_path, "src", Target(ip="10.10.10.5"))
+    findings_mod.add_findings(
+        prof.directory,
+        [
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/login.php.swp",
+                "status": 200,
+                "discovered_at": "t",
+            },
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/.git/HEAD",
+                "status": 200,
+                "discovered_at": "t",
+            },
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/config.php.bak",
+                "status": 200,
+                "discovered_at": "t",
+            },
+            {
+                "module": "http",
+                "port": 80,
+                "path": "/index.html",
+                "status": 200,
+                "discovered_at": "t",
+            },
+        ],
+    )
+    panel = DiscoveredUrlsPanel("dark")
+    qtbot.addWidget(panel)
+    panel.set_profile(prof)
+    panel.configure(DiscoveredService(80, Proto.TCP, "http"))
+    out = tmp_path / "urls.csv"
+    monkeypatch.setattr(
+        "oscprecon.gui.widgets.discovered_urls_panel.QFileDialog.getSaveFileName",
+        lambda *a, **k: (str(out), "CSV (*.csv)"),
+    )
+    panel._export_csv()
+    rows = list(csv.reader(out.open()))
+    flag_by_url = {r[5]: r[6] for r in rows[1:]}
+    assert flag_by_url["http://10.10.10.5/login.php.swp"] == "source/backup disclosure"
+    assert flag_by_url["http://10.10.10.5/.git/HEAD"] == "source/backup disclosure"
+    assert flag_by_url["http://10.10.10.5/config.php.bak"] == "source/backup disclosure"
+    assert flag_by_url["http://10.10.10.5/index.html"] == ""  # a plain page is not flagged
 
 
 def _mixed_profile(tmp_path: Path) -> Profile:

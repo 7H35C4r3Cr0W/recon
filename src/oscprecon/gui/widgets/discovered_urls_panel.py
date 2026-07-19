@@ -275,13 +275,16 @@ class DiscoveredUrlsPanel(QWidget):
         if not path:
             return
         # export the CLEANED view: only rows the current filter + hide-static toggle keep, so the
-        # exported sheet matches what the operator is looking at.
+        # exported sheet matches what the operator is looking at. The trailing "Important" column
+        # carries the ⚠ source/backup/VCS-disclosure flag so the interesting URLs (login.php.swp,
+        # .git/, config.bak) are sortable/filterable in Excel — not lost like they were before.
         with open(path, "w", newline="", encoding="utf-8") as fh:
             writer = csv.writer(fh)
-            writer.writerow(_COLUMNS)
-            for status, method, lines, words, size, url, _is_src in self._collect_rows():
+            writer.writerow((*_COLUMNS, "Important"))
+            for status, method, lines, words, size, url, is_src in self._collect_rows():
                 if self._passes(str(status), method, url):
-                    writer.writerow([status, method, lines, words, size, url])
+                    flag = "source/backup disclosure" if is_src else ""
+                    writer.writerow([status, method, lines, words, size, url, flag])
 
     def _set_count_text(self, total: int, visible: int, flagged_visible: int) -> None:
         if total == 0:
