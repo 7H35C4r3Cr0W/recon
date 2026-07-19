@@ -26,33 +26,37 @@ def _now_stamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
 
 
+def _inline(value: object) -> str:
+    # why: a finding field can carry an embedded newline (a pasted banner / crafted value); left in,
+    # it starts a new markdown line in report.md — injecting a real `## heading` / `- list`.
+    # Collapse CR/LF to spaces so the whole field stays on the one bullet it belongs to.
+    return str(value).replace("\r", " ").replace("\n", " ").strip()
+
+
 def _finding_line(finding: dict[str, Any]) -> str:
     # why: findings.json carries two shapes — most modules use kind/value/detail (+snmp note);
     # http/vhost use port/path/status/note. Render each into one readable Obsidian bullet.
-    kind = str(finding.get("kind", "")).strip()
+    kind = _inline(finding.get("kind", ""))
     if kind:
-        value = str(finding.get("value", "")).strip()
+        value = _inline(finding.get("value", ""))
         extra = " · ".join(
             part
-            for part in (
-                str(finding.get("detail", "")).strip(),
-                str(finding.get("note", "")).strip(),
-            )
+            for part in (_inline(finding.get("detail", "")), _inline(finding.get("note", "")))
             if part
         )
         head = f"**{kind}** — {value}" if value else f"**{kind}**"
         return f"{head} ({extra})" if extra else head
     parts: list[str] = []
-    path = str(finding.get("path", "")).strip()
+    path = _inline(finding.get("path", ""))
     if path:
         parts.append(f"`{path}`")
     status = finding.get("status")
     if status:
         parts.append(f"→ {status}")
-    redirect = str(finding.get("redirect_to", "")).strip()
+    redirect = _inline(finding.get("redirect_to", ""))
     if redirect:
         parts.append(f"⇒ {redirect}")
-    note = str(finding.get("note", "")).strip()
+    note = _inline(finding.get("note", ""))
     if note:
         parts.append(note)
     port = finding.get("port")
@@ -153,6 +157,21 @@ class Reporter:
             autoescape=False,
             trim_blocks=True,
             lstrip_blocks=True,
+        )
+        # markdown-table-cell escape: a raw pipe or newline in a command/module/output cell would
+        # split the row into extra columns. Collapse CR/LF and escape `|` (mirrors _audit_summary).
+        self.env.filters["mdcell"] = lambda v: (
+            str(v).replace("\r", " ").replace("\n", " ").replace("|", "\\|")
+        )
+        # YAML-safe flow sequence for the frontmatter `tags`: quote each item + escape `"`/`\` so a
+        # tag containing `]`/`:`/newline can't break the frontmatter block (Obsidian would drop it).
+        self.env.filters["yamlflow"] = lambda items: (
+            "["
+            + ", ".join(
+                '"' + str(i).replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
+                for i in items
+            )
+            + "]"
         )
 
     def _context(self) -> dict[str, Any]:

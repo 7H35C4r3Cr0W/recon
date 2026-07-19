@@ -74,9 +74,16 @@ def _views_path() -> Path:
 def _view_from_dict(data: object) -> SavedView | None:
     if not isinstance(data, dict) or not str(data.get("name", "")).strip():
         return None
+    raw_statuses = data.get("statuses")
     return SavedView(
         name=str(data["name"]).strip()[:80],
-        statuses=[normalize_status(s) for s in data.get("statuses", []) if isinstance(s, str)],
+        # a hand-edited saved_views.json could have `statuses` as a non-list — iterating it would
+        # raise TypeError out of load_user_views (whose contract is a safe fallback), so guard it.
+        statuses=(
+            [normalize_status(s) for s in raw_statuses if isinstance(s, str)]
+            if isinstance(raw_statuses, list)
+            else []
+        ),
         tags=normalize_tags(data.get("tags")),
         pinned=data.get("pinned") if isinstance(data.get("pinned"), bool) else None,
         archived=data.get("archived") if isinstance(data.get("archived"), bool) else None,

@@ -8,7 +8,7 @@ target: {{ target.ip }}
 {% endif %}status: {{ status.get("state", "wip") }}
 started: {{ status.get("started_at", "") }}
 last-active: {{ status.get("last_active", "") }}
-tags: [{{ tags | join(", ") }}]
+tags: {{ tags | yamlflow }}
 ---
 
 # {{ profile_name }}
@@ -132,7 +132,7 @@ _No graph notes yet — add one via the Graph view's node detail panel._
 | # | Module | Command | Exit | Output |
 | - | ------ | ------- | ---- | ------ |
 {% for c in command_history %}
-| {{ loop.index }} | {{ c.get("module", "") }} | `{{ c.get("shell_line", "") }}` | {{ c.get("exit_code", "") }} | {{ c.get("output_file", "") }} |
+| {{ loop.index }} | {{ c.get("module", "") | mdcell }} | `{{ c.get("shell_line", "") | mdcell }}` | {{ c.get("exit_code", "") }} | {{ c.get("output_file", "") | mdcell }} |
 {% endfor %}
 {% if not command_history %}
 _No commands run yet._

@@ -113,3 +113,20 @@ def test_export_notes_carry_user_content(tmp_path: Path) -> None:
     out = vault_export.export_vault(prof, tmp_path / "vault")
     note_md = next((out / "notes").glob("*.md")).read_text(encoding="utf-8")
     assert "found GPP creds in SYSVOL" in note_md
+
+
+def test_export_slugs_module_with_path_separator(tmp_path: Path) -> None:
+    # regression: a finding whose `module` held a path separator (import/hand-edited findings.json)
+    # crashed the whole export (FileNotFoundError building a nested/out-of-tree path).
+    prof = Profile.create(tmp_path / "ws", "box", Target(ip="10.0.0.5"))
+    findings_mod.add_findings(
+        prof.directory,
+        [
+            {"module": "a/b", "kind": "k", "value": "y", "discovered_at": "t"},
+            {"module": "../../../../pwned", "kind": "k2", "value": "z", "discovered_at": "t"},
+        ],
+    )
+    out = vault_export.export_vault(prof, tmp_path / "vault")  # must not raise
+    names = [p.name for p in (out / "findings").glob("*.md")]
+    assert any("a-b" in n for n in names)  # slash slugged to a dash
+    assert not any("pwned" in n and ".." in n for n in names)  # no traversal survived

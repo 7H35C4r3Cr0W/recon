@@ -184,3 +184,31 @@ def test_report_links_hacktricks_per_service(tmp_path: Path) -> None:
     report = Reporter(prof).render()
     assert "**HackTricks:**" in report
     assert "book.hacktricks.wiki" in report  # a real reference URL was matched for SMB
+
+
+def test_finding_line_collapses_newlines_no_markdown_injection() -> None:
+    # regression: a finding value with an embedded newline injected a real heading / list / wikilink
+    out = _finding_line({"kind": "creds", "value": "user1\n## HEADING\n- [[wikilink]]"})
+    assert "\n" not in out  # stays on one bullet
+    assert "## HEADING" in out  # text preserved, but inline (not a real heading)
+
+
+def test_report_command_log_escapes_pipes_and_frontmatter_is_yaml_safe(tmp_path: Path) -> None:
+    import yaml
+
+    prof = Profile.create(tmp_path, "box", Target(ip="10.0.0.5"))
+    prof.command_history.append(
+        {
+            "module": "manual",
+            "shell_line": "curl http://x | grep flag | tee out.txt",
+            "exit_code": 0,
+            "output_file": "manual/1.txt",
+        }
+    )
+    prof.tags = ["oscp", "evil]"]  # a `]` used to break the frontmatter YAML
+    prof.save()
+    md = Reporter(prof).render()
+    cmd_line = next(line for line in md.splitlines() if "curl http://x" in line)
+    assert "\\|" in cmd_line  # the command's pipes are escaped
+    assert cmd_line.replace("\\|", "").count("|") == 6  # 5 columns intact, not split by the pipes
+    yaml.safe_load(md.split("---")[1])  # frontmatter parses as valid YAML

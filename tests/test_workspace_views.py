@@ -78,3 +78,12 @@ def test_apply_view_filters_by_summary_and_service(tmp_path: Path) -> None:
     assert {s.name for s in pg_view} == {"pg-box"}
     archived = views.apply_view(views.SavedView("z", archived=True), ws)
     assert {s.name for s in archived} == {"web-box"}
+
+
+def test_view_from_dict_tolerates_non_list_statuses() -> None:
+    # regression: `statuses` as a non-list (hand-edited saved_views.json) raised TypeError out of
+    # load_user_views, whose contract is a safe fallback.
+    view = views._view_from_dict({"name": "x", "statuses": 5})
+    assert view is not None and view.statuses == []  # coerced, not crashed
+    ok = views._view_from_dict({"name": "y", "statuses": ["active"]})
+    assert ok is not None and ok.statuses == ["active"]

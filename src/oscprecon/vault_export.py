@@ -38,7 +38,9 @@ def _service_note_name(service: DiscoveredService) -> str:
 
 
 def _finding_note_name(finding: dict[str, Any], index: int) -> str:
-    module = str(finding.get("module", "")) or "other"
+    # slug the module too — findings.json is import/hand-editable, so a `module` with a path
+    # separator ("a/b", "../x") would otherwise build a nested/out-of-tree path + abort the export.
+    module = _slug(str(finding.get("module", "")), "other")
     label = str(finding.get("kind") or finding.get("path") or finding.get("note") or "finding")
     return f"{index:03d}-{module}-{_slug(label, 'finding')}"
 
