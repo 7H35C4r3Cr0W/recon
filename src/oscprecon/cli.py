@@ -13,13 +13,28 @@ from oscprecon.profile import Profile
 from oscprecon.workspace import portability
 
 app = typer.Typer(
-    help="Nabu — headless recon CLI (recon-only, OSCP exam-legal).",
+    help=(
+        "Nabu — headless recon CLI (recon-only, OSCP exam-legal). "
+        f"Created by {branding.AUTHOR_NAME} · {branding.AUTHOR_EMAIL} · {branding.AUTHOR_GITHUB}"
+    ),
     add_completion=False,
 )
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"{branding.APP_NAME} v{branding.app_version()} ({branding.DIST_NAME})")
+        typer.echo(f"Created by {branding.AUTHOR_NAME} · {branding.AUTHOR_EMAIL}")
+        typer.echo(branding.AUTHOR_GITHUB)
+        raise typer.Exit()
+
+
 @app.callback()
-def _root() -> None:
+def _root(
+    version: bool = typer.Option(
+        False, "--version", "-V", help="Show version + author and exit.", callback=_version_callback
+    ),
+) -> None:
     # why: a callback keeps `scan` an explicit subcommand — Typer otherwise collapses a
     # single-command app and drops the subcommand name (`oscprecon-cli scan <ip>` would break).
     diagnostics.install("cli")  # capture uncaught crashes to the log; best-effort, never blocks

@@ -31,7 +31,14 @@ from PySide6.QtWidgets import (
 
 from oscprecon import alive, config, edb, findings, nmap_scan, references, vault_export
 from oscprecon.audit import Auditor
-from oscprecon.branding import APP_NAME, APP_SUBTITLE, APP_TAGLINE
+from oscprecon.branding import (
+    APP_NAME,
+    APP_SUBTITLE,
+    APP_TAGLINE,
+    AUTHOR_EMAIL,
+    AUTHOR_GITHUB,
+    AUTHOR_NAME,
+)
 from oscprecon.gui import theme
 from oscprecon.gui.assets import ICON, asset_path
 from oscprecon.gui.controllers.spray_controller import SprayController
@@ -309,17 +316,23 @@ class MainWindow(QMainWindow):
         # tool-panel builder scrolled even at full size. Start it compact — the user can drag it up.
         self.resizeDocks([self._notes_dock], [150], Qt.Orientation.Vertical)
 
-        # status footer (§19): app+version · active profile · workspace · exam-legal reminder
+        # status footer (§19): app+version · active profile · workspace · exam-legal · author mark
         self._status_profile = QLabel()
         self._status_workspace = QLabel()
         legal = QLabel("recon-only — OSCP exam legal per CLAUDE.md §2")
         legal.setStyleSheet(f"color: {tokens.active_palette().text_muted};")
+        author = QLabel(f"by {AUTHOR_NAME}")  # persistent author watermark (§19a brand mark)
+        author.setToolTip(
+            f"{APP_NAME} — created by {AUTHOR_NAME} · {AUTHOR_EMAIL}\n{AUTHOR_GITHUB}"
+        )
+        author.setStyleSheet(f"color: {tokens.active_palette().text_muted};")
         status = self.statusBar()
         assert status is not None
         status.addWidget(QLabel(f"{APP_NAME} v{_app_version()}"))
         status.addWidget(self._status_profile)
         status.addWidget(self._status_workspace)
         status.addPermanentWidget(legal)
+        status.addPermanentWidget(author)
         self._update_status_footer()
 
         self._build_menus()
@@ -630,7 +643,11 @@ class MainWindow(QMainWindow):
             f"<p>{APP_TAGLINE} — v{_app_version()}</p>"
             f"<p style='color:#8a94a6'>{APP_SUBTITLE}.<br>"
             "Wraps standard OSCP-allowed enumeration tools; runs offline, "
-            "makes no exploit or LLM calls at runtime.</p>",
+            "makes no exploit or LLM calls at runtime.</p>"
+            "<hr>"
+            f"<p><b>Created by {AUTHOR_NAME}</b><br>"
+            f"<a href='mailto:{AUTHOR_EMAIL}'>{AUTHOR_EMAIL}</a><br>"
+            f"<a href='{AUTHOR_GITHUB}'>{AUTHOR_GITHUB}</a></p>",
         )
 
     def _rebuild_recent_menu(self) -> None:

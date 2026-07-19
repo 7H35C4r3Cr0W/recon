@@ -321,6 +321,12 @@ uv run ruff format --check
 - [`PROJECT_MAP.md`](PROJECT_MAP.md) — subsystem-by-subsystem status map and forward plan.
 - [`PROGRESS.md`](PROGRESS.md) — the detailed build log.
 
+## Author
+
+**Nabu** is created and maintained by **Andre Boyle**
+· [its.lagus@proton.me](mailto:its.lagus@proton.me)
+· [github.com/7H35C4r3Cr0W/recon](https://github.com/7H35C4r3Cr0W/recon)
+
 ## License
 
 MIT — see [`pyproject.toml`](pyproject.toml). Bundled HackTricks content is CC BY-NC-SA; see the
