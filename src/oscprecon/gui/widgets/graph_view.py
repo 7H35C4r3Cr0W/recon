@@ -117,10 +117,16 @@ class GraphBridge(QObject):
     def add_note(self, node_id: str, note: str) -> None:
         self._update_override(node_id, "note", note)
 
+    def _writable(self) -> bool:
+        # a profile opened read-only (locked by another window) must not persist graph edits —
+        # save_graph would raise ReadOnlyError out of the Qt slot. No-op silently instead.
+        return self._profile is not None and not self._profile.read_only
+
     @Slot(str)
     def save_positions(self, positions_json: str) -> None:
-        if self._profile is None:
+        if not self._writable():
             return
+        assert self._profile is not None
         try:
             positions = json.loads(positions_json)
         except json.JSONDecodeError:
@@ -142,15 +148,17 @@ class GraphBridge(QObject):
 
     @Slot(str, str, str)
     def add_user_edge(self, source: str, target: str, label: str) -> None:
-        if self._profile is None:
+        if not self._writable():
             return
+        assert self._profile is not None
         graph = self._profile.load_graph()
         graph["user_edges"].append({"from": source, "to": target, "label": label})
         self._profile.save_graph(graph)
 
     def _update_override(self, node_id: str, key: str, value: Any) -> None:
-        if self._profile is None:
+        if not self._writable():
             return
+        assert self._profile is not None
         graph = self._profile.load_graph()
         overrides = graph["node_overrides"]
         if value is None:
@@ -194,10 +202,12 @@ class GraphDetail(QWidget):
 
         status_box = QGroupBox("Status")
         status_row = QHBoxLayout(status_box)
+        self._status_buttons: list[QPushButton] = []
         for status in _STATUSES:
             button = QPushButton(status)
             button.clicked.connect(lambda _=False, s=status: self._emit_status(s))
             status_row.addWidget(button)
+            self._status_buttons.append(button)
 
         self._note = QTextEdit()
         self._note.setPlaceholderText("Add a note (saved to graph.json, shown in the report)…")
@@ -287,6 +297,8 @@ class GraphDetail(QWidget):
     def _set_controls_enabled(self, enabled: bool) -> None:
         self._note.setEnabled(enabled)
         self._save_note.setEnabled(enabled)
+        for button in self._status_buttons:  # no silent no-op click before a node is selected
+            button.setEnabled(enabled)
 
     def _emit_status(self, status: str) -> None:
         if not self._node_id:

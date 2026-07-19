@@ -58,6 +58,21 @@ def test_bridge_persists_status_note_position(qtbot: QtBot, tmp_path: Path) -> N
     assert override["position"] == [120, 240]
 
 
+def test_bridge_write_slots_noop_on_read_only(qtbot: QtBot, tmp_path: Path) -> None:
+    # regression: a read-only profile (locked by another window) raised ReadOnlyError out of the
+    # graph bridge slots (save_graph). Every write must silently no-op instead of crashing.
+    prof = _profile(tmp_path)
+    prof.read_only = True
+    bridge = GraphBridge()
+    bridge.set_profile(prof)
+    bridge.set_status("service-445-tcp", "investigating")  # must not raise
+    bridge.add_note("service-445-tcp", "x")
+    bridge.save_positions(json.dumps({"service-445-tcp": [1, 2]}))
+    bridge.add_user_edge("service-445-tcp", "target", "pivot")
+    graph = prof.load_graph()
+    assert graph["node_overrides"] == {} and graph["user_edges"] == []  # nothing persisted
+
+
 def test_bridge_add_user_edge_and_bad_json(qtbot: QtBot, tmp_path: Path) -> None:
     prof = _profile(tmp_path)
     bridge = GraphBridge()

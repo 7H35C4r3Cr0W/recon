@@ -525,11 +525,13 @@ class MainWindow(QMainWindow):
         self._graph_action = QAction("Graph", self)
         self._graph_action.setCheckable(True)
         self._graph_action.setShortcut("Ctrl+G")
+        self._graph_action.setEnabled(False)  # needs a loaded profile (enabled in _set_profile)
         self._graph_action.toggled.connect(self._on_toggle_graph)
         view_menu.addAction(self._graph_action)
         self._report_action = QAction("Report Preview", self)
         self._report_action.setCheckable(True)
         self._report_action.setShortcut("Ctrl+R")
+        self._report_action.setEnabled(False)
         self._report_action.toggled.connect(self._on_toggle_report)
         view_menu.addAction(self._report_action)
 
@@ -744,6 +746,8 @@ class MainWindow(QMainWindow):
             profile.profile_name, target.ip, target.hostname or "", read_only=profile.read_only
         )
         self._nav.set_enabled_keys(True)
+        self._graph_action.setEnabled(True)  # Ctrl+G / Ctrl+R need a loaded profile too
+        self._report_action.setEnabled(True)
         self._central_stack.setCurrentIndex(0)  # leave the dashboard, show the three-pane view
         self._sync_nav()
         self._tool_panel.set_target(target.ip)
@@ -876,6 +880,8 @@ class MainWindow(QMainWindow):
         self._graph_view.clear_profile()  # no ghost of the deleted project in the graph/summary
         self._header.clear_profile()
         self._nav.set_enabled_keys(False)
+        self._graph_action.setEnabled(False)  # Ctrl+G / Ctrl+R must not leave the empty dashboard
+        self._report_action.setEnabled(False)
 
     # central-stack index -> nav key, so the rail highlight always matches the visible view
     _INDEX_KEY = {
@@ -1932,8 +1938,15 @@ class MainWindow(QMainWindow):
             self._graph_view.set_profile(self._profile)
             self._refresh_suggestions()
             self._update_status_footer()
-            if self._central_stack.currentIndex() == 2:
-                self._report_view.reload()  # live-refresh the report if it's the visible view
+            # live-refresh whichever data view is visible so it doesn't go stale mid-scan (the
+            # tree/graph above always refresh; report/findings/activity only when on screen)
+            current = self._central_stack.currentWidget()
+            if current is self._report_view:
+                self._report_view.reload()
+            elif current is self._findings_view:
+                self._findings_view.reload()
+            elif current is self._activity_view:
+                self._activity_view.reload()
         self._refresh_busy()
 
     def closeEvent(self, event: QCloseEvent) -> None:

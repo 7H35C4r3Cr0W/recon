@@ -67,6 +67,7 @@ class WorkspaceDashboard(QWidget):
             Qt.WidgetAttribute.WA_StyledBackground, True
         )  # so the themed bg actually paints
         self._summaries: list[ProfileSummary] = []
+        self._tool_hint_done = False  # doctor.scan() is cached after the first empty-state render
         self._index_worker: WorkspaceIndexWorker | None = None
         self._theme = theme_name
 
@@ -196,6 +197,9 @@ class WorkspaceDashboard(QWidget):
 
     def _on_index_done(self, summaries: object) -> None:
         self._summaries = summaries if isinstance(summaries, list) else []
+        self._tool_hint_done = (
+            False  # a re-index (profile added/removed) re-evaluates the tool nudge
+        )
         self._reload_views()
         self._apply_filters()
         warn = sum(1 for s in self._summaries if s.corrupt or s.warnings)
@@ -271,8 +275,11 @@ class WorkspaceDashboard(QWidget):
     def _apply_filters(self) -> None:
         visible = self._visible_summaries()
         empty = not self._summaries
-        if empty:
-            self._update_tool_hint()  # refresh the first-run tool nudge before the empty state
+        if empty and not self._tool_hint_done:
+            # scan ONCE per empty-state entry, not per filter keystroke — doctor.scan() probes ~25
+            # tools on PATH and _apply_filters fires on every keypress in the filter box.
+            self._tool_hint_done = True
+            self._update_tool_hint()
         self._stack.setCurrentIndex(1 if empty else 0)
         self._table.setSortingEnabled(False)
         self._table.setRowCount(0)
@@ -300,6 +307,10 @@ class WorkspaceDashboard(QWidget):
         status_text = cells[2]
         for col, text in enumerate(cells):
             item = QTableWidgetItem(text)
+            if col in (5, 6, 7) and text.isdigit():
+                # Svc/Find/Cred are counts — sort numerically (10 after 2), not lexically. A
+                # DisplayRole int both renders the number and makes the item compare as a number.
+                item.setData(Qt.ItemDataRole.DisplayRole, int(text))
             if col == 0:
                 item.setData(_DIR_ROLE, str(summary.directory))
                 if summary.warnings:
