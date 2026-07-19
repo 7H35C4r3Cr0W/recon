@@ -36,13 +36,18 @@ def parse_dig_version(text: str) -> list[DnsFinding]:
             continue
         if "couldn't get address" in line or "connection timed out" in line:
             continue
-        return [DnsFinding("version", line.strip('"'), "version.bind")]
+        # dig +short prints just the value; a full answer row is `name TTL CH TXT "value"`. Take the
+        # quoted rdata (or the last field) so a full row is never recorded whole as the version.
+        quoted = re.search(r'"([^"]*)"', line)
+        value = quoted.group(1) if quoted else line.split()[-1].strip('"')
+        return [DnsFinding("version", value, "version.bind")]
     return []
 
 
-# a dig AXFR record row: `name  TTL  IN  TYPE  data` (class IN is sometimes absent).
+# a dig AXFR record row: `name  TTL  IN  TYPE  data` (class IN is sometimes absent). The name class
+# includes `*` (wildcards) and `@` (zone apex) so those rows are not dropped from a transfer.
 _DIG_RECORD = re.compile(
-    r"^(?P<name>[A-Za-z0-9._-]+\.?)\s+\d+\s+(?:IN\s+)?(?P<type>[A-Z]+)\s+(?P<data>\S.*?)\s*$"
+    r"^(?P<name>[A-Za-z0-9._*@-]+\.?)\s+\d+\s+(?:IN\s+)?(?P<type>[A-Z]+)\s+(?P<data>\S.*?)\s*$"
 )
 
 

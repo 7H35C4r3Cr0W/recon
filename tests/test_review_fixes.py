@@ -79,6 +79,18 @@ def test_parse_port_line_digit_product_keeps_version() -> None:
     assert svc.version == "0.8.13"
 
 
+def test_parse_port_line_edition_year_is_not_the_version() -> None:
+    # regression: an edition YEAR (bare integer) inside a product name was taken as the version,
+    # dropping the real dotted version — corrupting the graph/report/searchsploit query
+    svc = parse_port_line("1433/tcp open ms-sql-s Microsoft SQL Server 2017 14.00.1000.00; RTM")
+    assert svc is not None
+    assert svc.product.startswith("Microsoft SQL Server 2017")
+    assert svc.version.startswith("14.00.1000.00")
+    # a normal dotted version still wins from position 1
+    ng = parse_port_line("80/tcp open http nginx 1.18.0")
+    assert ng is not None and ng.product == "nginx" and ng.version == "1.18.0"
+
+
 # --- #20 entry-target hostname case-insensitivity ----------------------------------------------
 def test_is_entry_target_hostname_casefold() -> None:
     assert is_entry_target("ACTIVE.HTB", "10.10.10.5", "active.htb") is True

@@ -195,6 +195,8 @@ def test_is_source_disclosure_flags_swap_backup_vcs() -> None:
     assert is_source_disclosure("/index.php.bak")
     assert is_source_disclosure("/config.old")
     assert is_source_disclosure("/.git/HEAD")
+    assert is_source_disclosure("/.git")  # the VCS dir itself, no trailing content
+    assert is_source_disclosure("/backup/.svn/entries")  # VCS dir not at the root
     assert is_source_disclosure("/db/dump.sql")
     assert is_source_disclosure("/app/index.php~")
     # normal pages / dirs are NOT source disclosures
@@ -202,3 +204,32 @@ def test_is_source_disclosure_flags_swap_backup_vcs() -> None:
     assert not is_source_disclosure("/index.php")
     assert not is_source_disclosure("/login/")
     assert not is_source_disclosure("/assets/js/main.js")
+    # regression: a VCS marker must be a whole path SEGMENT, not a bare substring
+    assert not is_source_disclosure("/.gitignore")
+    assert not is_source_disclosure("/.gitlab-ci.yml")
+    assert not is_source_disclosure("/.svnfoo")
+
+
+def test_whatweb_json_yields_redirect_vhost() -> None:
+    # regression: the JSON path dropped the redirect->vhost finding the plain path produces
+    import json
+
+    doc = json.dumps(
+        [
+            {
+                "target": "http://10.10.10.5/",
+                "http_status": 200,
+                "plugins": {
+                    "Meta-Refresh-Redirect": {"string": ["http://unika.htb/"]},
+                    "HTTPServer": {"string": ["Apache/2.4.38"]},
+                },
+            }
+        ]
+    )
+    vhosts = [f.redirect_to for f in parse_whatweb(doc, 80) if f.redirect_to]
+    assert vhosts == ["unika.htb"]
+    # the bare-list plugin shape (older whatweb) is handled too
+    doc2 = json.dumps(
+        [{"target": "http://10.10.10.5/", "plugins": {"RedirectLocation": ["http://blog.x.htb/"]}}]
+    )
+    assert [f.redirect_to for f in parse_whatweb(doc2, 80) if f.redirect_to] == ["blog.x.htb"]

@@ -74,7 +74,7 @@ _SOURCE_DISCLOSURE_EXT = frozenset(
         "sql",
     }
 )
-_VCS_MARKERS = ("/.git", "/.svn", "/.hg", "/.bzr")
+_VCS_DIRS = (".git", ".svn", ".hg", ".bzr")
 
 
 def is_source_disclosure(path: str) -> bool:
@@ -83,7 +83,9 @@ def is_source_disclosure(path: str) -> bool:
         return False
     if low.endswith("~"):
         return True
-    if any(marker in low for marker in _VCS_MARKERS):
+    # a VCS marker must be a whole path SEGMENT (/.git, /foo/.git/HEAD) — a bare-substring check
+    # false-flagged /.gitignore, /.gitlab-ci.yml, /.svnfoo as source disclosures.
+    if any(seg in _VCS_DIRS for seg in low.split("/")):
         return True
     name = low.rsplit("/", 1)[-1]
     ext = name.rsplit(".", 1)[-1] if "." in name else ""
@@ -269,6 +271,28 @@ def parse_nikto(text: str, port: int) -> list[HttpFinding]:
     return findings
 
 
+def _json_plugin_pairs(plugins: dict[str, Any]) -> list[tuple[str, str]]:
+    # flatten whatweb's JSON plugin map to (name, value) pairs like the plain parser does, so the
+    # redirect plugins (Meta-Refresh-Redirect / RedirectLocation / Location) feed vhost discovery.
+    # A plugin value is `{"string": [...]}` or a bare list, varying across whatweb versions.
+    pairs: list[tuple[str, str]] = []
+    for name, detail in plugins.items():
+        value = ""
+        if isinstance(detail, dict):
+            for key in ("string", "version", "module", "account"):
+                v = detail.get(key)
+                if isinstance(v, list) and v:
+                    value = str(v[0])
+                    break
+                if isinstance(v, str) and v:
+                    value = v
+                    break
+        elif isinstance(detail, list) and detail:
+            value = str(detail[0])
+        pairs.append((str(name), value))
+    return pairs
+
+
 def _parse_whatweb_json(text: str, port: int) -> list[HttpFinding]:
     # whatweb --log-json drifts between a single JSON array/object and NDJSON (one object per line)
     # across versions. Try the whole doc first, then fall back to line-by-line, skipping bad rows —
@@ -292,15 +316,20 @@ def _parse_whatweb_json(text: str, port: int) -> list[HttpFinding]:
         if not isinstance(entry, dict):
             continue
         plugins = entry.get("plugins", {})
-        names = ", ".join(sorted(plugins)) if isinstance(plugins, dict) else ""
+        is_dict = isinstance(plugins, dict)
+        names = ", ".join(sorted(plugins)) if is_dict else ""
+        path = _path_of(str(entry.get("target", "")))
+        status = _to_int(entry.get("http_status", 0))
         findings.append(
             HttpFinding(
                 port=port,
-                path=_path_of(str(entry.get("target", ""))),
-                status=_to_int(entry.get("http_status", 0)),
+                path=path,
+                status=status,
                 note=f"whatweb: {names}" if names else "whatweb",
             )
         )
+        if is_dict:
+            findings += _redirect_findings(_json_plugin_pairs(plugins), port, path, status)
     return findings
 
 

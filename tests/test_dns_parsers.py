@@ -104,3 +104,22 @@ def test_dispatch_and_garbage() -> None:
     assert parse_dns_tool("dig-axfr", _read("dig-axfr.txt"))
     assert parse_dig_axfr("total 8\nnot a record line") == []
     assert parse_dig_version(";; connection timed out; no servers could be reached\n") == []
+
+
+def test_axfr_keeps_wildcard_and_apex_records() -> None:
+    # regression: the name char class excluded * and @, silently dropping these rows from a transfer
+    axfr = (
+        "example.htb.\t604800\tIN\tA\t10.10.10.99\n"
+        "*.example.htb.\t604800\tIN\tA\t10.10.10.99\n"
+        "@\t604800\tIN\tMX\t10 mail.example.htb.\n"
+    )
+    values = [f.value for f in parse_dig_axfr(axfr) if f.kind == "record"]
+    assert any(v.startswith("*.example.htb.") for v in values)
+    assert any(v.startswith("@ MX") for v in values)
+
+
+def test_dig_version_extracts_value_from_full_answer_row() -> None:
+    # regression: a non-+short answer row was recorded whole as the "version"
+    row = 'version.bind.\t\t0\tCH\tTXT\t"9.11.3-1ubuntu1.18"\n'
+    assert parse_dig_version(row)[0].value == "9.11.3-1ubuntu1.18"
+    assert parse_dig_version("9.11.3-1ubuntu1.18\n")[0].value == "9.11.3-1ubuntu1.18"

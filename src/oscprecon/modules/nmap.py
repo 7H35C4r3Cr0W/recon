@@ -266,16 +266,13 @@ def parse_port_line(line: str) -> DiscoveredService | None:
         # banner is the product. Splitting on the first word instead mangled both fields
         # (product "Redis", version "key-value store 5.0.7").
         tokens = rest.split()
-
-        def _is_version(index: int, tok: str) -> bool:
-            # a dotted/dashed number is a version anywhere (2.4.52, 8.2p1, 0.8.13); a BARE number is
-            # a version only past position 0, so a product whose name starts with a digit (3proxy,
-            # 3CX, 7-Zip) is not mistaken for its own version.
-            if _VERSION_RE.match(tok):
-                return True
-            return index > 0 and tok[:1].isdigit()
-
-        vi = next((i for i, tok in enumerate(tokens) if _is_version(i, tok)), None)
+        # PREFER the first dotted/dashed version token (2.4.52, 14.00.1000.00, 8.2p1). An edition
+        # YEAR like "2017" in "Microsoft SQL Server 2017 14.00.1000.00" is a BARE integer that must
+        # not be mistaken for the version — so only when NO dotted token exists do we fall back to a
+        # bare number past position 0 ("Foo 5" still splits; "3proxy"/"7-Zip" never self-split).
+        vi = next((i for i, tok in enumerate(tokens) if _VERSION_RE.match(tok)), None)
+        if vi is None:
+            vi = next((i for i, tok in enumerate(tokens) if i > 0 and tok[:1].isdigit()), None)
         if vi is None:
             product = " ".join(tokens)
         else:
