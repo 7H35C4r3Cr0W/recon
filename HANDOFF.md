@@ -15,8 +15,27 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: Carpediem box review** (pushed; see `git log`).
+- **github/main HEAD: Phoenix box review** (pushed; see `git log`).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20g) — **HTB Phoenix box review** (Hard Linux; WordPress → asgaros SQLi → 2FA
+  bypass → Download-from-Files upload → rsync wildcard root). Three chunks, full suite EXIT=0:
+  (1) **`fix(http)` `c34d600`** — nmap's disallowed `/wp-admin/` in robots.txt is the canonical
+  WordPress tell, but the tool never fetched robots.txt in the GUI recon flow and `detect_wordpress`
+  only matched wordpress/wp-content/wp-login. New `parse_robots` (surfaces every Disallow/Allow/Sitemap
+  path — hidden admin/backup dirs, useful on ANY box) + `"robots"` in `_PARSERS`; **Fingerprint** now
+  curls robots.txt from the host root (tool="robots"); `detect_wordpress` broadened with
+  wp-admin/wp-includes/wp-json (fires the `[wordpress] detected` follow-up + the `suggest()` wpscan
+  step from robots alone); exploit-tab presence folds wp-content/wp-admin → WordPress ●. (2)
+  **`feat(exploit/linux)` `4a9218d`** — generic `cron-wildcard-rsync` primitive (a file named
+  `-e sh shell.sh` becomes rsync's remote-shell option), the victim/copy-only sibling of the existing
+  tar `--checkpoint` variant; the rest of the chain (pspy, wildcard, WordPress attacks) was already
+  covered at the right non-CVE altitude. (3) **`fix(http)` `601229c`** — a background adversarial
+  review (4 slices) confirmed 3 real defects in the new robots code, all reproduced + fixed:
+  **MEDIUM ReDoS** in `_ROBOTS_RULE` (lazy `\S.*?`+`\s*$` → O(n²) on a whitespace run; the target
+  serves robots.txt, so it's untrusted — made greedy) + a secondary O(n²) list-dedup (now set-backed);
+  **LOW** inline-`#`-comment swallowed into the path (now trimmed per RFC 9309); **LOW** scheme-less
+  URL+path fetched robots from the wrong location (urlsplit now `//`-prefixed). Two other slices
+  (rsync action, main_window parse flow) came back clean.
 - Session (2026-07-20f) — **HTB Carpediem box review** (Hard Linux; nginx portal / SIP-VoIP / Backdrop
   CMS / container escape). Full suite EXIT=0. Chunks: (1) **`fix(http)`** — the domain `carpediem.htb`
   lives ONLY in the landing-page `<h1>` body (not email/title/redirect), so whatweb+nmap surfaced
@@ -86,7 +105,7 @@ graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at run
   Commits `b1a2584`→`71e8efb`. (Also, non-repo: a `/etc/cron.d/nabu-maint` system-maintenance job on
   this Kali box — Timeshift snapshot → `apt full-upgrade` → junk cleanup, 3-day self-guarded; script at
   `/usr/local/sbin/nabu-maintenance.sh`.)
-- Exploit catalog: **182 services / 3,433 actions**. Pattern library: **127 rules**.
+- Exploit catalog: **182 services / 3,434 actions**. Pattern library: **127 rules**.
 - Full test suite green (**pytest EXIT=0**), all four gates clean.
 - Author/maintainer: **Andre Boyle · its.lagus@proton.me · github.com/7H35C4r3Cr0W/recon**
   (single source of truth: `src/oscprecon/branding.py`).
@@ -130,6 +149,9 @@ The pattern that works:
 - **Swept 2026-07-20f (Carpediem):** `nmap_scan.py`+`nmap.py`, `live_hacktricks.py`, `workspace/bulk.py`
   +`index.py`, `config.py` — 3 bugs fixed (config-crash HIGH, nmap `--reason`, cache non-UTF-8); 1
   latent (`bulk.py` lost-update, feature unwired) deferred.
+- **Swept 2026-07-20g (Phoenix):** the session's own new robots.txt code (`parse_robots` +
+  `_on_fingerprint` robots fetch), reviewed by a 4-slice adversarial Workflow → 3 confirmed bugs
+  fixed in-session (ReDoS MEDIUM + 2 LOW). The rsync-action + main_window http-parse slices: clean.
 - **Not yet swept (candidates for the next round):** `workspace/bulk.py` GUI wiring + its lost-update
   fix (when wired), the reporter templates under odd findings, `simple_recon.py` worker edge cases.
 
