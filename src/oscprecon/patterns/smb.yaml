@@ -63,3 +63,23 @@
     - text: "Hunt Group Policy Preferences creds in SYSVOL (cpassword / cached autologin)"
       command: "netexec smb {target} -u USER -p PASS -M gpp_password -M gpp_autologin"
 # source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+
+- match:
+    service: smb
+    field: kind
+    value: "auth"
+  suggest:
+    - text: "RID/SID-cycle the null/guest session to enumerate domain users that share-listing + SAMR enumdomusers miss (read-only, no auth guessing)"
+      command: "netexec smb {target} -u 'guest' -p '' --rid-brute 4000"
+    - text: "Read the domain password policy over the null/guest session — the account-lockout threshold is essential context before any later spray"
+      command: "netexec smb {target} -u 'guest' -p '' --pass-pol"
+# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Enumeration/User discovery/{netexec rid-brute,enum4linux-ng null & guest session}.md
+
+- match:
+    service: smb
+    field: kind
+    value: "signing"
+    detail_contains: "disabled"
+  suggest:
+    - text: "SMB signing disabled on {target} — record this host as an NTLM-relay CANDIDATE (confirm scope first; performing the relay is out of recon scope)"
+# source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md

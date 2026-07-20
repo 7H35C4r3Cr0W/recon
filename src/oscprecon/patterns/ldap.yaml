@@ -29,3 +29,44 @@
     - text: "AD user '{value}' found — collect discovered users into users.txt, then request AS-REP tickets (no pre-auth needed)"
       command: "GetNPUsers.py {domain}/ -dc-ip {target} -no-pass -usersfile users.txt"
 # source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md
+
+- match:
+    service: ldap
+    field: kind
+    value: "naming-context"
+  suggest:
+    - text: "Inventory every domain computer + OS build over the anonymous bind (spots SQL/Exchange/legacy targets to prioritise)"
+      command: "ldapsearch -x -H ldap://{target} -b '{value}' '(objectClass=computer)' dNSHostName operatingSystem operatingSystemVersion"
+# source: Obsidian: Courses/HTB/HTB AD Path/Active Directory LDAP/LDAP Anonymous Bind.md
+
+- match:
+    service: ldap
+    field: kind
+    value: "naming-context"
+  suggest:
+    - text: "List AS-REP-roastable accounts with a directory filter (DONT_REQ_PREAUTH set) — enumeration, not the attack"
+      command: "ldapsearch -x -H ldap://{target} -b '{value}' '(userAccountControl:1.2.840.113556.1.4.803:=4194304)' sAMAccountName"
+    - text: "List Kerberoastable accounts (those carrying an SPN) with a directory filter — enumeration only"
+      command: "ldapsearch -x -H ldap://{target} -b '{value}' '(&(objectClass=user)(servicePrincipalName=*))' sAMAccountName servicePrincipalName"
+# source: Obsidian: Courses/HTB/HTB AD Path/Active Directory Search Filters.md
+
+- match:
+    service: ldap
+    field: kind
+    value: "bind"
+  suggest:
+    - text: "Anonymous bind confirmed — run the full SAFE ldap NSE set (rootDSE + ldap-search); the 'not brute' guard excludes every credential script"
+      command: "nmap -n -sV -p 389,636,3268 --script 'ldap* and not brute' {target}"
+# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Enumeration/User discovery/nmap-ldap-script.md
+
+- match:
+    service: ldap
+    has_credential: true
+  suggest:
+    - text: "Collect the directory for BloodHound to reveal privilege paths (read-only LDAP/SMB collection — edit USER/PASS to a discovered cred)"
+      command: "netexec ldap {target} -u USER -p PASS --bloodhound --collection All --dns-server {target}"
+    - text: "Enumerate ADCS for misconfigured certificate templates (discovery only — no request/forge)"
+      command: "netexec ldap {target} -u USER -p PASS -M adcs"
+    - text: "Read exposed managed secrets + risky attributes over LDAP (gMSA / LAPS / machine-account-quota / adminCount)"
+      command: "netexec ldap {target} -u USER -p PASS --gmsa; netexec ldap {target} -u USER -p PASS -M laps"
+# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/{Bloodhound,ADCS,Full AD enum}.md

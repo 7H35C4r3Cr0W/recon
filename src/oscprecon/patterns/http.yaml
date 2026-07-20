@@ -102,3 +102,21 @@
     - text: "Splunk — confirm it and fingerprint the version from the login page (usually on 8000)"
       command: "curl -sk https://{target}:{port}/en-US/account/login"
 # source: Obsidian: CPTS/Attacking Common Applications/Splunk - Discovery & Enumeration.md
+
+- match:
+    service: http
+    field: status
+    value: "^401$"
+  suggest:
+    - text: "401 on {path} — read the auth scheme + realm first (Basic vs NTLM/Negotiate); the WWW-Authenticate realm often names the app, and NTLM leaks the internal AD domain/host"
+      command: "curl -sI http://{target}:{port}{path}"
+# source: Obsidian: 0.00 Methodology .../1. Initial Recon/web scan.md
+
+- match:
+    service: http
+    field: note
+    value: "(?i)joomla"
+  suggest:
+    - text: "Joomla detected — read the exact version from the unauthenticated manifest (feeds a version lookup)"
+      command: "curl -s 'http://{target}:{port}/administrator/manifests/files/joomla.xml'"
+# source: Obsidian: 0.00 Methodology .../Other Services/80 (Web services)/Joomla.md

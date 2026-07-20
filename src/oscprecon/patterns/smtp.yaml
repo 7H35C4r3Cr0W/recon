@@ -26,3 +26,20 @@
     - text: "Open-relay hint — confirm the relay path with a single swaks test (recon confirmation, not mass mail)"
       command: "swaks --server {target} --from test@{domain} --to test@{domain} --header 'Subject: relay-check' --body check"
 # source: Obsidian: 0.00 Methodology .../Other Services/Other/25 _ SMTP/User enum.md
+
+- match:
+    service: smtp
+    field: kind
+    value: "ntlm"
+  suggest:
+    - text: "SMTP NTLM leak '{value}' — the box disclosed its internal AD domain/hostname over SMTP AUTH with no creds. Add the name to /etc/hosts + Set Target Hostname, then pivot to AD enum"
+# source: Obsidian: 0.00 Methodology .../1. Initial Recon/Ports and tools.md
+
+- match:
+    service: smtp
+    field: kind
+    value: "banner"
+  suggest:
+    - text: "SMTP banner '{value}' — note the exact MTA (Exim/Postfix/Sendmail/Microsoft) + version and look it up (display-only, no PoC run)"
+      command: "searchsploit {value}"
+# source: Obsidian: 0.00 Methodology .../Other Services/Other/25 _ SMTP/User enum.md

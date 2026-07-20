@@ -32,3 +32,22 @@
   suggest:
     - text: "KDC server time is {value} — note the clock skew; Kerberos auth fails beyond ~5 minutes. Sync the local clock (faketime / ntpdate) before authenticated AD enum."
 # source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+
+- match:
+    service: kerberos
+    field: kind
+    value: "service"
+  suggest:
+    - text: "KDC present — enumerate valid usernames over Kerberos (no bind / no failed-logon / no lockout: a bad name errors, a valid one is asked for pre-auth)"
+      command: "nmap -p 88 --script krb5-enum-users --script-args krb5-enum-users.realm='{domain}' {target}"
+# source: Obsidian: 0.01 Cheatsheets/All_In_One/oncybersec.md
+
+- match:
+    service: kerberos
+    has_credential: true
+  suggest:
+    - text: "Credential + KDC in hand — enumerate Kerberoastable accounts with the allowed impacket enum script (crack off-host only if in scope, never here — edit USER/PASS)"
+      command: "GetUserSPNs.py {domain}/USER:PASS -dc-ip {target} -request"
+    - text: "Enumerate AS-REP-roastable accounts (pre-auth disabled) with the allowed impacket enum script"
+      command: "GetNPUsers.py {domain}/USER:PASS -dc-ip {target} -request"
+# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Enumeration/General impacket syntax/GetUserSPNs.md
