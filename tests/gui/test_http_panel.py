@@ -158,6 +158,22 @@ def test_fingerprint_also_fetches_robots_from_host_root(qtbot: QtBot, tmp_path: 
     assert robots[0] == "curl -sk -o http/80/robots.txt http://10.0.0.5/robots.txt"
 
 
+def test_fingerprint_robots_scheme_less_url_anchors_host_root(qtbot: QtBot, tmp_path: Path) -> None:
+    # a scheme-less URL that carries a path ("10.0.0.5/app/") must still fetch robots from the HOST
+    # ROOT, not "10.0.0.5/app//robots.txt" — urlsplit needs the "//" prefix to see the netloc.
+    prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.5"))
+    panel = HttpPanel()
+    qtbot.addWidget(panel)
+    panel.set_profile(prof)
+    panel.configure(DiscoveredService(80, Proto.TCP, "http"), _ref())
+    panel._url.setText("10.0.0.5/app/")
+    emits: list[tuple[str, str, str, int]] = []
+    panel.run_requested.connect(lambda *a: emits.append(a))
+    panel._on_fingerprint()
+    robots = next(e for e in emits if e[2] == "robots")
+    assert robots[0] == "curl -sk -o http/80/robots.txt http://10.0.0.5/robots.txt"
+
+
 def test_settings_persist_to_profile(qtbot: QtBot, tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.5"))
     panel = HttpPanel()

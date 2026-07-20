@@ -641,26 +641,36 @@ def parse_webpage(text: str, port: int) -> list[HttpFinding]:
 # upload dirs, and a CMS's install layout. A WordPress site's robots.txt disallows /wp-admin/, the
 # canonical fingerprint even when whatweb never emits "WordPress" (detect_wordpress reads this
 # text). Surface the Disallow/Allow/Sitemap entries as a recon finding.
-_ROBOTS_RULE = re.compile(r"^\s*(?:dis)?allow\s*:\s*(?P<path>\S.*?)\s*$", re.IGNORECASE)
+# why: the path group is GREEDY (\S.*), never `\S.*?` + a trailing `\s*$` — a lazy match followed by
+# a trailing-whitespace anchor backtracks quadratically on a long internal whitespace run, and the
+# target serves this file (untrusted), so that would be a ReDoS. The value is .strip()'d after.
+_ROBOTS_RULE = re.compile(r"^\s*(?:dis)?allow\s*:\s*(?P<path>\S.*)$", re.IGNORECASE)
 _ROBOTS_SITEMAP = re.compile(r"^\s*sitemap\s*:\s*(?P<url>\S+)", re.IGNORECASE)
+# an inline comment ("Disallow: /admin/  # hidden") ends the value at a whitespace-preceded (or
+# leading) '#'; a '#' fused to the path ("/a#b") is kept — per RFC 9309 the comment starts at '#'.
+_ROBOTS_COMMENT = re.compile(r"(?:^|\s)#")
 
 
 def parse_robots(text: str, port: int) -> list[HttpFinding]:
     paths: list[str] = []
     sitemaps: list[str] = []
+    seen_paths: set[str] = set()  # O(1) membership so a huge unique-path robots stays linear
+    seen_sitemaps: set[str] = set()
     for line in text.splitlines():
         sitemap = _ROBOTS_SITEMAP.match(line)
         if sitemap is not None:
             url = _clean(sitemap.group("url").strip())
-            if url and url not in sitemaps:
+            if url and url not in seen_sitemaps:
+                seen_sitemaps.add(url)
                 sitemaps.append(url)
             continue
         rule = _ROBOTS_RULE.match(line)
         if rule is None:
             continue
-        value = _clean(rule.group("path").strip())
+        value = _clean(_ROBOTS_COMMENT.split(rule.group("path"), 1)[0].strip())
         # skip the catch-all "/" (blocks/allows everything — discloses no specific path) and blanks
-        if value and value != "/" and value not in paths:
+        if value and value != "/" and value not in seen_paths:
+            seen_paths.add(value)
             paths.append(value)
     if not paths and not sitemaps:
         return []

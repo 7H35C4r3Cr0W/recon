@@ -518,10 +518,12 @@ class HttpPanel(QWidget):
         page_rel = f"http/{self._port}/index.html"
         self.run_requested.emit(f"curl -sk -o {page_rel} {url}", page_rel, "webpage", self._port)
         # robots.txt is a free path disclosure (admin panels, backups, CMS layout) and the canonical
-        # WordPress fingerprint (Disallow: /wp-admin/) even when whatweb misses it. It always lives at
-        # the host root, so rebuild scheme://netloc/robots.txt rather than appending to a deep URL.
-        parts = urlsplit(url)
-        root = f"{parts.scheme}://{parts.netloc}/" if parts.scheme and parts.netloc else url + "/"
+        # WordPress fingerprint (Disallow: /wp-admin/) even when whatweb misses it. It always lives
+        # at the host root, so rebuild scheme://netloc/robots.txt rather than append to a deep URL.
+        # Prefix "//" for a scheme-less URL ("10.0.0.5/app/") so urlsplit still yields the netloc
+        # instead of parsing the host as a path — else robots is fetched from the wrong location.
+        parts = urlsplit(url if "//" in url else f"//{url}")
+        root = f"{parts.scheme or 'http'}://{parts.netloc}/" if parts.netloc else url + "/"
         robots_rel = f"http/{self._port}/robots.txt"
         self.run_requested.emit(
             f"curl -sk -o {robots_rel} {root}robots.txt", robots_rel, "robots", self._port

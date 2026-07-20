@@ -321,6 +321,29 @@ def test_parse_robots_empty_and_catch_all_yield_nothing() -> None:
     assert parse_robots("User-agent: *\nDisallow: /\n", 80) == []
 
 
+def test_parse_robots_strips_inline_comments() -> None:
+    # RFC 9309: a rule line may carry a trailing '#' comment — it must not leak into the disclosed
+    # path, and two lines for the same path with different comments must still dedup.
+    note = parse_robots("Disallow: /admin/   # hide it\nDisallow: /admin/ # again", 80)[0].note
+    assert "1 path(s): /admin/" in note
+    assert "#" not in note  # comment text stripped, not swallowed into the path
+    # a comment-only value is dropped; a '#' fused to the path (no preceding space) is kept
+    assert parse_robots("Disallow: # nothing\nDisallow: /real/", 80)[0].note.endswith("/real/")
+    assert parse_robots("Disallow: /a#b", 80)[0].note.endswith("/a#b")
+
+
+def test_parse_robots_no_redos_on_hostile_input() -> None:
+    # the target serves robots.txt (untrusted) — a long internal whitespace run or a huge
+    # unique-path file must parse in linear time, never the O(n^2) a lazy regex + anchor incurs.
+    import time
+
+    hostile = "Disallow: /a" + " " * 200_000 + "b"
+    start = time.perf_counter()
+    parse_robots(hostile, 80)
+    parse_robots("\n".join(f"Disallow: /p{i}" for i in range(50_000)), 80)
+    assert time.perf_counter() - start < 2.0  # was ~18s combined before the fix
+
+
 def test_detect_wordpress_fires_on_robots_wp_admin_signal() -> None:
     # the canonical WordPress robots.txt fingerprint (Disallow: /wp-admin/) must be detected even
     # when whatweb never emits the product name — both on the raw text and the parse_robots note.
