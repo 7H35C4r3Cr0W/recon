@@ -79,7 +79,9 @@ def redirect_vhosts(raw_outputs: dict[str, str]) -> list[str]:
 # hide admin panels, backups and the-thing-they-don't-want-indexed there, so each is a high-value
 # recon lead surfaced for FREE by the scan (Spooktrol: /file_management/?file=implant). The header
 # is "| http-robots.txt: N disallowed entr…" and the paths follow on "|_/path" continuation lines.
-_ROBOTS_NSE_HEADER = re.compile(r"http-robots\.txt:\s*\d*\s*disallowed", re.IGNORECASE)
+# The count/whitespace between the header and "disallowed" is one char class (never `\s*\d*\s*`,
+# whose overlapping quantifiers backtrack O(n²) on a long whitespace run in target-served output).
+_ROBOTS_NSE_HEADER = re.compile(r"http-robots\.txt:[\s\d]*disallowed", re.IGNORECASE)
 
 
 def _strip_gutter(line: str) -> str:
@@ -105,9 +107,12 @@ def robots_disclosures(raw_outputs: dict[str, str]) -> list[str]:
                 continue
             if not collecting:
                 continue
-            tokens = [t for t in line.split() if t.startswith("/")]
-            if not tokens:
-                collecting = False  # a non-path line (next script / blank) ends the robots block
+            # a genuine robots continuation line is ONLY whitespace-separated '/'-paths; the moment
+            # a line isn't (e.g. the next NSE script "http-title: Index of /files"), the block ends
+            # — else that title's '/files' token would be mis-captured as a disallowed path.
+            tokens = line.split()
+            if not tokens or not all(t.startswith("/") for t in tokens):
+                collecting = False
                 continue
             for token in tokens:
                 if token not in seen:

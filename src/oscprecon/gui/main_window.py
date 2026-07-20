@@ -2326,7 +2326,9 @@ class MainWindow(QMainWindow):
                 "[wordpress] detected — follow-up: "
                 "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url <target>"
             )
-        if detect_api_server(text) and profile is self._profile:
+        # only the fingerprint (whatweb) output carries the Server-header context detect_api_server
+        # needs — never scan a raw index.html body, where a JS `application/json` literal false-fires
+        if tool == "whatweb" and detect_api_server(text) and profile is self._profile:
             self._tool_panel.append_output(
                 "[api] JSON API server detected — enumerate routes/params, not files: "
                 "curl /openapi.json /docs /redoc /swagger.json /api/v1"

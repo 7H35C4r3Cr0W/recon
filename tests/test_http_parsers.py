@@ -347,6 +347,19 @@ def test_detect_api_server_fires_on_asgi_and_json_signals() -> None:
     assert detect_api_server("nginx 1.18") is False
 
 
+def test_detect_api_server_no_false_positive_on_bodies_and_names() -> None:
+    # the name markers must sit in a SERVER-header context, and the JSON type must be anchored —
+    # else the most common web targets false-fire (adversarial-review regressions):
+    assert detect_api_server('<link type="application/json+oembed" href="/wp-json/">') is False
+    assert detect_api_server("Content-Type: application/ld+json") is False
+    assert detect_api_server("Computer name: DAPHNE") is False  # SMB host name, not a server header
+    assert detect_api_server("<h1>Growing Daphne odora</h1>") is False  # a shrub in page text
+    assert detect_api_server("whatweb: Title[Daphne's Blog], HTTPServer[nginx]") is False
+    # a real content-type / server header still fires
+    assert detect_api_server("Content-Type: application/json") is True
+    assert detect_api_server("http-server-header: uvicorn") is True
+
+
 def test_parse_robots_no_redos_on_hostile_input() -> None:
     # the target serves robots.txt (untrusted) — a long internal whitespace run or a huge
     # unique-path file must parse in linear time, never the O(n^2) a lazy regex + anchor incurs.

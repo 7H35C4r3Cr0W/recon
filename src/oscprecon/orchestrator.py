@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from oscprecon import shell
 from oscprecon.models import Command, Port, Proto
+from oscprecon.modules.http import HTTP_SERVICE_NAMES
 from oscprecon.modules.http.parsers import detect_api_server
 from oscprecon.modules.nmap import NmapModule, redirect_vhosts, robots_disclosures
 from oscprecon.profile import Profile
@@ -144,7 +145,13 @@ class Orchestrator:
                 "backups and sensitive endpoints there; investigate it (curl it, feed it to "
                 "content discovery)."
             )
-        if detect_api_server("\n".join(raw.values())):
+        # only nudge about an API when an HTTP service was actually found — else a marker appearing
+        # elsewhere in the cross-service scan (an SMB "Computer name: DAPHNE", a cert CN) would emit
+        # a JSON-API tip on a box with no web server at all.
+        has_http = any(
+            s.service.lower() in HTTP_SERVICE_NAMES for s in self.profile.discovered_services
+        )
+        if has_http and detect_api_server("\n".join(raw.values())):
             self._emit(
                 "[api] the web server looks like a JSON API (uvicorn / FastAPI / application-json) "
                 "— enumerate the API schema, not files: curl /openapi.json /docs /redoc "

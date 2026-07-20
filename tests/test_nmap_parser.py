@@ -160,3 +160,31 @@ def test_robots_disclosures_multi_entry_and_block_boundary() -> None:
     }
     assert robots_disclosures(raw) == ["/admin/", "/backup/"]
     assert robots_disclosures({"x": "80/tcp open http nginx\n|_http-title: Hi\n"}) == []
+
+
+def test_robots_disclosures_does_not_over_capture_title_slash() -> None:
+    # a following http-title that carries a '/'-token (a directory-index title) must NOT be mistaken
+    # for a robots path — the block ends the moment a line isn't purely '/'-paths.
+    raw = {
+        "x": (
+            "| http-robots.txt: 2 disallowed entries\n"
+            "| /admin/\n"
+            "|_/backup/\n"
+            "|_http-title: Index of /files\n"
+            "443/tcp open ssl/http\n"
+        )
+    }
+    assert robots_disclosures(raw) == ["/admin/", "/backup/"]  # /files (from the title) excluded
+    assert robots_disclosures(
+        {"x": "| http-robots.txt: 1 disallowed entry\n|_/a/\n|_http-title: /dashboard\n"}
+    ) == ["/a/"]
+
+
+def test_robots_disclosures_no_redos_on_hostile_header() -> None:
+    # the target serves robots.txt; a header line with a long whitespace run must parse linearly.
+    import time
+
+    big = ("http-robots.txt:    " + " " * 5000 + "x\n") * 2000
+    start = time.perf_counter()
+    robots_disclosures({"a": big})
+    assert time.perf_counter() - start < 2.0  # was ~70s with the ambiguous \s*\d*\s* header regex

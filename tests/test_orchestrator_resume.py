@@ -96,6 +96,33 @@ def test_nmap_nse_leads_surface_robots_and_api(
     assert any(ln.startswith("[api]") and "openapi.json" in ln for ln in lines)
 
 
+def _no_http_daphne_run(shell_line: str, output_file: Path, **_: object) -> object:
+    # a Windows SMB box (no HTTP) whose smb-os-discovery names the host DAPHNE — the API marker
+    # appears in the cross-service blob but there is no web server to enumerate.
+    out = Path(output_file)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        "PORT     STATE SERVICE       VERSION\n"
+        "135/tcp  open  msrpc         Microsoft Windows RPC\n"
+        "445/tcp  open  microsoft-ds\n"
+        "| smb-os-discovery:\n"
+        "|   Computer name: DAPHNE\n",
+        encoding="utf-8",
+    )
+    return shell.ShellResult(shell_line, 0, out, "", "", 0.0)
+
+
+def test_nmap_api_tip_needs_an_http_service(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # no HTTP port open -> the [api] nudge must NOT fire even though 'DAPHNE' is in the scan blob.
+    prof = Profile.create(tmp_path, "daphne", Target(ip="10.10.10.9"))
+    monkeypatch.setattr(shell, "run", _no_http_daphne_run)
+    lines: list[str] = []
+    Orchestrator(prof, on_line=lines.append).run_nmap()
+    assert not any(ln.startswith("[api]") for ln in lines)
+
+
 def test_nmap_redirect_autoset_hostname(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Ignition: nmap's http-title redirect auto-wires the vhost when none is set (announced).
     prof = Profile.create(tmp_path, "ign", Target(ip="10.10.10.5"))

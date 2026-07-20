@@ -714,20 +714,23 @@ def detect_wordpress(*texts: str) -> bool:
     return any(marker in blob for marker in _WORDPRESS_MARKERS)
 
 
-# an ASGI Python server (uvicorn/hypercorn/daphne) or a Starlette/FastAPI banner, or a JSON
-# content-type, is the tell that the site is a JSON API — not a file-serving website. The recon move
-# then is to enumerate the API surface (auto-generated docs/schema list every route + parameter),
-# not to dir-bust for files. gunicorn is excluded — it commonly fronts HTML Django/Flask apps too.
-_API_SERVER_MARKERS = (
-    "uvicorn",
-    "hypercorn",
-    "daphne",
-    "starlette",
-    "fastapi",
-    "application/json",
+# an ASGI Python server (uvicorn/hypercorn/daphne) or a Starlette/FastAPI banner in a SERVER-header
+# context, or a real JSON content-type, is the tell that the site is a JSON API — not a file-serving
+# website. The recon move is then to enumerate the API surface (auto-generated docs/schema list
+# every route + parameter), not to dir-bust for files. gunicorn is excluded (fronts HTML too).
+# The name must sit in a header context (`Server:`/`HTTPServer[…]`/`X-Powered-By[…]`), never a bare
+# substring — else a page whose title/body merely says "Daphne"/"FastAPI" false-fires; and the JSON
+# type is anchored so `application/json+oembed` (in every WordPress <head>) is NOT a match.
+_API_NAMES = r"(?:uvicorn|hypercorn|daphne|starlette|fastapi)"
+_API_SERVER_RE = re.compile(
+    r"(?:http-?)?server(?:[-\s]*header)?\s*[:\[]\s*"
+    + _API_NAMES  # Server/HTTPServer/http-server-header
+    + r"|x-powered-by\s*[:\[]\s*"
+    + _API_NAMES  # whatweb X-Powered-By[FastAPI]
+    + r"|application/json(?![+\w-])",  # a real JSON content-type, not application/json+oembed / +ld
+    re.IGNORECASE,
 )
 
 
 def detect_api_server(*texts: str) -> bool:
-    blob = " ".join(texts).lower()
-    return any(marker in blob for marker in _API_SERVER_MARKERS)
+    return _API_SERVER_RE.search(" ".join(texts)) is not None
