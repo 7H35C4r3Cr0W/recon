@@ -18,7 +18,7 @@ from oscprecon.modules.smb.parsers import parse_netexec_shares, readable_shares
 from oscprecon.modules.vhost.parsers import parse_gobuster_dns
 from oscprecon.nmap_scan import ScanSpec, build_nmap_command, is_entry_target
 from oscprecon.references import ExploitHit
-from oscprecon.shell import _redact_cmdline
+from oscprecon.shell import _redact_cmdline, policy_violation
 from oscprecon.workspace import portability
 
 
@@ -260,3 +260,48 @@ def test_delete_project_refuses_symlink(tmp_path: Path) -> None:
     with pytest.raises(portability.ProjectArchiveError):
         portability.delete_project(link, ws)
     assert real.exists()  # the real project must survive
+
+
+# --- 2026-07-20 engine-core review: policy holes + secret redaction ---------------------------
+def test_wpscan_brute_blocks_equals_and_concatenated_forms() -> None:
+    # the =-form and concatenated short form must be blocked in default mode, like the space form
+    for argv in (
+        ["wpscan", "--url", "http://x", "--passwords=rockyou.txt"],
+        ["wpscan", "--url", "http://x", "-Prockyou.txt"],
+        ["wpscan", "--url", "http://x", "--usernames=u.txt"],
+        ["wpscan", "--url", "http://x", "-Uu.txt"],
+    ):
+        assert policy_violation(argv) is not None, argv
+        assert policy_violation(argv, spray=True) is None  # Spray mode unlocks it
+    assert policy_violation(["wpscan", "--url", "http://x", "--enumerate", "u"]) is None  # recon ok
+
+
+def test_nmap_script_all_and_star_are_blocked() -> None:
+    assert policy_violation(["nmap", "--script", "all", "10.0.0.1"]) is not None
+    assert policy_violation(["nmap", "--script", "*", "10.0.0.1"]) is not None
+    assert policy_violation(["nmap", "--script=all", "10.0.0.1"]) is not None
+    assert policy_violation(["nmap", "--script", "all", "10.0.0.1"], spray=True) is None
+    # legitimate recon scripts and the allowed recon-brute stay allowed
+    assert policy_violation(["nmap", "--script", "http-title,ssl-cert", "10.0.0.1"]) is None
+    assert policy_violation(["nmap", "--script", "oracle-sid-brute", "10.0.0.1"]) is None
+
+
+def test_netexec_relative_wordlist_is_blocked_without_touching_disk() -> None:
+    # a relative wordlist path that doesn't resolve from cwd must still be caught by its extension
+    assert policy_violation(["netexec", "smb", "10.0.0.1", "-u", "users.txt", "-p", "pass.txt"])
+    assert policy_violation(["netexec", "smb", "10.0.0.1", "-p", "wordlist.lst"])
+    # a single interactive credential (no wordlist extension) stays allowed
+    assert (
+        policy_violation(["netexec", "smb", "10.0.0.1", "-u", "administrator", "-p", "sa"]) is None
+    )
+    assert policy_violation(["netexec", "smb", "10.0.0.1", "-u", "guest", "-p", ""]) is None
+
+
+def test_redact_masks_impacket_single_dash_hashes_for_any_tool() -> None:
+    # -hashes (impacket single-dash) must be masked even on a bare, un-prefixed script name (§6)
+    line = _redact_cmdline(
+        ["impacket-mssqlclient", "-hashes", "aad3b435:c0ffeec0ffee", "d/u@1.2.3.4"]
+    )
+    assert "aad3b435:c0ffeec0ffee" not in line and "<redacted" in line
+    bare = _redact_cmdline(["GetNPUsers.py", "-hashes", "aad:bbbb", "d/u"])
+    assert "aad:bbbb" not in bare and "<redacted" in bare

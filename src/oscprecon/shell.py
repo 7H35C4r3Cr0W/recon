@@ -41,6 +41,10 @@ _CRED_TOOLS: frozenset[str] = frozenset(
     }
 )
 _SECRET_VALUE_FLAGS: frozenset[str] = frozenset({"-p", "-a", "-w", "-H", "--hashes"})
+# secret-bearing flags whose value is masked for ANY tool (§6 "never log secret values"), not only
+# recognised cred tools: impacket scripts pass NT hashes as the single-dash `-hashes LM:NT`, and a
+# bare `GetNPUsers.py` isn't in _CRED_TOOLS, so keying redaction off the tool name would leak it.
+_SECRET_HEADS: tuple[str, ...] = ("--password", "--pass", "--hashes", "-hashes")
 
 
 def _mask(value: str) -> str:
@@ -87,16 +91,14 @@ def _redact_cmdline(argv: list[str]) -> str:
     while i < len(argv):
         tok = argv[i]
         head = tok.split("=", 1)[0]
-        next_is_secret = (head in ("--password", "--pass")) or (
-            cred_tool and tok in _SECRET_VALUE_FLAGS
-        )
+        next_is_secret = (head in _SECRET_HEADS) or (cred_tool and tok in _SECRET_VALUE_FLAGS)
         if head in ("-U", "--user") and "=" in tok:  # --user=DOMAIN\user%PASS
             out.append(f"{head}={_mask_userpct(tok.split('=', 1)[1])}")
         elif tok in ("-U", "--user") and i + 1 < len(argv):  # -U DOMAIN\user%PASS (split token)
             out += [tok, _mask_userpct(argv[i + 1])]
             i += 2
             continue
-        elif "=" in tok and head in ("--password", "--pass"):
+        elif "=" in tok and head in _SECRET_HEADS:
             out.append(f"{head}={_mask(tok.split('=', 1)[1])}")
         elif next_is_secret and i + 1 < len(argv):
             # mask the flag's value AND any trailing non-flag tokens (nargs spray: -p p1 p2 p3)
@@ -343,6 +345,14 @@ def _ike_scan_violation(argv: list[str]) -> str | None:
 # handles all three; a single inline literal (`-p ''`, `-p sa`) stays allowed (the Tier-1/2 check).
 _NETEXEC_TOOLS: frozenset[str] = frozenset({"netexec", "nxc", "crackmapexec"})
 _NETEXEC_AUTH_FLAGS: frozenset[str] = frozenset({"-u", "--username", "-p", "--password"})
+_WORDLIST_EXTS: frozenset[str] = frozenset({"txt", "lst", "list", "dic", "dict"})
+
+
+def _looks_like_wordlist(value: str) -> bool:
+    # a relative wordlist path may not resolve from the interpreter's cwd (netexec runs with the
+    # profile dir as cwd), so Path.is_file() alone misses `-p pass.txt`. A known wordlist extension
+    # is a strong file signal a single interactive password (`-p sa`, `-p ''`) never has.
+    return value.rsplit("/", 1)[-1].rsplit(".", 1)[-1].lower() in _WORDLIST_EXTS
 
 
 def _netexec_violation(argv: list[str]) -> str | None:
@@ -369,7 +379,7 @@ def _netexec_violation(argv: list[str]) -> str | None:
         if len(literals) > 1:
             return f"netexec {flag} has {len(literals)} inline credentials — spray (forbidden)"
         for value in values:
-            if value and Path(value).is_file():
+            if value and (Path(value).is_file() or _looks_like_wordlist(value)):
                 return f"netexec {flag} {value} is a list file — credential brute (forbidden)"
     return None
 
@@ -482,18 +492,23 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
         return f"{tool} is not on the OSCP-allowed tool list"
     if not spray:
         for token in argv[1:]:
-            if token.lower() in _FORBIDDEN_FLAGS:
+            head = token.split("=", 1)[0].lower()  # catch --passwords=FILE, not just --passwords
+            if head in _FORBIDDEN_FLAGS:
                 return (
-                    f"{token} is a credential brute/spray flag (off by default — enable Spray mode)"
+                    f"{head} is a credential brute/spray flag (off by default — enable Spray mode)"
                 )
     # why: drive EVERY per-tool sub-check off `base` (the lowercased basename), NOT the raw argv[0].
     # An absolute/relative path (/usr/bin/netexec, ./nmap) passes the allow-list via `base` but
     # slip past a `tool == "netexec"` check, letting list-driven spray / brute run in recon mode.
-    if base == "nmap":
+    if base == "nmap" and not spray:
         for value in _script_values(argv):
             for script in value.split(","):  # --script takes a comma list; judge each name
                 name = script.strip().lower()
-                if "brute" in name and name not in _NMAP_RECON_BRUTE and not spray:
+                # `all` / `*` run EVERY script incl. the *-brute credential scripts, but carry no
+                # literal "brute" substring for the per-name check — block the glob-everything form
+                if name in ("all", "*"):
+                    return "nmap --script all/* runs credential brute (off by default — Spray mode)"
+                if "brute" in name and name not in _NMAP_RECON_BRUTE:
                     return f"nmap --script {name} is credential brute (off by default — Spray mode)"
     if base == "searchsploit":
         for token in argv[1:]:
@@ -505,8 +520,14 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
             return aws_violation
     if base == "wpscan" and not spray:
         for token in argv[1:]:
-            if token in _WPSCAN_FORBIDDEN:
-                return f"wpscan {token} is credential brute (off by default — enable Spray mode)"
+            head = token.split("=", 1)[0]  # --passwords=FILE / --usernames=FILE
+            # `-Pfile` / `-Ufile` concatenated short form (wpscan's Ruby OptionParser accepts it)
+            concat = (
+                len(token) > 2 and not token.startswith("--") and token[:2] in _WPSCAN_FORBIDDEN
+            )
+            if head in _WPSCAN_FORBIDDEN or concat:
+                flag = token[:2] if concat else head
+                return f"wpscan {flag} is credential brute (off by default — enable Spray mode)"
     if base in _NETEXEC_TOOLS and not spray:
         netexec_violation = _netexec_violation(argv)
         if netexec_violation is not None:
