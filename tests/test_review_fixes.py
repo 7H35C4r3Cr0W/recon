@@ -334,3 +334,19 @@ def test_report_command_log_redacts_credentialed_shell_line() -> None:
         [{"module": "smb", "shell_line": "impacket-secretsdump corp/bob:S3cretPass@10.0.0.5"}]
     )
     assert "S3cretPass" not in out[0]["shell_line"] and "<redacted" in out[0]["shell_line"]
+
+
+# --- 2026-07-20 recon-parser review ------------------------------------------------------------
+def test_parse_dnsrecon_cname_does_not_store_hostname_as_ip() -> None:
+    from oscprecon.modules.vhost.parsers import parse_dnsrecon
+
+    cname = parse_dnsrecon("2026-07-10T21:02:31 INFO     CNAME www.example.com example.com")
+    assert cname[0].vhost == "www.example.com"
+    assert cname[0].ip == ""  # a CNAME's rdata is a hostname, not an address
+    a = parse_dnsrecon("2026-07-10T21:02:31 INFO     A host.example.com 10.10.10.5")
+    assert a[0].ip == "10.10.10.5"  # a real A record still carries its address
+
+
+def test_parse_port_line_strips_trailing_version_punctuation() -> None:
+    svc = parse_port_line("1433/tcp open ms-sql-s Microsoft SQL Server 2017 14.00.1000.00; RTM+")
+    assert svc is not None and svc.version == "14.00.1000.00"  # no trailing ';'

@@ -108,7 +108,7 @@ def parse_gobuster_dns(text: str) -> list[VhostFinding]:
 
 
 # dnsrecon: pre-1.x "[+] A host ip"; 1.6.0 "<timestamp> INFO \t A host ip".
-_DNSRECON = re.compile(r"(?:\[[*+]\]|INFO)\s+(?:A|AAAA|CNAME)\s+(?P<host>\S+)\s+(?P<ip>\S+)")
+_DNSRECON = re.compile(r"(?:\[[*+]\]|INFO)\s+(?P<type>A|AAAA|CNAME)\s+(?P<host>\S+)\s+(?P<ip>\S+)")
 
 
 def parse_dnsrecon(text: str) -> list[VhostFinding]:
@@ -116,9 +116,10 @@ def parse_dnsrecon(text: str) -> list[VhostFinding]:
     for line in text.splitlines():
         match = _DNSRECON.search(line)
         if match is not None:
-            findings.append(
-                VhostFinding(vhost=match.group("host"), ip=match.group("ip"), note="dnsrecon brt")
-            )
+            # a CNAME's rdata is a canonical HOSTNAME, not an address — don't store it in `ip`
+            # (mirrors parse_dnsenum), else a bogus "ip" (a hostname) enters the graph/pivot model.
+            ip = match.group("ip") if match.group("type") in ("A", "AAAA") else ""
+            findings.append(VhostFinding(vhost=match.group("host"), ip=ip, note="dnsrecon brt"))
     return findings
 
 

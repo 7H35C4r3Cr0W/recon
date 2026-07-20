@@ -277,7 +277,9 @@ def parse_port_line(line: str) -> DiscoveredService | None:
             product = " ".join(tokens)
         else:
             product = " ".join(tokens[:vi])
-            version = tokens[vi]
+            # strip banner punctuation glued to the version token (nmap's "14.00.1000.00; RTM+"
+            # splits to "14.00.1000.00;") so the report/graph show a clean version
+            version = tokens[vi].rstrip(";,")
     return DiscoveredService(
         port=int(match.group("port")),
         proto=Proto(match.group("proto")),
