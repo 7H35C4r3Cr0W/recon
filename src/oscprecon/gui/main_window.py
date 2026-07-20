@@ -2327,7 +2327,7 @@ class MainWindow(QMainWindow):
                 "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url <target>"
             )
         # only the fingerprint (whatweb) output carries the Server-header context detect_api_server
-        # needs — never scan a raw index.html body, where a JS `application/json` literal false-fires
+        # needs — never scan a raw index.html body, where a JS `application/json` literal misfires
         if tool == "whatweb" and detect_api_server(text) and profile is self._profile:
             self._tool_panel.append_output(
                 "[api] JSON API server detected — enumerate routes/params, not files: "
