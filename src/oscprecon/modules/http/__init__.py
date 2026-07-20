@@ -12,6 +12,7 @@ from oscprecon.modules.http.parsers import (
     detect_wordpress,
     email_domains_from_plugins,
     is_vhost_host,
+    lab_hostnames_from_text,
     parse_tool,
     vhost_from_redirect,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "email_domains_from_plugins",
     "is_tls",
     "is_vhost_host",
+    "lab_hostnames_from_text",
     "parse_tool",
     "vhost_from_redirect",
     "wide_net_extensions",
@@ -298,6 +300,7 @@ class HttpModule(Module):
                             "redirect_to": hf.redirect_to,
                             "base_path": hf.base_path,
                             "email_domain": hf.email_domain,
+                            "page_host": hf.page_host,
                         },
                     )
                 )
@@ -346,6 +349,19 @@ class HttpModule(Module):
                 f"Email domain '{domain}' disclosed on the page — likely the target domain. Add it "
                 f"to /etc/hosts, Set Target Hostname, and enumerate vhosts/subdomains "
                 f"(ffuf -H 'Host: FUZZ.{domain}' …); a name-based vhost may serve content the IP "
+                f"won't."
+            )
+        # a lab hostname printed in the page body (heading/footer/comment, e.g. carpediem.htb) is
+        # almost always the box's domain — the vhost-enum prerequisite the bare IP never serves. A
+        # loud lead like the email domain (weaker than a redirect, so surface it, don't auto-set).
+        page_hosts = sorted(
+            {h for f in findings if (h := str(f.fields.get("page_host", "")).strip())}
+        )
+        for host in page_hosts:
+            out.append(
+                f"Host '{host}' disclosed in the page content — likely the target domain/vhost. "
+                f"Add it to /etc/hosts, Set Target Hostname, and enumerate vhosts/subdomains "
+                f"(ffuf -H 'Host: FUZZ.{host}' …); a name-based vhost may serve content the IP "
                 f"won't."
             )
         # a 401 endpoint wants HTTP auth — a SINGLE attempt with a well-known default is Tier-2

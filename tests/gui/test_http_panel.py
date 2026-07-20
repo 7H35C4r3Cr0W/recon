@@ -122,6 +122,24 @@ def test_fingerprint_emits_whatweb_through_parse_path(qtbot: QtBot, tmp_path: Pa
     )
 
 
+def test_fingerprint_also_snapshots_index_for_page_hosts(qtbot: QtBot, tmp_path: Path) -> None:
+    # Carpediem: the domain is only in the page body, so Fingerprint also curls the index page with
+    # tool="webpage" -> parse_webpage mines lab hostnames the whatweb summary never carries.
+    prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.5"))
+    panel = HttpPanel()
+    qtbot.addWidget(panel)
+    panel.set_profile(prof)
+    panel.configure(DiscoveredService(80, Proto.TCP, "http"), _ref())
+    emits: list[tuple[str, str, str, int]] = []
+    panel.run_requested.connect(lambda *a: emits.append(a))
+    panel._on_fingerprint()
+    tools = {tool for (_cmd, _rel, tool, _port) in emits}
+    assert tools == {"whatweb", "webpage"}
+    page = next(e for e in emits if e[2] == "webpage")
+    assert page[1] == "http/80/index.html"  # snapshot path keyed by port
+    assert page[0] == "curl -sk -o http/80/index.html http://10.0.0.5/"
+
+
 def test_settings_persist_to_profile(qtbot: QtBot, tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.5"))
     panel = HttpPanel()

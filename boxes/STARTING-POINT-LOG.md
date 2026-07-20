@@ -746,6 +746,39 @@ had `info@snoopy.htb` in hand on two prior boxes and did nothing with it — a d
 the cheapest, most reliable path to a box's real (vhost-only) attack surface, so it must become an
 actionable lead, not inert note text.
 
+**32 · Carpediem (HTB, Hard, Linux) — nginx portal (login_type mass-assign → upload webshell) → Trudesk/VoIP → TLS-decrypt → Backdrop CMS → container escape — recon + attack — live.**
+`10.129.227.179` (`carpediem.htb`). Ports: 22/ssh (OpenSSH 8.2p1) + 80/http (nginx 1.18.0) + **5060/udp
+SIP (Asterisk VoIP)**. 68/udp came back `open|filtered` and was correctly **not** marked present; the
+SIP service was correctly surfaced as `open`. Ran the full loop live.
+- **Recon bug → fix (the box's entry point, invisible to the tool):** the domain `carpediem.htb` lives
+  ONLY in the landing page body (`<h1>Carpediem.htb</h1>`) — not in an email, title, or redirect.
+  whatweb never reads page text (verified: even `-v`/`-a 3` only give `Title[Comming Soon]` +
+  `Meta-Author`), and nmap's http-title is just "Comming Soon", so the domain that unlocks the whole
+  box was surfaced by **nothing**. The Snoopy email fix doesn't catch this (body text, not an email).
+  Fix: the **Fingerprint** button now also snapshots the index page (`curl -sk -o index.html`, §9)
+  and a new `parse_webpage` / `lab_hostnames_from_text` mines **lab-TLD hostnames** (`*.htb/.vl/.thm/
+  .local/.corp/.internal/…`) from the body into a `HttpFinding.page_host` finding + a "add to
+  /etc/hosts, Set Target Hostname, enumerate vhosts" `suggest()` step. CDN/vendor `.com/.org` hosts are
+  ignored (only lab TLDs), so it's low-noise. Validated live end-to-end: page body → `carpediem.htb` →
+  vhost enum → `portal.carpediem.htb` (the foothold vhost). Fixture `index-page-host.html` + 5 tests
+  (parser body/shapes, module suggest, the fingerprint double-emit). Recon guide synced.
+- **Attack coverage (mostly present, +1 generic primitive added):** the chain is covered at the right
+  non-CVE altitude — web **`api-mass-assignment`** is the general form of the `login_type=2→1` hidden
+  privilege-field tamper; **file-upload → shell** covers the multipart webshell; **`backdrop.py`** is
+  the Backdrop-CMS module-upload RCE; **`sip.py`** (svmap/sipvicious) covers VoIP enum; `linux` has
+  `getcap`, `sudo-tcpdump`, and Cron abuse. The one genuine gap: `docker.py` had remote-API and
+  `--privileged` mount breakouts but **not the cgroup-v1 `release_agent` escape** — the classic
+  CAP_SYS_ADMIN container-breakout primitive (the general technique behind Carpediem's CVE-2022-0492
+  escape, documented in HackTricks independent of the CVE). Added **`docker-inside-cgroup-release-
+  agent`** (victim-side / copy-only, `{command}`-parameterised, HackTricks-sourced) — applies to any
+  privileged/CAP_SYS_ADMIN container, not just this box (SOP §2.3, same as Dump's tcpdump/motd). The
+  CVE-2022-0492 PoC itself, the TLS-key decrypt, and the VoIP voicemail step stay manual (§21).
+
+**Lesson:** domain disclosure has *many* shapes — a redirect (Ignition), an email (Snoopy), and now
+plain body text (Carpediem). whatweb/nmap only see structured signals, so a hostname that lives only in
+the rendered HTML needs the page itself snapshotted and mined. Restricting the mine to lab TLDs is what
+keeps "grep the page for hostnames" from becoming noise.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,

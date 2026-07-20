@@ -29,6 +29,7 @@ class HttpFinding:
     words: int = 0  # response word count (feroxbuster -o "22w")
     base_path: str = ""  # subdir the site root redirects to (e.g. "/racers/") — app lives here
     email_domain: str = ""  # domain of an email disclosed on the page — a vhost/subdomain-enum lead
+    page_host: str = ""  # lab hostname (*.htb/.vl/…) disclosed in page body — a vhost-enum lead
 
     def __post_init__(self) -> None:
         self.path = _clean(self.path)
@@ -37,6 +38,7 @@ class HttpFinding:
         self.method = _clean(self.method)
         self.base_path = _clean(self.base_path)
         self.email_domain = _clean(self.email_domain)
+        self.page_host = _clean(self.page_host)
         # why: a redirect observed AT the site root ("/") to a subdirectory means the whole app is
         # served from that base path — content discovery / fingerprinting must pivot there. A
         # redirect on a deeper path (e.g. /admin -> /admin/) is normal and is NOT a base path.
@@ -57,6 +59,7 @@ class HttpFinding:
             "words": self.words,
             "base_path": self.base_path,
             "email_domain": self.email_domain,
+            "page_host": self.page_host,
             "discovered_at": discovered_at,
         }
 
@@ -594,6 +597,46 @@ def parse_wpscan(text: str, port: int) -> list[HttpFinding]:
     return findings
 
 
+# lab/CTF domains disclosed as plain text in a page body ("<h1>carpediem.htb</h1>", a footer, an
+# HTML comment) are almost always the box's real domain — the vhost/subdomain-enum prerequisite the
+# bare IP never serves (§10). whatweb never reads body text, so we snapshot the index page and mine
+# these. Restricting to pentesting-lab TLDs keeps it clean: a real page's CDN hosts (.com/.org/.net)
+# are ignored, and a *.htb/.vl/.thm host in a page is a lead by definition, never noise.
+_LAB_TLDS = ("htb", "vl", "thm", "local", "lab", "corp", "internal", "offsec", "pg")
+_LAB_HOST_RE = re.compile(
+    r"\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:" + "|".join(_LAB_TLDS) + r")\b",
+    re.IGNORECASE,
+)
+
+
+def lab_hostnames_from_text(text: str) -> list[str]:
+    # pull every pentesting-lab hostname (dotted name ending in a lab TLD) disclosed in the text,
+    # lower-cased + deduped in first-seen order — feeds the domain/vhost recon lead.
+    hosts: list[str] = []
+    for match in _LAB_HOST_RE.finditer(text):
+        host = match.group(0).lower().strip(".")
+        if host and host not in hosts:
+            hosts.append(host)
+    return hosts
+
+
+def parse_webpage(text: str, port: int) -> list[HttpFinding]:
+    # a raw page snapshot (index.html) — mine disclosed lab hostnames as vhost/domain leads.
+    out: list[HttpFinding] = []
+    for host in lab_hostnames_from_text(text):
+        out.append(
+            HttpFinding(
+                port=port,
+                path="/",
+                status=0,
+                page_host=host,
+                note=f"page content discloses host '{host}' — likely the target domain/vhost; add "
+                f"it to /etc/hosts, Set Target Hostname, and enumerate vhosts (Host: FUZZ.{host})",
+            )
+        )
+    return out
+
+
 _PARSERS = {
     "feroxbuster": parse_feroxbuster,
     "gobuster": parse_gobuster,
@@ -602,6 +645,7 @@ _PARSERS = {
     "nikto": parse_nikto,
     "whatweb": parse_whatweb,
     "wpscan": parse_wpscan,
+    "webpage": parse_webpage,
 }
 
 

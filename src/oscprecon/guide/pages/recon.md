@@ -63,6 +63,10 @@ discovery / whatweb / nikto at that base path — enumerating `/` alone would mi
 **Fingerprint** turns up an email address on the page (whatweb's `Email[…]` plugin, e.g.
 `info@snoopy.htb`), it surfaces the email's **domain as a vhost/subdomain-enum lead** — add it to
 `/etc/hosts`, *Set Target Hostname*, and fuzz `Host: FUZZ.<domain>`; a name-based vhost often serves
-content the bare IP won't (public mailbox providers like `gmail.com` are filtered out as noise); and
+content the bare IP won't (public mailbox providers like `gmail.com` are filtered out as noise); the
+**Fingerprint** also snapshots the index page and mines **lab hostnames printed in the body** (a
+heading/footer/comment, e.g. `<h1>carpediem.htb</h1>`) — whatweb never reads page text, so a domain
+that lives only in the HTML would otherwise be invisible; any `*.htb` / `*.vl` / `*.thm` / `*.local`
+host becomes the same "add to `/etc/hosts`, *Set Target Hostname*, fuzz `Host: FUZZ.<host>`" lead; and
 when an endpoint returns **401** it suggests a *single* well-known default (`curl -u admin:admin …`) —
 a Tier-2 recon-adjacent check, never a password spray.

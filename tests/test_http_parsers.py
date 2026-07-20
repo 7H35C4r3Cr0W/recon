@@ -198,6 +198,38 @@ def test_email_domains_filters_public_providers() -> None:
     assert email_domains_from_plugins([("Title", "chat@snoopy.htb portal")]) == []
 
 
+def test_parse_webpage_mines_lab_host_from_body() -> None:
+    # Carpediem: the domain lives only in an <h1>carpediem.htb</h1> — whatweb never sees body text,
+    # so the index snapshot is mined for lab hostnames. CDN/vendor domains must stay ignored.
+    from oscprecon.modules.http.parsers import parse_webpage
+
+    findings = parse_webpage(_read("index-page-host.html"), 80)
+    assert len(findings) == 1
+    assert findings[0].page_host == "carpediem.htb"
+    assert findings[0].path == "/"
+    assert "/etc/hosts" in findings[0].note and "carpediem.htb" in findings[0].note
+
+
+def test_lab_hostnames_from_text_shapes() -> None:
+    from oscprecon.modules.http.parsers import lab_hostnames_from_text
+
+    # only pentesting-lab TLDs (real CDN/vendor .com/.org are never a lab lead)
+    assert lab_hostnames_from_text("https://cdn.bootstrapcdn.com/x https://www.w3.org/") == []
+    # multiple lab hosts incl a subdomain -> deduped, first-seen order, case-insensitive
+    assert lab_hostnames_from_text("<h1>Carpediem.htb</h1> portal.carpediem.htb CARPEDIEM.HTB") == [
+        "carpediem.htb",
+        "portal.carpediem.htb",
+    ]
+    assert lab_hostnames_from_text("a.htb b.vl c.thm d.local e.corp f.internal") == [
+        "a.htb",
+        "b.vl",
+        "c.thm",
+        "d.local",
+        "e.corp",
+        "f.internal",
+    ]
+
+
 def test_base_path_from_redirect_shapes() -> None:
     from oscprecon.modules.http.parsers import base_path_from_redirect
 

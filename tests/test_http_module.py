@@ -186,6 +186,24 @@ def test_suggest_email_domain_leads_to_vhost_enum() -> None:
     assert not any("disclosed" in line for line in module.suggest([bare]))
 
 
+def test_suggest_page_host_leads_to_vhost_enum() -> None:
+    # Carpediem: a lab hostname printed in the page body (carpediem.htb) becomes a vhost/domain lead
+    # (vhost enum against it finds portal.carpediem.htb, the foothold surface).
+    module = HttpModule()
+    finding = Finding(
+        service="http",
+        title="0 /",
+        detail="page content discloses host 'carpediem.htb'",
+        fields={"path": "/", "status": "0", "page_host": "carpediem.htb"},
+    )
+    out = module.suggest([finding])
+    assert any("carpediem.htb" in line and "vhost" in line.lower() for line in out)
+    assert any("/etc/hosts" in line for line in out)
+    # no page_host -> no such suggestion
+    bare = Finding(service="http", title="200 /", detail="whatweb: nginx", fields={"path": "/"})
+    assert not any("disclosed in the page content" in line for line in module.suggest([bare]))
+
+
 def test_suggest_base_path_from_root_redirect() -> None:
     # Race: the site root redirects to /racers/ — surface it so content discovery pivots off /.
     module = HttpModule()

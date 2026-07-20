@@ -512,6 +512,11 @@ class HttpPanel(QWidget):
         output_rel = f"http/{self._port}/whatweb.txt"
         command = f"whatweb --colour=never --log-brief={output_rel} {url}"
         self.run_requested.emit(command, output_rel, "whatweb", self._port)
+        # also snapshot the index page (§9) and mine lab hostnames from the body — whatweb never
+        # reads page text, so a domain printed in a heading/footer (e.g. carpediem.htb) is invisible
+        # to the fingerprint alone. The "webpage" parser turns those into vhost/domain recon leads.
+        page_rel = f"http/{self._port}/index.html"
+        self.run_requested.emit(f"curl -sk -o {page_rel} {url}", page_rel, "webpage", self._port)
 
     def _on_dry_run(self) -> None:
         self.dry_run_requested.emit(build_command(self._current_settings()))
