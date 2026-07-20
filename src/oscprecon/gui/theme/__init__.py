@@ -7,10 +7,24 @@ from oscprecon.gui.theme import tokens
 
 # why: §19/§23 — a dark/light toggle for exam-day comfort. Fusion + a dark QPalette is the robust
 # Qt way (complete coverage of every widget role, no fragile per-widget QSS to maintain).
-THEMES = ("light", "dark", "htb", "leet", "amber", "synthwave")
+THEMES = (
+    "light",
+    "dark",
+    "htb",
+    "leet",
+    "amber",
+    "synthwave",
+    "dracula",
+    "nord",
+    "gruvbox",
+    "solarized",
+    "tokyonight",
+    "monokai",
+)
 # HTB / Parrot is the default look (owner request, 2026-07-16) — a deep navy-teal ground with the
 # Parrot cyan-green accent + a light-blue secondary. Light + Dark remain for exam-day comfort;
-# Leet / Amber / Synthwave (Nabu brand kit) ride the RETICLE instrument layer unchanged.
+# Leet / Amber / Synthwave (Nabu brand kit) and the six familiar editor palettes (Dracula / Nord /
+# Gruvbox / Solarized / Tokyo Night / Monokai) all ride the RETICLE instrument layer unchanged.
 DEFAULT_THEME = "htb"
 _LABELS = {
     "light": "Light",
@@ -19,6 +33,12 @@ _LABELS = {
     "leet": "Leet",
     "amber": "Amber",
     "synthwave": "Synthwave",
+    "dracula": "Dracula",
+    "nord": "Nord",
+    "gruvbox": "Gruvbox",
+    "solarized": "Solarized",
+    "tokyonight": "Tokyo Night",
+    "monokai": "Monokai",
 }
 
 

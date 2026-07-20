@@ -69,7 +69,9 @@ def test_theme_group_has_all_options(qtbot: QtBot) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
     labels = {a.text().lower() for a in window._theme_group.actions()}
-    assert labels == {"light", "dark", "htb", "leet", "amber", "synthwave"}
+    # every declared theme must appear as a menu action (self-maintaining as themes are added)
+    assert labels == {theme.label(t).lower() for t in theme.THEMES}
+    assert len(labels) == len(theme.THEMES)  # no duplicate/missing actions
 
 
 @pytest.mark.parametrize("name", ["leet", "amber", "synthwave"])

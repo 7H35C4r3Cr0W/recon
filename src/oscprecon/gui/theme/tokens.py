@@ -153,6 +153,123 @@ SYNTHWAVE = Palette(  # neon magenta + cyan on deep violet
     info="#26f0ff",
 )
 
+# Six popular editor palettes people already know from their terminal / VS Code, so the theme
+# picker feels familiar. Each rides the generic _fusion_palette() layer (no per-theme QSS) and is
+# WCAG-AA-validated by test_theme_contrast for every contrast pair.
+DRACULA = Palette(  # the classic purple-on-charcoal
+    bg="#282a36",
+    surface="#343746",
+    surface_alt="#3d4055",
+    border="#4d5066",
+    text="#f8f8f2",
+    text_muted="#9aa4d2",
+    nav_label="#ff79c6",
+    accent="#bd93f9",
+    accent_text="#1a1428",
+    secondary="#8be9fd",
+    focus="#bd93f9",
+    selection="#44475a",
+    success="#50fa7b",
+    warning="#f1fa8c",
+    error="#ff5555",
+    info="#8be9fd",
+)
+
+NORD = Palette(  # arctic blue-grey, frost accents
+    bg="#2e3440",
+    surface="#3b4252",
+    surface_alt="#434c5e",
+    border="#4c566a",
+    text="#eceff4",
+    text_muted="#c0c8d6",
+    nav_label="#8fbcbb",
+    accent="#88c0d0",
+    accent_text="#16303a",
+    secondary="#81a1c1",
+    focus="#88c0d0",
+    selection="#434c5e",
+    success="#a3be8c",
+    warning="#ebcb8b",
+    error="#bf616a",
+    info="#81a1c1",
+)
+
+GRUVBOX = Palette(  # warm retro — cream on brown-black, amber/orange accents
+    bg="#282828",
+    surface="#3c3836",
+    surface_alt="#504945",
+    border="#665c54",
+    text="#ebdbb2",
+    text_muted="#c4b596",
+    nav_label="#fe8019",
+    accent="#fabd2f",
+    accent_text="#2a2000",
+    secondary="#83a598",
+    focus="#fabd2f",
+    selection="#504945",
+    success="#b8bb26",
+    warning="#fabd2f",
+    error="#fb4934",
+    info="#83a598",
+)
+
+SOLARIZED = Palette(  # Solarized Dark — teal-ink ground, yellow accent
+    bg="#002b36",
+    surface="#073642",
+    surface_alt="#0a4a5a",
+    border="#0f5c6e",
+    text="#eee8d5",
+    text_muted="#93a1a1",
+    nav_label="#2aa198",
+    accent="#b58900",
+    accent_text="#04212a",
+    secondary="#268bd2",
+    focus="#b58900",
+    selection="#0a4a5a",
+    success="#859900",
+    warning="#cb4b16",
+    error="#dc322f",
+    info="#268bd2",
+)
+
+TOKYONIGHT = Palette(  # muted indigo night, soft blue accent
+    bg="#1a1b26",
+    surface="#24283b",
+    surface_alt="#2f334d",
+    border="#3b4261",
+    text="#c0caf5",
+    text_muted="#9099c4",
+    nav_label="#7dcfff",
+    accent="#7aa2f7",
+    accent_text="#0d1020",
+    secondary="#bb9af7",
+    focus="#7aa2f7",
+    selection="#2f334d",
+    success="#9ece6a",
+    warning="#e0af68",
+    error="#f7768e",
+    info="#7dcfff",
+)
+
+MONOKAI = Palette(  # the Sublime classic — lime-green accent on olive-charcoal
+    bg="#272822",
+    surface="#33342c",
+    surface_alt="#3e3d32",
+    border="#4d4c40",
+    text="#f8f8f2",
+    text_muted="#bcbcab",
+    nav_label="#66d9ef",
+    accent="#a6e22e",
+    accent_text="#0f1a00",
+    secondary="#f92672",
+    focus="#a6e22e",
+    selection="#3e3d32",
+    success="#a6e22e",
+    warning="#e6db74",
+    error="#f92672",
+    info="#66d9ef",
+)
+
 
 _PALETTES = {
     "dark": DARK,
@@ -161,6 +278,12 @@ _PALETTES = {
     "leet": LEET,
     "amber": AMBER,
     "synthwave": SYNTHWAVE,
+    "dracula": DRACULA,
+    "nord": NORD,
+    "gruvbox": GRUVBOX,
+    "solarized": SOLARIZED,
+    "tokyonight": TOKYONIGHT,
+    "monokai": MONOKAI,
 }
 _active_theme = "htb"  # HTB / Parrot is the default look (set by theme.apply_theme on startup)
 
