@@ -54,12 +54,17 @@ class NmapWorker(CancellableThread):
     failed = Signal(str)
 
     def __init__(
-        self, profile: Profile, udp_full: bool = False, scan_profile: str = "default"
+        self,
+        profile: Profile,
+        udp_full: bool = False,
+        scan_profile: str = "default",
+        resume: bool = False,
     ) -> None:
         super().__init__()
         self._profile = profile
         self._udp_full = udp_full
         self._scan_profile = scan_profile
+        self._resume = resume
 
     def run(self) -> None:
         try:
@@ -69,6 +74,7 @@ class NmapWorker(CancellableThread):
                 udp_full=self._udp_full,
                 scan_profile=self._scan_profile,
                 cancel=self._cancel,
+                resume=self._resume,
             )
             orch.run_nmap()
         except Exception as exc:  # boundary: surface worker failures to the UI thread

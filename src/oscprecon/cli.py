@@ -5,11 +5,12 @@ from pathlib import Path
 
 import typer
 
-from oscprecon import branding, config, diagnostics, guide, vault_export
+from oscprecon import branding, config, diagnostics, guide, shell, vault_export
 from oscprecon import doctor as doctor_mod
 from oscprecon.models import Target
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
+from oscprecon.reporter import Reporter
 from oscprecon.workspace import portability
 
 app = typer.Typer(
@@ -489,6 +490,397 @@ def pivot_cmd(
             typer.echo(f"  {line}")
         typer.echo("")
     raise typer.Exit(0)
+
+
+def _profile_dir(profile: str, workspace: Path | None) -> Path:
+    root = workspace if workspace is not None else config.workspace_root()
+    directory = Path(root) / profile
+    if not (directory / "profile.json").exists():
+        typer.echo(f"[error] no profile '{profile}' in {root}", err=True)
+        raise typer.Exit(2)
+    return directory
+
+
+@app.command("enum")
+def enum_cmd(
+    service: str | None = typer.Argument(
+        None, help="Service to enumerate (see the no-arg list). Omit to list runnable services."
+    ),
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    port: int = typer.Option(0, "--port", help="Override the discovered port (0 = the default)."),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Run a service's Tier-1 recon headlessly (the same enumeration the GUI service panels run)."""
+    from datetime import UTC, datetime
+
+    from oscprecon import findings as findings_mod
+    from oscprecon.gui.simple_recon import SIMPLE_SPECS  # Qt-free: importing it never loads PySide6
+    from oscprecon.parsing import run_parser
+
+    if service is None:
+        typer.echo("Runnable services (`nabu-cli enum <service> -p <profile>`):\n")
+        typer.echo("  " + ", ".join(sorted(SIMPLE_SPECS)))
+        raise typer.Exit(0)
+    spec = SIMPLE_SPECS.get(service)
+    if spec is None:
+        typer.echo(
+            f"[error] '{service}' is not a runnable enum service. Choose one of: "
+            f"{', '.join(sorted(SIMPLE_SPECS))}",
+            err=True,
+        )
+        raise typer.Exit(2)
+    prof = Profile.load(_profile_dir(profile, workspace))
+    raw: dict[str, str] = {}
+    issues: list[str] = []
+    for command, tool in spec.steps_fn(prof.target, port):
+        out = prof.directory / command.output_file
+        result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
+        if result.missing_tool is not None:
+            issues.append(f"{result.missing_tool} not installed")
+        elif result.blocked is not None:
+            issues.append("a step was blocked by the recon-only policy")
+        if tool:
+            try:
+                raw[tool] = out.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                raw[tool] = ""
+    module = spec.factory()
+    found = run_parser(lambda: module.parse(raw), label=spec.module, raw="\n".join(raw.values()))
+    if found:
+        now = datetime.now(UTC).isoformat()
+        findings_mod.add_findings(
+            prof.directory,
+            [
+                {
+                    "module": f.service,
+                    "kind": f.fields.get("kind", ""),
+                    "value": f.fields.get("value", ""),
+                    "detail": f.detail,
+                    "discovered_at": now,
+                }
+                for f in found
+            ],
+        )
+    if issues:
+        typer.echo(
+            f"\n⚠ {len(dict.fromkeys(issues))} step(s) did not run — "
+            f"{'; '.join(dict.fromkeys(issues))}. Findings may be INCOMPLETE."
+        )
+    typer.echo(f"\n[enum] {spec.module}: {len(found)} finding(s)")
+    for f in found:
+        kind = f.fields.get("kind", "?")
+        typer.echo(f"  • {kind}: {f.fields.get('value', '')}  {f.detail}".rstrip())
+    for tip in module.suggest(found):
+        typer.echo(f"  → {tip}")
+    Reporter(prof).write()
+
+
+@app.command("list")
+def list_cmd(
+    ip: str | None = typer.Option(None, "--ip", help="Only profiles whose target IP matches."),
+    archived: bool = typer.Option(
+        True, "--archived/--no-archived", help="Include archived profiles."
+    ),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """List workspace projects (name · IP · status · service/finding/cred counts)."""
+    from oscprecon.workspace import index, portability
+
+    root = workspace if workspace is not None else config.workspace_root()
+    if ip is not None:
+        matches = portability.find_profiles_by_ip(Path(root), ip)
+        if not matches:
+            typer.echo(f"[list] no profile targets {ip} in {root}")
+            raise typer.Exit(0)
+        for directory in matches:
+            typer.echo(f"  {directory.name}  ({directory})")
+        raise typer.Exit(0)
+    summaries = index.scan_workspace(Path(root), include_archived=archived)
+    if not summaries:
+        typer.echo(f"[list] no projects in {root}")
+        raise typer.Exit(0)
+    typer.echo(f"{'NAME':22} {'TARGET':18} {'STATUS':10}  SVC/FIND/CRED")
+    for s in summaries:
+        flag = " (archived)" if s.archived else ""
+        counts = f"{s.service_count}/{s.finding_count}/{s.credential_count}"
+        typer.echo(f"{s.name[:22]:22} {s.target[:18]:18} {s.status[:10]:10}  {counts}{flag}")
+
+
+@app.command("findings")
+def findings_cmd(
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    service: str | None = typer.Option(None, "--service", help="Only findings from this module."),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Print the structured findings a profile has collected (the Findings view, headless)."""
+    from oscprecon import findings as findings_mod
+
+    rows = findings_mod.load_findings(_profile_dir(profile, workspace))
+    if service is not None:
+        rows = [r for r in rows if str(r.get("module", "")) == service]
+    if not rows:
+        typer.echo("[findings] none recorded yet.")
+        raise typer.Exit(0)
+    for r in rows:
+        mod = str(r.get("module", "?"))
+        head = str(r.get("kind") or r.get("path") or "").strip()
+        val = str(r.get("value") or r.get("status") or "").strip()
+        detail = str(r.get("detail") or r.get("note") or "").replace("\n", " ").strip()
+        typer.echo(f"  [{mod}] {head} {val}  {detail}".rstrip())
+
+
+@app.command("health")
+def health_cmd(
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    repair: bool = typer.Option(
+        False, "--repair", help="Fix the repairable issues (creds perms, stale temp)."
+    ),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Check a profile's health (creds perms, stale temp, lock/schema) — optionally repair it."""
+    from oscprecon.workspace import health as health_mod
+
+    root = workspace if workspace is not None else config.workspace_root()
+    directory = _profile_dir(profile, workspace)
+    issues = health_mod.check_profile(directory, workspace_root=Path(root))
+    if not issues:
+        typer.echo("[health] no issues — profile is clean.")
+        raise typer.Exit(0)
+    for issue in issues:
+        mark = {"error": "!!", "warning": " !", "info": "  "}.get(issue.severity, "  ")
+        typer.echo(f"{mark} [{issue.severity}] {issue.code}: {issue.message}")
+    if repair:
+        fixed = health_mod.repair_creds_permissions(directory)
+        removed = health_mod.repair_remove_stale_temp(directory)
+        typer.echo(
+            f"[health] repaired: creds perms {'set' if fixed else 'ok'}; "
+            f"removed {len(removed)} stale temp file(s)."
+        )
+
+
+@app.command("activity")
+def activity_cmd(
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    limit: int = typer.Option(50, "--limit", "-n", help="Most-recent N events."),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Print the profile's audit-trail timeline (audit.jsonl) — the Activity view, headless."""
+    from oscprecon.workspace import activity as activity_mod
+
+    events, total = activity_mod.load_activity(_profile_dir(profile, workspace), limit=limit)
+    if not events:
+        typer.echo("[activity] no recorded activity.")
+        raise typer.Exit(0)
+    for event in events:
+        typer.echo(f"  {event.timestamp}  {event.event_type:16} {event.description}")
+    if total > len(events):
+        typer.echo(f"  … {total - len(events)} older event(s) not shown (raise --limit).")
+
+
+@app.command("delete-project")
+def delete_project_cmd(
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Permanently delete a project folder (lock-safe). Destructive — asks first unless --yes."""
+    from oscprecon.workspace import portability
+
+    root = workspace if workspace is not None else config.workspace_root()
+    directory = _profile_dir(profile, workspace)
+    if not yes and not typer.confirm(f"Permanently delete {directory}? This cannot be undone."):
+        typer.echo("[delete] cancelled.")
+        raise typer.Exit(0)
+    try:
+        portability.delete_project(directory, Path(root))
+    except portability.ProjectArchiveError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(2) from exc
+    typer.echo(f"[deleted] {directory}")
+
+
+@app.command("searchsploit")
+def searchsploit_cmd(
+    product: str = typer.Argument(..., help="Product name, e.g. 'vsftpd' or 'apache'."),
+    version: str = typer.Argument("", help="Optional version, e.g. '2.4.49'."),
+) -> None:
+    """Version-aware Exploit-DB lookup (display-only — never downloads or runs a PoC, §14)."""
+    import tempfile
+
+    from oscprecon import references
+
+    with tempfile.NamedTemporaryFile(suffix=".json") as tmp:
+        result = references.search_exploits(product, version, Path(tmp.name))
+    if not result.hits:
+        typer.echo(f"[searchsploit] no hits for '{product} {version}'.".rstrip())
+        raise typer.Exit(0)
+    scope = {"version": "version-specific", "product": "product-wide (version had no title match)"}
+    typer.echo(
+        f"# {result.query}  —  {scope.get(result.scope, result.scope)}  ({result.total} total)\n"
+    )
+    for hit in result.hits:
+        star = "★ " if hit.version_match else "  "
+        badge = f"[{hit.type or '?'}/{hit.platform or '?'}]"
+        typer.echo(f"{star}EDB-{hit.edb_id:7} {badge:20} {hit.title}")
+        typer.echo(f"     {hit.url}")
+
+
+creds_app = typer.Typer(help="Manage the profile credential vault (creds.json, chmod 600).")
+app.add_typer(creds_app, name="creds")
+
+
+@creds_app.command("list")
+def creds_list_cmd(
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """List stored credentials (secrets masked, like the GUI vault)."""
+    prof = Profile.load(_profile_dir(profile, workspace))
+    entries = prof.credentials()
+    if not entries:
+        typer.echo("[creds] none stored.")
+        raise typer.Exit(0)
+    for c in entries:
+        who = f"{c.domain}\\{c.username}" if c.domain else c.username
+        masked = f"<{c.secret_type} len={len(c.secret)}>"
+        typer.echo(f"  {who:32} {masked:20} {c.source}")
+
+
+@creds_app.command("add")
+def creds_add_cmd(
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    username: str = typer.Option(..., "--user", "-u", help="Username."),
+    secret: str = typer.Option(..., "--secret", "-s", help="Password or hash."),
+    secret_type: str = typer.Option("password", "--type", help="password | hash."),
+    domain: str = typer.Option("", "--domain", "-d", help="Domain (optional)."),
+    source: str = typer.Option("cli", "--source", help="Where it came from."),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Record a credential in the vault (creds.json is written chmod 600)."""
+    from oscprecon.models import Credential
+
+    prof = Profile.load(_profile_dir(profile, workspace))
+    prof.add_credential(
+        Credential(
+            username=username, secret=secret, secret_type=secret_type, domain=domain, source=source
+        )
+    )
+    typer.echo(f"[creds] stored {domain + chr(92) if domain else ''}{username} ({secret_type}).")
+
+
+@creds_app.command("rm")
+def creds_rm_cmd(
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    username: str = typer.Option(..., "--user", "-u", help="Username to remove."),
+    domain: str = typer.Option("", "--domain", "-d", help="Domain (to disambiguate)."),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Delete a credential from the vault by username (+ optional domain)."""
+    prof = Profile.load(_profile_dir(profile, workspace))
+    matches = [
+        c
+        for c in prof.credentials()
+        if c.username == username and (not domain or c.domain == domain)
+    ]
+    if not matches:
+        typer.echo(f"[creds] no credential for '{username}'.", err=True)
+        raise typer.Exit(1)
+    for c in matches:
+        prof.delete_credential(c)
+    typer.echo(f"[creds] removed {len(matches)} credential(s) for '{username}'.")
+
+
+@app.command("config")
+def config_cmd(
+    spray: bool | None = typer.Option(
+        None, "--spray/--no-spray", help="Enable/disable Spray mode (§2a)."
+    ),
+    exploit: bool | None = typer.Option(
+        None, "--exploit/--no-exploit", help="Enable/disable exploit execution (§2b)."
+    ),
+) -> None:
+    """Show or toggle the opt-in mode gates (Spray mode / Exploit execution). No arg = show."""
+    from dataclasses import replace
+
+    settings = config.load_settings()
+    if spray is None and exploit is None:
+        typer.echo(f"spray_enabled   = {settings.spray_enabled}")
+        typer.echo(f"exploit_enabled = {settings.exploit_enabled}")
+        raise typer.Exit(0)
+    updated = replace(
+        settings,
+        spray_enabled=settings.spray_enabled if spray is None else spray,
+        exploit_enabled=settings.exploit_enabled if exploit is None else exploit,
+    )
+    config.save_settings(updated)
+    typer.echo(
+        f"[config] spray_enabled={updated.spray_enabled} exploit_enabled={updated.exploit_enabled}"
+    )
+
+
+@app.command("spray")
+def spray_cmd(
+    service: str = typer.Argument(..., help="Service key: smb | winrm | ldap | ssh | ftp | rdp."),
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    port: int = typer.Option(0, "--port", help="Override the discovered port (0 = tool default)."),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Password-spray a service using the vault creds (opt-in Spray mode, §2a — OFF by default)."""
+    from oscprecon import spray as spray_mod
+
+    if not config.spray_enabled():
+        typer.echo(
+            "[error] Spray mode is OFF (exam-legal default). Enable it with "
+            "`nabu-cli config --spray`, then re-run. Only spray your own authorized target.",
+            err=True,
+        )
+        raise typer.Exit(2)
+    prof = Profile.load(_profile_dir(profile, workspace))
+    users, passwords = spray_mod.vault_material(prof.credentials())
+    if not users or not passwords:
+        typer.echo(
+            "[error] the vault has no usernames/passwords to spray — add some with `creds add`.",
+            err=True,
+        )
+        raise typer.Exit(2)
+    try:
+        user_file, pass_file = spray_mod.write_spray_lists(prof.directory, users, passwords)
+        command = spray_mod.build_spray_command(
+            service, prof.target.ip, user_file, pass_file, port or None
+        )
+        typer.echo(f"[spray] {command}")
+        redactor = spray_mod.make_redactor(passwords)
+        out = prof.directory / f"spray/{service}.txt"
+        shell.run(
+            command,
+            out,
+            cwd=prof.directory,
+            spray=True,
+            on_line=lambda line: typer.echo(redactor(line)),
+        )
+    except ValueError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(2) from exc
+    finally:
+        spray_mod.clean_spray_artifacts(prof.directory)
 
 
 def main() -> None:

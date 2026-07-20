@@ -2205,9 +2205,10 @@ class MainWindow(QMainWindow):
         else:
             self._tool_panel.append_output("[ping] recon cancelled — target not scanned.")
 
-    def _launch_recon(self, profile_name: str) -> None:
+    def _launch_recon(self, profile_name: str, *, resume: bool = False) -> None:
         # the actual scan launch (after the optional pre-flight). A /24 network project runs a
         # host-discovery sweep into the topology; a single host runs the versioned service battery.
+        # `resume` reuses output from steps that already finished (exit 0) — parity with CLI --resume.
         if self._profile is None or self._profile.read_only:
             return
         if not self._tasks.can_start(exclusive=True):
@@ -2217,16 +2218,20 @@ class MainWindow(QMainWindow):
             self._launch_network_recon(profile_name)
             return
         settings = config.load_settings()
+        resume_note = " (resume — skipping completed steps)" if resume else ""
         self._tool_panel.append_output(
-            f"[nmap] starting… (scan profile: {profile_name}) — port discovery can take a few "
-            "minutes; live output streams below."
+            f"[nmap] starting…{resume_note} (scan profile: {profile_name}) — port discovery can "
+            "take a few minutes; live output streams below."
         )
         self._service_tree.set_empty_message(
             f"Scanning {self._profile.target.ip} — discovering open ports…\n"
             "Services appear here as nmap finds them."
         )
         worker = NmapWorker(
-            self._profile, udp_full=settings.nmap_udp_full, scan_profile=profile_name
+            self._profile,
+            udp_full=settings.nmap_udp_full,
+            scan_profile=profile_name,
+            resume=resume,
         )
         self._start(worker, "nmap", self._on_scan_done, exclusive=True)
 
