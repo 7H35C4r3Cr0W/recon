@@ -199,3 +199,16 @@ def test_v1_profile_loads_with_empty_hosts(tmp_path: Path) -> None:
     prof.profile_json_path.write_text(json.dumps(raw))
     reloaded = Profile.load(prof.directory)
     assert reloaded.discovered_hosts == []
+
+
+def test_cli_pivot_normalizes_unknown_os_in_header() -> None:
+    # regression: `pivot --os bogus` echoed the raw value in the header while the steps fell back to
+    # Linux — a self-contradictory readout. The header must match the normalized OS the steps use.
+    from typer.testing import CliRunner
+
+    from oscprecon.cli import app
+
+    out = CliRunner().invoke(app, ["pivot", "--os", "bogus"]).output
+    assert "(linux pivot)" in out and "bogus" not in out
+    win = CliRunner().invoke(app, ["pivot", "--os", "Windows"]).output  # case-insensitive
+    assert "(windows pivot)" in win

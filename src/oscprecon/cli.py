@@ -93,7 +93,9 @@ def scan(
         # why: on resume the loaded profile's stored target is authoritative (run_nmap scans it),
         # so a differing CLI ip would be silently ignored — scanning the wrong host. Refuse the
         # mismatch rather than guess; the user opens the right profile or creates a new one.
-        if prof.target.ip != ip:
+        # Compare the NORMALIZED target (Target() canonicalizes a host-bit CIDR to its network
+        # address), so `10.10.5.5/24` resuming a profile stored as `10.10.5.0/24` isn't rejected.
+        if prof.target.ip != target.ip:
             typer.echo(
                 f"[error] --resume target mismatch: profile '{profile}' targets {prof.target.ip}, "
                 f"but you gave {ip}. Use the matching IP, or drop --resume to start a new scan.",
@@ -441,6 +443,11 @@ def pivot_cmd(
     """Show the ligolo-ng pivot workflow as copy-paste steps (display-only; same as the Pivot tab)."""  # noqa: E501
     from oscprecon import ligolo
 
+    # normalize up front: build_ligolo_steps() falls back to the Linux workflow for any unknown
+    # value, so the header must match — else `--os bogus` prints "bogus pivot" over Linux steps.
+    agent_os = agent_os.strip().lower()
+    if agent_os not in ("linux", "windows"):
+        agent_os = "linux"
     ip = lhost.strip() or ligolo.detect_tun_ip("tun0") or ligolo.detect_tun_ip("tun1")
     route_list = [r.strip() for r in routes.replace(";", ",").split(",") if r.strip()]
     typer.echo(f"# ligolo-ng — reach an internal network ({agent_os} pivot)")

@@ -33,3 +33,30 @@ def test_scan_threads_valid_profile_to_orchestrator(monkeypatch: pytest.MonkeyPa
     result = runner.invoke(app, ["scan", "10.10.10.5", "--profile", "b", "--scan-profile", "exam"])
     assert result.exit_code == 0
     assert captured["scan_profile"] == "exam" and captured["ran"]
+
+
+def test_scan_resume_accepts_equivalent_host_bit_cidr(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    # regression: --resume compared the RAW ip arg vs the NORMALIZED stored target, so a host-bit
+    # CIDR (10.10.5.5/24) was falsely rejected as a mismatch for a profile stored as 10.10.5.0/24.
+    from oscprecon.models import Target
+    from oscprecon.profile import Profile
+
+    Profile.create(tmp_path, "net", Target(ip="10.10.5.0/24"))
+    captured: dict[str, Any] = {}
+
+    class FakeOrch:
+        def __init__(self, _profile: Any, **kwargs: Any) -> None:
+            pass
+
+        def run_nmap(self) -> None:
+            captured["ran"] = True
+
+    monkeypatch.setattr(cli_mod, "Orchestrator", FakeOrch)
+    result = runner.invoke(
+        app,
+        ["scan", "10.10.5.5/24", "--profile", "net", "--resume", "--workspace", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output  # the equivalent CIDR must not be a mismatch
+    assert captured.get("ran")
