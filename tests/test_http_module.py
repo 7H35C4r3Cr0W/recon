@@ -166,3 +166,37 @@ def test_suggest_vhost_from_redirect() -> None:
         service="http", title="301 /a", detail="", fields={"redirect_to": "/a/"}
     )
     assert not module.suggest([path_redirect])
+
+
+def test_suggest_base_path_from_root_redirect() -> None:
+    # Race: the site root redirects to /racers/ — surface it so content discovery pivots off /.
+    module = HttpModule()
+    finding = Finding(
+        service="http",
+        title="200 /",
+        detail="root redirects to /racers/",
+        fields={"path": "/", "status": "200", "base_path": "/racers/", "redirect_to": "/racers/"},
+    )
+    out = module.suggest([finding])
+    assert any("/racers/" in line and "base path" in line for line in out)
+    assert any("racers/" in line for line in out)  # the feroxbuster example points at the subdir
+
+
+def test_suggest_basic_auth_default_cred_on_401() -> None:
+    # Race: phpsysinfo returns 401 (Basic auth) and admin:admin works. Surface a Tier-2 single-shot
+    # default-cred hint on a 401 — but NOT on a 403 (forbidden, not an auth prompt).
+    module = HttpModule()
+    finding = Finding(
+        service="http",
+        title="401 /phpsysinfo",
+        detail="whatweb: WWW-Authenticate[phpsysinfo][Basic]",
+        fields={"path": "/phpsysinfo", "status": "401"},
+    )
+    out = module.suggest([finding])
+    hint = next((line for line in out if "/phpsysinfo" in line), "")
+    assert "401" in hint and "admin:admin" in hint
+    assert "spray" in hint  # explicitly framed as a single attempt, not a spray
+    forbidden = Finding(
+        service="http", title="403 /x", detail="", fields={"path": "/x", "status": "403"}
+    )
+    assert not module.suggest([forbidden])

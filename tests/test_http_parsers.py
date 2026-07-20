@@ -140,6 +140,41 @@ def test_whatweb_redirect_ignores_ip_and_self() -> None:
     assert vhost_from_redirect("/local/path") == ""  # a path redirect is not a vhost
 
 
+def test_whatweb_root_redirect_surfaces_base_path() -> None:
+    # Race: the site root meta-refreshes to /racers/ (a subdirectory, not a vhost). The whole app
+    # lives there, so surface it as a base_path finding — content discovery must pivot off /.
+    findings = parse_whatweb(_read("whatweb-basepath.txt"), 80)
+    assert len(findings) == 2
+    fingerprint, base = findings
+    assert fingerprint.base_path == "" and "Apache" in fingerprint.note
+    assert base.base_path == "/racers/"
+    assert base.redirect_to == "/racers/"
+    assert "base path" in base.note and "content discovery" in base.note
+
+
+def test_base_path_from_redirect_shapes() -> None:
+    from oscprecon.modules.http.parsers import base_path_from_redirect
+
+    assert base_path_from_redirect("/racers/") == "/racers/"
+    assert base_path_from_redirect("/racers") == "/racers/"  # bare dir gets a trailing slash
+    assert base_path_from_redirect("http://race.vl/racers/") == "/racers/"
+    assert base_path_from_redirect("/wordpress/wp-login.php") == "/wordpress/"  # keep the dir
+    assert base_path_from_redirect("/") == ""  # root -> nothing to pivot into
+    assert base_path_from_redirect("/index.php") == ""  # a file at root is not a base path
+    assert base_path_from_redirect("http://unika.htb/") == ""  # a vhost is not a base path
+
+
+def test_deep_path_redirect_is_not_a_base_path() -> None:
+    # a normal trailing-slash 301 on a deep path (/admin -> /admin/) must NOT be flagged as the
+    # app's base path — only a redirect observed AT the site root counts.
+    findings = parse_feroxbuster(
+        "301      GET        9l       28w      315c "
+        "http://10.129.234.209/admin => http://10.129.234.209/admin/",
+        80,
+    )
+    assert findings and all(f.base_path == "" for f in findings)
+
+
 def test_whatweb_plain_strips_ansi_colour() -> None:
     coloured = (
         "\x1b[1m\x1b[34mhttp://t/\x1b[0m [200 OK] "

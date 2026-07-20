@@ -27,12 +27,19 @@ class HttpFinding:
     method: str = ""  # HTTP verb from the dir-buster (GET/POST) — for the Discovered URLs table
     lines: int = 0  # response line count (feroxbuster -o "8l")
     words: int = 0  # response word count (feroxbuster -o "22w")
+    base_path: str = ""  # subdir the site root redirects to (e.g. "/racers/") — app lives here
 
     def __post_init__(self) -> None:
         self.path = _clean(self.path)
         self.redirect_to = _clean(self.redirect_to)
         self.note = _clean(self.note)
         self.method = _clean(self.method)
+        self.base_path = _clean(self.base_path)
+        # why: a redirect observed AT the site root ("/") to a subdirectory means the whole app is
+        # served from that base path — content discovery / fingerprinting must pivot there. A
+        # redirect on a deeper path (e.g. /admin -> /admin/) is normal and is NOT a base path.
+        if not self.base_path and self.path in ("", "/") and self.redirect_to:
+            self.base_path = base_path_from_redirect(self.redirect_to)
 
     def to_dict(self, discovered_at: str) -> dict[str, Any]:
         return {
@@ -46,6 +53,7 @@ class HttpFinding:
             "method": self.method,
             "lines": self.lines,
             "words": self.words,
+            "base_path": self.base_path,
             "discovered_at": discovered_at,
         }
 
@@ -380,11 +388,29 @@ def vhost_from_redirect(value: str) -> str:
     return host if is_vhost_host(host) else ""
 
 
+def base_path_from_redirect(value: str) -> str:
+    # pull the base *directory* a redirect points at ("/racers/", "http://race.vl/racers/" ->
+    # "/racers/"). Returns "" for a redirect to the root ("/") or to a bare file at the root
+    # ("/index.php"), where there is no subdirectory to pivot content discovery into.
+    target = value.strip()
+    path = urlsplit(target if "//" in target else f"//{target}").path
+    path = re.sub(r"/+", "/", path)  # collapse "//" so "///racers/" -> "/racers/"
+    if not path or path == "/":
+        return ""
+    last = path.rstrip("/").rsplit("/", 1)[-1]
+    if not path.endswith("/") and "." in last:
+        # a file at the root ("/index.php") -> no subdir; a file inside a dir keeps the dir
+        directory = path.rsplit("/", 1)[0] + "/"
+        return "" if directory == "/" else directory
+    return path if path.endswith("/") else path + "/"
+
+
 def _redirect_findings(
     pairs: list[tuple[str, str]], port: int, path: str, status: int
 ) -> list[HttpFinding]:
     out: list[HttpFinding] = []
     seen: set[str] = set()
+    at_root = path in ("", "/")
     for name, value in pairs:
         if name.lower() not in _REDIRECT_PLUGINS:
             continue
@@ -398,6 +424,22 @@ def _redirect_findings(
                     status=status,
                     redirect_to=host,
                     note=f"redirect -> {host} — add to /etc/hosts and enumerate as a vhost",
+                )
+            )
+        # the site root redirecting into a subdirectory means the app lives there — surface it so
+        # content discovery / fingerprinting re-target that base path instead of hammering /.
+        base = base_path_from_redirect(value) if at_root else ""
+        if base and base not in seen:
+            seen.add(base)
+            out.append(
+                HttpFinding(
+                    port=port,
+                    path=path,
+                    status=status,
+                    redirect_to=value.strip(),
+                    base_path=base,
+                    note=f"root redirects to {base} — the app is served from this base path; "
+                    f"run content discovery, whatweb and nikto against it, not /",
                 )
             )
     return out

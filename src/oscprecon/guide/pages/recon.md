@@ -57,3 +57,8 @@ with "the service isn't there".
 
 As findings land, the pattern library surfaces **Recon next steps** in the tool panel — sensible,
 provenance-cited suggestions with a *Pre-fill command* button. They are hints; nothing auto-runs.
+The HTTP module adds its own, e.g.: when the **site root redirects into a subdirectory** (a
+meta-refresh or 301 from `/` to `/racers/`), it tells you the app lives there and to point content
+discovery / whatweb / nikto at that base path — enumerating `/` alone would miss everything; and when
+an endpoint returns **401** it suggests a *single* well-known default (`curl -u admin:admin …`) — a
+Tier-2 recon-adjacent check, never a password spray.

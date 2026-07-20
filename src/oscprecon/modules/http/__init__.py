@@ -294,6 +294,7 @@ class HttpModule(Module):
                             "status": str(hf.status),
                             "size": str(hf.size),
                             "redirect_to": hf.redirect_to,
+                            "base_path": hf.base_path,
                         },
                     )
                 )
@@ -320,5 +321,30 @@ class HttpModule(Module):
             out.append(
                 f"Name-based virtual host '{host}' found via redirect — add it to /etc/hosts and "
                 f"enumerate it as a vhost (Host: FUZZ.{host}); it may serve content the IP won't."
+            )
+        # a root redirect into a subdirectory means the whole app is served from that base path.
+        bases = sorted({b for f in findings if (b := str(f.fields.get("base_path", "")).strip())})
+        for base in bases:
+            stripped = base.lstrip("/")
+            out.append(
+                f"Site root redirects to '{base}' — the app is served from this base path. Point "
+                f"content discovery, whatweb and nikto at it (feroxbuster -u {{url}}{stripped}), "
+                f"not /; enumerating / will miss everything."
+            )
+        # a 401 endpoint wants HTTP auth — a SINGLE attempt with a well-known default is Tier-2
+        # recon-adjacent (§2), never a wordlist. Surface it so the operator one-shots a default.
+        auth_paths = sorted(
+            {
+                str(f.fields.get("path", ""))
+                for f in findings
+                if str(f.fields.get("status")) == "401"
+            }
+        )
+        for p in auth_paths[:3]:
+            stripped = p.lstrip("/")
+            out.append(
+                f"{p} returned 401 Unauthorized — if it's HTTP Basic auth, try ONE well-known "
+                f"default by hand (curl -u admin:admin {{url}}{stripped}); a single attempt is "
+                f"recon-adjacent, not a password spray."
             )
         return out

@@ -15,9 +15,21 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: `71e8efb`** (all pushed). `origin` = local Gitea (often offline) — push to the
+- **github/main HEAD: `c4c09ae`** (all pushed). `origin` = local Gitea (often offline) — push to the
   **`github`** remote (`git push github main`).
-- Latest session (2026-07-20): **+6 GUI themes** (Dracula/Nord/Gruvbox/Solarized/Tokyo Night/Monokai,
+- Session (2026-07-20b) — **HTB Race box review** (Grav CMS / phpsysinfo / subdir-hosted app). Found +
+  fixed 4 gaps, each tested: (1) **base-path redirect** — a root meta-refresh/301 to a subdirectory
+  (`/` → `/racers/`) was dropped; now surfaced as an http finding + "point content discovery at this
+  base path" next-step (`HttpFinding.base_path`, `base_path_from_redirect`). (2) **web-app fingerprint
+  → Exploitation-tab presence** — a specific web app (Grav/WordPress/Drupal/…) was never marked `●`
+  because the panel only read nmap service *names* ("http"); it now folds whatweb/nmap fingerprints
+  from findings into presence (`exploit.web_app_keys_from_fingerprints`, curated + left-token-boundary
+  matched; panel `_present_keys()`/`_fingerprint_texts()`). (3) **latent `_service_key_for_name` bug** —
+  substring matching mapped `wordpress`→`rdp` and `ftp`⊂`tftp`; hardened to left-token-boundary regex
+  (`_FRAG_PATTERNS`). (4) **401 Basic-auth** — a 401 endpoint (phpsysinfo, `admin:admin`) got no hint;
+  now a Tier-2 single-shot default-cred next-step (never a spray). Verified end-to-end live on
+  10.129.234.209: base_path `/racers/` + `grav` present both surface. Guide (recon/exploitation) synced.
+- Prior session (2026-07-20): **+6 GUI themes** (Dracula/Nord/Gruvbox/Solarized/Tokyo Night/Monokai,
   all WCAG-AA-validated, now 12 total) · **nmap** 83 scan presets (was 29) + a searchable NSE picker +
   `--open`/`-O`/`-n`/`--reason`/`--min-rate` in the Scan dialog (new `nmap_nse.py`) · **doctor** now
   also checks reference data (SecLists/NSE/Exploit-DB), host readiness (VPN/disk/raw-socket), and
