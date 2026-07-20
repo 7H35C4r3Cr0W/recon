@@ -9,6 +9,7 @@ from oscprecon.models import Command, Finding, Port, Proto, ScanResults, Target
 from oscprecon.modules.base import Module
 from oscprecon.modules.http.parsers import (
     HttpFinding,
+    detect_api_server,
     detect_wordpress,
     email_domains_from_plugins,
     is_vhost_host,
@@ -34,6 +35,7 @@ __all__ = [
     "build_command",
     "default_output",
     "default_url",
+    "detect_api_server",
     "detect_wordpress",
     "email_domains_from_plugins",
     "is_tls",
@@ -313,6 +315,15 @@ class HttpModule(Module):
             out.append(
                 "WordPress detected — enumerate (never brute): "
                 "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url {url}"
+            )
+        # an ASGI/JSON API (uvicorn/FastAPI) is enumerated by its schema, not by dir-busting for
+        # files — the auto-generated docs list every route and its expected parameters (§14 lookup).
+        if detect_api_server(blob):
+            out.append(
+                "JSON API server detected (uvicorn/FastAPI/Starlette) — enumerate the API "
+                "surface, not just files: curl the auto-generated docs/schema (/openapi.json, "
+                "/docs, /redoc, /swagger.json) and probe versioned roots (/api, /api/v1). They "
+                "list every route and its parameters."
             )
         # a Location is a bare host (whatweb), a full URL (ferox/gobuster/ffuf) or a relative path;
         # vhost_from_redirect pulls the hostname from any of them, so 'http://internal.htb/' shows.

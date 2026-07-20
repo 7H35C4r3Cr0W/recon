@@ -712,3 +712,22 @@ _WORDPRESS_MARKERS = ("wordpress", "wp-content", "wp-login", "wp-admin", "wp-inc
 def detect_wordpress(*texts: str) -> bool:
     blob = " ".join(texts).lower()
     return any(marker in blob for marker in _WORDPRESS_MARKERS)
+
+
+# an ASGI Python server (uvicorn/hypercorn/daphne) or a Starlette/FastAPI banner, or a JSON
+# content-type, is the tell that the site is a JSON API — not a file-serving website. The recon move
+# then is to enumerate the API surface (auto-generated docs/schema list every route + parameter),
+# not to dir-bust for files. gunicorn is excluded — it commonly fronts HTML Django/Flask apps too.
+_API_SERVER_MARKERS = (
+    "uvicorn",
+    "hypercorn",
+    "daphne",
+    "starlette",
+    "fastapi",
+    "application/json",
+)
+
+
+def detect_api_server(*texts: str) -> bool:
+    blob = " ".join(texts).lower()
+    return any(marker in blob for marker in _API_SERVER_MARKERS)

@@ -94,7 +94,12 @@ from oscprecon.gui.workers import (
 from oscprecon.gui.workspace import WorkspaceDashboard
 from oscprecon.manual_commands import expand, load_manual_commands
 from oscprecon.models import Credential, DiscoveredHost, DiscoveredService, Target
-from oscprecon.modules.http import default_url, detect_wordpress, parse_tool
+from oscprecon.modules.http import (
+    default_url,
+    detect_api_server,
+    detect_wordpress,
+    parse_tool,
+)
 from oscprecon.modules.nmap import NmapModule
 from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.parsing import run_parser
@@ -2320,6 +2325,11 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(
                 "[wordpress] detected — follow-up: "
                 "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url <target>"
+            )
+        if detect_api_server(text) and profile is self._profile:
+            self._tool_panel.append_output(
+                "[api] JSON API server detected — enumerate routes/params, not files: "
+                "curl /openapi.json /docs /redoc /swagger.json /api/v1"
             )
 
     def _on_vhost_run(self, command: str, output_rel: str, tool: str, domain: str) -> None:

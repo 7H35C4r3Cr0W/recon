@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from oscprecon.modules.http.parsers import (
+    detect_api_server,
     detect_wordpress,
     parse_dirsearch,
     parse_feroxbuster,
@@ -330,6 +331,20 @@ def test_parse_robots_strips_inline_comments() -> None:
     # a comment-only value is dropped; a '#' fused to the path (no preceding space) is kept
     assert parse_robots("Disallow: # nothing\nDisallow: /real/", 80)[0].note.endswith("/real/")
     assert parse_robots("Disallow: /a#b", 80)[0].note.endswith("/a#b")
+
+
+def test_detect_api_server_fires_on_asgi_and_json_signals() -> None:
+    # Spooktrol: an ASGI server (uvicorn) / FastAPI banner / JSON content-type marks a JSON API —
+    # the tell to enumerate the API schema, not dir-bust for files.
+    assert detect_api_server("whatweb: HTTPServer[uvicorn], Country[RESERVED][ZZ]") is True
+    assert detect_api_server("http-server-header: uvicorn") is True
+    assert detect_api_server("Site doesn't have a title (application/json)") is True
+    assert detect_api_server("X-Powered-By[FastAPI]") is True
+    assert detect_api_server("Server[hypercorn]") is True
+    # ordinary sites must NOT trip it — gunicorn is excluded (it fronts HTML Django/Flask too)
+    assert detect_api_server("Apache[2.4.52], PHP[8.1], WordPress") is False
+    assert detect_api_server("HTTPServer[gunicorn], Django") is False
+    assert detect_api_server("nginx 1.18") is False
 
 
 def test_parse_robots_no_redos_on_hostile_input() -> None:

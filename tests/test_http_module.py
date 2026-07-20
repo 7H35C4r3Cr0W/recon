@@ -150,6 +150,24 @@ def test_suggest_wordpress() -> None:
     assert "--passwords" not in out[0]
 
 
+def test_suggest_api_server_enumeration() -> None:
+    # Spooktrol: a uvicorn/FastAPI fingerprint should nudge toward enumerating the API schema
+    # (/openapi.json, /docs) rather than only dir-busting for files.
+    module = HttpModule()
+    out = module.suggest(
+        [Finding(service="http", title="200 /", detail="whatweb: HTTPServer[uvicorn]")]
+    )
+    api = [line for line in out if "openapi.json" in line]
+    assert api and "/docs" in api[0]
+    # a plain Apache page gets no API nudge
+    assert not any(
+        "openapi.json" in line
+        for line in module.suggest(
+            [Finding(service="http", title="200 /", detail="whatweb: Apache[2.4.52]")]
+        )
+    )
+
+
 def test_suggest_vhost_from_redirect() -> None:
     # Responder: whatweb's Meta-Refresh-Redirect surfaces a vhost the bare IP won't serve.
     module = HttpModule()

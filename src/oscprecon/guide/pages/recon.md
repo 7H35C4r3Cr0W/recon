@@ -75,4 +75,8 @@ which is the **canonical WordPress fingerprint** even when whatweb never prints 
 WordPress-detected box surfaces the *enumerate (never brute)* `wpscan --enumerate …` next-step (and
 marks WordPress ● on the Exploitation tab) from the `robots.txt`/page-body `wp-content` signal alone;
 and when an endpoint returns **401** it suggests a *single* well-known default (`curl -u admin:admin
-…`) — a Tier-2 recon-adjacent check, never a password spray.
+…`) — a Tier-2 recon-adjacent check, never a password spray. When the fingerprint shows a **JSON API
+server** — an ASGI stack (`uvicorn` / `hypercorn` / `daphne`), a `FastAPI`/`Starlette` banner, or an
+`application/json` root — it nudges you to **enumerate the API surface, not dir-bust for files**: curl
+the auto-generated docs/schema (`/openapi.json`, `/docs`, `/redoc`, `/swagger.json`) and versioned
+roots (`/api`, `/api/v1`), which list every route and its expected parameters.
