@@ -15,8 +15,22 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: `4ca14fd`** (Snoopy box review pushed).
+- **github/main HEAD: Carpediem box review** (pushed; see `git log`).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20f) — **HTB Carpediem box review** (Hard Linux; nginx portal / SIP-VoIP / Backdrop
+  CMS / container escape). Full suite EXIT=0. Chunks: (1) **`fix(http)`** — the domain `carpediem.htb`
+  lives ONLY in the landing-page `<h1>` body (not email/title/redirect), so whatweb+nmap surfaced
+  nothing. The **Fingerprint** button now also snapshots the index page (`curl -sk -o index.html`) and
+  `parse_webpage`/`lab_hostnames_from_text` mine lab-TLD hostnames (`*.htb/.vl/.thm/.local/…`, CDN
+  hosts ignored) into a `HttpFinding.page_host` finding + vhost-enum suggest step. Verified live: body
+  → `carpediem.htb` → vhost enum → `portal.carpediem.htb`. (2) **`feat(exploit/docker)`** — added the
+  cgroup-v1 `release_agent` container escape (victim/copy-only, the generic CAP_SYS_ADMIN breakout
+  behind CVE-2022-0492); the rest of the chain was already covered (`api-mass-assignment`, file-upload,
+  `backdrop.py`, `sip.py`, getcap, tcpdump, cron). (3) **`fix` robustness** — 3 bugs from an adversarial
+  review of 4 not-yet-swept slices: corrupt-config-bricks-startup (HIGH; `config._read_json` now
+  `except (OSError, ValueError)`), nmap `--reason` polluting `product` (MEDIUM; stripped in
+  `parse_port_line`), `live_hacktricks.read_cache` raising on non-UTF-8 (LOW). A `bulk.py` lost-update
+  is latent (feature unwired — `run_bulk` has no GUI caller) → deferred.
 - Session (2026-07-20e) — **HTB Snoopy box review** (Hard Linux; DNS Bind9 / nginx LFI → leaked
   rndc-key DNS-hijack → Mattermost → git/clamscan sudo). Two chunks, both full-suite EXIT=0:
   (1) **`fix(http)` `00c7baa`** — whatweb captured `Email[info@snoopy.htb]` but only rendered it into
@@ -113,8 +127,11 @@ The pattern that works:
   reporter templates + workspace search/health + msfvenom builder.
 - **Swept 2026-07-20e (Snoopy):** `edb.py`/searchsploit lookup, `gtfobins_search`, `config.py`
   migration, the theme system, and the `graph_html` JS bridge — core clean, 4 low-sev GUI bugs fixed.
-- **Not yet swept (candidates for the next round):** `nmap_scan.py` builder edge cases,
-  `references/live_hacktricks` under odd network, `workspace/bulk.py` + `index.py`.
+- **Swept 2026-07-20f (Carpediem):** `nmap_scan.py`+`nmap.py`, `live_hacktricks.py`, `workspace/bulk.py`
+  +`index.py`, `config.py` — 3 bugs fixed (config-crash HIGH, nmap `--reason`, cache non-UTF-8); 1
+  latent (`bulk.py` lost-update, feature unwired) deferred.
+- **Not yet swept (candidates for the next round):** `workspace/bulk.py` GUI wiring + its lost-update
+  fix (when wired), the reporter templates under odd findings, `simple_recon.py` worker edge cases.
 
 ## How to add a recon service module
 Drop `src/oscprecon/modules/<svc>/` with `__init__.py` (subclass `Module`), `parsers.py`,

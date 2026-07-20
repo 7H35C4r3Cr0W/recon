@@ -773,6 +773,21 @@ SIP service was correctly surfaced as `open`. Ran the full loop live.
   agent`** (victim-side / copy-only, `{command}`-parameterised, HackTricks-sourced) — applies to any
   privileged/CAP_SYS_ADMIN container, not just this box (SOP §2.3, same as Dump's tcpdump/motd). The
   CVE-2022-0492 PoC itself, the TLS-key decrypt, and the VoIP voicemail step stay manual (§21).
+- **Robustness hardening (adversarial review of 4 not-yet-swept slices):** a background review of
+  `nmap_scan.py`/`nmap.py`, `live_hacktricks.py`, `workspace/bulk.py`+`index.py`, and `config.py`
+  migration found the scan-dialog (recon-only, injection-safe), the HTML→md parser, and `index.py`
+  (containment) all **clean**, and 3 real bugs — all fixed + regression-tested: (1) **HIGH — a corrupt
+  `prefs.json`/`recent.json` bricked startup**: `config._read_json` caught only `JSONDecodeError`, so
+  non-UTF-8 bytes (`UnicodeDecodeError`) or a directory at the path (`OSError`) propagated through
+  `load_settings` at GUI+CLI launch — AND blocked Preferences from overwriting the bad file. Widened to
+  `except (OSError, ValueError)`. (2) **MEDIUM — the Scan dialog's `--reason` checkbox polluted the
+  product field**: `--reason` inserts a `syn-ack ttl 64` column that `parse_port_line` folded into
+  `product` (`syn-ack ttl 64 OpenSSH`), breaking searchsploit/EDB + the graph; now stripped when the
+  leading token is a known nmap reason (a real lowercase product like `nginx` is never eaten). (3)
+  **LOW — `live_hacktricks.read_cache` raised on a non-UTF-8 cache** despite its never-raise contract;
+  same `(OSError, ValueError)` widening. One flagged item (`bulk.py` same-process lost-update) is a
+  latent bug in a feature **not yet wired to the GUI** (`run_bulk` has no caller) — noted for a focused
+  follow-up, not rushed (the fix needs a bulk-vs-open-window semantics decision).
 
 **Lesson:** domain disclosure has *many* shapes — a redirect (Ignition), an email (Snoopy), and now
 plain body text (Carpediem). whatweb/nmap only see structured signals, so a hostname that lives only in
