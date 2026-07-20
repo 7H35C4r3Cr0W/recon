@@ -24,9 +24,19 @@ attack tools are present before exam day. Those span apt/pipx/gem, so you instal
 
 ```bash
 nabu                    # the GUI  (python -m oscprecon is equivalent)
-nabu-cli scan 10.10.10.5 --profile htb-active   # headless
+nabu-cli scan 10.10.10.5 --profile htb-active   # headless staged nmap
+nabu-cli enum smb -p htb-active                 # run a service's Tier-1 recon headlessly
+nabu-cli findings -p htb-active                 # browse what was found
+nabu-cli list                                   # your workspace projects
+nabu-cli creds list -p htb-active               # the vault (secrets masked)
 nabu-cli docs           # this documentation, in the terminal
 ```
+
+The **CLI is at feature parity with the GUI** for automatable work — `scan`, `enum`, `findings`,
+`creds` (add/list/rm), `list`, `health`, `activity`, `delete-project`, `searchsploit`, `exploit`,
+`payload`, `gtfobins`, `pivot`, `export-*`/`import-project`, and the gated `spray`/`config`. Run
+`nabu-cli --help` for the full surface. (The settings-heavy web/SMB panels — wordlist-driven content
+discovery, tiered SMB — stay richest in the GUI.)
 
 ## Your first scan (GUI)
 

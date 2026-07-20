@@ -1154,7 +1154,10 @@ Six phases. Phase "done" = tool used on ≥ 3 boxes from `TRACKER.md` without ma
 - `pyproject.toml`, `uv sync`, `mypy --strict`, `ruff` configured
 - `shell.py`, `profile.py`, `orchestrator.py`, `reporter.py`
 - `modules/base.py` (ABC), `modules/nmap.py` (TCP top-1000 → full → versioned, UDP top-100)
-- `cli.py` — Typer entry `oscprecon-cli scan <ip> --profile <name>`
+- `cli.py` — Typer entry (`nabu-cli`), at **feature parity with the GUI** for automatable work:
+  `scan` (+ `--resume`), `enum <service>` (headless Tier-1 service recon), `creds` (add/list/rm),
+  `list`/`findings`/`health`/`activity`/`delete-project`, `searchsploit`, `exploit`, `payload`,
+  `gtfobins`, `pivot`, `doctor`, `docs`, `export-*`/`import-project`, and the gated `spray` + `config`
 - `__main__.py` — GUI launch
 - Basic PySide6 window: File menu, New Scan Profile dialog, target input, "Run nmap" button, output panel
 - Profile auto-load on start via `recent.json`

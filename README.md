@@ -152,12 +152,24 @@ PORT     STATE SERVICE       VERSION
 # → results saved under ~/oscprecon/htb-active/nmap/*.txt and recorded in profile.json
 ```
 
-Reopen the same folder in the GUI (or `--resume` on the CLI) and the whole state comes back. The CLI
-mirrors the GUI's reference/helper surfaces so nothing is GUI-only: `nabu-cli doctor` (host readiness,
-`--install` to apt-install the missing ones), `nabu-cli exploit [service]` (the Exploitation catalog),
-`nabu-cli payload` (msfvenom builder), `nabu-cli gtfobins [binary]` (GTFOBins lookup), `nabu-cli pivot`
-(the ligolo-ng workflow, `--os linux|windows`), `nabu-cli docs`, and `export-vault` / `export-project` /
-`import-project` (see `nabu-cli --help`).
+Reopen the same folder in the GUI (or `--resume` on the CLI, or `Scan → Resume Recon` in the GUI) and
+the whole state comes back. **The CLI is at feature parity with the GUI** for automatable work — the
+same engine, nothing GUI-only:
+
+- **Recon:** `nabu-cli scan` (staged nmap), `nabu-cli enum <service> -p <profile>` (run a service's
+  Tier-1 enumeration headlessly — SMB null-session, SNMP walk, FTP/SMTP/… — the same steps the GUI
+  panels run), `nabu-cli findings -p <profile>` (browse structured findings).
+- **Project management:** `nabu-cli list` (workspace dashboard), `open`/`import-project`/`export-project`
+  /`export-vault`/`delete-project`, `nabu-cli health -p <profile> [--repair]`, `nabu-cli activity`.
+- **Credentials:** `nabu-cli creds add|list|rm -p <profile>` (the vault, chmod-600, secrets masked).
+- **References / helpers:** `nabu-cli doctor [--install]`, `nabu-cli searchsploit <product> [version]`,
+  `nabu-cli exploit [service]` (the Exploitation catalog, display-only), `nabu-cli payload` (msfvenom
+  builder), `nabu-cli gtfobins [binary]`, `nabu-cli pivot` (ligolo-ng, `--os linux|windows`), `nabu-cli docs`.
+- **Opt-in modes (§2a/§2b):** `nabu-cli config --spray/--exploit` toggles the gates; `nabu-cli spray
+  <service> -p <profile>` runs an OSCP-legal spray from the vault (refused while Spray mode is off,
+  the exam-legal default).
+
+Run `nabu-cli --help` (or `nabu-cli <command> --help`) for the full surface.
 
 **Scan profiles** — `quick` (top-1000 only), `default`, `full` (adds the slow full UDP sweep), or
 `exam` (speed-tuned, tight, exam-legal — no vuln NSE). Pick one in Preferences, via `Scan → Run recon

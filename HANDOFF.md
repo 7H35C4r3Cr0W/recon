@@ -15,8 +15,41 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: Spooktrol box review** (pushed; see `git log`).
+- **github/main HEAD: EarlyAccess box review + full sweep mandate** (pushed; see `git log`).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20i) — **HTB EarlyAccess box review + a full owner-mandated sweep**. EarlyAccess
+  first: **`feat(nmap)` `98246be`** — mine the box hostname from the **ssl-cert CN/SAN** (nmap
+  `ssl-cert` NSE); `_handle_redirect_vhosts`→`_handle_hostname_leads` unions the redirect + cert
+  sources, regression-safe (redirect keeps its exact auto-set; the cert auto-sets ONLY when there's
+  no redirect + no hostname; user hostname never overridden; SANs → vhost leads). Then the owner asked
+  for a **complete sweep** run as parallel audit Workflows → fixed in orderly chunks:
+  - **`fix(gui)` `af66a00`** — 15 GUI-UX defects (silent no-ops now give feedback: scan-preset load /
+    http Fingerprint / vhost Run+wildcard+enumerate; `styles.flash_copied` "Copied ✓" on cred-vault /
+    msfvenom / pivot copies; Save gated on a loaded project; theme radio matches multi-word names via
+    `action.setData`; dashboard status → status bar; graph-export + log-clear failures surfaced;
+    wordlist empty-state hint; shortcut labels corrected).
+  - **`fix` `e35510e`** — 7 code-review bugs, reproduced + regression-tested: 3 report.md.j2 markdown
+    injections (Summary-table `|`, ``` code-fence break-out, YAML-frontmatter newline → new `mdcell`/
+    zero-width-break/`yamlstr`), a kubernetes parser crash on a non-list `versions`, `cli exploit`
+    ignoring hash creds (now fills `{hash}` like the GUI), `workspace.bulk` clobbering a malformed-lock
+    profile, and an `exploit/cmsms` attacker action with a `~`-path argv0 → victim (the popen-runnable
+    guard now also rejects `~`/`$VAR`).
+  - **`feat(cli)` `2fb511b`** — closed 11 CLI↔GUI parity gaps: new CLI `enum <svc>` (runs the 44
+    SIMPLE_SPECS services' Tier-1 recon headlessly), `creds` add/list/rm, `list`, `findings`, `health`,
+    `activity`, `delete-project`, `searchsploit`, `spray` + `config` (gated), and a GUI **Scan →
+    Resume Recon** (parity with `scan --resume`).
+  - **`feat(patterns)` `9a71c69`** — +16 vault-mined recon next-steps (ldap/kerberos/smb/smtp/http;
+    AD-Path/CPTS-sourced, all recon-only + provenance-cited). 139 pattern rules now.
+
+  **Deferred follow-ups from the mandate (not yet done):**
+  - CLI `enum` covers the 44 SIMPLE_SPECS services; **http/smb/ftp/ssh/dns/ldap/vhost keep their
+    settings-heavy panels GUI-primary** (wordlist pickers, tiered SMB, vhost fuzz config). Their nmap
+    discovery already runs headless via `scan`. If full parity is wanted, extract those panels'
+    Qt-free step builders into a shared module and add them to `enum`.
+  - 4 vault "missing techniques" need an **allow-list decision or a parser/module change** first:
+    `kerbrute userenum`, `certipy-ad find` (both need adding to `ALLOWED_TOOLS`); `smtp-enum-users`
+    NSE (add to the smtp scan); `snmpwalk -Oa` (readable hex strings — changes the snmp parser +
+    fixtures, so verify carefully).
 - Session (2026-07-20h) — **HTB Spooktrol box review** (Hard Linux; uvicorn/FastAPI malware-C2,
   path-traversal file-write, SQLite task injection). Recon-only lessons (§21) — the Ghidra/implant/DB
   exploitation is out of scope. Three chunks, full suite EXIT=0:
@@ -123,7 +156,9 @@ graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at run
   Commits `b1a2584`→`71e8efb`. (Also, non-repo: a `/etc/cron.d/nabu-maint` system-maintenance job on
   this Kali box — Timeshift snapshot → `apt full-upgrade` → junk cleanup, 3-day self-guarded; script at
   `/usr/local/sbin/nabu-maintenance.sh`.)
-- Exploit catalog: **182 services / 3,434 actions**. Pattern library: **127 rules**.
+- Exploit catalog: **182 services / 3,434 actions**. Pattern library: **139 rules**.
+  CLI (`nabu-cli`) and GUI (`nabu`) are now at **feature parity** for automatable work (see the
+  parity note above for the intentional GUI-primary panels).
 - Full test suite green (**pytest EXIT=0**), all four gates clean.
 - Author/maintainer: **Andre Boyle · its.lagus@proton.me · github.com/7H35C4r3Cr0W/recon**
   (single source of truth: `src/oscprecon/branding.py`).
@@ -141,8 +176,18 @@ full-suite backstop in the background (write a done-marker, poll it) before repo
 ## How I work on this (the owner's expectations)
 - **Autonomous + chunked.** Don't ask permission mid-task; do it, test, commit per logical chunk,
   report once. (See memory `work-fully-autonomously`, `autonomous-chunking`, `box-review-efficiency`.)
-- **Docs in sync.** A code change also updates README / CLAUDE.md / the in-app guide (`src/oscprecon/
-  guide/pages/*.md`) / docs where relevant. (memory `keep-docs-in-sync`)
+- **Thorough — "I do not want to have to come back and revisit this."** On a broad ask, spawn parallel
+  audit **Workflows** (code-review / CLI-GUI-parity / GUI-UX / Obsidian-mining), then implement each
+  result as its own gated, committed chunk. Be exhaustive, not fast.
+- **Full CLI↔GUI parity.** Nothing should be behind only one surface — if a capability exists in the
+  GUI, wire it into the CLI (and vice-versa). Both drive the same engine.
+- **Keep mining the Obsidian vault** (`vault:`, esp. `CBBH` / `CPTS` /
+  `HTB AD Path`) for recon patterns + techniques (memory `obsidian-notes-location`). Recon-only,
+  exam-legal, `# source:`-cited.
+- **Docs in sync — especially THIS file.** A code change also updates README / CLAUDE.md / the in-app
+  guide (`src/oscprecon/guide/pages/*.md`) / docs. Keep HANDOFF current so a fresh session knows
+  exactly what's expected. (memory `keep-docs-in-sync`)
+- **Reports: concise, to the point.** No long-winded write-ups; a TLDR per box/bug/change.
 - **Don't break functions.** Additive/guarded fixes; no tech-stack changes (§3 is locked); no big
   risky refactors unless asked.
 - **Commit trailers** (already enforced by the harness): `Co-Authored-By: Andre Boyle
