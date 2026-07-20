@@ -80,5 +80,9 @@ class LogViewerDialog(QDialog):
             "Clear log",
             "Clear the current diagnostic log? Rotated backups are kept.",
         )
-        if confirm == QMessageBox.StandardButton.Yes and diagnostics.clear():
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        if diagnostics.clear():
             self._reload()
+        else:
+            QMessageBox.warning(self, "Clear log", "Could not clear the log file.")

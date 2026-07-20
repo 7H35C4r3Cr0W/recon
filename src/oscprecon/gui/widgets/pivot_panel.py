@@ -219,7 +219,7 @@ class PivotPanel(QWidget):
         row = QHBoxLayout()
         row.addWidget(body, stretch=1)
         copy = QPushButton("Copy")
-        copy.clicked.connect(lambda _=False, t=text: self._copy(t))
+        copy.clicked.connect(lambda _=False, t=text, b=copy: self._copy(t, b))
         row.addWidget(copy, alignment=Qt.AlignmentFlag.AlignTop)
         outer.addLayout(row)
         return card
@@ -253,7 +253,7 @@ class PivotPanel(QWidget):
             row = QHBoxLayout()
             row.addWidget(body, stretch=1)
             copy = QPushButton("Copy")
-            copy.clicked.connect(lambda _=False, t=item.command: self._copy(t))
+            copy.clicked.connect(lambda _=False, t=item.command, b=copy: self._copy(t, b))
             row.addWidget(copy, alignment=Qt.AlignmentFlag.AlignTop)
             outer.addLayout(row)
         return card
@@ -280,7 +280,7 @@ class PivotPanel(QWidget):
         row = QHBoxLayout()
         row.addWidget(body, stretch=1)
         copy = QPushButton("Copy")
-        copy.clicked.connect(lambda _=False, text=cmd_text: self._copy(text))
+        copy.clicked.connect(lambda _=False, text=cmd_text, b=copy: self._copy(text, b))
         row.addWidget(copy, alignment=Qt.AlignmentFlag.AlignTop)
         outer.addLayout(row)
 
@@ -292,7 +292,8 @@ class PivotPanel(QWidget):
         return card
 
     @staticmethod
-    def _copy(text: str) -> None:
+    def _copy(text: str, button: QPushButton) -> None:
         clip = QGuiApplication.clipboard()
         if clip is not None:
             clip.setText(text)
+            styles.flash_copied(button)

@@ -276,6 +276,9 @@ class MainWindow(QMainWindow):
         self._dashboard.open_requested.connect(lambda d: self._open_path(Path(str(d))))
         self._dashboard.create_requested.connect(self._on_new)
         self._dashboard.status_message.connect(self._tool_panel.append_output)
+        # the tool panel is hidden behind the dashboard (stack index 0) — also surface dashboard
+        # status (refresh count, delete refusals, tag/pin skips) in the always-visible status bar.
+        self._dashboard.status_message.connect(lambda m: self.statusBar().showMessage(m, 6000))
         self._dashboard.profile_mutated.connect(self._on_dashboard_mutated)
         self._dashboard.delete_requested.connect(self._on_delete_requested)
         self._central_stack = QStackedWidget()
@@ -544,6 +547,7 @@ class MainWindow(QMainWindow):
         current_theme = theme.normalize(config.load_settings().theme)
         for name in theme.THEMES:
             action = QAction(theme.label(name), self, checkable=True)
+            action.setData(name)  # the stable theme key — _sync_theme_menu matches data, not label
             action.setChecked(name == current_theme)
             action.triggered.connect(lambda _checked=False, n=name: self._set_theme(n))
             self._theme_group.addAction(action)
@@ -608,8 +612,8 @@ class MainWindow(QMainWindow):
             ("Ctrl+9", "Activity"),
             ("Ctrl+G", "Toggle graph view"),
             ("Ctrl+R", "Report preview"),
-            ("Ctrl+F", "Filter / find in the service tree"),
-            ("Esc", "Clear the filter"),
+            ("Ctrl+F", "Find (reference pane / dashboard / findings — context-aware)"),
+            ("Esc", "Dismiss the tool-panel banner"),
             ("Ctrl+,", "Preferences"),
             ("Ctrl+Q", "Quit"),
         ]
@@ -1108,8 +1112,11 @@ class MainWindow(QMainWindow):
         self._audit_action("settings-changed", theme=settings.theme)
 
     def _sync_theme_menu(self, name: str) -> None:
+        # match on the stored theme KEY (action.data), never the display label — a multi-word label
+        # like "Tokyo Night" never equals its key "tokyonight", so the radio would show nothing set.
+        target = theme.normalize(name)
         for action in self._theme_group.actions():
-            action.setChecked(action.text().lower() == name)
+            action.setChecked(action.data() == target)
 
     def _on_graph_service_open(self, port: int, proto: str) -> None:
         # the graph's "Open service tooling" button jumps to the three-pane view + selects the svc
@@ -1837,7 +1844,9 @@ class MainWindow(QMainWindow):
         self._import_project_action.setEnabled(not any_running)
         # export packs the profile dir — gate it so a snapshot isn't taken mid-scan-write
         self._export_project_action.setEnabled(not any_running and self._profile is not None)
-        self._save_action.setEnabled(not any_running and not read_only)
+        self._save_action.setEnabled(
+            self._profile is not None and not any_running and not read_only
+        )
         self._edit_project_action.setEnabled(
             self._profile is not None and not any_running and not read_only
         )
@@ -1980,6 +1989,9 @@ class MainWindow(QMainWindow):
         # why: pre-fill the command builder with a nmap preset (target filled) for the user to
         # review and Run — never auto-executed (§7). Needs a profile for the target.
         if self._profile is None:
+            QMessageBox.information(
+                self, APP_NAME, "Open or create a project first, then load a scan preset."
+            )
             return
         filled = expand(command, target=self._profile.target.ip)
         self._tool_panel.prefill_command(filled)

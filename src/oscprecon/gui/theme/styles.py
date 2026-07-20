@@ -1,7 +1,20 @@
 from __future__ import annotations
 
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QAbstractButton
+
 from oscprecon.gui.theme import tokens
 from oscprecon.gui.theme.tokens import Palette
+
+
+def flash_copied(button: QAbstractButton, *, ms: int = 1200) -> None:
+    # visible feedback for a clipboard copy (setting the clipboard is otherwise invisible): flash
+    # the button to "Copied ✓" then restore. The button is the timer's context object, so if it's
+    # destroyed before the timer fires (dialog closed), the restore is auto-cancelled (no crash).
+    original = button.text()
+    button.setText("Copied ✓")
+    QTimer.singleShot(ms, button, lambda: button.setText(original))
+
 
 # Small, composable QSS builders derived from tokens. Widgets call these instead of pasting hex
 # strings, so hover/pressed/focus states stay uniform. Each returns a QSS snippet (a str); nothing

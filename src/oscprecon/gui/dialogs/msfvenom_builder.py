@@ -92,7 +92,7 @@ class MsfvenomBuilderDialog(QDialog):
         self._command.setFixedHeight(56)
         copy_cmd = QPushButton("Copy command")
         copy_cmd.setStyleSheet(styles.accent_button())
-        copy_cmd.clicked.connect(lambda: self._copy(self._command.toPlainText()))
+        copy_cmd.clicked.connect(lambda: self._copy(self._command.toPlainText(), copy_cmd))
         cmd_row = QHBoxLayout()
         cmd_row.addWidget(self._command, stretch=1)
         cmd_row.addWidget(copy_cmd)
@@ -102,7 +102,7 @@ class MsfvenomBuilderDialog(QDialog):
         self._listener.setFont(QFont("monospace"))
         self._listener.setFixedHeight(56)
         copy_listen = QPushButton("Copy listener")
-        copy_listen.clicked.connect(lambda: self._copy(self._listener.toPlainText()))
+        copy_listen.clicked.connect(lambda: self._copy(self._listener.toPlainText(), copy_listen))
         listen_row = QHBoxLayout()
         listen_row.addWidget(self._listener, stretch=1)
         listen_row.addWidget(copy_listen)
@@ -180,7 +180,8 @@ class MsfvenomBuilderDialog(QDialog):
         self._notes.setText("  ·  ".join(result.notes) if result.notes else "")
 
     @staticmethod
-    def _copy(text: str) -> None:
+    def _copy(text: str, button: QPushButton) -> None:
         clip = QGuiApplication.clipboard()
         if clip is not None:
             clip.setText(text)
+            styles.flash_copied(button)

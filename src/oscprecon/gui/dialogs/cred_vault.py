@@ -215,11 +215,13 @@ class CredentialVaultDialog(QDialog):
         cred = self._selected_cred()
         if cred is not None:
             QGuiApplication.clipboard().setText(cred.username)
+            styles.flash_copied(self._copy_user)
 
     def _on_copy_secret(self) -> None:
         # explicit user action — the plaintext goes to the clipboard only, never to the UI/logs
         cred = self._selected_cred()
         if cred is not None:
             QGuiApplication.clipboard().setText(cred.secret)
+            styles.flash_copied(self._copy_secret)  # the Secret column is masked — confirm the copy
             # username only — the audit line this drives must carry no secret
             self.secret_copied.emit(cred.username)

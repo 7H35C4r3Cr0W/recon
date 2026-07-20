@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import contextlib
 import json
 import os
 from pathlib import Path
@@ -13,6 +12,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSplitter,
     QStackedWidget,
@@ -649,8 +649,10 @@ class GraphView(QWidget):
         chosen, _ = QFileDialog.getSaveFileName(self, caption, f"graph.{ext}", f"*.{ext}")
         if not chosen:
             return
-        with contextlib.suppress(OSError, ValueError):
+        try:
             self._write_image(image_format, data, Path(chosen))
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, caption, f"Could not write {chosen}:\n{exc}")
 
     @staticmethod
     def _write_image(image_format: str, data: str, path: Path) -> None:

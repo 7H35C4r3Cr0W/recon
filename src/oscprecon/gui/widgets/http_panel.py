@@ -508,6 +508,11 @@ class HttpPanel(QWidget):
         # file (whatweb streams to stdout otherwise, which the parser never sees).
         url = self._url.text().strip()
         if not url:
+            QToolTip.showText(  # match Run's feedback — never a silent no-op
+                self._url.mapToGlobal(QPoint(0, self._url.height())),
+                "Set a target URL first.",
+                self._url,
+            )
             return
         output_rel = f"http/{self._port}/whatweb.txt"
         command = f"whatweb --colour=never --log-brief={output_rel} {url}"

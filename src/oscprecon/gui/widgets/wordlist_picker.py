@@ -115,7 +115,13 @@ class WordlistPicker(QWidget):
         for category in categories:
             self._category.addItem(category)
         self._category.blockSignals(False)
-        self._status.setText(f"{len(self._all)} wordlists")
+        if self._all:
+            self._status.setText(f"{len(self._all)} wordlists")
+        else:
+            # blank list with no guidance is a dead end — point the user at where to add paths
+            self._status.setText(
+                "No wordlists found — add search paths in Preferences → Tool paths."
+            )
         self._refresh()
 
     def _matches(self, wordlist: wordlists.Wordlist) -> bool:

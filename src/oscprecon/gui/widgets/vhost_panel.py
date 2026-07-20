@@ -255,7 +255,14 @@ class VhostPanel(QWidget):
 
     def _on_run(self) -> None:
         settings = self._current_settings()
-        if not settings.domain or not settings.wordlist:
+        if not settings.domain:
+            self.validation_failed.emit(
+                "set a target domain first (Edit -> Set Target Hostname) — vhost fuzzing needs a "
+                "base domain to build 'Host: FUZZ.<domain>'."
+            )
+            return
+        if not settings.wordlist:
+            self.validation_failed.emit("pick a wordlist first.")
             return
         error = self._validate()
         if error is not None:
@@ -271,6 +278,9 @@ class VhostPanel(QWidget):
     def _on_detect_wildcard(self) -> None:
         domain = self._domain.text().strip()
         if not domain or not self._target:
+            self.validation_failed.emit(
+                "set a target domain first — wildcard detection probes a random FUZZ.<domain>."
+            )
             return
         error = self._validate()
         if error is not None:
@@ -281,5 +291,9 @@ class VhostPanel(QWidget):
 
     def _on_enumerate(self) -> None:
         item = self._vhosts.currentItem()
-        if item is not None:
-            self.enumerate_as_http_requested.emit(item.text())
+        if item is None:
+            self.validation_failed.emit(
+                "run a vhost scan and select a discovered vhost in the list first."
+            )
+            return
+        self.enumerate_as_http_requested.emit(item.text())
