@@ -51,6 +51,24 @@ def test_corrupt_config_falls_back_safely(tmp_path: Path, monkeypatch: pytest.Mo
     assert config.recent_profiles() == []
 
 
+def test_non_utf8_or_directory_config_never_crashes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # a prefs.json of raw non-UTF-8 bytes raises UnicodeDecodeError (a ValueError, not
+    # JSONDecodeError), and a directory at that path raises IsADirectoryError (OSError). Neither may
+    # brick startup — load_settings runs at launch and save_settings reads first to recover.
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    cfg = tmp_path / "oscprecon"
+    cfg.mkdir(parents=True, exist_ok=True)
+    (cfg / "prefs.json").write_bytes(b"\x80\xff not utf-8")
+    assert config.load_prefs() == {}  # no UnicodeDecodeError
+    settings = config.load_settings()  # the real startup path
+    assert settings.theme  # a usable default, not a crash
+    (cfg / "prefs.json").unlink()
+    (cfg / "prefs.json").mkdir()  # path is a directory -> OSError on read
+    assert config.load_prefs() == {}
+
+
 def test_recent_dedups_and_caps(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     for i in range(config.RECENT_LIMIT + 5):

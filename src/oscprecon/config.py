@@ -90,7 +90,11 @@ def _read_json(path: Path, default: Any) -> Any:
         return default
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (OSError, ValueError):
+        # why: a corrupt config must degrade to defaults, never brick startup. ValueError covers
+        # JSONDecodeError AND UnicodeDecodeError (non-UTF-8 bytes); OSError covers the path being a
+        # directory / unreadable. This reader runs at GUI + CLI startup and inside save_settings, so
+        # a narrow `except JSONDecodeError` left the app unable to even overwrite the bad file.
         return default
 
 

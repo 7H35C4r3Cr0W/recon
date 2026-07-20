@@ -226,8 +226,10 @@ def read_cache(url: str) -> CacheEntry | None:
     path = _cache_path(url)
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None  # missing OR corrupt -> degrade to "no cache", never raise
+    except (OSError, ValueError):
+        # missing OR corrupt -> degrade to "no cache", never raise. ValueError covers
+        # JSONDecodeError AND UnicodeDecodeError (non-UTF-8 cache bytes), honouring the contract.
+        return None
     if not isinstance(data, dict) or data.get("url") != url:
         return None
     try:

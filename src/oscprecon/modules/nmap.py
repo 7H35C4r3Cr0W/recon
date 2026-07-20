@@ -37,6 +37,32 @@ _VHOST_HOST_RE = re.compile(r"^(?=.*[A-Za-z])[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 # with a digit (3proxy, 3CX, 7-Zip) does NOT match, so it is not mistaken for its own version.
 _VERSION_RE = re.compile(r"^v?\d+([.\-]\d+)+")
 
+# `nmap --reason` (offered in the custom Scan dialog) inserts a REASON column between SERVICE and
+# VERSION — "22/tcp open ssh syn-ack ttl 64 OpenSSH 8.2p1". Without stripping it, the reason text
+# ("syn-ack ttl 64") is folded into `product`, polluting discovered_services and the searchsploit
+# / EDB lookup. The reason is one token from nmap's fixed vocabulary, optionally followed by
+# "ttl <n>"; strip it only when the leading token is a KNOWN reason, so a real lowercase product
+# (nginx, lighttpd) is never mistaken for a reason and eaten.
+_NMAP_REASONS = frozenset(
+    {
+        "syn-ack", "syn", "split-handshake-syn", "reset", "no-response", "init-timeout",
+        "conn-refused", "conn-timeout", "perc-timeout", "udp-response", "tcp-response",
+        "proto-response", "arp-response", "nd-response", "ip-response", "localhost-response",
+        "unknown-response", "host-unreach", "net-unreach", "proto-unreach", "port-unreach",
+        "dest-unreach", "echo-reply", "time-exceeded", "ttl-exceeded", "admin-prohibited",
+        "host-prohibited", "net-prohibited", "source-quench", "redirect", "user-set", "script-set",
+    }
+)  # fmt: skip
+_REASON_PREFIX = re.compile(r"^(?P<reason>[a-z][a-z-]*)(?: ttl \d+)?\s+")
+
+
+def _strip_reason(rest: str) -> str:
+    # drop a leading "<reason> [ttl <n>] " column that `--reason` prepends to the version banner.
+    match = _REASON_PREFIX.match(rest)
+    if match is not None and match.group("reason") in _NMAP_REASONS:
+        return rest[match.end() :]
+    return rest
+
 
 def redirect_vhosts(raw_outputs: dict[str, str]) -> list[str]:
     """Vhost hostnames nmap saw the target redirect to (http-title 'Did not follow redirect …')."""
@@ -288,7 +314,7 @@ def parse_port_line(line: str) -> DiscoveredService | None:
     match = _PORT_LINE.match(line.strip())
     if match is None:
         return None
-    rest = match.group("rest") or ""
+    rest = _strip_reason(match.group("rest") or "")
     product = ""
     version = ""
     # a leading "(" means nmap detected no product name, just parenthetical extrainfo

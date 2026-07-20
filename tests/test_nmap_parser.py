@@ -83,6 +83,27 @@ def test_parse_port_line_records_state() -> None:
     assert open_udp is not None and open_udp.state == "open"
 
 
+def test_parse_port_line_strips_reason_column() -> None:
+    # `nmap --reason` (a Scan-dialog checkbox) inserts a REASON column ("syn-ack ttl 64") between
+    # SERVICE and VERSION. It must be stripped, not folded into product — else searchsploit/EDB and
+    # the graph/report get "syn-ack ttl 64 OpenSSH" as the product.
+    from oscprecon.modules.nmap import parse_port_line
+
+    ssh = parse_port_line("22/tcp open ssh syn-ack ttl 64 OpenSSH 8.2p1 Ubuntu")
+    assert ssh is not None and ssh.product == "OpenSSH" and ssh.version == "8.2p1"
+    apache = parse_port_line("80/tcp open http syn-ack ttl 63 Apache httpd 2.4.29 ((Ubuntu))")
+    assert apache is not None and apache.product == "Apache httpd" and apache.version == "2.4.29"
+    # a reason with no version banner leaves a clean product
+    ftp = parse_port_line("21/tcp open ftp reset ttl 64 vsftpd")
+    assert ftp is not None and ftp.product == "vsftpd" and ftp.version == ""
+    # WITHOUT --reason, a real lowercase product (nginx) must NOT be mistaken for a reason + eaten
+    ng = parse_port_line("80/tcp open http nginx 1.18.0")
+    assert ng is not None and ng.product == "nginx" and ng.version == "1.18.0"
+    # a product that is not a known reason word is never stripped even if shaped like one
+    telnet = parse_port_line("23/tcp open telnet Linux telnetd")
+    assert telnet is not None and telnet.product == "Linux telnetd"
+
+
 def test_findings_derived_from_services() -> None:
     findings = NmapModule().parse(_raw())
     titles = {f.title for f in findings}

@@ -155,6 +155,10 @@ def test_corrupt_cache_degrades_and_rebuilds():
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("{not json", encoding="utf-8")
     assert lh.read_cache(_MAPPED) is None  # corrupt -> None, no raise
+    # a cache file of raw non-UTF-8 bytes raises UnicodeDecodeError (a ValueError, not
+    # JSONDecodeError); read_cache promises to never raise, so it must still degrade to None.
+    path.write_bytes(b"\x80\xff not utf-8")
+    assert lh.read_cache(_MAPPED) is None
     opener = _Opener(_Resp(body=_html(), headers={"Content-Type": "text/html"}))
     result = lh.get_page(_MAPPED, force=True, opener=opener)
     assert result.state == "live-refreshed"  # rebuilt cleanly
