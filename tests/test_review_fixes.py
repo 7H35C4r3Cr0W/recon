@@ -17,7 +17,9 @@ from oscprecon.modules.nmap import parse_port_line
 from oscprecon.modules.smb.parsers import parse_netexec_shares, readable_shares
 from oscprecon.modules.vhost.parsers import parse_gobuster_dns
 from oscprecon.nmap_scan import ScanSpec, build_nmap_command, is_entry_target
-from oscprecon.references import ExploitHit
+from oscprecon.references import ExploitHit, _title_matches_version
+from oscprecon.references.live_hacktricks import html_to_markdown
+from oscprecon.reporter import _redacted_history
 from oscprecon.shell import _redact_cmdline, policy_violation
 from oscprecon.workspace import portability
 
@@ -305,3 +307,30 @@ def test_redact_masks_impacket_single_dash_hashes_for_any_tool() -> None:
     assert "aad3b435:c0ffeec0ffee" not in line and "<redacted" in line
     bare = _redact_cmdline(["GetNPUsers.py", "-hashes", "aad:bbbb", "d/u"])
     assert "aad:bbbb" not in bare and "<redacted" in bare
+
+
+# --- 2026-07-20 references + reporter review --------------------------------------------------
+def test_version_match_uses_token_boundary_for_full_version() -> None:
+    # a bare major.minor version must NOT substring-match a longer number (mis-flagged exploits)
+    assert _title_matches_version("SomeApp 2.41 XSS", "2.4", "2.4") is False
+    assert _title_matches_version("foo 12.4 bar", "2.4", "2.4") is False
+    assert _title_matches_version("x 1.20 y", "1.2", "1.2") is False
+    assert (
+        _title_matches_version("nginx 2.4.49 RCE", "2.4", "2.4") is True
+    )  # genuine prefix matches
+
+
+def test_html_sanitizer_void_end_tag_does_not_leak_chrome() -> None:
+    md = html_to_markdown(
+        "<main><nav>NAVCHROME<meta charset=utf8></meta>LEAKED<p>x</p></nav><p>body</p></main>"
+    )
+    text = md[0] if isinstance(md, tuple) else md
+    assert "NAVCHROME" not in text and "LEAKED" not in text  # a </meta> must not end the skip early
+    assert "body" in text  # the real content after the nav still renders
+
+
+def test_report_command_log_redacts_credentialed_shell_line() -> None:
+    out = _redacted_history(
+        [{"module": "smb", "shell_line": "impacket-secretsdump corp/bob:S3cretPass@10.0.0.5"}]
+    )
+    assert "S3cretPass" not in out[0]["shell_line"] and "<redacted" in out[0]["shell_line"]

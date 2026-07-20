@@ -280,7 +280,10 @@ def normalize_product(product: str, version: str) -> tuple[str, str]:
 
 def _title_matches_version(title: str, version: str, short: str) -> bool:
     low = title.lower()
-    if version and version.lower() in low:
+    # both checks need the same token boundary: a bare `version` (nmap often reports major.minor, so
+    # version == short) must NOT match "2.41"/"12.4" via a plain substring test — that defeated the
+    # guarded `short` check below and mis-flagged version_match, floating the wrong exploit up.
+    if version and re.search(rf"(?<![\d.]){re.escape(version.lower())}(?!\d)", low):
         return True
     if not short:
         return False

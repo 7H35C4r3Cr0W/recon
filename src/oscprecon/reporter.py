@@ -6,7 +6,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from oscprecon import audit, references
+from oscprecon import audit, references, shell
 from oscprecon import edb as edb_mod
 from oscprecon import findings as findings_mod
 from oscprecon.graph_data import build_elements
@@ -82,6 +82,19 @@ def _group_findings(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
         module = str(finding.get("module", "")).strip() or "other"
         groups.setdefault(module, []).append(_finding_line(finding))
     return [{"module": module, "lines": groups[module]} for module in sorted(groups)]
+
+
+def _redacted_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # scrub any credential embedded in a logged command before it reaches the report's command log,
+    # matching the audit layer (§6/§18). Today command_history holds only Tier-1 recon commands, but
+    # a future writer that records a credentialed command must not leak it verbatim into report.md.
+    out: list[dict[str, Any]] = []
+    for entry in history:
+        line = entry.get("shell_line")
+        if isinstance(line, str) and line:
+            entry = {**entry, "shell_line": shell.redact_command(line)}
+        out.append(entry)
+    return out
 
 
 def _group_edb(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -255,7 +268,7 @@ class Reporter:
             "edb_groups": edb_groups,
             "audit_rows": audit_rows,
             "audit_total": len(all_audit),
-            "command_history": profile.command_history,
+            "command_history": _redacted_history(profile.command_history),
             "tags": profile.tags,
             "notes": notes,
             "entry_ip": profile.target.ip,

@@ -147,7 +147,11 @@ class _MarkdownExtractor(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         if tag in _SKIP_TAGS:
-            self._skip = max(0, self._skip - 1)
+            # only decrement for tags that INCREMENTED — a void skip tag (</meta>, <link/>) never
+            # opened a region, so decrementing here would unbalance and end the skip early, leaking
+            # chrome (nav/form/head) into the sanitized markdown. Mirror the handle_starttag guard.
+            if tag not in _VOID_TAGS:
+                self._skip = max(0, self._skip - 1)
             return
         if self._skip:
             return
