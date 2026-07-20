@@ -392,3 +392,84 @@
   description: "SMB MS17-010 (EternalBlue) focus"
   why: "Just the MS17-010 detection on 445 — the single most common Windows quick-win. Detection only."
   command: "nmap -p 445 --script \"smb-vuln-ms17-010\" {target}"
+
+# =================================================================================================
+# ==  EXTENDED SET II  ============================================================================
+# Still recon-only (§8): plain nmap + enumeration NSE, no brute (except the allowed oracle-sid-brute),
+# no spoofing.
+# =================================================================================================
+
+# ---- Service-focused ------------------------------------------------------------------------------
+- category: "Service-focused"
+  description: "IMAP / POP3 capabilities"
+  why: "Mail-retrieval capabilities and STARTTLS support on 110/143 (+ secure 993/995) — no login."
+  command: "nmap -sV -p 110,143,993,995 --script \"imap-capabilities,pop3-capabilities\" {target}"
+
+- category: "Service-focused"
+  description: "WinRM surface (5985/5986)"
+  why: "Version the WinRM/WSMan ports — the remote-management surface after you have AD creds."
+  command: "nmap -sV -p 5985,5986 {target}"
+
+- category: "Service-focused"
+  description: "Kerberos / KDC (88, 464)"
+  why: "Version the KDC ports — confirms a Domain Controller and the Kerberos surface (AS-REP/roast)."
+  command: "nmap -sV -p 88,464 {target}"
+
+- category: "Service-focused"
+  description: "LDAP over SSL (636 / 3269) + rootDSE"
+  why: "Cert detail and anonymous rootDSE over LDAPS — naming contexts and DC info on the secure port."
+  command: "nmap -sV -p 636,3269 --script \"ssl-cert,ldap-rootdse\" {target}"
+
+- category: "Service-focused"
+  description: "REST DBs — Elasticsearch / CouchDB (9200 / 5984)"
+  why: "Title + headers on the HTTP DB ports — an exposed cluster often answers unauthenticated."
+  command: "nmap -sV -p 9200,5984 --script \"http-title,http-headers\" {target}"
+
+- category: "Service-focused"
+  description: "Container / orchestration APIs (Docker / etcd / kubelet)"
+  why: "The unauth-prone control ports — Docker 2375, etcd 2379/2380, kubelet 10250. Title + headers."
+  command: "nmap -sV -p 2375,2379,2380,10250 --script \"http-title,http-headers\" {target}"
+
+- category: "Service-focused"
+  description: "rsync modules (873)"
+  why: "List rsync modules on 873 — unauthenticated modules are a common file-read/write win."
+  command: "nmap -sV -p 873 --script \"rsync-list-modules\" {target}"
+
+- category: "Service-focused"
+  description: "IPP / CUPS printers (631)"
+  why: "Printer/queue attributes on 631 — CUPS/IPP info, sometimes creds or a foothold."
+  command: "nmap -sV -p 631 --script \"cups-info,cups-queue-info\" {target}"
+
+- category: "Service-focused"
+  description: "SIP / VoIP methods (5060/udp)"
+  why: "Supported SIP methods on 5060/udp — VoIP surface, precursor to extension enumeration."
+  command: "nmap -sU -sV -p 5060 --script \"sip-methods\" {target}"
+
+# ---- Version & scripts ----------------------------------------------------------------------------
+- category: "Version & scripts"
+  description: "One-shot recon combo (banners + titles + certs + SMB OS)"
+  why: "A broad low-noise sweep — service banners, web titles, TLS certs and SMB OS in a single pass."
+  command: "nmap -sV --script \"banner,http-title,ssl-cert,smb-os-discovery\" {target}"
+
+# ---- Verbose / debug ------------------------------------------------------------------------------
+- category: "Verbose / debug"
+  description: "Verbose, only-open, with reasons"
+  why: "Live progress (-v), only open ports, and WHY each is open (--reason) — a clean readable run."
+  command: "nmap -sV -v --open --reason {target}"
+
+- category: "Verbose / debug"
+  description: "Packet trace (debug a filtered/odd host)"
+  why: "Print every probe/response (--packet-trace) on the top-20 ports — see exactly what a firewall does."
+  command: "nmap -Pn --top-ports 20 --packet-trace --reason {target}"
+
+# ---- Host discovery -------------------------------------------------------------------------------
+- category: "Host discovery"
+  description: "ARP ping sweep (same L2 / local /24)"
+  why: "ARP host discovery (-PR) is the most reliable on a local subnet — nothing hides from ARP. Edit {target} to a /24."
+  command: "nmap -sn -PR -n {target}"
+
+# ---- Full TCP -------------------------------------------------------------------------------------
+- category: "Full TCP"
+  description: "Deep — full TCP, versioned, default + vuln NSE (very slow)"
+  why: "Everything on every port: versions, default scripts AND the vuln category. Thorough; leave it running."
+  command: "nmap -p- -sV -sC --script vuln -T4 {target}"

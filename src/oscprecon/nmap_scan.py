@@ -33,6 +33,9 @@ class ScanSpec:
     scripts: str = ""  # NSE scripts -> --script <scripts>
     only_open: bool = False  # --open (hide closed/filtered ports)
     os_detect: bool = False  # -O (OS fingerprint — needs root)
+    no_dns: bool = False  # -n (skip reverse-DNS — faster)
+    reason: bool = False  # --reason (show why a port is in its state)
+    min_rate: int = 0  # --min-rate N (0 = off; packets/sec floor to speed a scan)
     extra: str = ""  # free-form extra flags (full power)
 
 
@@ -159,8 +162,12 @@ def build_nmap_command(spec: ScanSpec) -> str:
     tokens.append(_SCAN_TYPE_FLAG.get(spec.scan_type, "-sT"))
     if spec.no_ping and not ping_sweep:  # -Pn is meaningless with -sn (both concern discovery)
         tokens.append("-Pn")
+    if spec.no_dns:  # -n applies in every mode (including a ping sweep) — just skips reverse DNS
+        tokens.append("-n")
     if spec.timing.strip():
         tokens.append(spec.timing.strip())
+    if spec.min_rate > 0:
+        tokens.append(f"--min-rate {spec.min_rate}")
     if not ping_sweep:
         # a ping sweep discovers live hosts only — ports / version / scripts do not apply
         if spec.ports.strip():
@@ -175,6 +182,8 @@ def build_nmap_command(spec: ScanSpec) -> str:
             tokens.append("-O")
         if spec.only_open:
             tokens.append("--open")
+    if spec.reason:  # --reason shows WHY a port/host is in its state — valid in every mode
+        tokens.append("--reason")
     if spec.extra.strip():
         tokens.append(spec.extra.strip())
     tokens.append(target)

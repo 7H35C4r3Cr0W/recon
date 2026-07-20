@@ -71,3 +71,15 @@ def test_open_and_os_detect_checkboxes(qtbot: QtBot) -> None:
     dlg._only_open.setChecked(True)
     dlg._os_detect.setChecked(True)
     assert dlg._preview.text() == "nmap -sT -T4 --top-ports 1000 -sV -O --open 10.0.0.5"
+
+
+def test_no_dns_reason_min_rate_controls(qtbot: QtBot) -> None:
+    dlg = NmapScanDialog("10.0.0.5", ["10.0.0.5"], "10.0.0.5")
+    qtbot.addWidget(dlg)
+    dlg._no_dns.setChecked(True)
+    dlg._reason.setChecked(True)
+    dlg._min_rate.setValue(1500)
+    assert (
+        dlg._preview.text()
+        == "nmap -sT -n -T4 --min-rate 1500 --top-ports 1000 -sV --reason 10.0.0.5"
+    )

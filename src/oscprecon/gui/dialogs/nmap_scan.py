@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -93,6 +94,15 @@ class NmapScanDialog(QDialog):
         self._nse_row.setLayout(nse_row)
         self._only_open = QCheckBox("--open (only show open ports)")
         self._os_detect = QCheckBox("-O (OS detection — needs root)")
+        self._no_dns = QCheckBox("-n (skip reverse DNS — faster)")
+        self._reason = QCheckBox("--reason (why each port is in its state)")
+        self._min_rate = QSpinBox()
+        self._min_rate.setRange(0, 1_000_000)
+        self._min_rate.setSingleStep(500)
+        self._min_rate.setSpecialValueText("off")  # 0 renders as "off"
+        self._min_rate.setToolTip(
+            "--min-rate: minimum packets/sec — raise to finish a big scan faster"
+        )
         self._extra = QLineEdit()
         self._extra.setPlaceholderText("extra flags — e.g. --min-rate 1500  --open  -6")
         self._pivot = QComboBox()
@@ -111,6 +121,9 @@ class NmapScanDialog(QDialog):
         form.addRow("Add NSE script:", self._nse_row)
         form.addRow("", self._only_open)
         form.addRow("", self._os_detect)
+        form.addRow("", self._no_dns)
+        form.addRow("", self._reason)
+        form.addRow("Min rate (pkts/s):", self._min_rate)
         form.addRow("Extra flags:", self._extra)
         form.addRow("Pivoted in via:", self._pivot)
 
@@ -134,8 +147,11 @@ class NmapScanDialog(QDialog):
             self._scripts_default,
             self._only_open,
             self._os_detect,
+            self._no_dns,
+            self._reason,
         ):
             check.toggled.connect(self._rebuild_preview)
+        self._min_rate.valueChanged.connect(self._rebuild_preview)
 
         self._buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -165,6 +181,9 @@ class NmapScanDialog(QDialog):
             scripts=self._scripts.text(),
             only_open=self._only_open.isChecked(),
             os_detect=self._os_detect.isChecked(),
+            no_dns=self._no_dns.isChecked(),
+            reason=self._reason.isChecked(),
+            min_rate=self._min_rate.value(),
             extra=self._extra.text(),
         )
 
@@ -201,6 +220,9 @@ class NmapScanDialog(QDialog):
             self._nse_row,
             self._only_open,
             self._os_detect,
+            self._no_dns,
+            self._reason,
+            self._min_rate,
             self._extra,
         ):
             widget.setEnabled(not on)

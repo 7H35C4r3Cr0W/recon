@@ -90,6 +90,24 @@ def test_ping_sweep_ignores_open_and_os_detect() -> None:
     assert cmd == "nmap -sn -T4 10.0.0.0/24"
 
 
+def test_build_no_dns_reason_and_min_rate() -> None:
+    cmd = build_nmap_command(ScanSpec(target="10.0.0.5", no_dns=True, reason=True, min_rate=2000))
+    assert cmd == "nmap -sT -n -T4 --min-rate 2000 --top-ports 1000 -sV --reason 10.0.0.5"
+
+
+def test_min_rate_zero_and_flags_off_add_nothing() -> None:
+    cmd = build_nmap_command(ScanSpec(target="10.0.0.5", min_rate=0))
+    assert cmd == "nmap -sT -T4 --top-ports 1000 -sV 10.0.0.5"  # no --min-rate / -n / --reason
+
+
+def test_ping_sweep_keeps_no_dns_and_reason_but_not_ports() -> None:
+    # -n / --reason are valid in a host-discovery sweep; ports/-sV still dropped
+    cmd = build_nmap_command(
+        ScanSpec(target="10.0.0.0/24", scan_type="ping", no_dns=True, reason=True, min_rate=1000)
+    )
+    assert cmd == "nmap -sn -n -T4 --min-rate 1000 --reason 10.0.0.0/24"
+
+
 def test_ping_sweep_drops_ports_version_and_pn() -> None:
     # -sn is host discovery only; ports/version/scripts/-Pn do not apply and are omitted
     cmd = build_nmap_command(
