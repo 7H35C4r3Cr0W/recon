@@ -2,6 +2,8 @@
 
 **This file is auto-loaded by Claude Code as project context.** It is the single source of truth for what this project is, what it must NOT do, how it is built, and how you (Claude Code) should behave when working on it. Read it fully before proposing any change.
 
+> **▶ CONTINUING PRIOR WORK / CONTEXT WAS RESET?** Read [`HANDOFF.md`](HANDOFF.md) first — it has the current repo HEAD, the four gates, how the owner wants work done, the adversarial-review workflow, what's already been swept, and what to do next. This file (CLAUDE.md) is the full brief and the rules; HANDOFF.md is the short "pick up where we left off" companion.
+
 Companion files in this repo elaborate specific slices — `ROADMAP.md` for phase-by-phase build order, `prompts/*.md` for paste-able sequenced work chunks, `boxes/TRACKER.md` for the study list — but everything critical is in this file.
 
 ---
