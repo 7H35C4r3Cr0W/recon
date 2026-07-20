@@ -287,4 +287,5 @@ def parse_port_line(line: str) -> DiscoveredService | None:
         product=product,
         version=version,
         discovered_at=_now_iso(),
+        state=match.group("state"),
     )

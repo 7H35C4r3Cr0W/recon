@@ -63,3 +63,16 @@ def test_report_shows_product_version_and_script_detail(tmp_path: Path) -> None:
     assert "OpenSSH" in md and "1.18.0" in md  # product/version in the report
     assert "ssh-hostkey" in md  # the NSE detail block is surfaced
     assert "```text" in md  # rendered as a fenced code block
+
+
+def test_service_state_round_trips_through_save_load(tmp_path: Path) -> None:
+    # the nmap port state (open vs open|filtered) must survive a save/load so the exploit-tab
+    # presence filter can trust it. An older profile.json without the field loads as "open".
+    udp = "PORT       STATE         SERVICE\n139/udp open|filtered netbios-ssn\n161/udp open snmp\n"
+    profile = Profile.create(tmp_path, "st", Target(ip="10.10.10.5"))
+    profile.set_services(NmapModule().discovered_services({"u.txt": udp}))
+    profile.save()
+    loaded = Profile.load(profile.directory).discovered_services
+    reloaded = {(s.port, s.proto.value): s for s in loaded}
+    assert reloaded[(139, "udp")].state == "open|filtered"
+    assert reloaded[(161, "udp")].state == "open"

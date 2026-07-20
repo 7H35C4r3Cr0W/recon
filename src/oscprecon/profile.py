@@ -97,6 +97,7 @@ def _service_to_dict(service: DiscoveredService) -> dict[str, Any]:
         "version": service.version,
         "nmap_scripts_output": service.nmap_scripts_output,
         "discovered_at": service.discovered_at,
+        "state": service.state,
     }
 
 
@@ -111,6 +112,7 @@ def _service_from_dict(data: dict[str, Any]) -> DiscoveredService | None:
             version=str(data.get("version", "")),
             nmap_scripts_output=str(data.get("nmap_scripts_output", "")),
             discovered_at=str(data.get("discovered_at", "")),
+            state=str(data.get("state", "open")),
         )
     except (KeyError, ValueError, TypeError):
         return None

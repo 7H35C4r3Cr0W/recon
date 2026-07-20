@@ -111,6 +111,10 @@ class DiscoveredService:
     version: str = ""
     nmap_scripts_output: str = ""
     discovered_at: str = ""
+    # nmap port state: "open" (confirmed) or "open|filtered" (UDP no-response — nmap could not
+    # confirm it; almost always just a non-responding port). Defaults to "open" so pre-state
+    # profiles and hand-built services keep their old confirmed-present behaviour.
+    state: str = "open"
 
 
 def subnet_of(ip: str, prefix: int = 24) -> str:

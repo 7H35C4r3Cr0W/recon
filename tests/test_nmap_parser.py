@@ -54,6 +54,19 @@ def test_ignores_non_port_lines() -> None:
     assert services == []
 
 
+def test_parse_port_line_records_state() -> None:
+    from oscprecon.modules.nmap import parse_port_line
+
+    open_tcp = parse_port_line("80/tcp open  http    Apache httpd 2.4.62")
+    assert open_tcp is not None and open_tcp.state == "open"
+    # nmap marks a non-responding UDP port "open|filtered" — record it so downstream can tell it
+    # apart from a confirmed-open service (it must not count as a strong "present" signal).
+    of_udp = parse_port_line("139/udp open|filtered netbios-ssn")
+    assert of_udp is not None and of_udp.state == "open|filtered"
+    open_udp = parse_port_line("161/udp open          snmp")
+    assert open_udp is not None and open_udp.state == "open"
+
+
 def test_findings_derived_from_services() -> None:
     findings = NmapModule().parse(_raw())
     titles = {f.title for f in findings}

@@ -15,8 +15,17 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: `c4c09ae`** (all pushed). `origin` = local Gitea (often offline) — push to the
-  **`github`** remote (`git push github main`).
+- **github/main HEAD: `838952f`** (Race fixes pushed; the BigBang chunk below commits on top). `origin`
+  = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20c) — **HTB BigBang box review** (WordPress + BuddyForms / vhost-redirect /
+  Grafana). Verified the Race fixes hold live (vhost `blog.bigbang.htb` redirect + WP enum suggestion
+  both fire) and fixed 2 more gaps, tested: (1) **nmap `http-generator` → fingerprint presence** — the
+  CMS name nmap's NSE finds ("WordPress 6.5.4") lives in `nmap_scripts_output`, which the exploit-tab
+  fingerprint fold ignored; now included, so WordPress is `●` right after the scan (before whatweb).
+  (2) **`open|filtered` UDP no longer marks a service present** — the UDP top-100 returns non-responding
+  ports as `open|filtered`, which falsely flagged SMB/SNMP/AD present; added `DiscoveredService.state`
+  (parsed + persisted) and the exploit-tab presence now counts only `state=="open"`. Verified live on
+  10.129.41.186: present = {ssh, wordpress}; no false smb/snmp/ad. Guide (exploitation) synced.
 - Session (2026-07-20b) — **HTB Race box review** (Grav CMS / phpsysinfo / subdir-hosted app). Found +
   fixed 4 gaps, each tested: (1) **base-path redirect** — a root meta-refresh/301 to a subdirectory
   (`/` → `/racers/`) was dropped; now surfaced as an http finding + "point content discovery at this
