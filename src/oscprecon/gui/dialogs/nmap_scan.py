@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QCompleter,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
+from oscprecon.nmap_nse import list_scripts
 from oscprecon.nmap_scan import ScanSpec, build_nmap_command, validate_scan_target
 
 # scan-type combo -> ScanSpec.scan_type. Connect (-sT) is the default: it needs no raw sockets, so
@@ -63,6 +68,31 @@ class NmapScanDialog(QDialog):
         self._scripts_default = QCheckBox("-sC (default scripts)")
         self._scripts = QLineEdit()
         self._scripts.setPlaceholderText("NSE — e.g. smb-os-discovery,http-title")
+        # searchable NSE picker: type to filter (MatchContains), or open the dropdown; Add appends
+        # the chosen script above. Sourced from the host's nmap scripts, brute-filtered (§2).
+        scripts = list_scripts()
+        self._nse_pick = QComboBox()
+        self._nse_pick.setEditable(True)
+        self._nse_pick.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._nse_pick.addItems(scripts)
+        self._nse_pick.setCurrentText("")
+        self._nse_pick.setPlaceholderText(f"search {len(scripts)} NSE scripts…")
+        completer = QCompleter(scripts, self)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self._nse_pick.setCompleter(completer)
+        self._nse_add = QPushButton("＋ Add")
+        self._nse_add.setToolTip("Append the selected NSE script to the field above")
+        self._nse_add.clicked.connect(self._on_add_nse)
+        nse_row = QHBoxLayout()
+        nse_row.setContentsMargins(0, 0, 0, 0)
+        nse_row.addWidget(self._nse_pick, stretch=1)
+        nse_row.addWidget(self._nse_add)
+        self._nse_row = QWidget()
+        self._nse_row.setLayout(nse_row)
+        self._only_open = QCheckBox("--open (only show open ports)")
+        self._os_detect = QCheckBox("-O (OS detection — needs root)")
         self._extra = QLineEdit()
         self._extra.setPlaceholderText("extra flags — e.g. --min-rate 1500  --open  -6")
         self._pivot = QComboBox()
@@ -78,6 +108,9 @@ class NmapScanDialog(QDialog):
         form.addRow("", self._version)
         form.addRow("", self._scripts_default)
         form.addRow("NSE scripts:", self._scripts)
+        form.addRow("Add NSE script:", self._nse_row)
+        form.addRow("", self._only_open)
+        form.addRow("", self._os_detect)
         form.addRow("Extra flags:", self._extra)
         form.addRow("Pivoted in via:", self._pivot)
 
@@ -95,7 +128,13 @@ class NmapScanDialog(QDialog):
             widget.textChanged.connect(self._rebuild_preview)
         self._scan_type.currentIndexChanged.connect(self._rebuild_preview)
         self._timing.currentIndexChanged.connect(self._rebuild_preview)
-        for check in (self._no_ping, self._version, self._scripts_default):
+        for check in (
+            self._no_ping,
+            self._version,
+            self._scripts_default,
+            self._only_open,
+            self._os_detect,
+        ):
             check.toggled.connect(self._rebuild_preview)
 
         self._buttons = QDialogButtonBox(
@@ -124,8 +163,20 @@ class NmapScanDialog(QDialog):
             version=self._version.isChecked(),
             default_scripts=self._scripts_default.isChecked(),
             scripts=self._scripts.text(),
+            only_open=self._only_open.isChecked(),
+            os_detect=self._os_detect.isChecked(),
             extra=self._extra.text(),
         )
+
+    def _on_add_nse(self) -> None:
+        name = self._nse_pick.currentText().strip()
+        if not name:
+            return
+        existing = [s.strip() for s in self._scripts.text().split(",") if s.strip()]
+        if name not in existing:
+            existing.append(name)
+        self._scripts.setText(",".join(existing))  # triggers _rebuild_preview via textChanged
+        self._nse_pick.setCurrentText("")
 
     def _rebuild_preview(self) -> None:
         if self._raw.isChecked():
@@ -147,6 +198,9 @@ class NmapScanDialog(QDialog):
             self._version,
             self._scripts_default,
             self._scripts,
+            self._nse_row,
+            self._only_open,
+            self._os_detect,
             self._extra,
         ):
             widget.setEnabled(not on)

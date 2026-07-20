@@ -31,6 +31,8 @@ class ScanSpec:
     version: bool = True  # -sV
     default_scripts: bool = False  # -sC
     scripts: str = ""  # NSE scripts -> --script <scripts>
+    only_open: bool = False  # --open (hide closed/filtered ports)
+    os_detect: bool = False  # -O (OS fingerprint — needs root)
     extra: str = ""  # free-form extra flags (full power)
 
 
@@ -169,6 +171,10 @@ def build_nmap_command(spec: ScanSpec) -> str:
             tokens.append("-sC")
         if spec.scripts.strip():
             tokens.append(f"--script {spec.scripts.strip()}")
+        if spec.os_detect:
+            tokens.append("-O")
+        if spec.only_open:
+            tokens.append("--open")
     if spec.extra.strip():
         tokens.append(spec.extra.strip())
     tokens.append(target)

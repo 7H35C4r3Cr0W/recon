@@ -49,3 +49,25 @@ def test_pivot_source_defaults_to_entry(qtbot: QtBot) -> None:
     dlg = NmapScanDialog("10.10.5.23", ["10.129.33.39", "10.10.5.23"], "10.129.33.39")
     qtbot.addWidget(dlg)
     assert dlg.pivot_source() == "10.129.33.39"
+
+
+def test_nse_picker_appends_and_dedupes(qtbot: QtBot) -> None:
+    dlg = NmapScanDialog("10.0.0.5", ["10.0.0.5"], "10.0.0.5")
+    qtbot.addWidget(dlg)
+    dlg._nse_pick.setCurrentText("smb-os-discovery")
+    dlg._nse_add.click()
+    dlg._nse_pick.setCurrentText("http-title")
+    dlg._nse_add.click()
+    assert dlg._scripts.text() == "smb-os-discovery,http-title"
+    assert "--script smb-os-discovery,http-title" in dlg._preview.text()
+    dlg._nse_pick.setCurrentText("http-title")  # already present -> no duplicate
+    dlg._nse_add.click()
+    assert dlg._scripts.text() == "smb-os-discovery,http-title"
+
+
+def test_open_and_os_detect_checkboxes(qtbot: QtBot) -> None:
+    dlg = NmapScanDialog("10.0.0.5", ["10.0.0.5"], "10.0.0.5")
+    qtbot.addWidget(dlg)
+    dlg._only_open.setChecked(True)
+    dlg._os_detect.setChecked(True)
+    assert dlg._preview.text() == "nmap -sT -T4 --top-ports 1000 -sV -O --open 10.0.0.5"

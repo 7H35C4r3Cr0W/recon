@@ -75,6 +75,21 @@ def test_build_syn_scan_with_nse() -> None:
     assert cmd == "nmap -sS -T4 -p- -sV --script smb-os-discovery 10.0.0.5"
 
 
+def test_build_includes_open_and_os_detect() -> None:
+    cmd = build_nmap_command(
+        ScanSpec(target="10.0.0.5", scripts="http-title", only_open=True, os_detect=True)
+    )
+    assert cmd == "nmap -sT -T4 --top-ports 1000 -sV --script http-title -O --open 10.0.0.5"
+
+
+def test_ping_sweep_ignores_open_and_os_detect() -> None:
+    # -O / --open are port-scan concepts; a host-discovery sweep must not carry them
+    cmd = build_nmap_command(
+        ScanSpec(target="10.0.0.0/24", scan_type="ping", only_open=True, os_detect=True)
+    )
+    assert cmd == "nmap -sn -T4 10.0.0.0/24"
+
+
 def test_ping_sweep_drops_ports_version_and_pn() -> None:
     # -sn is host discovery only; ports/version/scripts/-Pn do not apply and are omitted
     cmd = build_nmap_command(

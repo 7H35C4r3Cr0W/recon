@@ -176,3 +176,219 @@
   description: "Vuln NSE category sweep (opt-in, slow/noisy)"
   why: "§8 allows --script vuln — flags known service weaknesses, detection only (never exploits)."
   command: "nmap -sV --script vuln {target}"
+
+# =================================================================================================
+# ==  EXTENDED SET  ===============================================================================
+# More labelled options for common situations. All recon-only (§8): plain nmap + enumeration NSE,
+# no brute (oracle-sid-brute is the sole allowed exception — it enumerates SIDs, not passwords),
+# no spoofing.
+# =================================================================================================
+
+# ---- Fast / triage --------------------------------------------------------------------------------
+- category: "Fast / triage"
+  description: "Top 20 ports (instant)"
+  why: "The absolute-fastest sanity ping — is anything obvious open? Then widen the net."
+  command: "nmap --top-ports 20 -T4 {target}"
+
+- category: "Fast / triage"
+  description: "Ping-less quick triage (top 100, -Pn)"
+  why: "Same quick top-100 look but assumes the host is up — for boxes that drop ICMP echo."
+  command: "nmap --top-ports 100 -Pn -T4 -n {target}"
+
+- category: "Fast / triage"
+  description: "Only-open, quiet (top 200)"
+  why: "Top-200 ports, hide closed/filtered noise (--open), no DNS — a clean 'what's open' readout."
+  command: "nmap --top-ports 200 --open -T4 -n {target}"
+
+# ---- Full TCP -------------------------------------------------------------------------------------
+- category: "Full TCP"
+  description: "Full TCP — versioned + default scripts (the works, one pass)"
+  why: "All 65535 ports WITH versions and safe default NSE in one rate-boosted command."
+  command: "nmap -p- -sV -sC -T4 --min-rate 1000 {target}"
+
+- category: "Full TCP"
+  description: "Full TCP — only-open, with reasons"
+  why: "Every port, host assumed up, show only open ports and WHY nmap thinks so (--reason)."
+  command: "nmap -p- -Pn --open --reason -T4 {target}"
+
+- category: "Full TCP"
+  description: "Full TCP — trimmed retries (lossy links / pivots)"
+  why: "Fewer retransmits + a rate floor so a full sweep finishes over a flaky ligolo tunnel."
+  command: "nmap -p- -Pn -n --max-retries 2 --min-rate 1500 {target}"
+
+# ---- Version & scripts ----------------------------------------------------------------------------
+- category: "Version & scripts"
+  description: "Default + safe scripts"
+  why: "Versions plus the 'default' AND 'safe' NSE categories — broader than -sC, still non-intrusive."
+  command: "nmap -sV --script \"default,safe\" {target}"
+
+- category: "Version & scripts"
+  description: "Discovery scripts"
+  why: "The NSE 'discovery' category — extra info (rpcinfo, snmp, http-* enum) from open ports."
+  command: "nmap -sV --script discovery {target}"
+
+- category: "Version & scripts"
+  description: "Fast version detect (--version-light)"
+  why: "Lighter -sV probe set — quicker identification when the full intensity is too slow."
+  command: "nmap -sV --version-light {target}"
+
+# ---- UDP ------------------------------------------------------------------------------------------
+- category: "UDP"
+  description: "UDP top-200, versioned"
+  why: "A wider UDP net (top-200) with versions — catches the less-common UDP services too."
+  command: "nmap -sU -sV --top-ports 200 {target}"
+
+- category: "UDP"
+  description: "Common UDP services (DNS/TFTP/NTP/NetBIOS/SNMP/IKE)"
+  why: "Just the UDP ports that actually matter for OSCP — fast and targeted instead of top-N."
+  command: "nmap -sU -sV -p 53,69,123,137,161,500 {target}"
+
+- category: "UDP"
+  description: "SNMP focus (+info scripts)"
+  why: "SNMP on 161/udp with the info scripts — system, processes and interfaces via public community."
+  command: "nmap -sU -p 161 --script \"snmp-info,snmp-sysdescr,snmp-processes,snmp-interfaces\" {target}"
+
+# ---- Firewall / IDS evasion -----------------------------------------------------------------------
+- category: "Firewall / IDS evasion"
+  description: "MTU fragmentation (--mtu 16)"
+  why: "Fragment probes to a 16-byte MTU to slip past simple stateless filters. No spoofing."
+  command: "nmap -Pn --mtu 16 {target}"
+
+- category: "Firewall / IDS evasion"
+  description: "Scan delay (throttle, IDS-gentle)"
+  why: "One second between probes — low-and-slow so a rate-based IDS doesn't trip. Slow but quiet."
+  command: "nmap -sV --scan-delay 1s {target}"
+
+- category: "Firewall / IDS evasion"
+  description: "Bad-checksum probe (spot dumb filters)"
+  why: "Send deliberately-wrong TCP checksums — a host that still replies has a naive filter. Detection only."
+  command: "nmap -Pn --badsum {target}"
+
+# ---- Active Directory / Windows -------------------------------------------------------------------
+- category: "Active Directory / Windows"
+  description: "SMB full enum scripts (shares/users/os/sessions)"
+  why: "The whole safe smb-enum-* battery on 445 — shares, users, sessions, domains, OS, signing."
+  command: "nmap -p 445 --script \"smb-os-discovery,smb-enum-shares,smb-enum-users,smb-enum-sessions,smb-enum-domains,smb-security-mode,smb2-security-mode\" {target}"
+
+- category: "Active Directory / Windows"
+  description: "SMB protocols + signing posture"
+  why: "Which SMB dialects are offered and whether signing is required — the relay-candidate check."
+  command: "nmap -p 139,445 --script \"smb-protocols,smb2-capabilities,smb-security-mode,smb2-security-mode\" {target}"
+
+- category: "Active Directory / Windows"
+  description: "LDAP anonymous rootDSE"
+  why: "Anonymous LDAP root-DSE dump — naming contexts, domain functional level, DC hostname."
+  command: "nmap -p 389 --script \"ldap-rootdse\" {target}"
+
+- category: "Active Directory / Windows"
+  description: "RDP info + encryption / NLA"
+  why: "NTLM info (domain, hostname, build) and the encryption/NLA posture from 3389 — no login."
+  command: "nmap -p 3389 --script \"rdp-ntlm-info,rdp-enum-encryption\" {target}"
+
+- category: "Active Directory / Windows"
+  description: "MSRPC endpoint mapper (135)"
+  why: "Enumerate the RPC endpoint mapper on 135 — service interfaces bound on the box."
+  command: "nmap -p 135 --script \"msrpc-enum\" {target}"
+
+# ---- Service-focused ------------------------------------------------------------------------------
+- category: "Service-focused"
+  description: "HTTP enum scripts (title/headers/methods/robots/enum)"
+  why: "The safe http-* enumeration set across the common web ports — a fast first web look."
+  command: "nmap -sV -p 80,443,8080,8443 --script \"http-title,http-headers,http-methods,http-robots.txt,http-enum\" {target}"
+
+- category: "Service-focused"
+  description: "HTTP security headers + TLS cert"
+  why: "Missing security headers plus the TLS cert/cipher detail on the HTTPS ports."
+  command: "nmap -sV -p 443,8443 --script \"http-security-headers,ssl-cert,ssl-enum-ciphers\" {target}"
+
+- category: "Service-focused"
+  description: "FTP anonymous + system"
+  why: "Anonymous-login check and the FTP system type on 21 — the classic easy win."
+  command: "nmap -sV -p 21 --script \"ftp-anon,ftp-syst\" {target}"
+
+- category: "Service-focused"
+  description: "SSH host keys + algorithms + auth methods"
+  why: "Host-key fingerprints, supported algos and which auth methods 22 accepts (keys vs password)."
+  command: "nmap -sV -p 22 --script \"ssh-hostkey,ssh2-enum-algos,ssh-auth-methods\" {target}"
+
+- category: "Service-focused"
+  description: "DNS server info + recursion"
+  why: "Server id, open recursion and cache-snoop on 53 — is this a resolver you can lean on?"
+  command: "nmap -sV -p 53 --script \"dns-nsid,dns-recursion,dns-cache-snoop\" {target}"
+
+- category: "Service-focused"
+  description: "SMTP commands + open-relay + NTLM"
+  why: "Supported SMTP verbs, open-relay test and NTLM info on 25/465/587 — mail-server recon."
+  command: "nmap -sV -p 25,465,587 --script \"smtp-commands,smtp-open-relay,smtp-ntlm-info\" {target}"
+
+- category: "Service-focused"
+  description: "NFS exports + mounts (safe)"
+  why: "showmount exports, statfs and a bounded listing via the safe nfs-* scripts + rpcinfo."
+  command: "nmap -sV -p 111,2049 --script \"nfs-showmount,nfs-statfs,nfs-ls,rpcinfo\" {target}"
+
+- category: "Service-focused"
+  description: "MySQL info"
+  why: "Protocol/version/capabilities from 3306 without logging in — pre-cred recon."
+  command: "nmap -sV -p 3306 --script \"mysql-info\" {target}"
+
+- category: "Service-focused"
+  description: "MSSQL info + NTLM"
+  why: "Instance name, version and NTLM (domain/host) from 1433 — no credentials needed."
+  command: "nmap -sV -p 1433 --script \"ms-sql-info,ms-sql-ntlm-info\" {target}"
+
+- category: "Service-focused"
+  description: "Redis info"
+  why: "Unauth INFO from 6379 — role, version, and whether it's wide open."
+  command: "nmap -sV -p 6379 --script \"redis-info\" {target}"
+
+- category: "Service-focused"
+  description: "MongoDB info + databases"
+  why: "Build info and, if unauth, the database list from 27017 — no login attempted."
+  command: "nmap -sV -p 27017 --script \"mongodb-info,mongodb-databases\" {target}"
+
+- category: "Service-focused"
+  description: "VNC info + auth types"
+  why: "Protocol, supported auth types and the RealVNC auth-bypass check across 5900-5906. Detection only."
+  command: "nmap -sV -p 5900-5906 --script \"vnc-info,vnc-title,realvnc-auth-bypass\" {target}"
+
+- category: "Service-focused"
+  description: "Oracle TNS version + SID enum"
+  why: "TNS listener version and SID enumeration on 1521 — oracle-sid-brute enumerates SIDs (identifiers), not passwords (§ allowed)."
+  command: "nmap -sV -p 1521 --script \"oracle-tns-version,oracle-sid-brute\" {target}"
+
+- category: "Service-focused"
+  description: "NetBIOS name table (137/udp)"
+  why: "nbstat name/MAC table on 137/udp — hostname and logged-on hints before SMB."
+  command: "nmap -sU -sV -p 137 --script \"nbstat\" {target}"
+
+# ---- TLS / SSL ------------------------------------------------------------------------------------
+- category: "TLS / SSL"
+  description: "Cipher + certificate audit"
+  why: "Full cipher suite grading and the certificate detail (CN/SAN/issuer/validity) on 443."
+  command: "nmap -sV -p 443 --script \"ssl-cert,ssl-enum-ciphers\" {target}"
+
+- category: "TLS / SSL"
+  description: "Heartbleed check"
+  why: "CVE-2014-0160 detection on 443 — the classic OpenSSL memory leak. Detection only."
+  command: "nmap -p 443 --script \"ssl-heartbleed\" {target}"
+
+- category: "TLS / SSL"
+  description: "Weak-TLS sweep (POODLE / DH / SSLv2 / CCS)"
+  why: "Legacy-protocol and weak-parameter checks in one pass — POODLE, weak DH, SSLv2, CCS injection."
+  command: "nmap -p 443 --script \"ssl-poodle,ssl-dh-params,sslv2,ssl-ccs-injection\" {target}"
+
+# ---- OS & vulnerability ---------------------------------------------------------------------------
+- category: "OS & vulnerability"
+  description: "Safe vuln scripts only (less noisy)"
+  why: "Only the vuln scripts also tagged 'safe' — flags weaknesses without the intrusive checks."
+  command: "nmap -sV --script \"vuln and safe\" {target}"
+
+- category: "OS & vulnerability"
+  description: "HTTP vuln scripts (web weaknesses)"
+  why: "The http-vuln-* family on the web ports — known web-app/server CVEs, detection only."
+  command: "nmap -sV -p 80,443,8080,8443 --script \"http-vuln*\" {target}"
+
+- category: "OS & vulnerability"
+  description: "SMB MS17-010 (EternalBlue) focus"
+  why: "Just the MS17-010 detection on 445 — the single most common Windows quick-win. Detection only."
+  command: "nmap -p 445 --script \"smb-vuln-ms17-010\" {target}"

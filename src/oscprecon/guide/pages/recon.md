@@ -19,7 +19,14 @@ Recon goes fast-to-thorough so you're never blocked waiting on a full scan:
 
 The **Run Recon** split-button chooses how heavy to go (Quick / Default / Full / Exam), and the
 **Scan a host / range** dialog gives full nmap-flag control — scan type, `-Pn`, ports, timing, NSE,
-free-form flags — with a live preview. The target can be a single IP **or a whole `/24`**.
+`--open`, `-O`, free-form flags — with a live preview. Its **NSE picker** is a searchable dropdown
+(type to filter across every script the installed nmap ships, brute-filtered per §2) with an **Add**
+button that appends the chosen script. The target can be a single IP **or a whole `/24`**.
+
+**Scan → More options…** opens the preset chooser — 60+ labelled nmap scans grouped by situation
+(Fast / triage · Full TCP · Version & scripts · UDP · Firewall/IDS evasion · Active Directory ·
+Service-focused NSE bundles · TLS/SSL · Host discovery · OS & vulnerability). Filter by keyword, read
+what each is for, then **Load into builder** or **Run**.
 
 ## Per-service modules & the tier model
 
