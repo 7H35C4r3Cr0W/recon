@@ -68,6 +68,34 @@ def _redirect_run(host_line: str) -> Callable[..., object]:
     return run
 
 
+def _spook_run(shell_line: str, output_file: Path, **_: object) -> object:
+    out = Path(output_file)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        "PORT     STATE SERVICE VERSION\n"
+        "80/tcp   open  http    Uvicorn\n"
+        "|_http-server-header: uvicorn\n"
+        "| http-robots.txt: 1 disallowed entry\n"
+        "|_/file_management/?file=implant\n"
+        "|_http-title: Site doesn't have a title (application/json).\n",
+        encoding="utf-8",
+    )
+    return shell.ShellResult(shell_line, 0, out, "", "", 0.0)
+
+
+def test_nmap_nse_leads_surface_robots_and_api(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Spooktrol: the -sC scan reveals the robots disallowed path + a uvicorn/JSON API banner; both
+    # must surface as scan-time recon tips (wired via run_nmap -> _handle_nse_leads).
+    prof = Profile.create(tmp_path, "spook", Target(ip="10.129.96.46"))
+    monkeypatch.setattr(shell, "run", _spook_run)
+    lines: list[str] = []
+    Orchestrator(prof, on_line=lines.append).run_nmap()
+    assert any("[robots]" in ln and "/file_management/?file=implant" in ln for ln in lines)
+    assert any(ln.startswith("[api]") and "openapi.json" in ln for ln in lines)
+
+
 def test_nmap_redirect_autoset_hostname(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Ignition: nmap's http-title redirect auto-wires the vhost when none is set (announced).
     prof = Profile.create(tmp_path, "ign", Target(ip="10.10.10.5"))

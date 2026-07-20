@@ -80,3 +80,9 @@ server** — an ASGI stack (`uvicorn` / `hypercorn` / `daphne`), a `FastAPI`/`St
 `application/json` root — it nudges you to **enumerate the API surface, not dir-bust for files**: curl
 the auto-generated docs/schema (`/openapi.json`, `/docs`, `/redoc`, `/swagger.json`) and versioned
 roots (`/api`, `/api/v1`), which list every route and its expected parameters.
+
+Some of these leads surface **the moment the nmap scan lands**, before you touch a service panel: the
+default `-sC` scripts are mined for a redirect vhost (auto-set as the target hostname), for
+**`http-robots.txt` disallowed entries** (each disallowed path — an admin panel, a backup, the thing
+they didn't want indexed — becomes a `[robots]` lead to investigate), and for a **JSON API banner**
+(`uvicorn` / `application/json` → the same `[api]` "enumerate the schema, not files" nudge).

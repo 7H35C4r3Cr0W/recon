@@ -5,7 +5,8 @@ from collections.abc import Callable
 
 from oscprecon import shell
 from oscprecon.models import Command, Port, Proto
-from oscprecon.modules.nmap import NmapModule, redirect_vhosts
+from oscprecon.modules.http.parsers import detect_api_server
+from oscprecon.modules.nmap import NmapModule, redirect_vhosts, robots_disclosures
 from oscprecon.profile import Profile
 from oscprecon.reporter import Reporter
 
@@ -133,6 +134,23 @@ class Orchestrator:
                 "to recon it as a vhost."
             )
 
+    def _handle_nse_leads(self, raw: dict[str, str]) -> None:
+        # surface high-value leads nmap's -sC NSE scripts revealed for free, the moment the scan
+        # lands (mirrors _handle_redirect_vhosts): robots.txt disallowed entries = paths an admin
+        # hid; a uvicorn / FastAPI / application-json banner = a JSON API to enumerate by schema.
+        for path in robots_disclosures(raw):
+            self._emit(
+                f"[robots] nmap's robots.txt discloses '{path}' — admins hide admin panels, "
+                "backups and sensitive endpoints there; investigate it (curl it, feed it to "
+                "content discovery)."
+            )
+        if detect_api_server("\n".join(raw.values())):
+            self._emit(
+                "[api] the web server looks like a JSON API (uvicorn / FastAPI / application-json) "
+                "— enumerate the API schema, not files: curl /openapi.json /docs /redoc "
+                "/swagger.json /api/v1 (they list every route + parameter)."
+            )
+
     def run_nmap(self) -> None:
         target = self.profile.target
         raw: dict[str, str] = {}
@@ -175,6 +193,7 @@ class Orchestrator:
                 self.profile.save()
 
         self._handle_redirect_vhosts(raw)
+        self._handle_nse_leads(raw)
 
         Reporter(self.profile).write()
         count = len(self.profile.discovered_services)

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from oscprecon.models import Proto
-from oscprecon.modules.nmap import NmapModule, redirect_vhosts
+from oscprecon.modules.nmap import NmapModule, redirect_vhosts, robots_disclosures
 
 FIXTURES = Path(__file__).parent / "fixtures" / "nmap"
 
@@ -130,3 +130,33 @@ def test_redirect_vhosts_ignores_ip_and_dedupes() -> None:
     }
     assert redirect_vhosts(raw) == ["ignition.htb"]  # deduped
     assert redirect_vhosts({"x": "80/tcp open http nginx"}) == []  # no redirect at all
+
+
+def test_robots_disclosures_from_nmap_nse() -> None:
+    # Spooktrol: nmap's -sC http-robots.txt reveals the disallowed path (with the |/|_ gutter).
+    raw = {
+        "tcp.txt": (
+            "80/tcp   open  http    Uvicorn\n"
+            "|_http-server-header: uvicorn\n"
+            "| http-robots.txt: 1 disallowed entry \n"
+            "|_/file_management/?file=implant\n"
+            "|_http-title: Site doesn't have a title (application/json).\n"
+        )
+    }
+    assert robots_disclosures(raw) == ["/file_management/?file=implant"]
+
+
+def test_robots_disclosures_multi_entry_and_block_boundary() -> None:
+    # space-separated + continuation paths are all captured; a following non-path NSE line ends the
+    # block so an unrelated later '/'-line is not mistaken for a robots entry; deduped.
+    raw = {
+        "x": (
+            "| http-robots.txt: 3 disallowed entries\n"
+            "|_/admin/ /backup/\n"
+            "| /admin/\n"  # dup
+            "|_http-title: Home\n"
+            "|_/not-a-robots-path/\n"
+        )
+    }
+    assert robots_disclosures(raw) == ["/admin/", "/backup/"]
+    assert robots_disclosures({"x": "80/tcp open http nginx\n|_http-title: Hi\n"}) == []

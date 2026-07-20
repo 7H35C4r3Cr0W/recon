@@ -75,6 +75,47 @@ def redirect_vhosts(raw_outputs: dict[str, str]) -> list[str]:
     return hosts
 
 
+# nmap's http-robots.txt NSE (run by -sC) reports the paths a site's robots.txt disallows — admins
+# hide admin panels, backups and the-thing-they-don't-want-indexed there, so each is a high-value
+# recon lead surfaced for FREE by the scan (Spooktrol: /file_management/?file=implant). The header
+# is "| http-robots.txt: N disallowed entr…" and the paths follow on "|_/path" continuation lines.
+_ROBOTS_NSE_HEADER = re.compile(r"http-robots\.txt:\s*\d*\s*disallowed", re.IGNORECASE)
+
+
+def _strip_gutter(line: str) -> str:
+    # drop nmap's NSE gutter ("| ", "|_", "|   ") so the script text/path is matched cleanly.
+    stripped = line.strip()
+    if stripped.startswith("|"):
+        stripped = stripped[1:]
+    if stripped.startswith("_"):
+        stripped = stripped[1:]
+    return stripped.strip()
+
+
+def robots_disclosures(raw_outputs: dict[str, str]) -> list[str]:
+    """Disallowed paths nmap's http-robots.txt NSE reported, deduped in first-seen order."""
+    paths: list[str] = []
+    seen: set[str] = set()
+    for text in raw_outputs.values():
+        collecting = False
+        for raw_line in text.splitlines():
+            line = _strip_gutter(raw_line)
+            if _ROBOTS_NSE_HEADER.search(line):
+                collecting = True
+                continue
+            if not collecting:
+                continue
+            tokens = [t for t in line.split() if t.startswith("/")]
+            if not tokens:
+                collecting = False  # a non-path line (next script / blank) ends the robots block
+                continue
+            for token in tokens:
+                if token not in seen:
+                    seen.add(token)
+                    paths.append(token)
+    return paths
+
+
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
