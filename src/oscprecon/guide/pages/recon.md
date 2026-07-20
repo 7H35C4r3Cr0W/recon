@@ -67,6 +67,12 @@ content the bare IP won't (public mailbox providers like `gmail.com` are filtere
 **Fingerprint** also snapshots the index page and mines **lab hostnames printed in the body** (a
 heading/footer/comment, e.g. `<h1>carpediem.htb</h1>`) — whatweb never reads page text, so a domain
 that lives only in the HTML would otherwise be invisible; any `*.htb` / `*.vl` / `*.thm` / `*.local`
-host becomes the same "add to `/etc/hosts`, *Set Target Hostname*, fuzz `Host: FUZZ.<host>`" lead; and
-when an endpoint returns **401** it suggests a *single* well-known default (`curl -u admin:admin …`) —
-a Tier-2 recon-adjacent check, never a password spray.
+host becomes the same "add to `/etc/hosts`, *Set Target Hostname*, fuzz `Host: FUZZ.<host>`" lead;
+**Fingerprint** also fetches **`robots.txt`** from the host root and surfaces every `Disallow` /
+`Allow` / `Sitemap` entry as a finding — a free disclosure of the paths an admin wanted hidden (admin
+panels, backup/upload dirs, a CMS's install layout). A WordPress `robots.txt` disallows `/wp-admin/`,
+which is the **canonical WordPress fingerprint** even when whatweb never prints "WordPress" — so a
+WordPress-detected box surfaces the *enumerate (never brute)* `wpscan --enumerate …` next-step (and
+marks WordPress ● on the Exploitation tab) from the `robots.txt`/page-body `wp-content` signal alone;
+and when an endpoint returns **401** it suggests a *single* well-known default (`curl -u admin:admin
+…`) — a Tier-2 recon-adjacent check, never a password spray.

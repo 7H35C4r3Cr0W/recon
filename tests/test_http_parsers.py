@@ -7,6 +7,7 @@ from oscprecon.modules.http.parsers import (
     parse_ffuf,
     parse_gobuster,
     parse_nikto,
+    parse_robots,
     parse_tool,
     parse_whatweb,
     parse_wpscan,
@@ -299,6 +300,38 @@ def test_parse_tool_dispatch_and_garbage() -> None:
     assert parse_whatweb("not json", 80) == []
     assert parse_wpscan("[]", 80) == []
     assert detect_wordpress("nginx 1.18") is False
+
+
+def test_parse_robots_surfaces_disclosed_paths_and_sitemap() -> None:
+    findings = parse_robots(_read("robots-wordpress.txt"), 443)
+    assert len(findings) == 1
+    f = findings[0]
+    assert f.path == "/robots.txt"
+    # every disallowed/allowed path is disclosed, the catch-all "/" is dropped, sitemap surfaced
+    assert "/wp-admin/" in f.note
+    assert "/backup/" in f.note
+    assert "/secret-admin/" in f.note
+    assert "sitemap: https://phoenix.htb/sitemap.xml" in f.note
+    assert parse_tool("robots", _read("robots-wordpress.txt"), 443)[0].path == "/robots.txt"
+
+
+def test_parse_robots_empty_and_catch_all_yield_nothing() -> None:
+    # a blank robots or one that only disallows everything ("/") discloses no specific path
+    assert parse_robots("", 80) == []
+    assert parse_robots("User-agent: *\nDisallow: /\n", 80) == []
+
+
+def test_detect_wordpress_fires_on_robots_wp_admin_signal() -> None:
+    # the canonical WordPress robots.txt fingerprint (Disallow: /wp-admin/) must be detected even
+    # when whatweb never emits the product name — both on the raw text and the parse_robots note.
+    robots = _read("robots-wordpress.txt")
+    assert detect_wordpress(robots) is True
+    assert detect_wordpress(parse_robots(robots, 443)[0].note) is True
+    # the wp-includes / wp-json markers are recognised too
+    assert detect_wordpress("Disallow: /wp-includes/") is True
+    assert detect_wordpress('<link rel="https://api.w.org/" href="/wp-json/">') is True
+    # and no false positive on an unrelated page that merely mentions "admin"
+    assert detect_wordpress("Apache index of /uploads/ admin login") is False
 
 
 def test_is_source_disclosure_flags_swap_backup_vcs() -> None:

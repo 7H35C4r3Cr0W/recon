@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /wp-admin/
+Allow: /wp-admin/admin-ajax.php
+Disallow: /backup/
+Disallow: /secret-admin/
+
+Sitemap: https://phoenix.htb/sitemap.xml

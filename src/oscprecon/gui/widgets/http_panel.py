@@ -517,6 +517,15 @@ class HttpPanel(QWidget):
         # to the fingerprint alone. The "webpage" parser turns those into vhost/domain recon leads.
         page_rel = f"http/{self._port}/index.html"
         self.run_requested.emit(f"curl -sk -o {page_rel} {url}", page_rel, "webpage", self._port)
+        # robots.txt is a free path disclosure (admin panels, backups, CMS layout) and the canonical
+        # WordPress fingerprint (Disallow: /wp-admin/) even when whatweb misses it. It always lives at
+        # the host root, so rebuild scheme://netloc/robots.txt rather than appending to a deep URL.
+        parts = urlsplit(url)
+        root = f"{parts.scheme}://{parts.netloc}/" if parts.scheme and parts.netloc else url + "/"
+        robots_rel = f"http/{self._port}/robots.txt"
+        self.run_requested.emit(
+            f"curl -sk -o {robots_rel} {root}robots.txt", robots_rel, "robots", self._port
+        )
 
     def _on_dry_run(self) -> None:
         self.dry_run_requested.emit(build_command(self._current_settings()))

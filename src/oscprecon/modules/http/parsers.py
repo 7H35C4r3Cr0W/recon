@@ -637,6 +637,44 @@ def parse_webpage(text: str, port: int) -> list[HttpFinding]:
     return out
 
 
+# robots.txt is a free disclosure of the paths an admin wants hidden — admin panels, backup and
+# upload dirs, and a CMS's install layout. A WordPress site's robots.txt disallows /wp-admin/, the
+# canonical fingerprint even when whatweb never emits "WordPress" (detect_wordpress reads this
+# text). Surface the Disallow/Allow/Sitemap entries as a recon finding.
+_ROBOTS_RULE = re.compile(r"^\s*(?:dis)?allow\s*:\s*(?P<path>\S.*?)\s*$", re.IGNORECASE)
+_ROBOTS_SITEMAP = re.compile(r"^\s*sitemap\s*:\s*(?P<url>\S+)", re.IGNORECASE)
+
+
+def parse_robots(text: str, port: int) -> list[HttpFinding]:
+    paths: list[str] = []
+    sitemaps: list[str] = []
+    for line in text.splitlines():
+        sitemap = _ROBOTS_SITEMAP.match(line)
+        if sitemap is not None:
+            url = _clean(sitemap.group("url").strip())
+            if url and url not in sitemaps:
+                sitemaps.append(url)
+            continue
+        rule = _ROBOTS_RULE.match(line)
+        if rule is None:
+            continue
+        value = _clean(rule.group("path").strip())
+        # skip the catch-all "/" (blocks/allows everything — discloses no specific path) and blanks
+        if value and value != "/" and value not in paths:
+            paths.append(value)
+    if not paths and not sitemaps:
+        return []
+    bits: list[str] = []
+    if paths:
+        shown = ", ".join(paths[:25])
+        more = f" (+{len(paths) - 25} more)" if len(paths) > 25 else ""
+        bits.append(f"{len(paths)} path(s): {shown}{more}")
+    if sitemaps:
+        bits.append("sitemap: " + ", ".join(sitemaps[:5]))
+    note = ("robots.txt discloses " + "; ".join(bits))[:600]
+    return [HttpFinding(port=port, path="/robots.txt", status=0, note=note)]
+
+
 _PARSERS = {
     "feroxbuster": parse_feroxbuster,
     "gobuster": parse_gobuster,
@@ -646,6 +684,7 @@ _PARSERS = {
     "whatweb": parse_whatweb,
     "wpscan": parse_wpscan,
     "webpage": parse_webpage,
+    "robots": parse_robots,
 }
 
 
@@ -654,6 +693,12 @@ def parse_tool(tool: str, text: str, port: int) -> list[HttpFinding]:
     return parser(text, port) if parser is not None else []
 
 
+# wp-admin / wp-includes / wp-json are the canonical WordPress fingerprints a robots.txt
+# (Disallow: /wp-admin/) or a REST link ("/wp-json/") discloses even when whatweb never emits the
+# string "WordPress"; all are wp-prefixed and unambiguous, so no false positives on non-WP pages.
+_WORDPRESS_MARKERS = ("wordpress", "wp-content", "wp-login", "wp-admin", "wp-includes", "wp-json")
+
+
 def detect_wordpress(*texts: str) -> bool:
     blob = " ".join(texts).lower()
-    return "wordpress" in blob or "wp-content" in blob or "wp-login" in blob
+    return any(marker in blob for marker in _WORDPRESS_MARKERS)

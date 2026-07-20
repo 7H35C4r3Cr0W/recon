@@ -134,10 +134,28 @@ def test_fingerprint_also_snapshots_index_for_page_hosts(qtbot: QtBot, tmp_path:
     panel.run_requested.connect(lambda *a: emits.append(a))
     panel._on_fingerprint()
     tools = {tool for (_cmd, _rel, tool, _port) in emits}
-    assert tools == {"whatweb", "webpage"}
+    assert tools == {"whatweb", "webpage", "robots"}
     page = next(e for e in emits if e[2] == "webpage")
     assert page[1] == "http/80/index.html"  # snapshot path keyed by port
     assert page[0] == "curl -sk -o http/80/index.html http://10.0.0.5/"
+
+
+def test_fingerprint_also_fetches_robots_from_host_root(qtbot: QtBot, tmp_path: Path) -> None:
+    # Phoenix: robots.txt (Disallow: /wp-admin/) is a free path disclosure + the canonical WordPress
+    # fingerprint whatweb misses. Fingerprint fetches it with tool="robots" -> parse_robots, always
+    # from the host root even when the configured URL carries a deeper path.
+    prof = Profile.create(tmp_path, "b", Target(ip="10.0.0.5"))
+    panel = HttpPanel()
+    qtbot.addWidget(panel)
+    panel.set_profile(prof)
+    panel.configure(DiscoveredService(80, Proto.TCP, "http"), _ref())
+    panel._url.setText("http://10.0.0.5/forum/")  # deep URL — robots still fetched from root
+    emits: list[tuple[str, str, str, int]] = []
+    panel.run_requested.connect(lambda *a: emits.append(a))
+    panel._on_fingerprint()
+    robots = next(e for e in emits if e[2] == "robots")
+    assert robots[1] == "http/80/robots.txt"
+    assert robots[0] == "curl -sk -o http/80/robots.txt http://10.0.0.5/robots.txt"
 
 
 def test_settings_persist_to_profile(qtbot: QtBot, tmp_path: Path) -> None:
