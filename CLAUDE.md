@@ -1045,7 +1045,7 @@ credentials, findings, and graph layout. The three File-menu actions above forma
 - **Edit** — Add Note / Add Credential / Add Manual Finding
 - **Scan** — Run Quick Recon / Run Full Recon / Custom Command / Stop All
 - **View** — Service Tree / Graph (Ctrl+G) / Notes / Report Preview / Theme
-- **Help** — About / OSCP Constraints / Doctor / **View Diagnostics Log**
+- **Help** — About / OSCP Constraints / Doctor / Documentation / Shortcuts / **View Diagnostics Log**
 
 ### 19a. Brand mark & diagnostics log — BUILT
 
@@ -1066,7 +1066,7 @@ credentials, findings, and graph layout. The three File-menu actions above forma
 - Workspace root path (default `~/oscprecon/`)
 - Wordlist paths (add/remove; default `/usr/share/seclists/`, `/usr/share/wordlists/`, `~/wordlists/`)
 - Default scan profile: `quick` / `default` / `full` / `exam`
-- Theme: light / dark
+- Theme: one of 12 — Light · Dark · HTB (default) · Leet · Amber · Synthwave · Dracula · Nord · Gruvbox · Solarized · Tokyo Night · Monokai (all WCAG-AA-validated)
 - Font size
 
 ---
@@ -1217,7 +1217,7 @@ Each ships with: fixture, parser test, ≥ 3 pattern library entries, HackTricks
 
 ### Phase 6 — Exam-day polish
 
-- `oscprecon-cli doctor` + Help → Doctor menu — checks each wrapped tool via `which`, prints install commands for missing
+- `oscprecon-cli doctor` + Help → Doctor menu — checks each wrapped tool via `which` (prints install commands for missing), the reference data they rely on (SecLists / nmap NSE / Exploit-DB), and exam-day host readiness (VPN tun up? workspace disk free? nmap raw-socket capable?); `--versions` prints each present tool's version
 - Exam profile preset: tight fast command set (no `--script vuln`, no deep recursion)
 - Self-contained report — no inlined external content beyond user findings and commands
 - Mock exam: 3 standalone + AD set, timed

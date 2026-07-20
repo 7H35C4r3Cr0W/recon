@@ -15,14 +15,20 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: `faed314`** (all pushed). `origin` = local Gitea (often offline) — push to the
+- **github/main HEAD: `71e8efb`** (all pushed). `origin` = local Gitea (often offline) — push to the
   **`github`** remote (`git push github main`).
 - Latest session (2026-07-20): **+6 GUI themes** (Dracula/Nord/Gruvbox/Solarized/Tokyo Night/Monokai,
-  all WCAG-AA-validated) · **nmap** 69 scan presets (was 29) + a searchable NSE picker + `--open`/`-O`
-  in the Scan dialog (new `nmap_nse.py`) · **doctor** now also checks reference data (SecLists/NSE/
-  Exploit-DB), host readiness (VPN/disk/raw-socket), and `--versions`. Commits `b1a2584`/`f538de1`/
-  `faed314`. (Also, non-repo: a `/etc/cron.d/nabu-maint` system-maintenance job on this Kali box —
-  Timeshift snapshot → `apt full-upgrade` → junk cleanup, 3-day self-guarded; script at
+  all WCAG-AA-validated, now 12 total) · **nmap** 83 scan presets (was 29) + a searchable NSE picker +
+  `--open`/`-O`/`-n`/`--reason`/`--min-rate` in the Scan dialog (new `nmap_nse.py`) · **doctor** now
+  also checks reference data (SecLists/NSE/Exploit-DB), host readiness (VPN/disk/raw-socket), and
+  `--versions`. THEN a **full adversarial code review** (8 background agents over the whole tool) found
+  **18 confirmed bugs, all fixed + regression-tested** — highlights: closed 4 §2/§6 shell policy/
+  redaction holes (wpscan `--passwords=`/`-P` bypass, impacket `-hashes` not redacted, nmap `--script
+  all/*`, netexec relative-wordlist), graphql Run-button dead from literal braces, blocking listeners
+  mis-marked attacker, exploit-panel braced-cred silent-Run + cred-lost-on-reentry, foreign-host lock
+  PID-collision, read-only notes clobber, version-match boundary, HTML-sanitizer void-tag, +cli/parser.
+  Commits `b1a2584`→`71e8efb`. (Also, non-repo: a `/etc/cron.d/nabu-maint` system-maintenance job on
+  this Kali box — Timeshift snapshot → `apt full-upgrade` → junk cleanup, 3-day self-guarded; script at
   `/usr/local/sbin/nabu-maintenance.sh`.)
 - Exploit catalog: **182 services / 3,433 actions**. Pattern library: **127 rules**.
 - Full test suite green (**pytest EXIT=0**), all four gates clean.

@@ -88,7 +88,7 @@ shipped as actions.
   SQLmap/Metasploit-modules are never shipped as actions.
 - **Workspace dashboard** — searchable/filterable table of every project, with locking, health checks,
   and portable `<name>.tar.gz` import/export.
-- **Light / dark theme**, offline splash, and a **diagnostics log** (Help → View Diagnostics Log).
+- **12 built-in themes** (Light · Dark · HTB · Leet · Amber · Synthwave · Dracula · Nord · Gruvbox · Solarized · Tokyo Night · Monokai), offline splash, and a **diagnostics log** (Help → View Diagnostics Log).
 
 ## Quickstart
 
@@ -237,7 +237,7 @@ and service/finding/**credential counts** (counts only — secret values never a
 `~/.config/oscprecon/prefs.json`:
 
 - **Workspace** — workspace root (created on save if missing).
-- **Appearance** — light/dark theme and an optional application font-size override (applied live).
+- **Appearance** — a 12-theme picker (Light, Dark, HTB, Leet, Amber, Synthwave, Dracula, Nord, Gruvbox, Solarized, Tokyo Night, Monokai) and an optional application font-size override (applied live).
 - **Tool paths** — wordlist search paths (password lists are always filtered out and never shown).
 - **Scan** — default scan profile (quick/default/full/exam) + opt-in full UDP port sweep (default
   stays UDP top-100).
