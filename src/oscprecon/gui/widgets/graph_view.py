@@ -115,7 +115,9 @@ class GraphBridge(QObject):
 
     @Slot(str, str)
     def add_note(self, node_id: str, note: str) -> None:
-        self._update_override(node_id, "note", note)
+        # an empty/whitespace note is a CLEAR, not a value — route it through the None path so it
+        # drops the override instead of leaving an orphan {"note": ""} entry in graph.json. [#34]
+        self._update_override(node_id, "note", note.strip() or None)
 
     def _writable(self) -> bool:
         # a profile opened read-only (locked by another window) must not persist graph edits —
@@ -152,7 +154,15 @@ class GraphBridge(QObject):
             return
         assert self._profile is not None
         graph = self._profile.load_graph()
-        graph["user_edges"].append({"from": source, "to": target, "label": label})
+        edges = graph["user_edges"]
+        # dedup: relating the same pair twice must not accumulate overlapping edges. An edge is
+        # directionless for this purpose, so A->B already covers a later B->A request.
+        if any(
+            isinstance(e, dict) and {str(e.get("from")), str(e.get("to"))} == {source, target}
+            for e in edges
+        ):
+            return
+        edges.append({"from": source, "to": target, "label": label})
         self._profile.save_graph(graph)
 
     def _update_override(self, node_id: str, key: str, value: Any) -> None:

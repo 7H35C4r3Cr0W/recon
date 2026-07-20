@@ -715,8 +715,12 @@
   }
   function osBadge(os) {
     var s = (os || "").toLowerCase();
-    if (/win/.test(s)) return BADGE.winOs;
-    if (/linux|ubuntu|debian|unix|nix|centos|red ?hat|freebsd|solaris/.test(s)) return BADGE.nixOs;
+    // check *nix FIRST (incl. darwin/macos) so it returns before the "win" test — otherwise the
+    // "win" inside "darwin" would mislabel a Mac as Windows. With darwin already handled, the win
+    // branch can keep a loose "win" (matches win10/win7/win32) without any false positive.
+    if (/linux|ubuntu|debian|unix|nix|centos|red ?hat|freebsd|solaris|darwin|mac ?os/.test(s))
+      return BADGE.nixOs;
+    if (/windows|microsoft|win/.test(s)) return BADGE.winOs;
     return null;
   }
   // Composite corner badges onto a node via layered background-image. Corners: danger=TR, OS=TL,
@@ -875,9 +879,13 @@
         } else {
           if (bridge && id !== linkSource) {
             bridge.add_user_edge(linkSource, id, "");
-            cy.add({
-              data: { id: "live-" + linkSource + "-" + id, source: linkSource, target: id, type: "relates-to" },
-            });
+            // guard the live add: re-linking a pair whose edge already exists would throw on a
+            // duplicate element id and strand link mode ON (setLinkMode below never runs). The
+            // Python bridge dedups the persisted edge; skip the redundant canvas add here.
+            var edgeId = "live-" + linkSource + "-" + id;
+            if (cy.getElementById(edgeId).empty()) {
+              cy.add({ data: { id: edgeId, source: linkSource, target: id, type: "relates-to" } });
+            }
           }
           setLinkMode(false);
         }

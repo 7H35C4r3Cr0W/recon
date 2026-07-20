@@ -725,6 +725,21 @@ tcp+udp)** + 80/http (nginx 1.18.0). 68/udp came back `open|filtered` and — th
   (the `sudo git apply` privesc primitive) is already in the offline reference. The CVE-specific
   git-symlink patch and clamscan-XXE (CVE-2023-20052) stay **manual** — box/CVE-specific exploit
   logic is out of the recon tool per §21.
+- **GUI/UX hardening (adversarial review of 5 not-yet-swept slices):** a background review agent
+  exercised `graph_html` (JS bridge), `edb.py`, `gtfobins_search`, `config.py` migration, and the
+  theme system under offscreen Qt — core logic (config migration, searchsploit sanitisation/version
+  ranking, cred redaction, EDB race-guard, read-only guard) all **clean**. Fixed **4 confirmed
+  low-severity bugs** it reproduced: (1) **graph link-mode** — re-linking the same two nodes threw a
+  duplicate-element-id error that stranded link mode ON and accumulated overlapping `relates-to`
+  edges; added direction-insensitive dedup in `GraphBridge.add_user_edge` + a `cy.getElementById(...)
+  .empty()` guard on the live `cy.add`. (2) **empty note orphan** — saving a blank note wrote
+  `{"note": ""}`; now routed through the clear path like status toggle-off (#34). (3) **Dark theme
+  palette** — the hand-written Fusion palette was grey `#353535` while the QSS/tokens are navy
+  `#0f1420`; Dark now derives from its tokens like every other non-htb/light theme. (4) **`osBadge`**
+  mis-tagged `Darwin`/macOS as Windows (the `win` in `darwin`); check *nix first. One flagged item — a
+  "dead" exploit-db-reference graph node/legend — was a **false positive** (`finding_severity.classify`
+  *does* return `reference` for edb/searchsploit findings), so it was left intact. 2 regression tests
+  added.
 
 **Lesson:** a fingerprint that *captures* a signal isn't the same as one that *acts* on it. whatweb
 had `info@snoopy.htb` in hand on two prior boxes and did nothing with it — a disclosed email domain is

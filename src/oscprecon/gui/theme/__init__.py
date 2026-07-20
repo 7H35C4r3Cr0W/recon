@@ -47,35 +47,6 @@ def label(name: str) -> str:
     return _LABELS.get(name, name.capitalize())
 
 
-def _dark_palette() -> QPalette:
-    dark = QColor(53, 53, 53)
-    base = QColor(35, 35, 35)
-    text = QColor(221, 221, 221)
-    highlight = QColor(42, 130, 218)
-    disabled = QColor(120, 120, 120)
-    p = QPalette()
-    p.setColor(QPalette.ColorRole.Window, dark)
-    p.setColor(QPalette.ColorRole.WindowText, text)
-    p.setColor(QPalette.ColorRole.Base, base)
-    p.setColor(QPalette.ColorRole.AlternateBase, dark)
-    p.setColor(QPalette.ColorRole.ToolTipBase, base)
-    p.setColor(QPalette.ColorRole.ToolTipText, text)
-    p.setColor(QPalette.ColorRole.Text, text)
-    p.setColor(QPalette.ColorRole.Button, dark)
-    p.setColor(QPalette.ColorRole.ButtonText, text)
-    p.setColor(QPalette.ColorRole.BrightText, QColor(255, 80, 80))
-    p.setColor(QPalette.ColorRole.Link, highlight)
-    p.setColor(QPalette.ColorRole.Highlight, highlight)
-    p.setColor(QPalette.ColorRole.HighlightedText, QColor(20, 20, 20))
-    for role in (
-        QPalette.ColorRole.Text,
-        QPalette.ColorRole.ButtonText,
-        QPalette.ColorRole.WindowText,
-    ):
-        p.setColor(QPalette.ColorGroup.Disabled, role, disabled)
-    return p
-
-
 def _htb_palette() -> QPalette:
     # HTB / Parrot-OS flavour (the default) — deep navy-teal ground, Parrot cyan-green highlight,
     # light-blue links. Mirrors tokens.HTB so every Fusion widget (tables, inputs) reads right.
@@ -177,13 +148,14 @@ def apply_theme(name: str) -> None:
     normalized = normalize(name)
     tokens.set_active_theme(normalized)  # so primary buttons pick up this theme's accent
     app.setStyle("Fusion")  # a deterministic base so the instrument QSS renders the same everywhere
-    if normalized == "dark":
-        app.setPalette(_dark_palette())
-    elif normalized == "htb":
+    if normalized == "htb":
         app.setPalette(_htb_palette())
     elif normalized == "light":
         app.setPalette(_light_palette())
-    else:  # leet / amber / synthwave (and any future token-only theme)
+    else:
+        # dark / leet / amber / synthwave / … — a Fusion palette straight from the theme tokens, so
+        # the un-QSS'd native surfaces match the token-painted panels. (dark's old hand-written grey
+        # #353535 clashed with its navy #0f1420 tokens; deriving from tokens keeps them in step.)
         app.setPalette(_fusion_palette(tokens.palette(normalized)))
     # the RETICLE "precision-instrument" layer — restyles the plain base widgets from the palette
     app.setStyleSheet(styles.app_stylesheet(normalized))

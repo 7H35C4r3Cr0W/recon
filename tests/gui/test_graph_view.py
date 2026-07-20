@@ -85,6 +85,31 @@ def test_bridge_add_user_edge_and_bad_json(qtbot: QtBot, tmp_path: Path) -> None
     assert "service-445-tcp" not in prof.load_graph()["node_overrides"]
 
 
+def test_bridge_add_user_edge_dedups_same_pair(qtbot: QtBot, tmp_path: Path) -> None:
+    # relating the same two nodes twice must not accumulate overlapping edges (which also caused the
+    # live cy.add to throw on a duplicate id and strand link mode). Direction-insensitive.
+    prof = _profile(tmp_path)
+    bridge = GraphBridge()
+    bridge.set_profile(prof)
+    bridge.add_user_edge("service-445-tcp", "target", "")
+    bridge.add_user_edge("service-445-tcp", "target", "")  # same pair -> ignored
+    bridge.add_user_edge("target", "service-445-tcp", "")  # reversed -> still the same pair
+    assert prof.load_graph()["user_edges"] == [
+        {"from": "service-445-tcp", "to": "target", "label": ""}
+    ]
+
+
+def test_bridge_empty_note_clears_instead_of_orphaning(qtbot: QtBot, tmp_path: Path) -> None:
+    # saving a note then clearing it must drop the override, not leave an orphan {"note": ""} [#34]
+    prof = _profile(tmp_path)
+    bridge = GraphBridge()
+    bridge.set_profile(prof)
+    bridge.add_note("service-445-tcp", "weird share names")
+    assert prof.load_graph()["node_overrides"]["service-445-tcp"]["note"] == "weird share names"
+    bridge.add_note("service-445-tcp", "   ")  # whitespace-only = clear
+    assert "service-445-tcp" not in prof.load_graph()["node_overrides"]
+
+
 def test_graph_view_constructs_fallback(qtbot: QtBot, tmp_path: Path) -> None:
     # conftest sets OSCPRECON_DISABLE_WEBVIEW=1 -> fallback path (no QWebEngineView)
     view = GraphView()
