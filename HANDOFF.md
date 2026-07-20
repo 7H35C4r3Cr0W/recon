@@ -15,8 +15,22 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: `59a72f7`** (Race + BigBang pushed; the Drive chunk below commits on top).
+- **github/main HEAD: `4ca14fd`** (Snoopy box review pushed).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20e) — **HTB Snoopy box review** (Hard Linux; DNS Bind9 / nginx LFI → leaked
+  rndc-key DNS-hijack → Mattermost → git/clamscan sudo). Two chunks, both full-suite EXIT=0:
+  (1) **`fix(http)` `00c7baa`** — whatweb captured `Email[info@snoopy.htb]` but only rendered it into
+  the note; `suggest()` did nothing, so an IP-only scan gave no nudge toward the `snoopy.htb` domain
+  that unlocks the box (vhost enum → `mm.snoopy.htb`, verified live). Now `email_domains_from_plugins`
+  + `HttpFinding.email_domain` (persisted) mine the email's domain (public providers filtered) into a
+  first-class recon finding + a "add to /etc/hosts, Set Hostname, enumerate vhosts" next-step. Fixture
+  + 4 tests + recon-guide sync. Box #31 logged. Attack chain already covered (LFI `....//`, nsupdate
+  DNS-injection, mattermost.py, git-sudo GTFOBins) at the correct non-CVE altitude. (2) **`fix(gui)`
+  `4ca14fd`** — adversarial review of 5 not-yet-swept slices (graph_html JS bridge, edb.py,
+  gtfobins_search, config migration, themes) → core clean, fixed 4 low-sev bugs: graph link-mode
+  duplicate-edge (dedup + `cy.add` guard, was stranding link mode), empty-note orphan, Dark theme
+  palette grey↔navy mismatch (derive from tokens), `osBadge` Darwin→Windows mislabel. 1 flagged item
+  was a false positive (reference node IS created via `finding_severity.classify`). 2 tests added.
 - Session (2026-07-20d) — **HTB Drive box review** (Django IDOR / vhost / filtered Gitea on 3000).
   vhost redirect to `drive.htb` surfaces via both whatweb and nmap. Fixed 1 gap: **filtered ports were
   dropped entirely** — the parser only matched `open`/`open|filtered`, so `3000/tcp filtered` (Gitea,
@@ -97,9 +111,10 @@ The pattern that works:
   creds/findings/reporter/live_hacktricks/sections), recon GUI widgets, spray subsystem + graph_data
   + DB parsers, the views (graph_view/dashboard/findings/report/activity/notes/app_header), and
   reporter templates + workspace search/health + msfvenom builder.
-- **Not yet swept (candidates for the next round):** `edb.py` / searchsploit lookup, `nmap_scan.py`
-  builder edge cases, `references/live_hacktricks` under odd network, `workspace/bulk.py` +
-  `index.py`, the graph_html JS bridge, `config.py` settings migration, the theme system.
+- **Swept 2026-07-20e (Snoopy):** `edb.py`/searchsploit lookup, `gtfobins_search`, `config.py`
+  migration, the theme system, and the `graph_html` JS bridge — core clean, 4 low-sev GUI bugs fixed.
+- **Not yet swept (candidates for the next round):** `nmap_scan.py` builder edge cases,
+  `references/live_hacktricks` under odd network, `workspace/bulk.py` + `index.py`.
 
 ## How to add a recon service module
 Drop `src/oscprecon/modules/<svc>/` with `__init__.py` (subclass `Module`), `parsers.py`,
