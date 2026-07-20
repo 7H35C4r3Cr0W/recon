@@ -150,3 +150,18 @@ def test_read_only_can_be_cleared_to_reopen_for_edit(tmp_path: Path) -> None:
     prof.read_only = False  # lock became available -> reopen for editing
     prof.set_status("blocked")
     assert Profile.load(prof.directory).organization_meta().status == "blocked"
+
+
+def test_is_ours_requires_matching_pid_and_hostname() -> None:
+    # regression: three lock guards compared PID only; a foreign-host lock whose PID coincidentally
+    # equals ours (realistic on a shared NFS/SMB workspace) was treated as ours and could be
+    # mutated/deleted under another host's live instance. is_ours() requires host + pid to match.
+    mine = locks.LockInfo(
+        pid=os.getpid(), hostname=socket.gethostname(), app_version="x", started_at="t"
+    )
+    assert locks.is_ours(mine)
+    foreign = locks.LockInfo(
+        pid=os.getpid(), hostname=socket.gethostname() + "-other", app_version="x", started_at="t"
+    )
+    assert not locks.is_ours(foreign)
+    assert not locks.is_stale(foreign)  # foreign host is never stale -> the guard must use is_ours

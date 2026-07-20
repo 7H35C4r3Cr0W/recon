@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -52,7 +51,7 @@ def run_bulk(
             skip_locked
             and info is not None
             and not locks.is_stale(info)
-            and info.pid != os.getpid()
+            and not locks.is_ours(info)
         ):
             results.append(BulkResult(name, False, "skipped (locked by another instance)"))
             continue

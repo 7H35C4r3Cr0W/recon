@@ -69,3 +69,21 @@ def test_add_credential_dialog(qtbot: QtBot) -> None:
     assert cred.username == "svc"
     assert cred.secret == "Sup3r"
     assert cred.source == "smb-share"
+
+
+def test_notes_pane_readonly_does_not_clobber_notes(qtbot: QtBot, tmp_path: Path) -> None:
+    # regression: a read-only window's flush()/_save() (fired on set/clear_profile) must NOT write
+    # notes.md — else it overwrites the writable window's newer notes with stale editor content.
+    prof = Profile.create(tmp_path, "box", Target(ip="10.0.0.1"))
+    prof.notes_path.write_text("NEWER notes from the writable window", encoding="utf-8")
+    prof.read_only = True
+
+    pane = NotesPane()
+    qtbot.addWidget(pane)
+    pane.set_profile(prof)  # loads the newer notes into the disabled editor
+    pane._editor.setPlainText("STALE content")  # a divergent edit that must NOT be persisted
+    pane.flush()
+    assert prof.notes_path.read_text(encoding="utf-8") == "NEWER notes from the writable window"
+
+    pane.clear_profile()  # also flushes — must still not write
+    assert prof.notes_path.read_text(encoding="utf-8") == "NEWER notes from the writable window"

@@ -102,6 +102,13 @@ def is_stale(info: LockInfo) -> bool:
     return not _pid_alive(info.pid)
 
 
+def is_ours(info: LockInfo) -> bool:
+    # a lock is "ours" ONLY if it matches this process ON THIS HOST. A PID-only check mis-treats a
+    # foreign-host lock whose PID coincidentally equals ours as ours (is_stale() returns False for a
+    # foreign host), letting us mutate/delete a profile a live instance on another host still holds.
+    return info.pid == os.getpid() and info.hostname == socket.gethostname()
+
+
 def acquire(directory: Path) -> LockInfo | None:
     """Atomically create <profile>/.lock. Returns our LockInfo on success, None if already held."""
     path = lock_path(directory)

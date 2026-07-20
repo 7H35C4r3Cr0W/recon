@@ -57,7 +57,10 @@ class NotesPane(QWidget):
         self._timer.start()
 
     def _save(self) -> None:
-        if self._profile is None:
+        # a read-only view (a second window on the same profile) must NEVER write notes.md — flush()
+        # is called unconditionally on set/clear_profile, so without this guard a read-only window
+        # would clobber the writable window's newer notes with its stale editor content.
+        if self._profile is None or self._profile.read_only:
             return
         path = self._profile.notes_path
         # why: atomic write (temp+replace) — notes are the user's findings; don't lose them.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QSize, Qt, QUrl, Signal
@@ -406,7 +405,7 @@ class WorkspaceDashboard(QWidget):
         changed = 0
         for directory in dirs:
             info, _malformed = locks.read_lock(directory)
-            if info is not None and not locks.is_stale(info) and info.pid != os.getpid():
+            if info is not None and not locks.is_stale(info) and not locks.is_ours(info):
                 self.status_message.emit(
                     f"[workspace] {directory.name}: open in another instance — skipped"
                 )

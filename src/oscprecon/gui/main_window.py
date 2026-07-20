@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 import socket
 from collections.abc import Callable
@@ -683,9 +682,7 @@ class MainWindow(QMainWindow):
         # True when <directory>/.lock is OUR live lock (same pid + host) — e.g. it moved with the
         # folder on a rename, so acquire() collides with our own lock rather than a foreign one.
         info, _malformed = locks.read_lock(directory)
-        return (
-            info is not None and info.pid == os.getpid() and info.hostname == socket.gethostname()
-        )
+        return info is not None and locks.is_ours(info)
 
     def _resolve_lock(self, profile: Profile) -> bool:
         # returns True to proceed (may set profile.read_only), False if the user cancels. A stale /
@@ -825,7 +822,7 @@ class MainWindow(QMainWindow):
                 )
                 continue
             info, _malformed = locks.read_lock(directory)
-            foreign = info is not None and not locks.is_stale(info) and info.pid != os.getpid()
+            foreign = info is not None and not locks.is_stale(info) and not locks.is_ours(info)
             # refuse whenever ANOTHER live instance holds the lock — even if this window has the
             # same project open read-only (is_active). A self-delete carries this window's own PID
             # so foreign is already False; an is_active+foreign case means another window is
