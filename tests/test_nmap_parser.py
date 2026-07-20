@@ -54,6 +54,22 @@ def test_ignores_non_port_lines() -> None:
     assert services == []
 
 
+def test_filtered_port_surfaced_as_finding_not_service() -> None:
+    # Drive: 3000/tcp is filtered from outside but runs Gitea (reachable after a foothold + SSH
+    # forward). It must NOT become a discovered service (would be a phantom actionable node), but
+    # SHOULD surface as an informational finding so the port isn't silently lost. Deduped by port.
+    mod = NmapModule()
+    raw = {
+        "top": "22/tcp open ssh\n80/tcp open http\n3000/tcp filtered ppp\n",
+        "full": "22/tcp open ssh\n3000/tcp filtered ppp\n",
+    }
+    assert 3000 not in {s.port for s in mod.discovered_services(raw)}
+    filtered = [f for f in mod.parse(raw) if f.service == "filtered"]
+    assert len(filtered) == 1  # deduped across the two scans
+    assert filtered[0].port == 3000 and "3000/tcp filtered" in filtered[0].title
+    assert "revisit" in filtered[0].detail.lower()
+
+
 def test_parse_port_line_records_state() -> None:
     from oscprecon.modules.nmap import parse_port_line
 

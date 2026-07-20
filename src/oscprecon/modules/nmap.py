@@ -20,6 +20,12 @@ _PORT_LINE = re.compile(
     r"(?P<service>\S+)(?:\s+(?P<rest>.*\S))?\s*$"
 )
 
+# a port nmap explicitly lists as "filtered" (a firewall dropped the probe) — NOT a confirmed
+# service, but worth surfacing: on boxes like Drive, 3000/tcp is filtered from outside yet runs
+# Gitea, reachable only after a foothold + SSH forward. Kept out of discovered_services (so it
+# never becomes an actionable/present node) and surfaced as an informational finding instead.
+_FILTERED_PORT_LINE = re.compile(r"^(?P<port>\d+)/(?P<proto>tcp|udp)\s+filtered\s+(?P<service>\S+)")
+
 # nmap's http-title NSE prints "Did not follow redirect to http://ignition.htb/" when a name-based
 # vhost box bounces the IP to its hostname — that hostname is the whole recon on such boxes.
 _REDIRECT_TITLE_RE = re.compile(
@@ -197,7 +203,36 @@ class NmapModule(Module):
                     proto=service.proto,
                 )
             )
+        findings.extend(self._filtered_findings(raw_outputs))
         return findings
+
+    def _filtered_findings(self, raw_outputs: dict[str, str]) -> list[Finding]:
+        # surface ports nmap lists as "filtered" — a firewall dropped the probe, so it's not a
+        # confirmed service, but a filtered port often hides an internal service reachable only
+        # after a foothold + pivot (Drive: 3000/tcp filtered -> Gitea via SSH forward). Deduped.
+        seen: set[tuple[int, str]] = set()
+        out: list[Finding] = []
+        for text in raw_outputs.values():
+            for line in text.splitlines():
+                m = _FILTERED_PORT_LINE.match(line.strip())
+                if m is None:
+                    continue
+                port, proto, svc = int(m.group("port")), m.group("proto"), m.group("service")
+                if (port, proto) in seen:
+                    continue
+                seen.add((port, proto))
+                out.append(
+                    Finding(
+                        service="filtered",
+                        title=f"{port}/{proto} filtered ({svc})",
+                        detail="filtered by a firewall — not confirmed open, but a service may be "
+                        "here; revisit after a foothold/pivot (e.g. SSH local-forward) before "
+                        "ruling it out.",
+                        port=port,
+                        proto=Proto(proto),
+                    )
+                )
+        return out
 
     def suggest(self, findings: list[Finding]) -> list[str]:
         return []

@@ -15,8 +15,15 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: `838952f`** (Race fixes pushed; the BigBang chunk below commits on top). `origin`
-  = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- **github/main HEAD: `59a72f7`** (Race + BigBang pushed; the Drive chunk below commits on top).
+  `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20d) — **HTB Drive box review** (Django IDOR / vhost / filtered Gitea on 3000).
+  vhost redirect to `drive.htb` surfaces via both whatweb and nmap. Fixed 1 gap: **filtered ports were
+  dropped entirely** — the parser only matched `open`/`open|filtered`, so `3000/tcp filtered` (Gitea,
+  the post-foothold pivot) vanished. `nmap.parse()` now emits an informational finding for explicitly-
+  filtered ports (deduped; "revisit after a foothold/pivot") WITHOUT adding them to
+  `discovered_services` (no phantom actionable node, unaffected presence). Verified on the real Drive
+  output. Tested.
 - Session (2026-07-20c) — **HTB BigBang box review** (WordPress + BuddyForms / vhost-redirect /
   Grafana). Verified the Race fixes hold live (vhost `blog.bigbang.htb` redirect + WP enum suggestion
   both fire) and fixed 2 more gaps, tested: (1) **nmap `http-generator` → fingerprint presence** — the
