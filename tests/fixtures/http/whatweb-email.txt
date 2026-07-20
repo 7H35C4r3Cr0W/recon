@@ -1,0 +1,1 @@
+http://10.129.229.5/ [200 OK] Bootstrap, Country[RESERVED][ZZ], Email[info@snoopy.htb], HTML5, HTTPServer[Ubuntu Linux][nginx/1.18.0 (Ubuntu)], IP[10.129.229.5], Lightbox, Script, Title[SnoopySec Bootstrap Template - Index], nginx[1.18.0]

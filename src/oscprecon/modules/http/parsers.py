@@ -28,6 +28,7 @@ class HttpFinding:
     lines: int = 0  # response line count (feroxbuster -o "8l")
     words: int = 0  # response word count (feroxbuster -o "22w")
     base_path: str = ""  # subdir the site root redirects to (e.g. "/racers/") — app lives here
+    email_domain: str = ""  # domain of an email disclosed on the page — a vhost/subdomain-enum lead
 
     def __post_init__(self) -> None:
         self.path = _clean(self.path)
@@ -35,6 +36,7 @@ class HttpFinding:
         self.note = _clean(self.note)
         self.method = _clean(self.method)
         self.base_path = _clean(self.base_path)
+        self.email_domain = _clean(self.email_domain)
         # why: a redirect observed AT the site root ("/") to a subdirectory means the whole app is
         # served from that base path — content discovery / fingerprinting must pivot there. A
         # redirect on a deeper path (e.g. /admin -> /admin/) is normal and is NOT a base path.
@@ -54,6 +56,7 @@ class HttpFinding:
             "lines": self.lines,
             "words": self.words,
             "base_path": self.base_path,
+            "email_domain": self.email_domain,
             "discovered_at": discovered_at,
         }
 
@@ -337,7 +340,9 @@ def _parse_whatweb_json(text: str, port: int) -> list[HttpFinding]:
             )
         )
         if is_dict:
-            findings += _redirect_findings(_json_plugin_pairs(plugins), port, path, status)
+            pairs = _json_plugin_pairs(plugins)
+            findings += _redirect_findings(pairs, port, path, status)
+            findings += _email_findings(pairs, port, path, status)
     return findings
 
 
@@ -403,6 +408,72 @@ def base_path_from_redirect(value: str) -> str:
         directory = path.rsplit("/", 1)[0] + "/"
         return "" if directory == "/" else directory
     return path if path.endswith("/") else path + "/"
+
+
+# whatweb's Email[] plugin carries every mailto/address it scraped from the page. The domain of a
+# disclosed email ("info@snoopy.htb") is very often the box's real domain — the prerequisite for
+# vhost/subdomain enumeration that the bare IP never reveals (§10). We surface it as a recon lead.
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@(?P<domain>[A-Za-z0-9.\-]+\.[A-Za-z]{2,})")
+# public mailbox providers + RFC-2606 reserved names: a real domain lead, not a lab/target domain.
+_PUBLIC_EMAIL_DOMAINS = frozenset(
+    {
+        "gmail.com",
+        "googlemail.com",
+        "outlook.com",
+        "hotmail.com",
+        "live.com",
+        "msn.com",
+        "yahoo.com",
+        "ymail.com",
+        "aol.com",
+        "icloud.com",
+        "me.com",
+        "protonmail.com",
+        "proton.me",
+        "gmx.com",
+        "zoho.com",
+        "mail.com",
+        "example.com",
+        "example.org",
+        "example.net",
+        "domain.com",
+        "email.com",
+        "sentry.io",
+        "wixpress.com",
+    }
+)
+
+
+def email_domains_from_plugins(pairs: list[tuple[str, str]]) -> list[str]:
+    # pull the domain of every address whatweb's Email[] plugin scraped, dropping public mailbox
+    # providers / RFC-2606 placeholders so only a real (usually box) domain surfaces as a lead.
+    domains: list[str] = []
+    for name, value in pairs:
+        if name.lower() != "email":
+            continue
+        for match in _EMAIL_RE.finditer(value):
+            domain = match.group("domain").strip(".").lower()
+            if domain and domain not in _PUBLIC_EMAIL_DOMAINS and domain not in domains:
+                domains.append(domain)
+    return domains
+
+
+def _email_findings(
+    pairs: list[tuple[str, str]], port: int, path: str, status: int
+) -> list[HttpFinding]:
+    out: list[HttpFinding] = []
+    for domain in email_domains_from_plugins(pairs):
+        out.append(
+            HttpFinding(
+                port=port,
+                path=path,
+                status=status,
+                email_domain=domain,
+                note=f"page discloses an email at {domain} — likely the target domain; add it to "
+                f"/etc/hosts, Set Target Hostname, and enumerate vhosts (Host: FUZZ.{domain})",
+            )
+        )
+    return out
 
 
 def _redirect_findings(
@@ -488,6 +559,7 @@ def _parse_whatweb_plain(text: str, port: int) -> list[HttpFinding]:
             )
         )
         findings += _redirect_findings(pairs, port, path, status)
+        findings += _email_findings(pairs, port, path, status)
     return findings
 
 

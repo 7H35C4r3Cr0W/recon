@@ -698,6 +698,39 @@ pick across a rebuild" must not treat the incidental alphabetical default as a p
 primitives that are *generic* techniques (GTFOBins tcpdump, writable update-motd.d) belong in the
 `linux` catalog as copy-only actions — box-specific exploit code does not.
 
+**31 · Snoopy (HTB, Hard, Linux) — DNS Bind9 / http nginx (LFI) → leaked rndc-key DNS-hijack → Mattermost → git/clamscan sudo — recon + attack — live.**
+`10.129.229.5` (`snoopy.htb`). Three ports: 22/ssh (OpenSSH 8.9p1) + **53/domain (ISC BIND 9.18.12,
+tcp+udp)** + 80/http (nginx 1.18.0). 68/udp came back `open|filtered` and — thanks to the BigBang
+`DiscoveredService.state` fix — was correctly **not** marked present. Ran the full loop live.
+- **Recon bug → fix (the box's entire entry point):** the landing page discloses `info@snoopy.htb`,
+  which whatweb captures as `Email[info@snoopy.htb]`. The whatweb parser *rendered* that into the
+  fingerprint note but did **nothing actionable** with it — `suggest()` returned nothing, so an
+  operator who scanned by IP got no nudge toward the `snoopy.htb` domain that unlocks everything
+  (vhost enum → `mm.snoopy.htb`, the Mattermost foothold; validated live — ffuf against `snoopy.htb`
+  returns `mm`). Fixed by mining the email's **domain** as a first-class recon lead:
+  `email_domains_from_plugins()` + a new `HttpFinding.email_domain` field (persisted to
+  `findings.json`), a dedicated finding, and a `suggest()` next-step ("add to /etc/hosts, Set Target
+  Hostname, enumerate vhosts `Host: FUZZ.snoopy.htb`"). Public mailbox providers (`gmail.com`, …) and
+  RFC-2606 placeholders are filtered so it stays low-noise. This is **generalizable** — box #25 (Base)
+  had already surfaced `Email[info@base.htb]` inertly; now any contact-email domain becomes a vhost
+  lead. Fixture `whatweb-email.txt` + 4 regression tests (parser plain/JSON paths, public-provider
+  filter, module suggest).
+- **Recon (already solid):** the `dns` module surfaces ISC BIND 9.18.12 and offers the AXFR zone
+  transfer (`dig @{target} {domain} AXFR`) both as an auto recon-step and a Tier-2 follow-up — the
+  right primitive (Snoopy's AXFR needs the leaked key, but the tool points you straight at it).
+- **Attack coverage (present, no add needed):** the box's chain is already covered at the correct
+  general (non-CVE, §21) altitude — web **`lfi-recursive-slash-bypass`** is the exact `....//....//`
+  filter bypass Snoopy uses; `dns.py` has **`nsupdate-dynamic-record-injection`** (the RFC-2136 DNS
+  hijack, copy-only/victim); `mattermost.py` exists; and the **`git` sudo → shell** GTFOBins entry
+  (the `sudo git apply` privesc primitive) is already in the offline reference. The CVE-specific
+  git-symlink patch and clamscan-XXE (CVE-2023-20052) stay **manual** — box/CVE-specific exploit
+  logic is out of the recon tool per §21.
+
+**Lesson:** a fingerprint that *captures* a signal isn't the same as one that *acts* on it. whatweb
+had `info@snoopy.htb` in hand on two prior boxes and did nothing with it — a disclosed email domain is
+the cheapest, most reliable path to a box's real (vhost-only) attack surface, so it must become an
+actionable lead, not inert note text.
+
 ## Trends & lessons (adapt going forward)
 
 - **Real boxes catch what unit tests can't.** Every bug here (share prose,

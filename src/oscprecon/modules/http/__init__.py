@@ -10,6 +10,7 @@ from oscprecon.modules.base import Module
 from oscprecon.modules.http.parsers import (
     HttpFinding,
     detect_wordpress,
+    email_domains_from_plugins,
     is_vhost_host,
     parse_tool,
     vhost_from_redirect,
@@ -33,6 +34,7 @@ __all__ = [
     "default_output",
     "default_url",
     "detect_wordpress",
+    "email_domains_from_plugins",
     "is_tls",
     "is_vhost_host",
     "parse_tool",
@@ -295,6 +297,7 @@ class HttpModule(Module):
                             "size": str(hf.size),
                             "redirect_to": hf.redirect_to,
                             "base_path": hf.base_path,
+                            "email_domain": hf.email_domain,
                         },
                     )
                 )
@@ -330,6 +333,20 @@ class HttpModule(Module):
                 f"Site root redirects to '{base}' — the app is served from this base path. Point "
                 f"content discovery, whatweb and nikto at it (feroxbuster -u {{url}}{stripped}), "
                 f"not /; enumerating / will miss everything."
+            )
+        # an email disclosed on the page ("info@snoopy.htb") usually names the box's real domain —
+        # the prerequisite for vhost/subdomain enumeration that the bare IP never serves (§10). This
+        # is a weaker signal than an nmap/whatweb redirect (contact info, not the server naming
+        # itself), so surface it as a loud lead rather than auto-setting the hostname.
+        email_domains = sorted(
+            {d for f in findings if (d := str(f.fields.get("email_domain", "")).strip())}
+        )
+        for domain in email_domains:
+            out.append(
+                f"Email domain '{domain}' disclosed on the page — likely the target domain. Add it "
+                f"to /etc/hosts, Set Target Hostname, and enumerate vhosts/subdomains "
+                f"(ffuf -H 'Host: FUZZ.{domain}' …); a name-based vhost may serve content the IP "
+                f"won't."
             )
         # a 401 endpoint wants HTTP auth — a SINGLE attempt with a well-known default is Tier-2
         # recon-adjacent (§2), never a wordlist. Surface it so the operator one-shots a default.

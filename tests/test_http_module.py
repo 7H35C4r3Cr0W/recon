@@ -168,6 +168,24 @@ def test_suggest_vhost_from_redirect() -> None:
     assert not module.suggest([path_redirect])
 
 
+def test_suggest_email_domain_leads_to_vhost_enum() -> None:
+    # Snoopy: the page discloses info@snoopy.htb — surface the domain as a vhost/subdomain-enum lead
+    # (the prerequisite for finding mm.snoopy.htb). It's the box's whole entry point.
+    module = HttpModule()
+    finding = Finding(
+        service="http",
+        title="200 /",
+        detail="page discloses an email at snoopy.htb",
+        fields={"path": "/", "status": "200", "email_domain": "snoopy.htb"},
+    )
+    out = module.suggest([finding])
+    assert any("snoopy.htb" in line and "vhost" in line.lower() for line in out)
+    assert any("/etc/hosts" in line for line in out)
+    # no email domain -> no such suggestion (empty string must not fire)
+    bare = Finding(service="http", title="200 /", detail="whatweb: nginx", fields={"path": "/"})
+    assert not any("disclosed" in line for line in module.suggest([bare]))
+
+
 def test_suggest_base_path_from_root_redirect() -> None:
     # Race: the site root redirects to /racers/ — surface it so content discovery pivots off /.
     module = HttpModule()

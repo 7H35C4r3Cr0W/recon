@@ -152,6 +152,52 @@ def test_whatweb_root_redirect_surfaces_base_path() -> None:
     assert "base path" in base.note and "content discovery" in base.note
 
 
+def test_whatweb_surfaces_email_domain_as_vhost_lead() -> None:
+    # Snoopy: the landing page discloses info@snoopy.htb (whatweb's Email[] plugin). The email's
+    # domain IS the box's domain — the prerequisite for the vhost enum that finds mm.snoopy.htb.
+    # Surface it as a separate finding carrying email_domain so suggest() can lead there.
+    findings = parse_whatweb(_read("whatweb-email.txt"), 80)
+    assert len(findings) == 2
+    fingerprint, lead = findings
+    assert fingerprint.email_domain == "" and "nginx" in fingerprint.note
+    assert lead.email_domain == "snoopy.htb"
+    assert "/etc/hosts" in lead.note and "snoopy.htb" in lead.note
+
+
+def test_whatweb_email_domain_json_path() -> None:
+    import json
+
+    doc = json.dumps(
+        [
+            {
+                "target": "http://x/",
+                "http_status": 200,
+                "plugins": {
+                    "Email": {"string": ["info@snoopy.htb"]},
+                    "Title": {"string": ["Home"]},
+                },
+            }
+        ]
+    )
+    domains = [f.email_domain for f in parse_whatweb(doc, 80) if f.email_domain]
+    assert domains == ["snoopy.htb"]
+
+
+def test_email_domains_filters_public_providers() -> None:
+    from oscprecon.modules.http.parsers import email_domains_from_plugins
+
+    # public mailboxes / RFC-2606 placeholders are contact noise, never a target-domain lead
+    assert email_domains_from_plugins([("Email", "support@gmail.com")]) == []
+    assert email_domains_from_plugins([("Email", "a@example.com")]) == []
+    # a real (lab) domain surfaces; multiple addresses in one value are all mined + deduped
+    assert email_domains_from_plugins([("Email", "a@gmail.com,admin@corp.local,b@snoopy.htb")]) == [
+        "corp.local",
+        "snoopy.htb",
+    ]
+    # only the Email plugin is mined — a Title that happens to contain an '@' is not a lead
+    assert email_domains_from_plugins([("Title", "chat@snoopy.htb portal")]) == []
+
+
 def test_base_path_from_redirect_shapes() -> None:
     from oscprecon.modules.http.parsers import base_path_from_redirect
 
