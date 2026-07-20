@@ -15,8 +15,26 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: Phoenix box review** (pushed; see `git log`).
+- **github/main HEAD: Spooktrol box review** (pushed; see `git log`).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20h) — **HTB Spooktrol box review** (Hard Linux; uvicorn/FastAPI malware-C2,
+  path-traversal file-write, SQLite task injection). Recon-only lessons (§21) — the Ghidra/implant/DB
+  exploitation is out of scope. Three chunks, full suite EXIT=0:
+  (1) **`feat(http)` `09b32f1`** — the box is a JSON API and the tool had ZERO API awareness (a JSON
+  root looks like a broken site to file-oriented discovery). New `detect_api_server()` +
+  `HttpModule.suggest()` API lead (curl /openapi.json, /docs, /redoc, /swagger.json, /api/v1 — the
+  schema lists every route+param) + inline `[api]` follow-up. (2) **`feat(nmap)` `d04b7bc`** — nmap's
+  `-sC` reveals `http-robots.txt` disallowed entries (Spooktrol: `/file_management/?file=implant` = the
+  whole path to the box) + a uvicorn/JSON banner, both buried in the NSE blob. New
+  `nmap.robots_disclosures()` + orchestrator `_handle_nse_leads` emit `[robots]`/`[api]` tips at scan
+  time (mirrors `_handle_redirect_vhosts`). Complements the Phoenix curl-robots fetch. (3) **`fix`
+  `f1b9578`** — a background adversarial review (3 slices) confirmed **4 real defects, all reproduced +
+  fixed**: MEDIUM `detect_api_server` false-fired on **every WordPress site** (`application/json` ⊂
+  `application/json+oembed`) + bare names in page bodies → now a **Server-header-context regex** +
+  anchored JSON + inline check gated to whatweb; MEDIUM `robots_disclosures` over-captured a
+  `/`-token from a following `http-title: Index of /files` → block now ends on any non-`/`-path line;
+  LOW orchestrator `[api]` tip on a no-web box (`Computer name: DAPHNE`) → gated on an HTTP service
+  being present; LOW ReDoS in `_ROBOTS_NSE_HEADER` (`\s*\d*\s*` O(n²), ~70s) → `[\s\d]*` linear.
 - Session (2026-07-20g) — **HTB Phoenix box review** (Hard Linux; WordPress → asgaros SQLi → 2FA
   bypass → Download-from-Files upload → rsync wildcard root). Three chunks, full suite EXIT=0:
   (1) **`fix(http)` `c34d600`** — nmap's disallowed `/wp-admin/` in robots.txt is the canonical
@@ -152,6 +170,9 @@ The pattern that works:
 - **Swept 2026-07-20g (Phoenix):** the session's own new robots.txt code (`parse_robots` +
   `_on_fingerprint` robots fetch), reviewed by a 4-slice adversarial Workflow → 3 confirmed bugs
   fixed in-session (ReDoS MEDIUM + 2 LOW). The rsync-action + main_window http-parse slices: clean.
+- **Swept 2026-07-20h (Spooktrol):** the session's own new API-detection + nmap-NSE-lead code
+  (`detect_api_server`, `robots_disclosures`, `_handle_nse_leads`), 3-slice adversarial Workflow → 4
+  confirmed bugs fixed in-session (2 detection false-positives, a no-web-box false tip, a ReDoS).
 - **Not yet swept (candidates for the next round):** `workspace/bulk.py` GUI wiring + its lost-update
   fix (when wired), the reporter templates under odd findings, `simple_recon.py` worker edge cases.
 
