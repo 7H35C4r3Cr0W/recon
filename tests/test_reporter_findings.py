@@ -212,3 +212,33 @@ def test_report_command_log_escapes_pipes_and_frontmatter_is_yaml_safe(tmp_path:
     assert "\\|" in cmd_line  # the command's pipes are escaped
     assert cmd_line.replace("\\|", "").count("|") == 6  # 5 columns intact, not split by the pipes
     yaml.safe_load(md.split("---")[1])  # frontmatter parses as valid YAML
+
+
+def test_report_summary_and_frontmatter_resist_banner_injection(tmp_path: Path) -> None:
+    import yaml
+
+    # a hostile/imported service banner + platform must not corrupt the summary table, the YAML
+    # frontmatter, or the nmap-script code fence.
+    prof = Profile.create(tmp_path, "box", Target(ip="10.0.0.5", platform="htb\ninjected: pwned"))
+    prof.set_services(
+        [
+            DiscoveredService(
+                80,
+                Proto.TCP,
+                "http",
+                product="nginx | col",
+                version="1|2",
+                nmap_scripts_output="http-title: hi\n```\n## FAKE HEADING\n",
+            )
+        ]
+    )
+    prof.save()
+    md = Reporter(prof).render()
+    # summary row: the banner pipes are escaped so the 5-column table isn't split
+    row = next(line for line in md.splitlines() if line.startswith("| 80 |"))
+    assert "\\|" in row and row.replace("\\|", "").count("|") == 6
+    # frontmatter stays valid YAML and the injected key never became a real key
+    fm = yaml.safe_load(md.split("---")[1])
+    assert "injected" not in fm and "htb" in str(fm["platform"])
+    # a ``` inside the nmap-script block can't close the fence early (zero-width-broken)
+    assert "​" in md

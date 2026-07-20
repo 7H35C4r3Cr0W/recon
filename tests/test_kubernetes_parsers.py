@@ -29,6 +29,17 @@ def test_api_forbidden_flagged() -> None:
     assert findings and findings[0].value == "forbidden"
 
 
+def test_api_non_list_versions_does_not_crash() -> None:
+    # a drifted/hostile body whose "versions" isn't a list of strings must degrade, never crash —
+    # a parse crash would drop ALL kube findings (the worker parses the 3 step outputs in one call).
+    for body in ('{"kind":"APIVersions","versions":{"bad":"shape"}}', '{"versions":"nope"}'):
+        findings = parse_kube_api(body)
+        assert findings and findings[0].value == "anonymous"
+    # a list with non-string members is stringified, not crashed
+    mixed = parse_kube_api('{"kind":"APIVersions","versions":[1,{"x":1}]}')
+    assert mixed and "1" in mixed[0].detail
+
+
 def test_healthz_ok() -> None:
     findings = parse_kube_healthz("ok")
     assert findings and findings[0].value == "ok"

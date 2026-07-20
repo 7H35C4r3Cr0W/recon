@@ -52,7 +52,11 @@ def parse_kube_api(text: str) -> list[KubeFinding]:
     if obj.get("kind") == "Status" and obj.get("code") in (401, 403):
         return [KubeFinding("access", "forbidden", "anonymous access denied by the API server")]
     if obj.get("kind") == "APIVersions" or "versions" in obj:
-        versions = obj.get("versions")
+        # the API can (or a drifted/hostile body could) return non-list / non-string versions —
+        # stringify defensively so a bad shape degrades to "no versions", never a parse crash that
+        # the worker would surface as the WHOLE service producing 0 findings.
+        raw = obj.get("versions")
+        versions = [str(v) for v in raw] if isinstance(raw, list) else []
         detail = f"anonymous access allowed (versions: {', '.join(versions)})" if versions else ""
         return [KubeFinding("access", "anonymous", detail or "anonymous access allowed")]
     return []

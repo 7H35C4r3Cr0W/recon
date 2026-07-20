@@ -1,13 +1,13 @@
 ---
 type: scan-report
-profile: {{ profile_name }}
-target: {{ target.ip }}
-{% if target.hostname %}hostname: {{ target.hostname }}
-{% endif %}platform: {{ target.platform or "unknown" }}
-{% if target.box_name %}box: {{ target.box_name }}
-{% endif %}status: {{ status.get("state", "wip") }}
-started: {{ status.get("started_at", "") }}
-last-active: {{ status.get("last_active", "") }}
+profile: {{ profile_name | yamlstr }}
+target: {{ target.ip | yamlstr }}
+{% if target.hostname %}hostname: {{ target.hostname | yamlstr }}
+{% endif %}platform: {{ (target.platform or "unknown") | yamlstr }}
+{% if target.box_name %}box: {{ target.box_name | yamlstr }}
+{% endif %}status: {{ status.get("state", "wip") | yamlstr }}
+started: {{ status.get("started_at", "") | yamlstr }}
+last-active: {{ status.get("last_active", "") | yamlstr }}
 tags: {{ tags | yamlflow }}
 ---
 
@@ -23,7 +23,7 @@ tags: {{ tags | yamlflow }}
 | Port | Proto | Service | Product | Version |
 | ---- | ----- | ------- | ------- | ------- |
 {% for s in services %}
-| {{ s.port }} | {{ s.proto }} | {{ s.service }} | {{ s.product or "—" }} | {{ s.version or "—" }} |
+| {{ s.port }} | {{ s.proto }} | {{ s.service | mdcell }} | {{ (s.product or "—") | mdcell }} | {{ (s.version or "—") | mdcell }} |
 {% endfor %}
 {% if not services %}
 _No open ports discovered yet._
@@ -32,10 +32,10 @@ _No open ports discovered yet._
 ## Discovered services
 {% for s in services %}
 
-### {{ s.port }}/{{ s.proto }} — {{ s.service }}
+### {{ s.port }}/{{ s.proto }} — {{ s.service | mdcell }}
 
-- **Product:** {{ s.product or "—" }}
-- **Version:** {{ s.version or "—" }}
+- **Product:** {{ (s.product or "—") | mdcell }}
+- **Version:** {{ (s.version or "—") | mdcell }}
 {% if s.hacktricks %}- **HackTricks:** [{{ s.label or s.service }}]({{ s.hacktricks }})
 {% endif %}
 {% if s.scripts %}

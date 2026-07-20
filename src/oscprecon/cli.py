@@ -322,12 +322,20 @@ def exploit_cmd(
         if prof.target.hostname and "." in prof.target.hostname:
             values["domain"] = prof.target.hostname.split(".", 1)[1]
         creds = prof.credentials()
+        # mirror the GUI's ExploitPanel fill: a hash cred fills {hash} for pass-the-hash actions,
+        # a password cred fills {password} — fill both when present so neither kind of template is
+        # left with an unfilled brace. user/domain come from the password cred, else the hash cred.
         pw = next((c for c in creds if c.secret_type == "password"), None)
+        hc = next((c for c in creds if c.secret_type == "hash"), None)
+        primary = pw or hc
+        if primary is not None:
+            values["user"] = primary.username
+            if primary.domain:
+                values["domain"] = primary.domain
         if pw is not None:
-            values["user"] = pw.username
             values["password"] = pw.secret
-            if pw.domain:
-                values["domain"] = pw.domain
+        if hc is not None:
+            values["hash"] = hc.secret
 
     if service is None:
         typer.echo("Exploitation services (use `nabu-cli exploit <service>` for actions):\n")

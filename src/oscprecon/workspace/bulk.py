@@ -46,12 +46,12 @@ def run_bulk(
         if cancel is not None and cancel.is_set():
             results.append(BulkResult(name, False, "cancelled"))
             continue
-        info, _malformed = locks.read_lock(directory)
-        if (
-            skip_locked
-            and info is not None
-            and not locks.is_stale(info)
-            and not locks.is_ours(info)
+        info, malformed = locks.read_lock(directory)
+        # a present-but-unreadable (malformed) lock is a live/unknown owner the rest of the system
+        # (locks.recover_stale/release) refuses to touch — treat it like a live lock and skip it,
+        # never mutate the profile underneath it.
+        if skip_locked and (
+            malformed or (info is not None and not locks.is_stale(info) and not locks.is_ours(info))
         ):
             results.append(BulkResult(name, False, "skipped (locked by another instance)"))
             continue

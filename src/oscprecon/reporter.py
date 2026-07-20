@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -186,6 +187,14 @@ class Reporter:
             )
             + "]"
         )
+        # YAML-safe scalar for a frontmatter value (profile_name/hostname/platform/box_name/…): a
+        # newline or a `:` in an imported/hand-edited profile.json would otherwise inject arbitrary
+        # frontmatter keys. Double-quote + escape `\`/`"` + collapse CR/LF.
+        self.env.filters["yamlstr"] = lambda v: (
+            '"'
+            + str(v).replace("\\", "\\\\").replace('"', '\\"').replace("\r", " ").replace("\n", " ")
+            + '"'  # noqa: E501
+        )
 
     def _context(self) -> dict[str, Any]:
         profile = self.profile
@@ -200,7 +209,14 @@ class Reporter:
                     "service": service.service,
                     "product": service.product,
                     "version": service.version,
-                    "scripts": service.nmap_scripts_output,
+                    # fence-safe: a target-influenced NSE line that is exactly ``` would close the
+                    # ```text code fence early and let injected markdown render — break any run of
+                    # 3+ backticks with a zero-width space so it can never terminate the fence.
+                    "scripts": re.sub(
+                        r"`{3,}",
+                        lambda m: "\u200b".join(m.group()),
+                        service.nmap_scripts_output,
+                    ),
                     "hacktricks": ref.hacktricks if ref else "",
                     "label": ref.label if ref else "",
                 }

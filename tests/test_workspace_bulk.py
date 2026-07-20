@@ -60,6 +60,18 @@ def test_bulk_skips_profile_locked_by_another_instance(tmp_path: Path, monkeypat
     assert "x" not in Profile.load(b.directory).organization_meta().tags  # untouched
 
 
+def test_bulk_skips_profile_with_malformed_lock(tmp_path: Path) -> None:
+    # a present-but-unreadable .lock is a live/unknown owner the rest of the system refuses to touch
+    # (locks.recover_stale/release) — run_bulk must skip it too, never clobber the profile under it.
+    a, b = _profiles(tmp_path, "a", "b")
+    locks.lock_path(b.directory).write_text("{ not valid json ")
+    results = bulk.run_bulk([a.directory, b.directory], bulk.add_tag("x"))
+    by_name = {r.profile: r for r in results}
+    assert by_name["a"].ok
+    assert not by_name["b"].ok and "locked" in by_name["b"].message
+    assert "x" not in Profile.load(b.directory).organization_meta().tags  # untouched
+
+
 def test_bulk_cancellation_marks_remaining(tmp_path: Path) -> None:
     profs = _profiles(tmp_path, "a", "b", "c")
     cancel = threading.Event()
