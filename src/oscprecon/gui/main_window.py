@@ -458,6 +458,12 @@ class MainWindow(QMainWindow):
         run_action = QAction("Run Full Recon", self)
         run_action.triggered.connect(self._on_run)
         scan_menu.addAction(run_action)
+        resume_action = QAction("Resume Recon (skip completed steps)", self)
+        resume_action.setStatusTip(
+            "Re-run recon, reusing output from steps that already finished (like CLI --resume)"
+        )
+        resume_action.triggered.connect(self._on_resume_recon)
+        scan_menu.addAction(resume_action)
         custom_scan_action = QAction("Scan a host / range...", self)
         custom_scan_action.setStatusTip(
             "Configure nmap flags, or scan a whole /24 across your pivot into the topology"
@@ -2098,6 +2104,24 @@ class MainWindow(QMainWindow):
         # Run Full Recon menu item → uses the configured default scan profile.
         self._start_recon(None)
 
+    def _on_resume_recon(self) -> None:
+        # parity with CLI --resume: re-run recon, skipping steps whose output already exists.
+        # No preflight ping — resume implies a prior scan, so the target is known to answer.
+        if self._profile is None:
+            QMessageBox.information(
+                self,
+                APP_NAME,
+                "No project is loaded — open one first, then Resume Recon.",
+            )
+            return
+        if self._profile.read_only:
+            QMessageBox.information(
+                self, APP_NAME, "This project is open read-only, so recon is disabled."
+            )
+            return
+        self._show_recon()
+        self._launch_recon(config.load_settings().scan_profile, resume=True)
+
     def _start_recon(self, scan_profile: str | None) -> None:
         # scan_profile=None → the configured default; a submenu passes an explicit override for
         # this one run without changing the saved preference. Every early-out tells the user WHY
@@ -2208,7 +2232,7 @@ class MainWindow(QMainWindow):
     def _launch_recon(self, profile_name: str, *, resume: bool = False) -> None:
         # the actual scan launch (after the optional pre-flight). A /24 network project runs a
         # host-discovery sweep into the topology; a single host runs the versioned service battery.
-        # `resume` reuses output from steps that already finished (exit 0) — parity with CLI --resume.
+        # `resume` reuses output from steps that already finished (exit 0), like CLI --resume.
         if self._profile is None or self._profile.read_only:
             return
         if not self._tasks.can_start(exclusive=True):

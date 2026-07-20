@@ -58,3 +58,47 @@ def test_import_collision_needs_overwrite(tmp_path: Path) -> None:
     assert "overwrite" in r.output
     r2 = runner.invoke(app, ["import-project", str(archive), "--workspace", str(ws), "--overwrite"])
     assert r2.exit_code == 0
+
+
+def test_cli_creds_add_list_rm(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    Profile.create(ws, "box", Target(ip="10.0.0.9"))
+    common = ["--profile", "box", "--workspace", str(ws)]
+    assert runner.invoke(app, ["creds", "add", "-u", "admin", "-s", "pw", *common]).exit_code == 0
+    assert (
+        runner.invoke(
+            app, ["creds", "add", "-u", "svc", "-s", "h", "--type", "hash", *common]
+        ).exit_code
+        == 0
+    )
+    listed = runner.invoke(app, ["creds", "list", *common])
+    assert listed.exit_code == 0
+    assert "admin" in listed.output and "<password len=2>" in listed.output  # secret masked
+    assert "pw" not in listed.output  # the plaintext is never printed
+    assert runner.invoke(app, ["creds", "rm", "-u", "svc", *common]).exit_code == 0
+    assert "svc" not in runner.invoke(app, ["creds", "list", *common]).output
+
+
+def test_cli_list_and_delete_project(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    Profile.create(ws, "box", Target(ip="10.10.10.5"))
+    listed = runner.invoke(app, ["list", "--workspace", str(ws)])
+    assert listed.exit_code == 0 and "box" in listed.output and "10.10.10.5" in listed.output
+    gone = runner.invoke(
+        app, ["delete-project", "--profile", "box", "--yes", "--workspace", str(ws)]
+    )
+    assert gone.exit_code == 0
+    assert not (ws / "box").exists()
+
+
+def test_cli_config_toggle_and_spray_gate(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from oscprecon import config
+
+    monkeypatch.setattr(config, "config_dir", lambda: tmp_path)  # isolate prefs.json
+    ws = tmp_path / "ws"
+    Profile.create(ws, "box", Target(ip="10.0.0.9"))
+    # spray is refused while the gate is off (exam-legal default)
+    off = runner.invoke(app, ["spray", "smb", "--profile", "box", "--workspace", str(ws)])
+    assert off.exit_code == 2 and "Spray mode is OFF" in off.output
+    shown = runner.invoke(app, ["config"])
+    assert "spray_enabled   = False" in shown.output
