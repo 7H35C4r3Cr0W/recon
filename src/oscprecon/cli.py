@@ -185,6 +185,9 @@ def doctor(
     yes: bool = typer.Option(
         False, "--yes", "-y", help="Skip the confirmation prompt (non-interactive install)."
     ),
+    show_versions: bool = typer.Option(
+        False, "--versions", help="Also print the installed version of each present tool (slower)."
+    ),
 ) -> None:
     """Check each wrapped tool; print install hints, optionally apt-install the missing ones."""
     report = doctor_mod.scan()
@@ -216,6 +219,23 @@ def doctor(
         )
         for tool in exploit_missing:
             typer.echo(f"  {tool.name:24}  {tool.hint}")
+
+    typer.echo("\n[doctor] Reference data (wordlists / NSE / Exploit-DB):")
+    for check in doctor_mod.scan_resources():
+        mark = "  ok" if check.ok else "  !!"
+        typer.echo(f"{mark}  {check.name:28}{'' if check.ok else '  ' + check.detail}")
+
+    typer.echo("\n[doctor] Host readiness:")
+    for check in doctor_mod.scan_system():
+        mark = "  ok" if check.ok else "  !!"
+        typer.echo(f"{mark}  {check.name:30}  {check.detail}")
+
+    if show_versions:
+        vers = doctor_mod.versions(report)
+        typer.echo("\n[doctor] Installed versions (present tools):")
+        for name in sorted(vers):
+            typer.echo(f"  {name:22}  {vers[name]}")
+
     if not req_missing:
         return
     if not install:

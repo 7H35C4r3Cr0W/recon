@@ -39,6 +39,28 @@ def test_doctor_dialog_counts_alternatives_as_covered(
     assert "exam-ready" in d.findChildren(QLabel)[0].text()
 
 
+def test_doctor_dialog_shows_readiness_sections(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(doctor.shutil, "which", lambda t: f"/usr/bin/{t}")
+    d = DoctorDialog()
+    qtbot.addWidget(d)
+    html = d._view.toHtml()
+    assert "Reference data" in html and "Host readiness" in html
+    assert "Installed versions" not in html  # versions only after the button is pressed
+
+
+def test_doctor_dialog_versions_button(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor.shutil, "which", lambda t: f"/usr/bin/{t}")
+    monkeypatch.setattr(doctor, "versions", lambda _report: {"nmap": "7.94"})
+    d = DoctorDialog()
+    qtbot.addWidget(d)
+    d._on_show_versions()
+    html = d._view.toHtml()
+    assert "Installed versions" in html and "7.94" in html
+    assert d._versions_btn.isEnabled() is False  # one-shot: disabled after use
+
+
 def test_doctor_dialog_shows_spray_tools_section(
     qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
 ) -> None:

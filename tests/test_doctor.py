@@ -1,6 +1,69 @@
+from pathlib import Path
+
 import pytest
 
 from oscprecon import doctor
+
+
+def test_scan_resources_reports_present_and_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    present = tmp_path / "here"
+    present.mkdir()
+    monkeypatch.setattr(
+        doctor,
+        "_RESOURCE_PATHS",
+        (
+            ("Present thing", str(present), "apt install x"),
+            ("Missing thing", str(tmp_path / "nope"), "apt install y"),
+        ),
+    )
+    checks = {c.name: c for c in doctor.scan_resources()}
+    assert checks["Present thing"].ok is True
+    assert checks["Missing thing"].ok is False
+    assert checks["Missing thing"].detail == "apt install y"
+
+
+def test_scan_system_flags_low_disk_and_missing_vpn(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor, "_free_gb", lambda _p: 0.3)
+    monkeypatch.setattr(doctor, "_vpn_up", lambda **_k: False)
+    monkeypatch.setattr(doctor, "_nmap_can_raw", lambda: True)
+    checks = {c.name: c for c in doctor.scan_system("/whatever")}
+    assert checks["Workspace disk space"].ok is False
+    assert "0.3 GB" in checks["Workspace disk space"].detail
+    assert checks["VPN tunnel up (tun/tap)"].ok is False
+    assert checks["Raw-socket scans (nmap -sS/-sU/-O)"].ok is True
+
+
+def test_scan_system_unknown_disk_does_not_alarm(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor, "_free_gb", lambda _p: -1.0)  # couldn't read the fs
+    checks = {c.name: c for c in doctor.scan_system("/x")}
+    assert checks["Workspace disk space"].ok is True  # unknown != a failure
+
+
+def test_tool_version_only_probes_curated_present_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor.shutil, "which", lambda t: "/usr/bin/nmap" if t == "nmap" else None)
+    calls: list[list[str]] = []
+
+    class _R:
+        stdout = "Nmap version 7.94 ( https://nmap.org )\nPlatform: x86_64"
+        stderr = ""
+
+    def _fake_run(argv: list[str], **_kw: object) -> _R:
+        calls.append(argv)
+        return _R()
+
+    monkeypatch.setattr(doctor.subprocess, "run", _fake_run)
+    assert doctor.tool_version("nmap") == "Nmap version 7.94 ( https://nmap.org )"
+    assert doctor.tool_version("gobuster") is None  # curated but not present (which -> None)
+    assert doctor.tool_version("smbclient") is None  # present-agnostic: no curated probe -> skipped
+    assert calls == [["nmap", "--version"]]  # only the present, curated tool was actually run
+
+
+def test_versions_maps_present_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor.shutil, "which", lambda t: "/x" if t == "nmap" else None)
+    monkeypatch.setattr(doctor, "tool_version", lambda n: "7.94" if n == "nmap" else None)
+    assert doctor.versions(doctor.scan()) == {"nmap": "7.94"}
 
 
 def test_scan_marks_present_and_missing(monkeypatch: pytest.MonkeyPatch) -> None:

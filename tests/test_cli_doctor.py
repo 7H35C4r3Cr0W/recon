@@ -25,7 +25,11 @@ def test_doctor_reports_missing_with_hints(monkeypatch: pytest.MonkeyPatch) -> N
     assert "impacket-mssqlclient" in result.output
     assert "ssh-audit" in result.output
     assert "redis-cli" in result.output
-    missing_block = result.output.split("missing (install the ones you need):", 1)[1]
+    # bound to just the required-missing list (it's followed by the "Note:" line) so the assertion
+    # isn't tripped by later sections that legitimately mention nmap (NSE data / raw-socket check)
+    missing_block = result.output.split("missing (install the ones you need):", 1)[1].split(
+        "Note:", 1
+    )[0]
     assert "nmap " not in missing_block
     assert "--install" in result.output  # points the user at the installer
 

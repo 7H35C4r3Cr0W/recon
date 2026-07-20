@@ -185,7 +185,10 @@ with profile`, or `nabu-cli scan --scan-profile <name>`.
   lookup-only), and an **audit-trail appendix**. `File → Export to Obsidian Vault…` writes a linked
   note folder.
 - **Resume** — `--resume` skips commands whose output already exists (`--force` re-runs).
-- **Doctor** — `nabu-cli doctor` checks every wrapped tool on `PATH` and prints install hints.
+- **Doctor** — `nabu-cli doctor` (Help → Doctor) checks every wrapped tool on `PATH`, the reference
+  data they rely on (SecLists / nmap NSE / Exploit-DB), and exam-day host readiness (VPN tunnel up?
+  workspace disk free? can nmap raw-socket scan?), with install hints. `--versions` also prints the
+  installed version of each present tool.
 
 ### Reference pane (HackTricks + Exploit-DB)
 

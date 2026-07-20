@@ -30,9 +30,10 @@ class DoctorDialog(QDialog):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Nabu · Doctor — wrapped tool status")
-        self.resize(600, 560)
+        self.setWindowTitle("Nabu · Doctor — host readiness")
+        self.resize(600, 620)
         self._proc: QProcess | None = None
+        self._versions_shown = False
 
         summary = QLabel("")
         summary.setWordWrap(True)
@@ -53,12 +54,18 @@ class DoctorDialog(QDialog):
         self._install_btn.clicked.connect(self._on_install)
         self._copy_btn = QPushButton("Copy apt command")
         self._copy_btn.clicked.connect(self._on_copy)
+        self._versions_btn = QPushButton("Show tool versions")
+        self._versions_btn.setToolTip(
+            "Query the installed version of each present tool (a few seconds)"
+        )
+        self._versions_btn.clicked.connect(self._on_show_versions)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
         action_row = QHBoxLayout()
         action_row.addWidget(self._install_btn)
         action_row.addWidget(self._copy_btn)
+        action_row.addWidget(self._versions_btn)
         action_row.addStretch(1)
         action_row.addWidget(buttons)
 
@@ -85,7 +92,14 @@ class DoctorDialog(QDialog):
             f"<b>{required_found}/{required_total}</b> wrapped tools found on PATH"
             + (" — all essentials present, exam-ready." if not req_missing else ".")
         )
-        self._view.setHtml(self._html(req_missing, spray_missing, exploit_missing, report.found))
+        resources = doctor.scan_resources()
+        system = doctor.scan_system()
+        vers = doctor.versions(report) if self._versions_shown else {}
+        self._view.setHtml(
+            self._html(
+                req_missing, spray_missing, exploit_missing, resources, system, vers, report.found
+            )
+        )
 
         have_pkgs = bool(self._plan.packages)
         self._install_btn.setEnabled(have_pkgs)
@@ -113,6 +127,12 @@ class DoctorDialog(QDialog):
         clip = QGuiApplication.clipboard()
         if clip is not None:
             clip.setText(" ".join(self._plan.apt_argv()))
+
+    def _on_show_versions(self) -> None:
+        self._versions_shown = True
+        self._versions_btn.setEnabled(False)
+        self._versions_btn.setText("Versions shown")
+        self._refresh_report()
 
     def _on_install(self) -> None:
         if self._proc is not None or not self._plan.packages:
@@ -167,6 +187,9 @@ class DoctorDialog(QDialog):
         req_missing: list[doctor.ToolStatus],
         spray_missing: list[doctor.ToolStatus],
         exploit_missing: list[doctor.ToolStatus],
+        resources: tuple[doctor.Check, ...],
+        system: tuple[doctor.Check, ...],
+        vers: dict[str, str],
         found: list[doctor.ToolStatus],
     ) -> str:
         parts: list[str] = []
@@ -184,6 +207,29 @@ class DoctorDialog(QDialog):
                 f"<li><b>{t.name}</b> — <code>{t.hint}</code></li>" for t in exploit_missing
             )
             parts.append("</ul>")
+
+        def _row(check: doctor.Check) -> str:
+            mark = "&#10003;" if check.ok else "&#10007;"
+            colour = "#3f7a52" if check.ok else "#c0564b"
+            return (
+                f"<li><span style='color:{colour}'>{mark}</span> <b>{check.name}</b>"
+                f" — {check.detail}</li>"
+            )
+
+        parts.append("<h4>Reference data (wordlists / NSE / Exploit-DB)</h4><ul>")
+        parts.extend(_row(c) for c in resources)
+        parts.append("</ul>")
+        parts.append("<h4>Host readiness</h4><ul>")
+        parts.extend(_row(c) for c in system)
+        parts.append("</ul>")
+
+        if vers:
+            parts.append("<h4>Installed versions</h4><ul>")
+            parts.extend(
+                f"<li><b>{name}</b> — <code>{vers[name]}</code></li>" for name in sorted(vers)
+            )
+            parts.append("</ul>")
+
         parts.append("<h4>Present</h4><ul>")
         parts.extend(f"<li>&#10003; {t.name}</li>" for t in found)
         parts.append("</ul>")

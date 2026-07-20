@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from oscprecon import shell
 
@@ -132,6 +133,146 @@ def scan() -> DoctorReport:
         for name, hint in _EXPLOIT_TOOLS
     )
     return DoctorReport(required + spray + exploit)
+
+
+# -------------------------------------------------------------------------------------------------
+# Beyond "is the binary on PATH": data files the tools need (wordlists / NSE / exploitdb) and
+# exam-day host readiness (VPN up? disk free? can we raw-socket scan?). These are NOT tools — they
+# never enter the apt install plan and are reported separately, so scan()'s tool set is unaffected.
+# -------------------------------------------------------------------------------------------------
+@dataclass(frozen=True)
+class Check:
+    name: str
+    ok: bool
+    detail: str  # remediation hint (when not ok) or extra info (e.g. free GB)
+
+
+# (label, path, remediation) — the reference data the wrapped tools rely on.
+_RESOURCE_PATHS: tuple[tuple[str, str, str], ...] = (
+    ("SecLists wordlists", "/usr/share/seclists", "apt install seclists"),
+    ("Standard wordlists", "/usr/share/wordlists", "apt install wordlists"),
+    ("NSE scripts (nmap)", "/usr/share/nmap/scripts", "apt install --reinstall nmap"),
+    ("Exploit-DB (searchsploit)", "/usr/share/exploitdb", "apt install exploitdb"),
+)
+
+
+def scan_resources() -> tuple[Check, ...]:
+    return tuple(Check(name, Path(path).exists(), detail) for name, path, detail in _RESOURCE_PATHS)
+
+
+def _vpn_up(net_dir: Path = Path("/sys/class/net")) -> bool:
+    try:
+        return any(iface.name.startswith(("tun", "tap", "ppp")) for iface in net_dir.iterdir())
+    except OSError:
+        return False
+
+
+def _free_gb(path: str) -> float:
+    # walk up to the nearest existing ancestor so a not-yet-created workspace still reports its disk
+    try:
+        p = Path(path).expanduser()
+        while not p.exists() and p != p.parent:
+            p = p.parent
+        return shutil.disk_usage(p).free / 1_000_000_000
+    except OSError:
+        return -1.0
+
+
+def _nmap_can_raw() -> bool:
+    # SYN / UDP / OS scans need raw sockets: root, or nmap granted cap_net_raw via setcap
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        return True
+    nmap, getcap = shutil.which("nmap"), shutil.which("getcap")
+    if nmap and getcap:
+        try:
+            out = subprocess.run(  # noqa: S603
+                [getcap, nmap], capture_output=True, text=True, timeout=2, check=False
+            )
+            return "cap_net_raw" in (out.stdout or "")
+        except (OSError, subprocess.SubprocessError):
+            return False
+    return False
+
+
+def scan_system(workspace_root: str | None = None) -> tuple[Check, ...]:
+    if workspace_root is None:
+        try:
+            from oscprecon import config
+
+            workspace_root = str(config.workspace_root())
+        except Exception:  # noqa: BLE001 - config read is a boundary; never let it break the doctor
+            workspace_root = str(Path.home() / "oscprecon")
+    free = _free_gb(workspace_root)
+    vpn = _vpn_up()
+    raw = _nmap_can_raw()
+    return (
+        Check(
+            "VPN tunnel up (tun/tap)",
+            vpn,
+            "a tun/tap interface is up"
+            if vpn
+            else "no tun/tap — connect your lab/exam VPN (e.g. openvpn lab.ovpn) before scanning",
+        ),
+        Check(
+            "Workspace disk space",
+            free < 0 or free >= 1.0,  # unknown (-1) → don't alarm
+            f"{free:.1f} GB free at {workspace_root}"
+            if free >= 0
+            else f"could not read {workspace_root}",
+        ),
+        Check(
+            "Raw-socket scans (nmap -sS/-sU/-O)",
+            raw,
+            "root or nmap has cap_net_raw"
+            if raw
+            else "not privileged — run with sudo, or: sudo setcap cap_net_raw+eip $(which nmap)",
+        ),
+    )
+
+
+# Curated, fast, offline `--version`-style probes for the tools people most want to spot-check. Only
+# these run (each timeout-bounded, stdin closed, argv list — never a shell); everything else is
+# skipped so the versions pass can't hang or do anything unexpected.
+_VERSION_CMD: dict[str, tuple[str, ...]] = {
+    "nmap": ("--version",),
+    "feroxbuster": ("--version",),
+    "ffuf": ("-V",),
+    "netexec": ("--version",),
+    "nxc": ("--version",),
+    "hashcat": ("--version",),
+    "curl": ("--version",),
+    "wget": ("--version",),
+}
+
+
+def tool_version(name: str) -> str | None:
+    flags = _VERSION_CMD.get(name)
+    if flags is None or shutil.which(name) is None:
+        return None
+    try:
+        proc = subprocess.run(  # noqa: S603
+            [name, *flags],
+            capture_output=True,
+            text=True,
+            timeout=4,
+            stdin=subprocess.DEVNULL,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    out = proc.stdout.strip() or proc.stderr.strip()
+    first = out.splitlines()[0].strip() if out else ""
+    return first[:120] or None
+
+
+def versions(report: DoctorReport) -> dict[str, str]:
+    # best-effort version string for each PRESENT tool we have a curated probe for
+    result: dict[str, str] = {}
+    for tool in report.found:
+        version = tool_version(tool.name)
+        if version:
+            result[tool.name] = version
+    return result
 
 
 @dataclass(frozen=True)
