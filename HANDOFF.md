@@ -15,8 +15,15 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: `24c0ac5`** (all pushed). `origin` = local Gitea (often offline) — push to the
+- **github/main HEAD: `faed314`** (all pushed). `origin` = local Gitea (often offline) — push to the
   **`github`** remote (`git push github main`).
+- Latest session (2026-07-20): **+6 GUI themes** (Dracula/Nord/Gruvbox/Solarized/Tokyo Night/Monokai,
+  all WCAG-AA-validated) · **nmap** 69 scan presets (was 29) + a searchable NSE picker + `--open`/`-O`
+  in the Scan dialog (new `nmap_nse.py`) · **doctor** now also checks reference data (SecLists/NSE/
+  Exploit-DB), host readiness (VPN/disk/raw-socket), and `--versions`. Commits `b1a2584`/`f538de1`/
+  `faed314`. (Also, non-repo: a `/etc/cron.d/nabu-maint` system-maintenance job on this Kali box —
+  Timeshift snapshot → `apt full-upgrade` → junk cleanup, 3-day self-guarded; script at
+  `/usr/local/sbin/nabu-maintenance.sh`.)
 - Exploit catalog: **182 services / 3,433 actions**. Pattern library: **127 rules**.
 - Full test suite green (**pytest EXIT=0**), all four gates clean.
 - Author/maintainer: **Andre Boyle · its.lagus@proton.me · github.com/7H35C4r3Cr0W/recon**
