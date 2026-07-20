@@ -82,7 +82,11 @@ the auto-generated docs/schema (`/openapi.json`, `/docs`, `/redoc`, `/swagger.js
 roots (`/api`, `/api/v1`), which list every route and its expected parameters.
 
 Some of these leads surface **the moment the nmap scan lands**, before you touch a service panel: the
-default `-sC` scripts are mined for a redirect vhost (auto-set as the target hostname), for
-**`http-robots.txt` disallowed entries** (each disallowed path — an admin panel, a backup, the thing
-they didn't want indexed — becomes a `[robots]` lead to investigate), and for a **JSON API banner**
-(`uvicorn` / `application/json` → the same `[api]` "enumerate the schema, not files" nudge).
+default `-sC` scripts are mined for the box's **hostname/vhost** — from an http→name **redirect**
+(`http-title`) *and* from the **TLS certificate's Subject CN / SAN** (`ssl-cert`, e.g.
+`CN=earlyaccess.htb` on a 443-only box with no redirect). When none is set and there's a single clear
+candidate it's **auto-wired as the target hostname** (announced, never silent, never overriding a
+user's); extra SAN names become vhost leads. The scan is also mined for **`http-robots.txt` disallowed
+entries** (each disallowed path — an admin panel, a backup, the thing they didn't want indexed —
+becomes a `[robots]` lead) and for a **JSON API banner** (`uvicorn` / `application/json` → the same
+`[api]` "enumerate the schema, not files" nudge).

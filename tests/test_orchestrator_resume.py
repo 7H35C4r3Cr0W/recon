@@ -135,6 +135,51 @@ def test_nmap_redirect_autoset_hostname(tmp_path: Path, monkeypatch: pytest.Monk
     assert any("set target hostname = ignition.htb" in ln for ln in lines)  # announced, not silent
 
 
+def _cert_run(cert_body: str) -> Callable[..., object]:
+    def run(shell_line: str, output_file: Path, **_: object) -> object:
+        out = Path(output_file)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        head = "PORT    STATE SERVICE\n443/tcp open  ssl/http Apache\n"
+        out.write_text(f"{head}{cert_body}\n", "utf-8")
+        return shell.ShellResult(shell_line, 0, out, "", "", 0.0)
+
+    return run
+
+
+def test_nmap_cert_cn_autosets_hostname_when_no_redirect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # EarlyAccess: a 443 box with the hostname only in the TLS cert (no http->name redirect) still
+    # auto-wires the vhost — from the Subject CN — announced as the SSL certificate.
+    prof = Profile.create(tmp_path, "ea", Target(ip="10.129.41.245"))
+    monkeypatch.setattr(shell, "run", _cert_run("| ssl-cert: Subject: commonName=earlyaccess.htb"))
+    lines: list[str] = []
+    Orchestrator(prof, on_line=lines.append).run_nmap()
+    assert prof.target.hostname == "earlyaccess.htb"
+    assert any("from the SSL certificate" in ln for ln in lines)
+
+
+def test_nmap_redirect_wins_over_cert_and_extra_san_is_a_lead(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # a redirect keeps its exact behavior (auto-set from the redirect); the cert's matching name is
+    # suppressed and only an EXTRA SAN (www.) surfaces as a vhost lead — no redirect regression.
+    prof = Profile.create(tmp_path, "ea2", Target(ip="10.129.41.245"))
+    body = (
+        "|_http-title: Did not follow redirect to https://earlyaccess.htb/\n"
+        "| ssl-cert: Subject: commonName=earlyaccess.htb\n"
+        "| Subject Alternative Name: DNS:earlyaccess.htb, DNS:www.earlyaccess.htb"
+    )
+    monkeypatch.setattr(shell, "run", _cert_run(body))
+    lines: list[str] = []
+    Orchestrator(prof, on_line=lines.append).run_nmap()
+    assert prof.target.hostname == "earlyaccess.htb"
+    assert any("from the nmap redirect" in ln for ln in lines)
+    assert any("www.earlyaccess.htb" in ln and "SSL certificate names" in ln for ln in lines)
+    # the cert name that equals the set hostname is NOT re-emitted as a lead
+    assert not any("SSL certificate names 'earlyaccess.htb'" in ln for ln in lines)
+
+
 def test_nmap_redirect_does_not_override_existing_hostname(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

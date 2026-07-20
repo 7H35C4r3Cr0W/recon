@@ -7,7 +7,12 @@ from oscprecon import shell
 from oscprecon.models import Command, Port, Proto
 from oscprecon.modules.http import HTTP_SERVICE_NAMES
 from oscprecon.modules.http.parsers import detect_api_server
-from oscprecon.modules.nmap import NmapModule, redirect_vhosts, robots_disclosures
+from oscprecon.modules.nmap import (
+    NmapModule,
+    cert_hostnames,
+    redirect_vhosts,
+    robots_disclosures,
+)
 from oscprecon.profile import Profile
 from oscprecon.reporter import Reporter
 
@@ -111,33 +116,53 @@ class Orchestrator:
         except OSError:
             return ""
 
-    def _handle_redirect_vhosts(self, raw: dict[str, str]) -> None:
-        # nmap's http-title revealed a vhost (e.g. ignition.htb) — on such boxes the hostname IS the
-        # recon. If none is set yet and there's exactly one, wire it in (announced, never silent) so
-        # host-based recon targets the name; otherwise surface it as an actionable hint.
-        hosts = redirect_vhosts(raw)
-        if not hosts:
+    def _handle_hostname_leads(self, raw: dict[str, str]) -> None:
+        # a box's real hostname/vhost — the host-based-recon prerequisite the bare IP won't serve —
+        # is declared by the server two strong ways: an http→name redirect (nmap http-title) and the
+        # TLS cert's Subject CN / SAN (nmap ssl-cert). If none is set yet and there's a single clear
+        # candidate, wire it in (announced, never silent); surface every other name as a vhost lead.
+        # A user-set hostname is never overridden. The redirect keeps its exact old behavior
+        # (auto-set on a lone redirect); the cert only auto-sets when there is no redirect.
+        redirect = redirect_vhosts(raw)
+        cert = cert_hostnames(raw)
+        if not redirect and not cert:
             return
-        if self.profile.target.hostname is None and len(hosts) == 1:
-            try:
-                self.profile.set_hostname(hosts[0])
-            except ValueError:
-                self._emit(f"[vhost] nmap redirects to '{hosts[0]}' — set via Set Target Hostname.")
-                return
-            self._emit(
-                f"[vhost] set target hostname = {hosts[0]} (from the nmap redirect) — host-based "
-                "recon now targets it. Add to /etc/hosts; change via Edit -> Set Target Hostname."
-            )
-            return
-        for host in hosts:
-            self._emit(
-                f"[vhost] nmap redirects to '{host}' — add to /etc/hosts and Set Target Hostname "
-                "to recon it as a vhost."
-            )
+        if self.profile.target.hostname is None:
+            primary, source = None, ""
+            if len(redirect) == 1:
+                primary, source = redirect[0], "the nmap redirect"
+            elif not redirect and cert:
+                primary, source = cert[0], "the SSL certificate"  # cert[0] is the Subject CN
+            if primary is not None:
+                try:
+                    self.profile.set_hostname(primary)
+                except ValueError:
+                    pass  # malformed (both sources are filtered, so unreachable) — leads still fire
+                else:
+                    self._emit(
+                        f"[vhost] set target hostname = {primary} (from {source}) — host-based "
+                        "recon now targets it. Add to /etc/hosts; change via Edit -> Set Hostname."
+                    )
+        current = self.profile.target.hostname
+        seen: set[str] = set()
+        for host in redirect:
+            if host != current and host not in seen:
+                seen.add(host)
+                self._emit(
+                    f"[vhost] nmap redirects to '{host}' — add to /etc/hosts and Set Target "
+                    "Hostname to recon it as a vhost."
+                )
+        for host in cert:
+            if host != current and host not in seen:
+                seen.add(host)
+                self._emit(
+                    f"[vhost] SSL certificate names '{host}' — add to /etc/hosts and Set Target "
+                    "Hostname to recon it as a vhost."
+                )
 
     def _handle_nse_leads(self, raw: dict[str, str]) -> None:
         # surface high-value leads nmap's -sC NSE scripts revealed for free, the moment the scan
-        # lands (mirrors _handle_redirect_vhosts): robots.txt disallowed entries = paths an admin
+        # lands (mirrors _handle_hostname_leads): robots.txt disallowed entries = paths an admin
         # hid; a uvicorn / FastAPI / application-json banner = a JSON API to enumerate by schema.
         for path in robots_disclosures(raw):
             self._emit(
@@ -199,7 +224,7 @@ class Orchestrator:
                 self.profile.set_services(self.nmap.discovered_services(raw))
                 self.profile.save()
 
-        self._handle_redirect_vhosts(raw)
+        self._handle_hostname_leads(raw)
         self._handle_nse_leads(raw)
 
         Reporter(self.profile).write()

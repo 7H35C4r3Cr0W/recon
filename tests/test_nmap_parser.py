@@ -1,7 +1,12 @@
 from pathlib import Path
 
 from oscprecon.models import Proto
-from oscprecon.modules.nmap import NmapModule, redirect_vhosts, robots_disclosures
+from oscprecon.modules.nmap import (
+    NmapModule,
+    cert_hostnames,
+    redirect_vhosts,
+    robots_disclosures,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "nmap"
 
@@ -178,6 +183,32 @@ def test_robots_disclosures_does_not_over_capture_title_slash() -> None:
     assert robots_disclosures(
         {"x": "| http-robots.txt: 1 disallowed entry\n|_/a/\n|_http-title: /dashboard\n"}
     ) == ["/a/"]
+
+
+def test_cert_hostnames_from_ssl_cert_nse() -> None:
+    # EarlyAccess: the box hostname lives in the TLS cert (Subject CN + SAN) even with no redirect.
+    raw = {
+        "tcp.txt": (
+            "443/tcp open  ssl/http Apache httpd\n"
+            "| ssl-cert: Subject: commonName=earlyaccess.htb\n"
+            "| Subject Alternative Name: DNS:earlyaccess.htb, DNS:www.earlyaccess.htb\n"
+            "| Issuer: commonName=earlyaccess.htb\n"
+            "|_Not valid after:  2032-01-01\n"
+        )
+    }
+    # CN first (the canonical, auto-set candidate), then the extra SAN; deduped
+    assert cert_hostnames(raw) == ["earlyaccess.htb", "www.earlyaccess.htb"]
+
+
+def test_cert_hostnames_filters_generic_ip_wildcard_and_issuer() -> None:
+    assert cert_hostnames({"x": "| ssl-cert: Subject: commonName=localhost\n"}) == []
+    assert cert_hostnames({"x": "| ssl-cert: Subject: commonName=10.10.11.110\n"}) == []
+    assert cert_hostnames({"x": "| Subject Alternative Name: DNS:*.corp.htb\n"}) == ["corp.htb"]
+    # a CA-signed cert's Issuer CN is the CA, not the box — never mined; the Subject is
+    assert cert_hostnames(
+        {"x": "| Issuer: commonName=letsencrypt.org\n| ssl-cert: Subject: commonName=real.htb\n"}
+    ) == ["real.htb"]
+    assert cert_hostnames({"x": "no cert here\n"}) == []
 
 
 def test_robots_disclosures_no_redos_on_hostile_header() -> None:

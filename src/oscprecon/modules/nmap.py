@@ -75,6 +75,54 @@ def redirect_vhosts(raw_outputs: dict[str, str]) -> list[str]:
     return hosts
 
 
+# nmap's ssl-cert NSE (run by -sC on a TLS port) prints the certificate's Subject CN and Subject
+# Alternative Names — a self-signed lab cert almost always carries the box's real hostname/vhost
+# there (EarlyAccess: CN=earlyaccess.htb), the host-based-recon prerequisite the bare IP never
+# serves. Mine the Subject CN (NOT the Issuer, a CA on a real cert) and every SAN DNS name.
+_CERT_CN_RE = re.compile(r"commonname=(?P<host>[a-z0-9*.\-]+)", re.IGNORECASE)
+_CERT_SAN_RE = re.compile(r"dns:(?P<host>[a-z0-9*.\-]+)", re.IGNORECASE)
+# boilerplate CNs of a default/appliance self-signed cert — never a box vhost, never auto-set.
+_GENERIC_CERT_HOSTS = frozenset(
+    {
+        "localhost",
+        "localhost.localdomain",
+        "example.com",
+        "example.org",
+        "example.net",
+        "domain.com",
+        "changeme",
+    }
+)
+
+
+def cert_hostnames(raw_outputs: dict[str, str]) -> list[str]:
+    """Box hostnames from nmap's ssl-cert NSE — Subject CN first, then SAN DNS names; lower-cased,
+    deduped, and filtered (drops IPs, bare names, wildcards' `*.`, and boilerplate default CNs)."""
+    cns: list[str] = []
+    sans: list[str] = []
+    for text in raw_outputs.values():
+        for raw_line in text.splitlines():
+            low = raw_line.lower()
+            # the Subject CN line; skip Issuer (a CA on a real cert, same host on self-signed)
+            if "commonname=" in low and "subject:" in low and "issuer" not in low:
+                match = _CERT_CN_RE.search(raw_line)
+                if match is not None:
+                    cns.append(match.group("host"))
+            for match in _CERT_SAN_RE.finditer(raw_line):  # SAN DNS: entries (the cert's own names)
+                sans.append(match.group("host"))
+    hosts: list[str] = []
+    seen: set[str] = set()
+    for raw_host in cns + sans:  # CN first so it is the canonical (auto-set) candidate
+        host = raw_host.strip().lower().lstrip("*").lstrip(".").strip(".")
+        if not host or host in seen:
+            continue
+        seen.add(host)
+        if host in _GENERIC_CERT_HOSTS or not _VHOST_HOST_RE.match(host):
+            continue
+        hosts.append(host)
+    return hosts
+
+
 # nmap's http-robots.txt NSE (run by -sC) reports the paths a site's robots.txt disallows — admins
 # hide admin panels, backups and the-thing-they-don't-want-indexed there, so each is a high-value
 # recon lead surfaced for FREE by the scan (Spooktrol: /file_management/?file=implant). The header
