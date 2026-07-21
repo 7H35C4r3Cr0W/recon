@@ -1,8 +1,9 @@
 name: CI
+# MANUAL-ONLY: push/pull_request auto-triggers were removed so routine commits (incl. the autosync
+# job) no longer burn GitHub Actions minutes — the same gates (mypy/ruff/pytest) run locally before
+# every push. Run this from the Actions tab (Run workflow) if you ever want a clean hosted check.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   gates:
