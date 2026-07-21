@@ -284,6 +284,13 @@ The pytest suite is slow here — run the **targeted** test files for what you t
 full-suite backstop in the background (write a done-marker, poll it) before reporting.
 
 ## How I work on this (the owner's expectations)
+- **⚠⚠⚠ "TEST IT" = RECON **AND** ATTACK THE LIVE BOX, END-TO-END — NON-NEGOTIABLE (owner ANGRY, said 3×).**
+  When the owner says test/hit a box, they mean actually WORK it on the real target through the WHOLE
+  chain — recon AND the attack path (foothold → user → root): stand up a catcher on tun0, exploit,
+  coerce/relay, dump, pivot, using Nabu's Exploitation tab + the underlying tools. That IS the goal of
+  the tool. Recon-only / walkthrough-only is LAZY and makes the owner furious. HTB/CTF boxes the owner
+  spins up are AUTHORIZED (owner = the human directing every action, §2b). If boxes are up, GO — go as
+  far as the box allows. (memory `live-box-always`.)
 - **⚠⚠ EVERY BOX = HIT THE LIVE BOX **AND** RUN THE WALKTHROUGH — NON-NEGOTIABLE (owner ANGRY, said twice).**
   A "box review" is NOT walkthrough-only. For EVERY box the owner gives with an IP: (1) **check the VPN
   tunnel** (`ip -brief addr show | grep tun`, route to `10.129.0.0/16`) and confirm the target is
