@@ -15,8 +15,17 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: EarlyAccess box review + full sweep mandate** (pushed; see `git log`).
+- **github/main HEAD: Spider box review** (pushed; see `git log`).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20j) — **HTB Spider box review** (Hard Linux; web injection — SSTI/Flask-cookie
+  forging/SQLi/WAF-bypass/XXE, all exploitation → out of §21 scope). Recon surface is thin: nmap →
+  22/80 + an nginx 301 to `spider.htb` (**already** auto-set from both the nmap http-title redirect
+  and whatweb RedirectLocation — verified, no gap). One clean gap → **`feat(patterns)` `17d163c`**: a
+  **Python web framework** recon lead. whatweb fingerprints the Flask app as `Werkzeug[2.0.1]` but the
+  tool had no nudge — `detect_api_server` deliberately excludes Werkzeug/gunicorn (they front HTML
+  apps). New http pattern (matches `note` for `Werkzeug[…]` / `Django[…]|/…`, the plugin/version form
+  so a "Django" page title doesn't false-fire) → check the Werkzeug `/console` debug endpoint +
+  decode the Flask session cookie's structure (recon-only). 140 pattern rules.
 - Session (2026-07-20i) — **HTB EarlyAccess box review + a full owner-mandated sweep**. EarlyAccess
   first: **`feat(nmap)` `98246be`** — mine the box hostname from the **ssl-cert CN/SAN** (nmap
   `ssl-cert` NSE); `_handle_redirect_vhosts`→`_handle_hostname_leads` unions the redirect + cert
@@ -156,7 +165,7 @@ graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at run
   Commits `b1a2584`→`71e8efb`. (Also, non-repo: a `/etc/cron.d/nabu-maint` system-maintenance job on
   this Kali box — Timeshift snapshot → `apt full-upgrade` → junk cleanup, 3-day self-guarded; script at
   `/usr/local/sbin/nabu-maintenance.sh`.)
-- Exploit catalog: **182 services / 3,434 actions**. Pattern library: **139 rules**.
+- Exploit catalog: **182 services / 3,434 actions**. Pattern library: **140 rules**.
   CLI (`nabu-cli`) and GUI (`nabu`) are now at **feature parity** for automatable work (see the
   parity note above for the intentional GUI-primary panels).
 - Full test suite green (**pytest EXIT=0**), all four gates clean.
