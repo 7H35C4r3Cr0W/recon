@@ -319,7 +319,9 @@ def exploit_cmd(
         prof = Profile.load(directory)
         values["target"] = prof.target.ip
         values["dc"] = prof.target.ip
-        values["url"] = f"http://{prof.target.host}/"
+        # no trailing slash: templates use {url}/path — a trailing slash double-slashed them
+        # (http://host//CHANGELOG.md). {url}?query still resolves fine.
+        values["url"] = f"http://{prof.target.host}"
         if prof.target.hostname and "." in prof.target.hostname:
             values["domain"] = prof.target.hostname.split(".", 1)[1]
         creds = prof.credentials()
@@ -348,7 +350,20 @@ def exploit_cmd(
             typer.echo(f"  {key:9} {spec.label:22} {len(spec.actions):3} actions   ports: {ports}")
         raise typer.Exit(0)
 
-    spec = exploit_mod.service_exploits(service)
+    # accept the service-name variants nmap/`enum` use (postgresql->postgres, etc.) so
+    # `exploit <name>` resolves the same key `enum <name>` and the tree use.
+    _ALIASES = {
+        "postgresql": "postgres",
+        "ms-sql-s": "mssql",
+        "microsoft-ds": "smb",
+        "netbios-ssn": "smb",
+        "domain": "dns",
+        "http": "web",
+        "https": "web",
+        "http-proxy": "squid",
+    }
+    key = _ALIASES.get(service.lower(), service)
+    spec = exploit_mod.service_exploits(key)
     if spec is None:
         typer.echo(f"[error] unknown service '{service}'", err=True)
         raise typer.Exit(2)
