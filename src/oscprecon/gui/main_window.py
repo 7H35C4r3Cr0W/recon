@@ -1295,6 +1295,16 @@ class MainWindow(QMainWindow):
                 self, "Missing input", "Both a profile name and a target are required."
             )
             return
+        # why: Profile.create maps name → workspace/<name>/ and overwrites profile.json — creating
+        # over an existing name would silently wipe that project's services/history/creds. Block it.
+        if (config.workspace_root() / name / "profile.json").exists():
+            QMessageBox.warning(
+                self,
+                "Project already exists",
+                f"A project named “{name}” already exists.\n\n"
+                "Open it instead (File → Open), or choose a different name.",
+            )
+            return
         try:
             profile = Profile.create(
                 config.workspace_root(), name, Target(ip=ip, hostname=hostname or None)

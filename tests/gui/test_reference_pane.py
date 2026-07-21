@@ -1,7 +1,13 @@
+from PySide6.QtWidgets import QListWidgetItem
 from pytestqt.qtbot import QtBot
 
 from oscprecon import hacktricks
-from oscprecon.gui.widgets.reference_pane import _FINDING_SECTIONS, ReferencePane
+from oscprecon.gui.widgets.reference_pane import (
+    _FINDING_SECTIONS,
+    _LABEL_ROLE,
+    _URL_ROLE,
+    ReferencePane,
+)
 from oscprecon.models import DiscoveredService, Proto
 from oscprecon.references import ServiceRef
 from oscprecon.references.live_hacktricks import LiveResult
@@ -31,6 +37,22 @@ def test_no_offline_page_falls_back_to_live_tab(qtbot: QtBot) -> None:
     pane.show_service(DiscoveredService(80, Proto.TCP, "http"), _ref("vhost", _SMB_URL))
     assert pane._tabs.currentIndex() == pane._live_index
     assert "No offline HackTricks page" in pane.offline_text()
+
+
+def test_clicking_edb_result_switches_to_live_tab(qtbot: QtBot) -> None:
+    # regression: after show_service the pane sits on the Offline tab; clicking an Exploit-DB result
+    # must switch to the Live tab so the loading page (or the "web view unavailable" fallback) is
+    # actually visible — otherwise the click looks like a no-op.
+    pane = ReferencePane()
+    qtbot.addWidget(pane)
+    pane.show_service(DiscoveredService(445, Proto.TCP, "microsoft-ds"), _ref("smb", _SMB_URL))
+    assert pane._tabs.currentIndex() == pane._offline_index  # offline-first default
+    item = QListWidgetItem("EDB-12345 — some exploit")
+    item.setData(_URL_ROLE, "https://www.exploit-db.com/exploits/12345")
+    item.setData(_LABEL_ROLE, "EDB-12345")
+    pane._exploits.addItem(item)
+    pane._on_exploit_activated(item)
+    assert pane._tabs.currentIndex() == pane._live_index  # surfaced the EDB page / fallback
 
 
 def test_clear_on_no_service(qtbot: QtBot) -> None:

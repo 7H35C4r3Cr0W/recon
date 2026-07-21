@@ -63,8 +63,14 @@ class NotesPane(QWidget):
         if self._profile is None or self._profile.read_only:
             return
         path = self._profile.notes_path
-        # why: atomic write (temp+replace) — notes are the user's findings; don't lose them.
+        # why: atomic write (temp+replace) — notes are the user's findings; don't lose them. Surface
+        # a failed save in the status label (this runs off a debounce timer, so an unhandled OSError
+        # would only reach the diagnostics log while the label kept claiming "saved").
         tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text(self._editor.toPlainText(), encoding="utf-8")
-        tmp.replace(path)
+        try:
+            tmp.write_text(self._editor.toPlainText(), encoding="utf-8")
+            tmp.replace(path)
+        except OSError as exc:
+            self._status.setText(f"⚠ NOT saved: {exc}")
+            return
         self._status.setText(f"saved · {path.name}")

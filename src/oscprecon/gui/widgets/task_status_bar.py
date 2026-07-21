@@ -88,7 +88,9 @@ class TaskStatusBar(QWidget):
             button.setIconSize(QSize(tokens.ICON_SM, tokens.ICON_SM))
             button.setToolTip(f"Stop {task.label}")
             button.setCursor(Qt.CursorShape.PointingHandCursor)
-            button.clicked.connect(lambda _checked=False, worker=task.worker: self._cancel(worker))
+            button.clicked.connect(
+                lambda _checked=False, worker=task.worker, b=button: self._cancel(worker, b)
+            )
             chip_row.addWidget(button)
             self._row.addWidget(chip)
         if len(tasks) > 1:
@@ -100,5 +102,10 @@ class TaskStatusBar(QWidget):
             self._row.addWidget(stop_all)
         self._row.addStretch(1)
 
-    def _cancel(self, worker: object) -> None:
+    def _cancel(self, worker: object, button: QPushButton | None = None) -> None:
+        # why: cancel() sets an Event but doesn't emit changed, so the chip isn't rebuilt until the
+        # worker actually exits (seconds for a long scan) — give immediate click feedback meanwhile.
+        if button is not None:
+            button.setEnabled(False)
+            button.setText(" Stopping…")
         self._manager.cancel(worker)

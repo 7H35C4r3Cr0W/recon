@@ -37,6 +37,37 @@ def _no_preflight() -> None:
 # --- Edit-project dialog + handler ----------------------------------------------------------------
 
 
+def test_new_project_over_existing_name_is_blocked_not_wiped(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # regression: creating a New Project whose name matches an existing one must NOT overwrite/wipe
+    # that project's profile.json — it must warn and leave the existing project untouched.
+    from oscprecon.models import DiscoveredService, Proto
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    existing = Profile.create(config.workspace_root(), "dup", Target(ip="10.10.10.5"))
+    existing.set_services([DiscoveredService(port=445, proto=Proto.TCP, service="smb")])
+    existing.save()
+
+    def fake_exec(self: NewProfileDialog) -> int:
+        self._name.setText("dup")  # same name, different target
+        self._ip.setText("10.10.10.9")
+        return int(QDialog.DialogCode.Accepted)
+
+    monkeypatch.setattr(NewProfileDialog, "exec", fake_exec)
+    warned: list[object] = []
+    monkeypatch.setattr(
+        "oscprecon.gui.main_window.QMessageBox.warning", lambda *a, **k: warned.append(a)
+    )
+    window._on_new()
+
+    assert warned  # the "already exists" warning fired
+    reloaded = Profile.load(config.workspace_root() / "dup")
+    assert reloaded.target.ip == "10.10.10.5"  # original target preserved
+    assert [s.port for s in reloaded.discovered_services] == [445]  # services NOT wiped
+
+
 def test_new_profile_dialog_edit_mode_prefills(qtbot: QtBot) -> None:
     dialog = NewProfileDialog(
         title="Edit Project", name="mybox", ip="10.1.1.1", hostname="a.htb", edit=True

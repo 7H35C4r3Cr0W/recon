@@ -56,7 +56,10 @@ class LdapPanel(QWidget):
         self._manual.itemActivated.connect(self._on_manual_activated)
         self._manual.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._manual.customContextMenuRequested.connect(self._on_manual_menu)
-        manual_box = QGroupBox("Manual follow-ups (Tier 2 — double-click; edit USER/PASSWORD)")
+        manual_box = QGroupBox(
+            "Manual follow-ups (Tier 2 — double-click to run · right-click → Copy to edit "
+            "USER/PASSWORD first)"
+        )
         QVBoxLayout(manual_box).addWidget(self._manual)
 
         self._summary = QListWidget()

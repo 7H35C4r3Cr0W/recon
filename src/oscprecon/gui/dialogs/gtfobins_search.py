@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon.gui.theme import tokens
+from oscprecon.gui.theme import styles, tokens
 from oscprecon.references import gtfobins
 
 _BIN_ROLE = Qt.ItemDataRole.UserRole
@@ -151,13 +151,14 @@ class GtfobinsDialog(QDialog):
         row = QHBoxLayout()
         row.addWidget(body, stretch=1)
         copy = QPushButton("Copy")
-        copy.clicked.connect(lambda _=False, code=tech.code: self._copy(code))
+        copy.clicked.connect(lambda _=False, code=tech.code, b=copy: self._copy(code, b))
         row.addWidget(copy, alignment=Qt.AlignmentFlag.AlignTop)
         outer.addLayout(row)
         return card
 
     @staticmethod
-    def _copy(text: str) -> None:
+    def _copy(text: str, button: QPushButton) -> None:
         clip = QGuiApplication.clipboard()
         if clip is not None:
             clip.setText(text)
+        styles.flash_copied(button)

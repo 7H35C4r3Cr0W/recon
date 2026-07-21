@@ -47,10 +47,14 @@ class SimpleReconPanel(QWidget):
         self._manual.itemActivated.connect(self._on_manual_activated)
         self._manual.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._manual.customContextMenuRequested.connect(self._on_manual_menu)
-        manual_box = QGroupBox("Manual follow-ups (Tier 2 — double-click; edit literals first)")
+        manual_box = QGroupBox(
+            "Manual follow-ups (Tier 2 — double-click to run · right-click → Copy to edit "
+            "literals first)"
+        )
         QVBoxLayout(manual_box).addWidget(self._manual)
 
         self._summary = QListWidget()
+        self._seed_summary_placeholder()
         summary_box = QGroupBox("Findings so far")
         QVBoxLayout(summary_box).addWidget(self._summary)
 
@@ -78,20 +82,44 @@ class SimpleReconPanel(QWidget):
 
     def set_summary(self, lines: list[str]) -> None:
         self._summary.clear()
+        if not lines:
+            self._seed_summary_placeholder()
+            return
         for line in lines:
             self._summary.addItem(line)
+
+    def _seed_summary_placeholder(self) -> None:
+        item = QListWidgetItem("Run the recon button above to populate findings.")
+        item.setFlags(Qt.ItemFlag.NoItemFlags)
+        self._summary.addItem(item)
 
     def _reload_manual(self) -> None:
         self._manual.clear()
         if self._profile is None:
             return
         target = self._profile.target
+        # pre-fill {user}/{password}/{domain} from the first password credential (mirrors smb_panel)
+        # so credentialed follow-ups (kerberos/mssql/winrm/…) come filled instead of collapsing the
+        # placeholders to empty strings and looking runnable-but-broken.
+        cred = next((c for c in self._profile.credentials() if c.secret_type == "password"), None)
+        user = cred.username if cred is not None else ""
+        password = cred.secret if cred is not None else ""
+        domain = (cred.domain if cred is not None and cred.domain else "") or target.hostname or ""
         for entry in manual_commands.load_manual_commands(self._spec.manual_yaml):
             command = manual_commands.expand(
-                entry.command, target=(self._host_ip or target.ip), port=self._port
+                entry.command,
+                target=(self._host_ip or target.ip),
+                port=self._port,
+                domain=domain,
+                user=user,
+                password=password,
             )
             item = QListWidgetItem(f"{entry.description}\n    {command}")
             item.setData(_COMMAND_ROLE, command)
+            # dim entries that need creds we don't have yet — running them just fails on empty auth.
+            if "creds" in entry.requires and cred is None:
+                item.setFlags(Qt.ItemFlag.NoItemFlags)
+                item.setToolTip("Add a credential first (this command needs {user}/{password}).")
             self._manual.addItem(item)
 
     def _on_manual_activated(self, item: QListWidgetItem) -> None:

@@ -56,7 +56,10 @@ class DnsPanel(QWidget):
         self._manual.itemActivated.connect(self._on_manual_activated)
         self._manual.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._manual.customContextMenuRequested.connect(self._on_manual_menu)
-        manual_box = QGroupBox("Manual follow-ups (Tier 2 — double-click; edit TARGET_IP)")
+        manual_box = QGroupBox(
+            "Manual follow-ups (Tier 2 — double-click to run · right-click → Copy to edit "
+            "TARGET_IP first)"
+        )
         QVBoxLayout(manual_box).addWidget(self._manual)
 
         self._summary = QListWidget()

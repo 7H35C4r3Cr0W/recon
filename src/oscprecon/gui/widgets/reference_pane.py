@@ -456,5 +456,8 @@ class ReferencePane(QWidget):
         url = item.data(_URL_ROLE)
         if isinstance(url, str) and url:
             self._load(QUrl(url))
+            # why: the pane usually sits on the Offline tab after show_service; the EDB page loads
+            # into the Live tab, so surface it (or the "web view unavailable" fallback) on click.
+            self._tabs.setCurrentIndex(self._live_index)
             label = item.data(_LABEL_ROLE)
             self.page_visited.emit(str(label) if isinstance(label, str) else "exploit-db", url)

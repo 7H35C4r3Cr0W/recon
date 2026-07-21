@@ -158,7 +158,14 @@ class MsfvenomBuilderDialog(QDialog):
                 self._fmt.blockSignals(True)
                 self._fmt.setCurrentIndex(idx)
                 self._fmt.blockSignals(False)
-            self._outfile.setPlaceholderText(f"auto: shell.{payload.default_ext}")
+            # why: build_command suppresses -o for raw formats (prints to stdout), so don't promise
+            # an auto-saved file the command never writes.
+            if payload.default_format == "raw":
+                self._outfile.setPlaceholderText(
+                    "raw payload prints to stdout — type a filename to save"
+                )
+            else:
+                self._outfile.setPlaceholderText(f"auto: shell.{payload.default_ext}")
         self._rebuild()
 
     def _spec(self) -> msfvenom.MsfvenomSpec:

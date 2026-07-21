@@ -18,13 +18,13 @@ class ReportView(QWidget):
         self._browser = QTextBrowser()
         self._browser.setOpenExternalLinks(True)
 
-        regenerate = QPushButton("Regenerate")
-        regenerate.clicked.connect(self.reload)
+        self._regenerate = QPushButton("Regenerate")
+        self._regenerate.clicked.connect(self.reload)
         self._open_editor = QPushButton("Open in editor")
         self._open_editor.clicked.connect(self._on_open_in_editor)
 
         bar = QHBoxLayout()
-        bar.addWidget(regenerate)
+        bar.addWidget(self._regenerate)
         bar.addWidget(self._open_editor)
         bar.addStretch(1)
 
@@ -38,6 +38,9 @@ class ReportView(QWidget):
         self.reload()
 
     def reload(self) -> None:
+        # why: enabled-but-no-op buttons read as broken — gate both on a loaded profile.
+        self._regenerate.setEnabled(self._profile is not None)
+        self._open_editor.setEnabled(self._profile is not None)
         if self._profile is None:
             self._browser.setMarkdown("_No profile loaded._")
             return
