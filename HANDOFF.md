@@ -283,17 +283,27 @@ QT_QPA_PLATFORM=offscreen uv run pytest -q      # slow on this VM (~20 min); run
 The pytest suite is slow here — run the **targeted** test files for what you touched first, then a
 full-suite backstop in the background (write a done-marker, poll it) before reporting.
 
-## How I work on this (the owner's expectations)
-- **⚠⚠⚠⚠ RUN THE FULL GAMBIT + SMOKE-TEST FOR BUGS + ADD EVERYTHING REUSABLE — every live box.**
-  For every box: (a) field-test the ENTIRE set of RELEVANT modules (recon+enum+attack) against the
-  live target and give a **PASS/FAIL per module** — only test services the box actually runs; (b)
-  **smoke-test hunting for bugs** (the DarkCorp run found + fixed `{url}` double-slash and the
-  `postgresql`/`postgres` exploit-key mismatch, and flagged `enum` missing http/ssh — that's the
-  point of live testing); (c) **ADD EVERYTHING REUSABLE** — if a command/technique/primitive is
-  GENERIC and usable on a future box (PostgreSQL-SQLi web-param templates, RoundCube CVE stored-XSS,
-  webmail contact-IDOR→blind-XSS-exfil, etc.), add it as a recon module / pattern / Exploitation-tab
-  template. Novel box-specific payloads still get hand-crafted per box — don't hardcode those; capture
-  the reusable CLASS. (memory `live-box-always`.)
+## ⭐ WHAT THIS TOOL IS FOR (read this first — the owner had to correct me hard on it)
+**Nabu is a recon/attack DECISION-AID + automated WORKFLOW for the pentester. It is NOT a CVE/exploit
+database.** The value is helping the operator make good recon/enum/attack DECISIONS fast and run a
+clean automated recon/enum workflow — NOT hoarding every CVE and PoC. **Do NOT dump box-specific CVE
+exploits / novel one-off payloads into the attack modules — that's insanity and bloats the tool; each
+CTF is different and those get hand-crafted per box anyway.** If you ever add a specific-CVE exploit
+action, DELETE it. What the attack side SHOULD carry is GENERIC, reusable DECISION-AID technique
+CLASSES (e.g. "you have PostgreSQL SQLi as superuser → here are the file-read / RCE paths"), not
+"CVE-XXXX-YYYY PoC runner".
+
+## ⚠⚠⚠⚠ EVERY LIVE BOX: FULL-GAMBIT SMOKE-TEST TO FIND TOOL BUGS + AUGMENT THE REUSABLE WORKFLOW
+The point of running against a live box is to **find and fix BUGS in the recon/enum/attack GUI+CLI**
+and confirm the tool actually AIDS the operator's decisions — not to harvest exploits. For every box:
+- (a) Field-test the RELEVANT modules (recon+enum+attack — only services the box actually runs) against
+  the live target; give a **PASS/FAIL per module**.
+- (b) **Hunt tool bugs** and fix them — that's the payoff (the DarkCorp run found+fixed `{url}`
+  double-slash, the `postgresql`/`postgres` exploit-key mismatch, and `enum` not covering http/ssh).
+- (c) **Augment the REUSABLE recon/enum/decision-aid** — add generic improvements that help on FUTURE
+  boxes (e.g. `enum` now runs the full recon modules; a generic PostgreSQL-SQLi decision-aid).
+  **Do NOT add box-specific CVE payloads** — capture only the reusable class / recon-enum improvement /
+  bug fix. (memory `live-box-always`, `tool-is-decision-aid-not-cve-db`.)
 - **⚠⚠⚠ "TEST IT" = RECON **AND** ATTACK THE LIVE BOX, END-TO-END — NON-NEGOTIABLE (owner ANGRY, said 3×).**
   When the owner says test/hit a box, they mean actually WORK it on the real target through the WHOLE
   chain — recon AND the attack path (foothold → user → root): stand up a catcher on tun0, exploit,
