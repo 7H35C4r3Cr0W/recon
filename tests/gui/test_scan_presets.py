@@ -33,11 +33,20 @@ def test_scan_preset_prefills_command_builder(qtbot: QtBot, tmp_path: Path) -> N
     assert window._tasks.active_count == 0  # nothing launched
 
 
-def test_scan_preset_noop_without_profile(qtbot: QtBot) -> None:
+def test_scan_preset_without_profile_shows_feedback(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import oscprecon.gui.main_window as mw
+
+    # loading a preset with no project shows a dialog (§24 — never a silent no-op). Spy the modal so
+    # the headless test doesn't block on it, and assert the feedback fired + nothing loaded/ran.
+    shown: list[object] = []
+    monkeypatch.setattr(mw.QMessageBox, "information", lambda *a, **k: shown.append(a))
     window = MainWindow()
     qtbot.addWidget(window)
-    window._on_scan_preset("nmap -p- {target}")  # no profile -> must not raise
-    assert window._tool_panel._command.text() == ""
+    window._on_scan_preset("nmap -p- {target}")  # no profile
+    assert shown  # the "open or create a project first" dialog was shown
+    assert window._tool_panel._command.text() == ""  # nothing dropped into the builder
 
 
 def test_start_recon_passes_the_chosen_profile(
