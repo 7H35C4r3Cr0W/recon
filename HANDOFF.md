@@ -15,8 +15,21 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD `d64391c`: HTB RopeTwo box review (generic recon/attack classes; V8/heap/kernel chains excluded)** (pushed).
+- **github/main HEAD `3d085d1`: HTB DarkCorp box review (LIVE-validated) — AD relay/loot + PG-superuser + SSSD** (pushed).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-21e) — **HTB DarkCorp box review, HIT LIVE** (Insane Win/AD). Owner (angrily, twice)
+  established the standing rule now at the top of "How I work": **hit the live box AND run the
+  walkthrough together; warn if the VPN is down.** Ran Nabu against 10.129.232.7 over VPN → 22/ssh +
+  80/nginx; **live-validated** the recon: the box uses an HTML **meta-refresh** redirect (not HTTP 301)
+  to drip.htb, and the whatweb parser's `meta-refresh-redirect` handling caught it correctly
+  (`redirect_to=drip.htb`). Then an 8-dimension survey→verify audit → `feat` `3d085d1` (catalog
+  3487→3497). Already-covered: the core NTLM-relay/PrinterBug/ESC8/shadow-cred/silvertkt/DCSync/bloodhound
+  chain in ad.py. Added: services.yaml Roundcube row + roundcube IDOR http pattern; postgres.py
+  `psql-lo-from-bytea-write` + `psql-archive-command-rce`; linux.py **"SSSD cache loot"**
+  (`sssd-read-config`/`sssd-extract-cached-hash` → cached AD $6$ hash); ad.py `getTGT-enterprise-principal`
+  (mixed-vendor "broken marriage" Kerberos) + `krbrelay-adcs` (Kerberos ESC8 relay) +
+  `dnsadmins-serverlevelplugindll`; windows.py `credman-get-storedcredential` + `credman-scheduledtask-dump`
+  + `dpapi-decrypt-blob-local`.
 - Session (2026-07-21d) — **HTB RopeTwo box review** (Insane exploit-dev: V8 type-confusion → glibc heap
   tcache → Linux-kernel-module ROP). The bespoke V8/heap/kernel chains are **box-specific and OUT per §21**
   (the audit verifier rejected them). 6-dimension survey→verify **audit workflow** → `feat` `d64391c`.
@@ -271,6 +284,16 @@ The pytest suite is slow here — run the **targeted** test files for what you t
 full-suite backstop in the background (write a done-marker, poll it) before reporting.
 
 ## How I work on this (the owner's expectations)
+- **⚠⚠ EVERY BOX = HIT THE LIVE BOX **AND** RUN THE WALKTHROUGH — NON-NEGOTIABLE (owner ANGRY, said twice).**
+  A "box review" is NOT walkthrough-only. For EVERY box the owner gives with an IP: (1) **check the VPN
+  tunnel** (`ip -brief addr show | grep tun`, route to `10.129.0.0/16`) and confirm the target is
+  reachable, and **SAY the result**; (2) if up, **actually run Nabu against the live target**
+  (`nabu-cli scan <ip> -p <profile>`, then validate recon features on real data — e.g. DarkCorp's
+  meta-refresh→vhost; run `enum`, exploit templates, GUI) — dogfood the tool + find real bugs/UX; (3)
+  read the walkthrough **in parallel** and build/fix the generic techniques. **If the OVPN/tunnel is
+  DOWN or the box is unreachable, WARN THE OWNER IMMEDIATELY** ("tunnel's down, can't hit it live") —
+  never silently fall back to walkthrough-only. (memory `live-box-always` — the owner keeps the VPN
+  open specifically so the tool is validated live; skipping it twice made them furious.)
 - **⚠ EVERY BOX REVIEW CHECKS BOTH RECON AND ATTACK — NON-NEGOTIABLE.** Do NOT wave off the attack
   side as "out of §21 scope". For each box: (1) fix the **recon** gaps AND (2) verify the
   **Exploitation-tab** catalog (§2b, `exploit/*.py`) carries the **generic** techniques for the box's
