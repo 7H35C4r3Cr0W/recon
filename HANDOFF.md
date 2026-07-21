@@ -15,8 +15,30 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: Spider + Breadcrumbs box reviews + attack-coverage catch-up** (pushed; see `git log`).
+- **github/main HEAD `41db300`: Cereal box review + cross-box attack-coverage + GUI-UX round 2** (pushed).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20l) — **Cereal box + overnight "hammer large chunks": attack-coverage catch-up + GUI-UX round 2 + full-suite hang fix.**
+  - **Full-suite hang FIXED (root cause found).** The deterministic ~16% freeze was NOT flaky/env — a
+    modal `QMessageBox.information` I'd added to `_on_scan_preset` (no-project path) blocked forever
+    headless. Fixed the specific test (spy the modal) **and** added a systemic conftest autouse guard
+    `_neuter_blocking_dialogs` that auto-answers every QMessageBox/QFileDialog/QInputDialog/QDialog.exec
+    so any stray modal is now a fast FAILURE, not a hang (a test needing a real return overrides it).
+    Verified the suite sails past 16%. Commits `af27d72` + `0648a6e`.
+  - **Attack-coverage audit → `7081eba`** — audited the Exploitation catalog vs Phoenix/Drive/Cereal/
+    Snoopy chains (Workflow); confirmed most feared gaps were ALREADY covered (flask-unsign, git-dumper,
+    ysoserial.NET, graphql-introspection, GodPotato/SweetPotato) and added the **7 genuinely-missing
+    generic techniques**: `totp-code-from-secret` (oathtool — the missing last mile of a 2FA bypass),
+    Django known-SECRET_KEY leak+forge (parallels the Flask coverage), `xss-ssrf-internal-read`,
+    `crack-phpass` (hashcat -m 400), `genericpotato-shell` (completes the potato family),
+    `nsupdate-tsig-key-authenticated-update`, and a `clamscan` GTFOBins entry. Regression-locked in
+    `test_recent_box_attack_techniques_present`; §21-safe (generic classes, no CVE/box payloads).
+  - **GUI-UX round 2 → `41db300`** — 16-agent find→verify review found 11 confirmed defects, all fixed:
+    (HIGH) EDB-result click now switches to the Live tab (was loading behind the hidden tab); New Project
+    over an existing name now BLOCKS instead of silently wiping profile.json; simple-recon Tier-2
+    follow-ups now fill {user}/{password}/{domain} + dim requires:["creds"]. (MED) per-task Stop button
+    feedback; gtfobins Copy flash; notes-pane autosave-failure surfaced; honest manual-followup labels.
+    (LOW) simple-panel empty-state placeholder; msfvenom raw-format placeholder truth; report_view
+    buttons gated on a loaded profile. +2 regression tests (EDB tab-switch, new-project no-wipe).
 - Session (2026-07-20k) — **Breadcrumbs box review + the owner's recon-AND-attack catch-up.** The owner
   (rightly, angrily) called out that the last few box reviews skipped the ATTACK side. Fixed:
   - **Recon (Breadcrumbs) `<discovered-urls uploads flag>`** — the Discovered-URLs "Important" column
