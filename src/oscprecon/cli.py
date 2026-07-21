@@ -662,6 +662,18 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
     ]
     if not ports:
         ports = [Port(number=default_port, proto=Proto.TCP, service=service)]
+    if service == "http":
+        # an unresolved profile hostname makes every http probe fail with "no address" — warn and
+        # let the module fall back to the IP so recon still works (add /etc/hosts for a real vhost).
+        from oscprecon.modules.http import effective_web_host
+
+        _, unresolved = effective_web_host(prof.target)
+        if unresolved:
+            typer.echo(
+                f"⚠ hostname '{prof.target.hostname}' does not resolve — probing the IP "
+                f"{prof.target.ip} instead. For a name-based vhost, add "
+                f"'{prof.target.ip} {prof.target.hostname}' to /etc/hosts and re-run."
+            )
     raw: dict[str, str] = {}
     issues: list[str] = []
     for command, key in _tier1_enum_steps(service, module, prof.target, default_port, ports):

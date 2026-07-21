@@ -190,6 +190,32 @@ def test_suggest_ua_gate_hint() -> None:
     )
 
 
+def test_effective_web_host_falls_back_on_unresolvable_hostname(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # HTB Falafel/Holiday: a profile hostname not in /etc/hosts makes every http probe fail with
+    # "no address" → recon silently returns nothing. effective_web_host must fall back to the IP.
+    from oscprecon.modules import http as httpmod
+
+    monkeypatch.setattr(
+        httpmod, "host_resolves", lambda _n: True
+    )  # resolvable → keep the vhost name
+    host, unresolved = httpmod.effective_web_host(Target(ip="10.10.10.5", hostname="box.htb"))
+    assert host == "box.htb" and unresolved is False
+    monkeypatch.setattr(
+        httpmod, "host_resolves", lambda _n: False
+    )  # unresolvable → fall back to IP
+    host, unresolved = httpmod.effective_web_host(Target(ip="10.10.10.5", hostname="box.htb"))
+    assert host == "10.10.10.5" and unresolved is True
+    # no hostname → the IP, no warning (nothing to resolve)
+    host, unresolved = httpmod.effective_web_host(Target(ip="10.10.10.5"))
+    assert host == "10.10.10.5" and unresolved is False
+    # and commands() must build probe URLs against the IP, not the dead hostname
+    cmds = httpmod.HttpModule().commands(
+        Target(ip="10.10.10.5", hostname="box.htb"), [Port(80, Proto.TCP, "http")]
+    )
+    assert all("box.htb" not in c.shell_line for c in cmds)
+    assert any("http://10.10.10.5/" in c.shell_line for c in cmds)
+
+
 def test_ua_gate_detector() -> None:
     from oscprecon.modules.http import detect_ua_gate
 

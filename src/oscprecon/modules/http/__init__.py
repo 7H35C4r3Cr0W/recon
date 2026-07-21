@@ -39,6 +39,8 @@ __all__ = [
     "detect_api_server",
     "detect_ua_gate",
     "detect_wordpress",
+    "effective_web_host",
+    "host_resolves",
     "email_domains_from_plugins",
     "is_tls",
     "is_vhost_host",
@@ -129,6 +131,29 @@ def default_url(host: str, port: int, tls: bool) -> str:
     if port == default_port:
         return f"{scheme}://{host}/"
     return f"{scheme}://{host}:{port}/"
+
+
+def host_resolves(name: str) -> bool:
+    # True if the name resolves via DNS or /etc/hosts. Used to avoid pointing http probes at a vhost
+    # the operator hasn't added to /etc/hosts yet (which fails with "no address" and zeroes recon).
+    import socket
+
+    try:
+        socket.getaddrinfo(name, None)
+    except OSError:
+        return False
+    return True
+
+
+def effective_web_host(target: Target) -> tuple[str, bool]:
+    # Returns (host_to_probe, hostname_unresolved). A hostname is correct for name-based vhosts, but
+    # only if it resolves — when it doesn't, every whatweb/curl/ferox probe fails and http recon
+    # silently returns nothing (seen live on HTB Holiday + Falafel). Fall back to the IP so recon
+    # works, and flag it so the caller can tell the operator to add the /etc/hosts entry.
+    name = target.hostname
+    if name and name != target.ip and not host_resolves(name):
+        return target.ip, True
+    return target.host, False
 
 
 def default_output(port: int, tool: str, wordlist: str) -> str:
@@ -253,11 +278,13 @@ class HttpModule(Module):
 
     def commands(self, target: Target, ports: list[Port]) -> list[Command]:
         commands: list[Command] = []
+        # target.host prefers the vhost name when set (so probes hit name-based virtual hosts like
+        # thetoppers.htb) — but only if it resolves; an unresolved hostname makes every probe fail,
+        # so effective_web_host falls back to the IP (add the /etc/hosts entry to enable the vhost).
+        web_host, _ = effective_web_host(target)
         for port in ports:
             tls = is_tls(port.service, port.number)
-            # target.host prefers the vhost name when set, so probes hit name-based virtual hosts
-            # (e.g. thetoppers.htb) that the bare IP won't serve — requires the /etc/hosts entry.
-            url = default_url(target.host, port.number, tls)
+            url = default_url(web_host, port.number, tls)
             base = f"http/{port.number}"
             commands += [
                 Command(
