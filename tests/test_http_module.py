@@ -168,6 +168,37 @@ def test_suggest_api_server_enumeration() -> None:
     )
 
 
+def test_suggest_ua_gate_hint() -> None:
+    # HTB Holiday: a Node/Express app that 404s the root to a non-browser UA. whatweb sees
+    # Title[Error]/X-Powered-By[Express]; suggest() must nudge to re-probe with a full browser UA.
+    module = HttpModule()
+    out = module.suggest(
+        [
+            Finding(
+                service="http", title="404 /", detail="whatweb: Title[Error], X-Powered-By[Express]"
+            )
+        ]
+    )
+    ua = [line for line in out if "User-Agent filter" in line]
+    assert ua and "curl -A" in ua[0] and "AppleWebKit" in ua[0]
+    # a normal 200 page with real content gets no UA-gate nudge
+    assert not any(
+        "User-Agent filter" in line
+        for line in module.suggest(
+            [Finding(service="http", title="200 /", detail="whatweb: Apache[2.4.52], Title[Home]")]
+        )
+    )
+
+
+def test_ua_gate_detector() -> None:
+    from oscprecon.modules.http import detect_ua_gate
+
+    assert detect_ua_gate("<pre>Cannot GET /login</pre>") is True
+    assert detect_ua_gate("whatweb: Title[Error], X-Powered-By[Express]") is True
+    # a page that merely mentions "error" in prose must NOT fire
+    assert detect_ua_gate("Login error: invalid password. Title[Dashboard]") is False
+
+
 def test_suggest_vhost_from_redirect() -> None:
     # Responder: whatweb's Meta-Refresh-Redirect surfaces a vhost the bare IP won't serve.
     module = HttpModule()

@@ -823,3 +823,16 @@ _API_SERVER_RE = re.compile(
 
 def detect_api_server(*texts: str) -> bool:
     return _API_SERVER_RE.search(" ".join(texts)) is not None
+
+
+# a live web server that returns an error/empty root ("Cannot GET /" is the Express/Node default
+# 404, a bare Title[Error]) — often just a missing / route, but also the tell of a User-Agent
+# filter: some apps 404/403 a curl/feroxbuster/no-UA request and serve real content ONLY to a full
+# browser UA (HTB Holiday 404s the root unless the UA is a complete browser string). Anchored so a
+# page that merely mentions "error" in its body doesn't fire — it must be the Express 404 phrase or
+# a whatweb Title[Error].
+_UA_GATE_RE = re.compile(r"cannot get /|title\[error\]", re.IGNORECASE)
+
+
+def detect_ua_gate(*texts: str) -> bool:
+    return _UA_GATE_RE.search(" ".join(texts)) is not None

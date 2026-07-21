@@ -10,6 +10,7 @@ from oscprecon.modules.base import Module
 from oscprecon.modules.http.parsers import (
     HttpFinding,
     detect_api_server,
+    detect_ua_gate,
     detect_wordpress,
     email_domains_from_plugins,
     is_vhost_host,
@@ -36,6 +37,7 @@ __all__ = [
     "default_output",
     "default_url",
     "detect_api_server",
+    "detect_ua_gate",
     "detect_wordpress",
     "email_domains_from_plugins",
     "is_tls",
@@ -147,6 +149,10 @@ class HttpScanSettings:
     skip_tls: bool = True
     status_codes: list[int] = field(default_factory=list)
     output_file: str = ""
+    # empty = the tool's own default UA (matches the §9 reference command). Set a full browser UA to
+    # defeat apps that filter by User-Agent — some (Node/Express, WAFs) 404/403 a curl/ferox/
+    # gobuster UA and only serve real content to a browser string. See suggest()'s UA-gate hint.
+    user_agent: str = ""
 
 
 def _csv(values: list[int]) -> str:
@@ -162,6 +168,8 @@ def _build_feroxbuster(s: HttpScanSettings) -> str:
         parts += ["--rate-limit", str(s.rate_limit)]
     if s.skip_tls:
         parts += ["-k"]
+    if s.user_agent:
+        parts += ["-a", _q(s.user_agent)]
     if s.status_codes:
         parts += ["-s", _csv(s.status_codes)]
     if s.output_file:
@@ -176,6 +184,8 @@ def _build_gobuster(s: HttpScanSettings) -> str:
     parts += ["-t", str(s.threads), "--timeout", f"{s.timeout}s"]
     if s.skip_tls:
         parts += ["-k"]
+    if s.user_agent:
+        parts += ["-a", _q(s.user_agent)]
     if s.status_codes:
         parts += ["-b", '""', "-s", _csv(s.status_codes)]
     if s.output_file:
@@ -193,6 +203,8 @@ def _build_ffuf(s: HttpScanSettings) -> str:
         parts += ["-recursion", "-recursion-depth", str(s.depth)]
     if s.rate_limit:
         parts += ["-rate", str(s.rate_limit)]
+    if s.user_agent:
+        parts += ["-H", _q(f"User-Agent: {s.user_agent}")]
     if s.status_codes:
         parts += ["-mc", _csv(s.status_codes)]
     if s.output_file:
@@ -207,6 +219,8 @@ def _build_dirsearch(s: HttpScanSettings) -> str:
     parts += ["-t", str(s.threads), "--timeout", str(s.timeout)]
     if s.depth:
         parts += ["-r", "--recursion-depth", str(s.depth)]
+    if s.user_agent:
+        parts += ["--user-agent", _q(s.user_agent)]
     if s.status_codes:
         parts += ["-i", _csv(s.status_codes)]
     if s.output_file:
@@ -324,6 +338,18 @@ class HttpModule(Module):
                 "surface, not just files: curl the auto-generated docs/schema (/openapi.json, "
                 "/docs, /redoc, /swagger.json) and probe versioned roots (/api, /api/v1). They "
                 "list every route and its parameters."
+            )
+        # the root returned a 404/Error page — often a missing / route, but also the classic tell of
+        # a User-Agent filter: some apps 404/403 a curl/ferox/gobuster (or no) UA and serve real
+        # content ONLY to a full browser string. Cheap to rule out, and it's why the tool's default
+        # probes can see an empty site the browser doesn't (§9).
+        if detect_ua_gate(blob):
+            out.append(
+                "Root returned a 404/Error page — if the site looks empty it may be a missing "
+                "route OR a User-Agent filter (some apps 404 a curl/feroxbuster/no-UA request and "
+                "only serve a full browser string). Re-probe with a browser UA: curl -A 'Mozilla/"
+                "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' {url} — if content appears, "
+                "set that User-Agent for content discovery (feroxbuster -a / ffuf -H)."
             )
         # a Location is a bare host (whatweb), a full URL (ferox/gobuster/ffuf) or a relative path;
         # vhost_from_redirect pulls the hostname from any of them, so 'http://internal.htb/' shows.

