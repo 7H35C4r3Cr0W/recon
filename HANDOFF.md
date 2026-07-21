@@ -15,8 +15,21 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD: Spider box review** (pushed; see `git log`).
+- **github/main HEAD: Spider + Breadcrumbs box reviews + attack-coverage catch-up** (pushed; see `git log`).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-20k) — **Breadcrumbs box review + the owner's recon-AND-attack catch-up.** The owner
+  (rightly, angrily) called out that the last few box reviews skipped the ATTACK side. Fixed:
+  - **Recon (Breadcrumbs) `<discovered-urls uploads flag>`** — the Discovered-URLs "Important" column
+    flagged source/backup/VCS files but not an `/uploads/`-type directory (the webshell-drop target,
+    Breadcrumbs' `/portal/uploads/`). New `is_upload_dir`/`interesting_path_reason` (curated high-signal
+    names, no `/files`/`/images` noise) → upload dirs get their own ⚠ flag + tooltip + CSV label.
+  - **ATTACK catch-up `0fd47b3`** — audited the Exploitation catalog vs Spider/Breadcrumbs/EarlyAccess/
+    Spooktrol attack chains (via a Workflow) and added the **6 generic techniques** that were missing:
+    4 Jinja2 SSTI WAF-bypass payloads (Spider), `jwt-alg-confusion` (Breadcrumbs — completes jwt_tool
+    set), `upload-filename-traversal-write` (Spooktrol), `php-variable-function-rce` (EarlyAccess),
+    generic SQLite loot triage + row-injection (Spooktrol), `arp` capability file-read + gtfobins
+    (EarlyAccess). All pass the Popen-safe/no-restricted guards; §21-safe (generic classes, no CVE/box
+    payloads). **Rule now in this file's "How I work": every box review checks BOTH recon AND attack.**
 - Session (2026-07-20j) — **HTB Spider box review** (Hard Linux; web injection — SSTI/Flask-cookie
   forging/SQLi/WAF-bypass/XXE, all exploitation → out of §21 scope). Recon surface is thin: nmap →
   22/80 + an nginx 301 to `spider.htb` (**already** auto-set from both the nmap http-title redirect
@@ -183,6 +196,15 @@ The pytest suite is slow here — run the **targeted** test files for what you t
 full-suite backstop in the background (write a done-marker, poll it) before reporting.
 
 ## How I work on this (the owner's expectations)
+- **⚠ EVERY BOX REVIEW CHECKS BOTH RECON AND ATTACK — NON-NEGOTIABLE.** Do NOT wave off the attack
+  side as "out of §21 scope". For each box: (1) fix the **recon** gaps AND (2) verify the
+  **Exploitation-tab** catalog (§2b, `exploit/*.py`) carries the **generic** techniques for the box's
+  attack chain — and **add any missing generic technique** (like Phoenix's `cron-wildcard-rsync`,
+  Carpediem's docker `release_agent` escape). §21 forbids box-SPECIFIC exploit code / CVE payloads /
+  hardcoded creds; it does NOT forbid adding generic technique classes (SSTI/XXE/JWT-forging/SQLi/
+  unrestricted-upload/LFI-php-filter/cmd-injection/cookie-forging/wildcard-injection/capability-privesc).
+  Report BOTH sides per box. (memory `box-review-covers-recon-and-attack` — the owner was ANGRY about
+  this being skipped.)
 - **Autonomous + chunked.** Don't ask permission mid-task; do it, test, commit per logical chunk,
   report once. (See memory `work-fully-autonomously`, `autonomous-chunking`, `box-review-efficiency`.)
 - **Thorough — "I do not want to have to come back and revisit this."** On a broad ask, spawn parallel

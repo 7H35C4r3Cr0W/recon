@@ -276,10 +276,10 @@ def test_source_disclosure_row_is_flagged(qtbot: QtBot, tmp_path: Path) -> None:
     panel.set_profile(prof)
     panel.configure(DiscoveredService(80, Proto.TCP, "http"))
 
-    # the .swp row is marked source-disclosure (7th tuple element); index.php is not
+    # the .swp row is flagged with its reason (7th tuple element); index.php is not
     rows = {r[5]: r[6] for r in panel._collect_rows()}
-    assert rows["http://10.129.95.184/login/login.php.swp"] is True
-    assert rows["http://10.129.95.184/index.php"] is False
+    assert rows["http://10.129.95.184/login/login.php.swp"] == "source/backup disclosure"
+    assert rows["http://10.129.95.184/index.php"] == ""
 
     # displayed with a ⚠ prefix, but the plain URL still opens/copies
     swp_row = next(

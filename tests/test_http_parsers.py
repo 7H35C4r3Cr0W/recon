@@ -407,6 +407,19 @@ def test_is_source_disclosure_flags_swap_backup_vcs() -> None:
     assert not is_source_disclosure("/.svnfoo")
 
 
+def test_interesting_path_reason_flags_upload_dirs_and_disclosures() -> None:
+    # HTB Breadcrumbs: /portal/uploads/ is the webshell-drop target — a discovered upload directory
+    # gets its own flag in the Discovered-URLs table, distinct from a source/backup disclosure.
+    from oscprecon.modules.http.parsers import interesting_path_reason, is_upload_dir
+
+    assert is_upload_dir("/portal/uploads/") and is_upload_dir("/fileupload")
+    assert interesting_path_reason("/portal/uploads/") == "upload directory"
+    assert interesting_path_reason("/login/login.php.swp") == "source/backup disclosure"
+    # high-signal only — generic dirs are NOT flagged as upload targets (no noise)
+    for noise in ("/files/", "/images/", "/media/", "/books/", "/portal/", "/", "/index.php"):
+        assert interesting_path_reason(noise) == "", noise
+
+
 def test_whatweb_json_yields_redirect_vhost() -> None:
     # regression: the JSON path dropped the redirect->vhost finding the plain path produces
     import json

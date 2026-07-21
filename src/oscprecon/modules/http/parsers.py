@@ -106,6 +106,41 @@ def is_source_disclosure(path: str) -> bool:
     return ext in _SOURCE_DISCLOSURE_EXT
 
 
+# a discovered directory whose name signals a FILE-UPLOAD feature — the classic webshell drop / file
+# read target (HTB Breadcrumbs: /portal/uploads/). Curated to high-signal names (generic /files,
+# /images, /media are excluded as noise); matched on the last path segment.
+_UPLOAD_DIR_NAMES = frozenset(
+    {
+        "uploads",
+        "upload",
+        "uploaded",
+        "_uploads",
+        "fileupload",
+        "file-upload",
+        "uploadfiles",
+        "userfiles",
+        "user_files",
+        "filemanager",
+    }
+)
+
+
+def is_upload_dir(path: str) -> bool:
+    low = path.lower().rstrip("/")
+    if not low or low == "/":
+        return False
+    return low.rsplit("/", 1)[-1] in _UPLOAD_DIR_NAMES
+
+
+def interesting_path_reason(path: str) -> str:
+    """Why a discovered URL is worth flagging in the Discovered-URLs table — '' when it isn't."""
+    if is_source_disclosure(path):
+        return "source/backup disclosure"
+    if is_upload_dir(path):
+        return "upload directory"
+    return ""
+
+
 _SIZE_UNITS = (("KB", 1024), ("MB", 1024 * 1024), ("GB", 1024 * 1024 * 1024), ("B", 1))
 
 

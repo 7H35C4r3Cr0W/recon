@@ -25,7 +25,7 @@ from oscprecon import findings as findings_mod
 from oscprecon.gui.theme import tokens
 from oscprecon.models import DiscoveredService
 from oscprecon.modules.http import default_url, is_tls
-from oscprecon.modules.http.parsers import is_source_disclosure
+from oscprecon.modules.http.parsers import interesting_path_reason
 from oscprecon.profile import Profile
 
 # Clean, sortable "site map" of what a content-discovery run found on the current web port — the
@@ -136,7 +136,7 @@ class DiscoveredUrlsPanel(QWidget):
         self._table.setRowCount(0)
         rows = self._collect_rows()
         pal = tokens.palette(self._theme)
-        for status, method, lines, words, size, url, is_src in rows:
+        for status, method, lines, words, size, url, reason in rows:
             r = self._table.rowCount()
             self._table.insertRow(r)
             self._table.setItem(r, 0, self._status_item(status, pal))
@@ -144,7 +144,7 @@ class DiscoveredUrlsPanel(QWidget):
             self._table.setItem(r, 2, self._num_item(lines))
             self._table.setItem(r, 3, self._num_item(words))
             self._table.setItem(r, 4, self._num_item(size))
-            self._table.setItem(r, _URL_COL, self._url_item(url, pal, is_src))
+            self._table.setItem(r, _URL_COL, self._url_item(url, pal, reason))
         self._table.setSortingEnabled(True)
         # deterministic, recon-useful default: 200s first (found pages), then the rest by status.
         # The user can re-sort by any column.
@@ -178,7 +178,7 @@ class DiscoveredUrlsPanel(QWidget):
                     flagged_visible += 1
         self._set_count_text(self._table.rowCount(), visible, flagged_visible)
 
-    def _collect_rows(self) -> list[tuple[int, str, int, int, int, str, bool]]:
+    def _collect_rows(self) -> list[tuple[int, str, int, int, int, str, str]]:
         # one row per discovered URL on the CURRENT web port — the dir-buster findings (status +
         # path), not the whatweb fingerprint note. Deduped by (status, path); newest run wins. The
         # trailing bool marks a source/backup/VCS disclosure (.swp/.bak/.git/~) — flagged loud.
@@ -186,7 +186,7 @@ class DiscoveredUrlsPanel(QWidget):
             return []
         host = self._host_ip or self._profile.target.host
         base = default_url(host, self._port, self._tls).rstrip("/")
-        by_key: dict[tuple[int, str], tuple[int, str, int, int, int, str, bool]] = {}
+        by_key: dict[tuple[int, str], tuple[int, str, int, int, int, str, str]] = {}
         for f in findings_mod.load_findings(self._profile.directory):
             if f.get("module") != "http" or f.get("port") != self._port:
                 continue
@@ -203,7 +203,7 @@ class DiscoveredUrlsPanel(QWidget):
                 _int(f.get("words")),
                 _int(f.get("size")),
                 base + path,
-                is_source_disclosure(path),
+                interesting_path_reason(path),
             )
         return sorted(by_key.values(), key=lambda r: (r[0], r[_URL_COL]))
 
@@ -222,18 +222,20 @@ class DiscoveredUrlsPanel(QWidget):
             item.setForeground(QBrush(QColor(colour)))
         return item
 
-    def _url_item(self, url: str, pal: tokens.Palette, is_src: bool = False) -> QTableWidgetItem:
-        # source/backup/VCS disclosures (login.php.swp, .git/, *.bak) get a ⚠ + warning colour so
-        # they stand out among ordinary 200s; the plain URL still opens/copies via the role.
-        item = QTableWidgetItem(f"⚠ {url}" if is_src else url)
+    def _url_item(self, url: str, pal: tokens.Palette, reason: str = "") -> QTableWidgetItem:
+        # a flagged URL (source/backup/VCS disclosure like login.php.swp / .git/ / *.bak, or an
+        # upload directory like /uploads/) gets a ⚠ + warning colour so it stands out among ordinary
+        # 200s; the plain URL still opens/copies via the role.
+        item = QTableWidgetItem(f"⚠ {url}" if reason else url)
         item.setData(_URL_ROLE, url)
-        item.setForeground(QBrush(QColor(pal.warning if is_src else pal.accent)))
-        item.setToolTip(
-            "⚠ source / backup / VCS disclosure — download and read it (may leak source or "
-            "credentials). Double-click to open."
-            if is_src
-            else "Double-click to open in the browser"
-        )
+        item.setForeground(QBrush(QColor(pal.warning if reason else pal.accent)))
+        tooltips = {
+            "source/backup disclosure": "⚠ source / backup / VCS disclosure — download and read it "
+            "(may leak source or credentials). Double-click to open.",
+            "upload directory": "⚠ upload directory — a common webshell-drop / file-read target. "
+            "Double-click to open.",
+        }
+        item.setToolTip(tooltips.get(reason, "Double-click to open in the browser"))
         return item
 
     # --- interactions -------------------------------------------------------------------------
@@ -276,15 +278,14 @@ class DiscoveredUrlsPanel(QWidget):
             return
         # export the CLEANED view: only rows the current filter + hide-static toggle keep, so the
         # exported sheet matches what the operator is looking at. The trailing "Important" column
-        # carries the ⚠ source/backup/VCS-disclosure flag so the interesting URLs (login.php.swp,
-        # .git/, config.bak) are sortable/filterable in Excel — not lost like they were before.
+        # carries the ⚠ reason (source/backup/VCS disclosure like login.php.swp / .git/ / *.bak, or
+        # an upload directory like /uploads/) so the interesting URLs stay sortable in Excel.
         with open(path, "w", newline="", encoding="utf-8") as fh:
             writer = csv.writer(fh)
             writer.writerow((*_COLUMNS, "Important"))
-            for status, method, lines, words, size, url, is_src in self._collect_rows():
+            for status, method, lines, words, size, url, reason in self._collect_rows():
                 if self._passes(str(status), method, url):
-                    flag = "source/backup disclosure" if is_src else ""
-                    writer.writerow([status, method, lines, words, size, url, flag])
+                    writer.writerow([status, method, lines, words, size, url, reason])
 
     def _set_count_text(self, total: int, visible: int, flagged_visible: int) -> None:
         if total == 0:
@@ -293,7 +294,9 @@ class DiscoveredUrlsPanel(QWidget):
             )
             return
         flagged = (
-            f"  —  ⚠ {flagged_visible} source/backup file(s) flagged" if flagged_visible else ""
+            f"  —  ⚠ {flagged_visible} flagged (source/backup / upload dir)"
+            if flagged_visible
+            else ""
         )
         shown = f"{visible}" if visible == total else f"{visible} of {total} (filtered)"
         self._count.setText(
