@@ -90,6 +90,56 @@ _SOURCE_DISCLOSURE_EXT = frozenset(
 )
 _VCS_DIRS = (".git", ".svn", ".hg", ".bzr")
 
+# a source-code / site-backup ARCHIVE served at the web root — a web app advertising "open source"
+# (HTB Intense) or a lazy admin's backup dropping its tree as src.zip / source.tar.gz / backup.7z.
+# Flagged only when an archive extension pairs with a high-signal stem, so jquery.zip /
+# report-2021.zip stay quiet.
+_ARCHIVE_EXT = frozenset({"zip", "tar", "gz", "tgz", "tbz2", "bz2", "7z", "rar", "war"})
+_SOURCE_ARCHIVE_STEMS = frozenset(
+    {
+        "src",
+        "source",
+        "sources",
+        "app",
+        "application",
+        "webapp",
+        "www",
+        "wwwroot",
+        "web",
+        "website",
+        "site",
+        "backup",
+        "backups",
+        "bak",
+        "code",
+        "codebase",
+        "html",
+        "htdocs",
+        "public",
+        "public_html",
+        "dist",
+        "release",
+        "deploy",
+        "database",
+        "db",
+        "sql",
+        "archive",
+        "full",
+    }
+)
+
+
+def is_source_archive(path: str) -> bool:
+    name = path.lower().rstrip("/").rsplit("/", 1)[-1]
+    if "." not in name:
+        return False
+    stem, ext = name.rsplit(".", 1)
+    if ext not in _ARCHIVE_EXT:
+        return False
+    if stem.endswith(".tar"):  # source.tar.gz -> stem "source.tar"
+        stem = stem[:-4]
+    return stem in _SOURCE_ARCHIVE_STEMS
+
 
 def is_source_disclosure(path: str) -> bool:
     low = path.lower().rstrip("/")
@@ -100,6 +150,8 @@ def is_source_disclosure(path: str) -> bool:
     # a VCS marker must be a whole path SEGMENT (/.git, /foo/.git/HEAD) — a bare-substring check
     # false-flagged /.gitignore, /.gitlab-ci.yml, /.svnfoo as source disclosures.
     if any(seg in _VCS_DIRS for seg in low.split("/")):
+        return True
+    if is_source_archive(low):
         return True
     name = low.rsplit("/", 1)[-1]
     ext = name.rsplit(".", 1)[-1] if "." in name else ""
@@ -134,6 +186,8 @@ def is_upload_dir(path: str) -> bool:
 
 def interesting_path_reason(path: str) -> str:
     """Why a discovered URL is worth flagging in the Discovered-URLs table — '' when it isn't."""
+    if is_source_archive(path):  # more specific than the generic disclosure reason below
+        return "leaked source archive"
     if is_source_disclosure(path):
         return "source/backup disclosure"
     if is_upload_dir(path):

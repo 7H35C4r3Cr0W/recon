@@ -420,6 +420,25 @@ def test_interesting_path_reason_flags_upload_dirs_and_disclosures() -> None:
         assert interesting_path_reason(noise) == "", noise
 
 
+def test_is_source_archive_flags_root_source_dumps() -> None:
+    # HTB Intense: the app advertises "open source" and serves src.zip at the web root — the single
+    # highest-value HTTP finding. Flag source/backup ARCHIVES, but only for a high-signal stem.
+    from oscprecon.modules.http.parsers import (
+        interesting_path_reason,
+        is_source_archive,
+        is_source_disclosure,
+    )
+
+    for p in ("/src.zip", "/source.tar.gz", "/www.zip", "/backup.7z", "/site.tgz", "/app.rar"):
+        assert is_source_archive(p), p
+        assert is_source_disclosure(p), p  # rolls up into the disclosure flag
+        assert interesting_path_reason(p) == "leaked source archive", p
+    # noise stays quiet — an archive without a source/backup stem is NOT a disclosure
+    for noise in ("/jquery.zip", "/report-2021.zip", "/downloads/manual.pdf.zip", "/photos.tar"):
+        assert not is_source_archive(noise), noise
+        assert interesting_path_reason(noise) == "", noise
+
+
 def test_whatweb_json_yields_redirect_vhost() -> None:
     # regression: the JSON path dropped the redirect->vhost finding the plain path produces
     import json

@@ -230,6 +230,8 @@ class DiscoveredUrlsPanel(QWidget):
         item.setData(_URL_ROLE, url)
         item.setForeground(QBrush(QColor(pal.warning if reason else pal.accent)))
         tooltips = {
+            "leaked source archive": "⚠ leaked source archive — download it: the whole codebase "
+            "(creds, hidden endpoints, logic) in one file. Double-click to open.",
             "source/backup disclosure": "⚠ source / backup / VCS disclosure — download and read it "
             "(may leak source or credentials). Double-click to open.",
             "upload directory": "⚠ upload directory — a common webshell-drop / file-read target. "
