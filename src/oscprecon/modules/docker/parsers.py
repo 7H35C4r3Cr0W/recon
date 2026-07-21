@@ -75,7 +75,7 @@ def parse_docker_containers(text: str) -> list[DockerFinding]:
         if not isinstance(container, dict):
             continue
         names = container.get("Names") or []
-        name = (names[0].lstrip("/") if names else "") or str(container.get("Id", ""))[:12]
+        name = (str(names[0]).lstrip("/") if names else "") or str(container.get("Id", ""))[:12]
         image = str(container.get("Image", ""))
         findings.append(
             DockerFinding("container", f"{name} ({image})".strip(), "running container")

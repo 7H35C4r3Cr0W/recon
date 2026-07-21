@@ -662,6 +662,10 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
     ]
     if not ports:
         ports = [Port(number=default_port, proto=Proto.TCP, service=service)]
+    # the scalar port the single-port step modules (ssh/ftp/ldap/smtp/dns/smb) actually probe: the
+    # DISCOVERED port when the scan found the service on a non-standard port, else the default. Was
+    # a bug: the step methods got default_port and probed 22 while the service lived on 2222.
+    probe_port = ports[0].number
     if service == "http":
         # an unresolved profile hostname makes every http probe fail with "no address" — warn and
         # let the module fall back to the IP so recon still works (add /etc/hosts for a real vhost).
@@ -676,7 +680,7 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
             )
     raw: dict[str, str] = {}
     issues: list[str] = []
-    for command, key in _tier1_enum_steps(service, module, prof.target, default_port, ports):
+    for command, key in _tier1_enum_steps(service, module, prof.target, probe_port, ports):
         out = prof.directory / command.output_file
         result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
         if result.missing_tool is not None:
@@ -688,7 +692,10 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
         except OSError:
             text = ""
         if key:  # unparsed steps (e.g. smb nmap-smb, http headers) run but carry no parser key
-            raw[key] = text
+            # ACCUMULATE, don't overwrite: several steps legitimately share one parser key (smb's
+            # null-session AND guest steps are both "netexec-shares"/"smbclient-shares"), so a plain
+            # raw[key]=text let the guest run (often LOGON_FAILURE) clobber the null findings.
+            raw[key] = raw[key] + "\n" + text if key in raw else text
     found = run_parser(lambda: module.parse(raw), label=service, raw="\n".join(raw.values()))
     if found:
         now = datetime.now(UTC).isoformat()

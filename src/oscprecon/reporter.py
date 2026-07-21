@@ -223,7 +223,9 @@ class Reporter:
             )
         notes = ""
         if profile.notes_path.exists():
-            notes = profile.notes_path.read_text(encoding="utf-8").strip()
+            # errors="replace": a non-UTF-8 byte in notes.md must degrade gracefully, not abort the
+            # whole report (and the nmap tail that follows) with UnicodeDecodeError.
+            notes = profile.notes_path.read_text(encoding="utf-8", errors="replace").strip()
         raw_findings = findings_mod.load_findings(profile.directory)
         edb_groups = _group_edb(edb_mod.load_edb(profile.directory))
         all_audit = audit.load_entries(profile.directory)

@@ -157,7 +157,10 @@ def _context(finding: dict[str, Any], target: str, domain: str) -> dict[str, str
     for key, value in finding.items():
         context[key] = str(value)
     kind = str(finding.get("kind", ""))
-    if kind:
+    # the {<kind>} alias must never shadow the reserved {target}/{domain} keys (a finding whose kind
+    # is literally "target"/"domain" would otherwise interpolate the value there), nor a real
+    # finding field already in context.
+    if kind and kind not in ("target", "domain") and kind not in finding:
         context[kind] = str(finding.get("value", ""))
     return context
 

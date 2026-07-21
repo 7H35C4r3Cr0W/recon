@@ -26,7 +26,9 @@ class ImapFinding:
 _SENTINEL = ("[missing]", "[blocked]")
 
 _CAPS = re.compile(r"imap-capabilities:\s*(?P<v>.+?)\s*$", re.MULTILINE | re.IGNORECASE)
-_SV_LINE = re.compile(r"^\d+/tcp\s+open\s+(?:ssl/)?imaps?\s+(?P<v>.+?)\s*$", re.MULTILINE)
+_SV_LINE = re.compile(
+    r"^\d+/tcp[^\S\n]+open[^\S\n]+(?:ssl/)?imaps?[^\S\n]+(?P<v>.+?)\s*$", re.MULTILINE
+)
 _DNS_COMPUTER = re.compile(r"DNS_Computer_Name:\s*(?P<v>.+?)\s*$", re.MULTILINE)
 _NETBIOS_COMPUTER = re.compile(r"NetBIOS_Computer_Name:\s*(?P<v>.+?)\s*$", re.MULTILINE)
 _DNS_DOMAIN = re.compile(r"DNS_Domain_Name:\s*(?P<v>.+?)\s*$", re.MULTILINE)

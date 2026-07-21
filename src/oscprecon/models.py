@@ -51,6 +51,10 @@ def validate_host_or_range(value: str) -> str:
             network = ipaddress.ip_network(text, strict=False)
         except ValueError as exc:
             raise ValueError(f"invalid target range: {value!r}") from exc
+        # a single-host CIDR (/32, /128) is a HOST, not a range — return the bare address so it
+        # flows into {target} tokens cleanly (else "10.10.10.5/32" corrupts every built command).
+        if network.num_addresses == 1:
+            return str(network.network_address)
         return str(network)
     return validate_host(text)
 

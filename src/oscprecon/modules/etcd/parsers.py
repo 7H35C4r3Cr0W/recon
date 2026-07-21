@@ -25,7 +25,12 @@ class EtcdFinding:
 
 # A missing/blocked wrapped tool writes a sentinel line to the output file (shell.run) — skip those.
 _SENTINEL = ("[missing]", "[blocked]")
-_AUTH_ERR = re.compile(r"401 Unauthorized|auth: ", re.IGNORECASE)
+# etcd signals auth-required with an HTTP 401 or its own message — match those, NOT a bare "auth: "
+# substring, which false-fired on legitimate key data containing "oauth:"/"auth: enabled" and then
+# silently dropped every finding.
+_AUTH_ERR = re.compile(
+    r"401 Unauthorized|requires user authentication|Insufficient credentials", re.IGNORECASE
+)
 
 
 def _loads(text: str) -> Any:

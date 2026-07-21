@@ -233,10 +233,11 @@ def _build_ffuf(s: HttpScanSettings) -> str:
     if s.status_codes:
         parts += ["-mc", _csv(s.status_codes)]
     if s.output_file:
-        # JSON to stdout, not output_file: shell.run redirects (stdout+stderr) into that file, so a
-        # `-o <output_file>` collides with the banner/progress capture and the JSON is corrupted or
-        # lost (silently drops findings). -s silences the noise; the parser tolerates the prefix.
-        parts += ["-s", "-of", "json", "-o", "/dev/stdout"]
+        # http content-discovery is GUI-only: the panel runs this with shell.run capturing stdout
+        # to a SEPARATE <name>.log while the parser reads THIS -o file, so there is no collision
+        # here (unlike the single-file vhost enum — see vhost/_build_ffuf). Keep -o writing the
+        # clean JSON to output_file; load_ffuf_json still tolerates noise defensively.
+        parts += ["-o", _q(s.output_file), "-of", "json"]
     return " ".join(parts)
 
 

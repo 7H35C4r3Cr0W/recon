@@ -27,7 +27,7 @@ _SENTINEL = ("[missing]", "[blocked]")
 
 _ENC_YES = re.compile(r"supports encryption", re.IGNORECASE)
 _ENC_NO = re.compile(r"does not support encryption", re.IGNORECASE)
-_SV_LINE = re.compile(r"^\d+/tcp\s+open\s+telnet\??\s+(?P<v>.+?)\s*$", re.MULTILINE)
+_SV_LINE = re.compile(r"^\d+/tcp[^\S\n]+open[^\S\n]+telnet\??[^\S\n]+(?P<v>.+?)\s*$", re.MULTILINE)
 _DNS_COMPUTER = re.compile(r"DNS_Computer_Name:\s*(?P<v>.+?)\s*$", re.MULTILINE)
 _NETBIOS_COMPUTER = re.compile(r"NetBIOS_Computer_Name:\s*(?P<v>.+?)\s*$", re.MULTILINE)
 _DNS_DOMAIN = re.compile(r"DNS_Domain_Name:\s*(?P<v>.+?)\s*$", re.MULTILINE)

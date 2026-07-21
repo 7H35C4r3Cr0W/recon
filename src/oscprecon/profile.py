@@ -433,6 +433,7 @@ class Profile:
     def set_hostname(self, hostname: str | None) -> None:
         # the vhost name is usually learned AFTER the first scan (a redirect, a cert CN, a contact
         # email) — let it be set later; host-based recon then targets the name instead of the IP.
+        self._ensure_writable()  # never mutate in-memory state on a read-only profile [#43]
         cleaned = (hostname or "").strip() or None
         self.target = replace(self.target, hostname=cleaned)  # Target is frozen — replace + resave
         self.save()

@@ -323,11 +323,12 @@ class HttpPanel(QWidget):
         self._reload_manual()
 
     def set_url(self, url: str) -> None:
-        self._url.setText(url)
-        # re-derive the port from the URL so the default output path lands under the NEW target's
-        # subtree — else a vhost enumerated from an 8443 selection would file its port-80 scan under
-        # http/8443/ (the stale _port). [#36]
+        # re-derive the port from the URL FIRST: setText fires textChanged -> _reload_manual, which
+        # rebuilds the Tier-2 follow-ups from self._port — updating _port afterward left them built
+        # with the stale previous port (so a vhost enumerated from an 8443 selection filed its
+        # port-80 follow-ups under the old port). [#36]
         self._port = _port_from_url(url)
+        self._url.setText(url)
         self._output_is_custom = False
         self._refresh()
 

@@ -231,6 +231,7 @@ _DB_CLIENTS: frozenset[str] = frozenset({"mysql", "psql", "mongosh", "mongo", "r
 _DB_FORBIDDEN_SUBSTR: tuple[str, ...] = (
     "into outfile",
     "into dumpfile",
+    "load data",  # LOAD DATA [LOCAL] INFILE — client-side file read into a table
     "load_file",
     "sys_exec",
     "sys_eval",
@@ -375,9 +376,11 @@ def _netexec_violation(argv: list[str]) -> str | None:
         else:
             i += 1
             continue
-        literals = [v for v in values if v]
-        if len(literals) > 1:
-            return f"netexec {flag} has {len(literals)} inline credentials — spray (forbidden)"
+        # count the raw nargs run, NOT the empty-filtered list: `-u '' admin` is a 2-username spray,
+        # but filtering the '' first left len==1 and slipped a multi-cred spray past the guard. A
+        # legit Tier-2 single default-cred (`-u administrator -p ''`) is still one value per flag.
+        if len(values) > 1:
+            return f"netexec {flag} has {len(values)} inline credentials — spray (forbidden)"
         for value in values:
             if value and (Path(value).is_file() or _looks_like_wordlist(value)):
                 return f"netexec {flag} {value} is a list file — credential brute (forbidden)"

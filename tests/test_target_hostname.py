@@ -12,7 +12,13 @@ def test_target_host_prefers_hostname_over_ip() -> None:
     assert Target(ip="10.10.10.5", hostname="box.htb").host == "box.htb"  # vhost wins
 
 
-def test_http_probes_use_the_hostname_when_set() -> None:
+def test_http_probes_use_the_hostname_when_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    # commands() now falls back to the IP when the vhost name does NOT resolve (the unresolvable-
+    # hostname fix); force it resolvable so this test deterministically exercises the hostname path
+    # (a real DNS lookup of thetoppers.htb is non-deterministic across environments).
+    import oscprecon.modules.http as httpmod
+
+    monkeypatch.setattr(httpmod, "host_resolves", lambda _n: True)
     module = HttpModule()
     target = Target(ip="10.129.227.248", hostname="thetoppers.htb")
     lines = [c.shell_line for c in module.commands(target, [Port(80, Proto.TCP, "http")])]

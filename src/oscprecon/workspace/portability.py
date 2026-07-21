@@ -164,7 +164,8 @@ def _validate_members(members: list[tarfile.TarInfo], root: Path) -> str:
             raise ProjectArchiveError(
                 "archive is too large to import (possible decompression bomb)"
             )
-        tops.add(parts[0])
+        if parts:  # a "." (current-dir) member has empty parts — skip it, don't IndexError
+            tops.add(parts[0])
     tops.discard(".")
     if len(tops) != 1:
         raise ProjectArchiveError(

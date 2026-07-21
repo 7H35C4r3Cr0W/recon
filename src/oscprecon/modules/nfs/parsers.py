@@ -78,7 +78,7 @@ def parse_showmount(text: str) -> list[NfsFinding]:
     return findings
 
 
-_NFS_VER = re.compile(r"^\d+/tcp\s+open\s+nfs[\w-]*\s+(?P<ver>\S.*)$", re.MULTILINE)
+_NFS_VER = re.compile(r"^\d+/tcp[^\S\n]+open[^\S\n]+nfs[\w-]*[^\S\n]+(?P<ver>\S.*)$", re.MULTILINE)
 # nfs-ls row: PERMISSION UID GID SIZE TIME FILENAME. TIME is `YYYY-MM-DD[T ]HH:MM[:SS]`; the name is
 # the remainder (internal spaces preserved). PERMISSION is an optional type char + 9 mode chars.
 _NFS_FILE = re.compile(
