@@ -142,3 +142,14 @@
     - text: "Out-of-band callback test (run by hand): submit a benign canary that only phones home (an <img src=http://YOUR-KALI-IP/xss-canary> in a stored field) and watch a listener (php -S 0.0.0.0:80 / nc -lvnp 80). A hit whose User-Agent is a real Chrome/HeadlessChrome proves a bot renders your input — then escalate manually from the Exploitation tab (xss-blind-oob-beacon, xss-cookie-steal, xss-ssrf-internal-read)"
       command: "curl -sI http://{target}:{port}{path}"
 # source: walkthroughs/htb-ropetwo.md (contact form rendered by an admin Chrome bot => blind XSS + client-side SSRF)
+
+- match:
+    service: http
+    field: note
+    value: "(?i)roundcube|webmail"
+  suggest:
+    - text: "Webmail address-book / recipient-autocomplete endpoints are classic IDOR + user/email enumeration surfaces — with a valid session, walk the contact id and the recipient search to read other users' contacts/addresses (HTB DarkCorp's recipient IDOR)"
+      command: "curl -sk -b cookie.txt 'http://{target}:{port}/?_task=addressbook&_action=show&_cid=1'"
+    - text: "Read the exact Roundcube version (feeds a version/CVE lookup — e.g. known stored-XSS in the mail body)"
+      command: "curl -sk http://{target}:{port}/CHANGELOG.md"
+# source: HackTricks Roundcube webmail (address-book / recipient IDOR); CPTS Web Attacks (IDOR)

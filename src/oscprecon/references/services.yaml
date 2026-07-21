@@ -413,6 +413,16 @@
 - { match: { product_contains: Joomla },   label: Joomla,  module: http, hacktricks: *web }
 - { match: { product_contains: Drupal },   label: Drupal,  module: http, hacktricks: *web }
 - { match: { product_contains: GitLab },   label: GitLab,  module: http, hacktricks: *web }
+# Roundcube before the generic Apache/nginx rows so a fingerprinted webmail labels as Roundcube
+# (it is usually fronted by Apache/nginx, which would otherwise win the product match).
+- match: { product_contains: Roundcube }
+  label: "Roundcube Webmail"
+  module: http
+  hacktricks: *web
+  tools:
+    - { name: "whatweb -a 3 http://{target}:{port}/", purpose: "confirm Roundcube + leak version/skin" }
+    - { name: "curl -sk http://{target}:{port}/CHANGELOG.md", purpose: "exact version → map applicable CVEs" }
+    - { name: "searchsploit roundcube", purpose: "list public Roundcube PoCs (display only)" }
 - { match: { product_contains: "Microsoft IIS" }, label: IIS, module: http, hacktricks: *web }
 - { match: { product_contains: Apache },   label: Apache httpd, module: http, hacktricks: *web }
 - { match: { product_contains: nginx },    label: nginx,   module: http, hacktricks: *web }
