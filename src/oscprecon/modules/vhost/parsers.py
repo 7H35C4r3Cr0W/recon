@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from typing import Any
 
-from oscprecon.modules.http.parsers import is_vhost_host
+from oscprecon.modules.http.parsers import is_vhost_host, load_ffuf_json
 
 
 @dataclass
@@ -37,10 +36,8 @@ def _to_int(value: Any) -> int:
 
 
 def parse_ffuf_vhost(text: str, domain: str) -> list[VhostFinding]:
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        return []
+    # tolerant load: the ffuf JSON + ffuf's trailing stdout progress share one file (HTB Fighter)
+    data = load_ffuf_json(text)
     if not isinstance(data, dict):
         return []
     results = data.get("results", [])

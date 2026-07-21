@@ -303,11 +303,23 @@ def parse_gobuster(text: str, port: int) -> list[HttpFinding]:
     return findings
 
 
-def parse_ffuf(text: str, port: int) -> list[HttpFinding]:
+def load_ffuf_json(text: str) -> Any:
+    # ffuf's JSON and the module's captured stdout share one file — the JSON object is prefixed by
+    # matched words and/or followed by ANSI progress lines, so json.loads on the whole file raises
+    # every finding is silently dropped (HTB Fighter). Parse the LEADING JSON object with raw_decode
+    # (after skipping to its first `{`) and ignore any surrounding noise.
+    idx = text.find("{")
+    if idx < 0:
+        return None
     try:
-        data = json.loads(text)
+        obj, _ = json.JSONDecoder().raw_decode(text[idx:])
     except json.JSONDecodeError:
-        return []
+        return None
+    return obj
+
+
+def parse_ffuf(text: str, port: int) -> list[HttpFinding]:
+    data = load_ffuf_json(text)
     if not isinstance(data, dict):
         return []
     results = data.get("results", [])

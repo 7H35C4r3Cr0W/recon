@@ -233,7 +233,10 @@ def _build_ffuf(s: HttpScanSettings) -> str:
     if s.status_codes:
         parts += ["-mc", _csv(s.status_codes)]
     if s.output_file:
-        parts += ["-o", _q(s.output_file), "-of", "json"]
+        # JSON to stdout, not output_file: shell.run redirects (stdout+stderr) into that file, so a
+        # `-o <output_file>` collides with the banner/progress capture and the JSON is corrupted or
+        # lost (silently drops findings). -s silences the noise; the parser tolerates the prefix.
+        parts += ["-s", "-of", "json", "-o", "/dev/stdout"]
     return " ".join(parts)
 
 

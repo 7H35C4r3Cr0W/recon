@@ -80,6 +80,19 @@ def test_ffuf() -> None:
     assert all(f.port == 8080 for f in findings)
 
 
+def test_ffuf_json_prefixed_and_trailing_noise() -> None:
+    # HTB Fighter: ffuf's JSON shares one output file with shell.run's captured stdout+stderr, so
+    # the JSON object arrives PREFIXED by matched words and FOLLOWED by ANSI progress lines. A plain
+    # json.loads raises → the parser must still recover it (else every finding is lost).
+    clean = _read("ffuf.json")
+    noisy = (
+        "admin\nlogin\n" + clean + "\n\x1b[2K:: Progress: [4989/4989] :: Job [1/1] :: 0 errors\n"
+    )
+    findings = parse_ffuf(noisy, 8080)
+    by_path = {f.path: f for f in findings}
+    assert by_path["/admin"].status == 301 and by_path["/login"].status == 200
+
+
 def test_dirsearch() -> None:
     findings = parse_dirsearch(_read("dirsearch.txt"), 80)
     by_path = {f.path: f for f in findings}

@@ -84,7 +84,11 @@ def _build_ffuf(s: VhostScanSettings) -> str:
         parts += ["-ac"]
     parts += ["-t", str(s.threads)]
     if s.output_file:
-        parts += ["-o", _q(s.output_file), "-of", "json"]
+        # JSON to stdout, not output_file: shell.run redirects (stdout+stderr) into that file, so a
+        # `-o <output_file>` collides and the JSON is interleaved with / overwritten by ffuf's
+        # banner+progress — silently losing every vhost (HTB Fighter: 'members'). -s silences the
+        # noise; the captured stream is just matched words + the JSON (parser tolerates the prefix).
+        parts += ["-s", "-of", "json", "-o", "/dev/stdout"]
     return " ".join(parts)
 
 
