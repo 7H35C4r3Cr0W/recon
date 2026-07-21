@@ -15,8 +15,23 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD `53f9817`: HTB Tentacle box review (Squid recon + MIT-Kerberos-on-Linux attack chain)** (pushed).
+- **github/main HEAD `7bd9e9a`: HTB Intense box review (source-archive flag + SQLite/hash-ext/binexp attacks)** (pushed).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-21c) — **HTB Intense box review** (Flask source-review → SQLite blind SQLi → hash
+  length-extension → path traversal → SNMP rwcommunity RCE → custom-binary ROP). 7-dimension
+  survey→verify **audit workflow** → `feat` `7bd9e9a`. Already-covered (grep-confirmed): **SNMP
+  NET-SNMP-extend RCE** (`snmp.py` extend-rce-create/trigger), path-traversal/LFI, ssh -L pivot +
+  authorized_keys plant. Added the verified gaps:
+  - RECON: `modules/http/parsers.py` **`is_source_archive()`** — flags a leaked source/site-backup
+    ARCHIVE at web root (src.zip/source.tar.gz/www.zip/backup.7z) as the top HTTP disclosure (archive
+    ext + high-signal stem only; jquery.zip stays quiet). New "leaked source archive" ⚠ reason +
+    tooltip + CSV flag + parser test.
+  - ATTACK: web.py `hash-length-extension` (hashpump forge H(secret‖data), brute secret len),
+    `sqli-sqlite-blind-oracle` (SQLite CASE WHEN…load_extension error-oracle + substr extraction),
+    `sqli-filter-bypass` (keyword/WAF bypass cheatsheet) — all victim; linux.py new **"Binary
+    exploitation"** category `binexp-checksec` + `binexp-pwntools-skeleton` (generic copy-only ROP
+    scaffold, NOT the box-specific chain per §21).
+  - Catalog **3476→3481**.
 - Session (2026-07-21b) — **HTB Tentacle box review** (Squid proxy → OpenSMTPD RCE → MIT Kerberos
   lateral + privesc). Ran a 9-dimension survey→adversarial-verify **audit workflow** across BOTH
   recon and attack sides → `feat` `53f9817`. Already-covered (grep-confirmed, NOT re-added): OpenSMTPD
