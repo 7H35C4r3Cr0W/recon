@@ -412,6 +412,7 @@
 - { match: { product_contains: WordPress }, label: WordPress, module: http, hacktricks: *web }
 - { match: { product_contains: Joomla },   label: Joomla,  module: http, hacktricks: *web }
 - { match: { product_contains: Drupal },   label: Drupal,  module: http, hacktricks: *web }
+- { match: { product_contains: GitLab },   label: GitLab,  module: http, hacktricks: *web }
 - { match: { product_contains: "Microsoft IIS" }, label: IIS, module: http, hacktricks: *web }
 - { match: { product_contains: Apache },   label: Apache httpd, module: http, hacktricks: *web }
 - { match: { product_contains: nginx },    label: nginx,   module: http, hacktricks: *web }

