@@ -60,3 +60,30 @@ def test_scan_resume_accepts_equivalent_host_bit_cidr(
     )
     assert result.exit_code == 0, result.output  # the equivalent CIDR must not be a mismatch
     assert captured.get("ran")
+
+
+def test_enum_lists_full_recon_modules() -> None:
+    # regression: `enum` must expose the rich full modules (http/ssh/…), not just simple specs —
+    # DarkCorp field-test found they were missing. No-arg lists the runnable services.
+    result = runner.invoke(app, ["enum", "--profile", "x"])
+    assert result.exit_code == 0
+    for m in ("ssh", "http", "smb", "ldap", "dns", "ftp", "vhost"):
+        assert m in result.stdout, m
+
+
+def test_enum_full_module_resolver_maps_names() -> None:
+    # the full-module names each resolve to a real recon Module class (no import/typo drift).
+    import importlib
+    import inspect
+
+    from oscprecon.cli import _FULL_ENUM_MODULES
+    from oscprecon.modules.base import Module
+
+    for name in _FULL_ENUM_MODULES:
+        mod = importlib.import_module(f"oscprecon.modules.{name}")
+        cls = [
+            o
+            for _, o in inspect.getmembers(mod, inspect.isclass)
+            if issubclass(o, Module) and o is not Module and o.__module__.startswith(mod.__name__)
+        ]
+        assert cls, f"no Module class for enum '{name}'"

@@ -284,6 +284,16 @@ The pytest suite is slow here — run the **targeted** test files for what you t
 full-suite backstop in the background (write a done-marker, poll it) before reporting.
 
 ## How I work on this (the owner's expectations)
+- **⚠⚠⚠⚠ RUN THE FULL GAMBIT + SMOKE-TEST FOR BUGS + ADD EVERYTHING REUSABLE — every live box.**
+  For every box: (a) field-test the ENTIRE set of RELEVANT modules (recon+enum+attack) against the
+  live target and give a **PASS/FAIL per module** — only test services the box actually runs; (b)
+  **smoke-test hunting for bugs** (the DarkCorp run found + fixed `{url}` double-slash and the
+  `postgresql`/`postgres` exploit-key mismatch, and flagged `enum` missing http/ssh — that's the
+  point of live testing); (c) **ADD EVERYTHING REUSABLE** — if a command/technique/primitive is
+  GENERIC and usable on a future box (PostgreSQL-SQLi web-param templates, RoundCube CVE stored-XSS,
+  webmail contact-IDOR→blind-XSS-exfil, etc.), add it as a recon module / pattern / Exploitation-tab
+  template. Novel box-specific payloads still get hand-crafted per box — don't hardcode those; capture
+  the reusable CLASS. (memory `live-box-always`.)
 - **⚠⚠⚠ "TEST IT" = RECON **AND** ATTACK THE LIVE BOX, END-TO-END — NON-NEGOTIABLE (owner ANGRY, said 3×).**
   When the owner says test/hit a box, they mean actually WORK it on the real target through the WHOLE
   chain — recon AND the attack path (foothold → user → root): stand up a catcher on tun0, exploit,

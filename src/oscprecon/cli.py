@@ -516,6 +516,112 @@ def _profile_dir(profile: str, workspace: Path | None) -> Path:
     return directory
 
 
+# the richer recon modules (their own commands()/parse(), not simple-spec steps). enum runs the
+# LIGHT Tier-1 battery each emits (banner/whatweb/curl/nmap-scripts) headlessly — the same engine
+# the GUI panels drive. default ports pick the module's port when the profile hasn't discovered one.
+_FULL_ENUM_MODULES: dict[str, int] = {
+    "ssh": 22,
+    "ftp": 21,
+    "http": 80,
+    "smb": 445,
+    "ldap": 389,
+    "dns": 53,
+    "smtp": 25,
+    "vhost": 80,
+}
+
+
+def _run_full_module_enum(service: str, profile: str, workspace: Path | None, port: int) -> None:
+    # run a full recon Module (commands -> shell.run -> parse -> record findings), mirroring how
+    # enum drives the simple specs, so http/ssh/ftp/dns/ldap/smb/smtp/vhost are enum-runnable too.
+    import importlib
+    import inspect
+    from datetime import UTC, datetime
+
+    from oscprecon import findings as findings_mod
+    from oscprecon.models import Port, Proto
+    from oscprecon.modules.base import Module
+    from oscprecon.parsing import run_parser
+
+    mod = importlib.import_module(f"oscprecon.modules.{service}")
+    cls = next(
+        (
+            obj
+            for _, obj in inspect.getmembers(mod, inspect.isclass)
+            if issubclass(obj, Module)
+            and obj is not Module
+            and obj.__module__.startswith(mod.__name__)
+        ),
+        None,
+    )
+    if cls is None:
+        typer.echo(f"[error] no recon module class for '{service}'", err=True)
+        raise typer.Exit(2)
+    module = cls()
+    prof = Profile.load(_profile_dir(profile, workspace))
+    # ports for this module: the discovered ports whose service name matches, else the CLI override
+    # or the module's default port — so it still runs a Tier-1 pass even before a versioned scan.
+    default_port = port or _FULL_ENUM_MODULES[service]
+    ports = [
+        Port(number=s.port, proto=s.proto, service=s.service, product=s.product, version=s.version)
+        for s in prof.discovered_services
+        if s.proto == Proto.TCP
+        and (s.service == service or (service == "http" and "http" in s.service))
+    ]
+    if not ports:
+        ports = [Port(number=default_port, proto=Proto.TCP, service=service)]
+    raw: dict[str, str] = {}
+    issues: list[str] = []
+    for command in module.commands(prof.target, ports):
+        out = prof.directory / command.output_file
+        result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
+        if result.missing_tool is not None:
+            issues.append(f"{result.missing_tool} not installed")
+        elif result.blocked is not None:
+            issues.append("a step was blocked by the recon-only policy")
+        try:
+            text = out.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            text = ""
+        # the parsers dispatch on the RAW-dict key: most modules key by the output-file stem
+        # ("nmap-ssh"), but http/vhost key by "<tool>:<port>" (port = the per-port output subdir).
+        of = Path(command.output_file)
+        parent = of.parent.name
+        key = (
+            f"{of.stem}:{parent}" if service in ("http", "vhost") and parent.isdigit() else of.stem
+        )
+        raw[key] = text
+    found = run_parser(lambda: module.parse(raw), label=service, raw="\n".join(raw.values()))
+    if found:
+        now = datetime.now(UTC).isoformat()
+        findings_mod.add_findings(
+            prof.directory,
+            [
+                {
+                    "module": f.service,
+                    "kind": f.fields.get("kind", ""),
+                    "value": f.fields.get("value", ""),
+                    "detail": f.detail,
+                    "discovered_at": now,
+                }
+                for f in found
+            ],
+        )
+    if issues:
+        typer.echo(
+            f"\n⚠ {len(dict.fromkeys(issues))} step(s) did not run — "
+            f"{'; '.join(dict.fromkeys(issues))}. Findings may be INCOMPLETE."
+        )
+    typer.echo(f"\n[enum] {service}: {len(found)} finding(s)")
+    for f in found:
+        typer.echo(
+            f"  • {f.fields.get('kind', '?')}: {f.fields.get('value', '')}  {f.detail}".rstrip()
+        )
+    for tip in module.suggest(found):
+        typer.echo(f"  → {tip}")
+    Reporter(prof).write()
+
+
 @app.command("enum")
 def enum_cmd(
     service: str | None = typer.Argument(
@@ -536,13 +642,17 @@ def enum_cmd(
 
     if service is None:
         typer.echo("Runnable services (`nabu-cli enum <service> -p <profile>`):\n")
-        typer.echo("  " + ", ".join(sorted(SIMPLE_SPECS)))
+        typer.echo("  " + ", ".join(sorted(set(SIMPLE_SPECS) | set(_FULL_ENUM_MODULES))))
         raise typer.Exit(0)
     spec = SIMPLE_SPECS.get(service)
     if spec is None:
+        # not a simple-spec service — try the richer full recon modules (http/ssh/ftp/dns/ldap/…)
+        if service in _FULL_ENUM_MODULES:
+            _run_full_module_enum(service, profile, workspace, port)
+            raise typer.Exit(0)
+        runnable = ", ".join(sorted(set(SIMPLE_SPECS) | set(_FULL_ENUM_MODULES)))
         typer.echo(
-            f"[error] '{service}' is not a runnable enum service. Choose one of: "
-            f"{', '.join(sorted(SIMPLE_SPECS))}",
+            f"[error] '{service}' is not a runnable enum service. Choose one of: {runnable}",
             err=True,
         )
         raise typer.Exit(2)
