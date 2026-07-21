@@ -13,3 +13,12 @@
     - text: "Attempt a full zone transfer (AXFR) — dumps every record if the server allows it"
       command: "dig {domain} @{target} axfr"
 # source: Obsidian: 0.01 Cheatsheets .../Other/53 _ DNS.md
+
+- match:
+    service: dns
+  suggest:
+    - text: "Check for a WPAD/PAC file — wpad.{domain} serving wpad.dat leaks the internal proxy config (which subnets go direct vs. via a proxy = the internal network map)"
+      command: "curl -s http://wpad.{domain}/wpad.dat"
+    - text: "Confirm wpad.{domain} resolves first (a stray A record for wpad often points at the DC / proxy host worth enumerating)"
+      command: "dig +short wpad.{domain} @{target}"
+# source: HackTricks — network-services-pentesting / spoofing-llmnr-nbt-ns-mdns-dns-and-wpad-and-relay-attacks (WPAD/PAC discovery)

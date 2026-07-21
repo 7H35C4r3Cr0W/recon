@@ -355,6 +355,19 @@
 - { match: { port: 9091, proto: tcp },  label: "HTTP (9091)",  module: http, hacktricks: *web }
 - { match: { port: 10000, proto: tcp }, label: "HTTP (10000)", module: http, hacktricks: *web }
 
+# Squid on its default port gets its own entry (port+proto beats the service_name:http-proxy
+# fallback below) so the reference pane shows the Squid page + proxy-pivot/cache-manager hints,
+# not the generic web page. module:http is kept so normal HTTP enum still runs.
+- match: { port: 3128, proto: tcp }
+  label: "Squid Proxy"
+  module: http
+  hacktricks: https://book.hacktricks.wiki/en/network-services-pentesting/3128-pentesting-squid.html
+  tools:
+    - { name: "nmap -sV -p 3128 --script http-open-proxy {target}", purpose: "confirm Squid + whether it forwards as an open proxy" }
+    - { name: "curl -s http://{target}:3128/", purpose: "trigger the Squid error page — often leaks the cache-admin email + real domain (a vhost/DNS lead)" }
+    - { name: "curl -x http://{target}:3128 http://127.0.0.1/", purpose: "reach a loopback/internal-only host through the proxy (gateway pivot)" }
+    - { name: "curl -x http://{target}:3128 http://{target}/squid-internal-mgr/menu", purpose: "cache-manager info disclosure — the request originates from the proxy so localhost-only mgr is reachable" }
+
 # --- Generic HTTP service_name fallbacks (any port nmap flags as http-ish) ---
 - { match: { service_name: http },           label: HTTP,  module: http, hacktricks: *web }
 - { match: { service_name: https },          label: HTTPS, module: http, hacktricks: *web }
