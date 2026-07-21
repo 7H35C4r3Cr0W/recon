@@ -28,6 +28,7 @@ _TFTP_PORTS = frozenset({69})
 # protocol, so recon is GETting a small fixed list of well-known names — content discovery (§2/§12),
 # not a credential/username brute.
 COMMON_FILES = (
+    # network-device configs (TFTP is blind — no listing — so we GET well-known names)
     "running-config",
     "startup-config",
     "config.text",
@@ -40,6 +41,20 @@ COMMON_FILES = (
     "version.txt",
     "sysconfig",
     "tftpd.conf",
+    # common Linux / service config + secret paths — a TFTP root mounted at / (or a permissive
+    # server) serves these by absolute path; grabbing squid.conf/passwd/keys is a classic foothold.
+    "/etc/passwd",
+    "/etc/shadow",
+    "/etc/squid/squid.conf",
+    "/etc/squid/passwords",
+    "/etc/apache2/apache2.conf",
+    "/etc/nginx/nginx.conf",
+    "/etc/hosts",
+    "/etc/crontab",
+    "/root/.ssh/id_rsa",
+    "/home/.ssh/id_rsa",
+    "/var/www/html/config.php",
+    ".htpasswd",
 )
 
 

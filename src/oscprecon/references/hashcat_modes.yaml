@@ -1,0 +1,161 @@
+# Curated hashcat hash-mode (-m) reference — a DECISION AID for picking the right mode and building
+# the crack command. NOT box-specific; a reusable syntax helper (a big pain point: which -m is this?).
+# Each entry: mode (the -m number), name (searchable label), category. Sourced from hashcat --help /
+# the BHIS hashcat cheat sheet. Curated to the modes a pentester actually meets, across every family.
+
+- category: "Raw hash"
+  modes:
+    - { mode: 900, name: "MD4" }
+    - { mode: 0, name: "MD5" }
+    - { mode: 100, name: "SHA1" }
+    - { mode: 1300, name: "SHA-224" }
+    - { mode: 1400, name: "SHA-256" }
+    - { mode: 10800, name: "SHA-384" }
+    - { mode: 1700, name: "SHA-512" }
+    - { mode: 5000, name: "SHA-3 (Keccak)" }
+    - { mode: 6000, name: "RIPEMD-160" }
+    - { mode: 6100, name: "Whirlpool" }
+    - { mode: 600, name: "BLAKE2b-512" }
+    - { mode: 5100, name: "Half MD5" }
+
+- category: "Raw hash + salt"
+  modes:
+    - { mode: 10, name: "md5($pass.$salt)" }
+    - { mode: 20, name: "md5($salt.$pass)" }
+    - { mode: 3800, name: "md5($salt.$pass.$salt)" }
+    - { mode: 2600, name: "md5(md5($pass))" }
+    - { mode: 110, name: "sha1($pass.$salt)" }
+    - { mode: 120, name: "sha1($salt.$pass)" }
+    - { mode: 4500, name: "sha1(sha1($pass))" }
+    - { mode: 1410, name: "sha256($pass.$salt)" }
+    - { mode: 1420, name: "sha256($salt.$pass)" }
+    - { mode: 1710, name: "sha512($pass.$salt)" }
+    - { mode: 1720, name: "sha512($salt.$pass)" }
+
+- category: "HMAC / authenticated"
+  modes:
+    - { mode: 50, name: "HMAC-MD5 (key=$pass)" }
+    - { mode: 150, name: "HMAC-SHA1 (key=$pass)" }
+    - { mode: 1450, name: "HMAC-SHA256 (key=$pass)" }
+    - { mode: 1750, name: "HMAC-SHA512 (key=$pass)" }
+    - { mode: 10200, name: "CRAM-MD5" }
+    - { mode: 16400, name: "CRAM-MD5 Dovecot" }
+
+- category: "KDF / slow hash"
+  modes:
+    - { mode: 400, name: "phpass (WordPress/Joomla/phpBB3)" }
+    - { mode: 3200, name: "bcrypt $2*$ (Blowfish/Unix)" }
+    - { mode: 8900, name: "scrypt" }
+    - { mode: 11900, name: "PBKDF2-HMAC-MD5" }
+    - { mode: 12000, name: "PBKDF2-HMAC-SHA1" }
+    - { mode: 10900, name: "PBKDF2-HMAC-SHA256" }
+    - { mode: 12100, name: "PBKDF2-HMAC-SHA512" }
+
+- category: "Unix / OS password"
+  modes:
+    - { mode: 500, name: "md5crypt $1$ (MD5-Unix, Cisco-IOS $1$)" }
+    - { mode: 1600, name: "Apache apr1 $apr1$ / md5apr1 / .htpasswd" }
+    - { mode: 7400, name: "sha256crypt $5$ (SHA256-Unix)" }
+    - { mode: 1800, name: "sha512crypt $6$ (SHA512-Unix / /etc/shadow)" }
+    - { mode: 1500, name: "descrypt (DES-Unix, traditional)" }
+    - { mode: 12400, name: "BSDi Crypt / Extended DES" }
+    - { mode: 30600, name: "yescrypt $y$" }
+    - { mode: 3000, name: "LM" }
+    - { mode: 1000, name: "NTLM" }
+    - { mode: 1100, name: "Domain Cached Creds (DCC / MS Cache 1)" }
+    - { mode: 2100, name: "Domain Cached Creds 2 (DCC2 / MS Cache 2)" }
+    - { mode: 122, name: "macOS 10.4-10.6" }
+    - { mode: 1722, name: "macOS 10.7" }
+    - { mode: 7100, name: "macOS 10.8+ (PBKDF2-SHA512)" }
+
+- category: "Network auth / Kerberos / NTLM"
+  modes:
+    - { mode: 5500, name: "NetNTLMv1 (+ESS)" }
+    - { mode: 5600, name: "NetNTLMv2" }
+    - { mode: 7500, name: "Kerberos 5 AS-REQ Pre-Auth etype 23 (AS-REP roast)" }
+    - { mode: 13100, name: "Kerberos 5 TGS-REP etype 23 (Kerberoast)" }
+    - { mode: 18200, name: "Kerberos 5 AS-REP etype 23" }
+    - { mode: 19600, name: "Kerberos 5 TGS-REP etype 17 (AES128)" }
+    - { mode: 19700, name: "Kerberos 5 TGS-REP etype 18 (AES256)" }
+    - { mode: 7300, name: "IPMI2 RAKP HMAC-SHA1" }
+    - { mode: 5300, name: "IKE-PSK MD5" }
+    - { mode: 5400, name: "IKE-PSK SHA1" }
+    - { mode: 11400, name: "SIP digest auth (MD5)" }
+    - { mode: 16500, name: "JWT (JSON Web Token)" }
+    - { mode: 2500, name: "WPA/WPA2 (hccapx)" }
+    - { mode: 22000, name: "WPA-PBKDF2-PMKID+EAPOL" }
+
+- category: "Database"
+  modes:
+    - { mode: 12, name: "PostgreSQL" }
+    - { mode: 11100, name: "PostgreSQL CRAM (MD5)" }
+    - { mode: 200, name: "MySQL323" }
+    - { mode: 300, name: "MySQL4.1/5 (SHA1)" }
+    - { mode: 11200, name: "MySQL CRAM (SHA1)" }
+    - { mode: 131, name: "MSSQL 2000" }
+    - { mode: 132, name: "MSSQL 2005" }
+    - { mode: 1731, name: "MSSQL 2012/2014" }
+    - { mode: 3100, name: "Oracle H (Oracle 7+)" }
+    - { mode: 112, name: "Oracle S (Oracle 11+)" }
+    - { mode: 12300, name: "Oracle T (Oracle 12+)" }
+
+- category: "CMS / web app"
+  modes:
+    - { mode: 7900, name: "Drupal7" }
+    - { mode: 400, name: "WordPress / Joomla >=2.5.18 (phpass)" }
+    - { mode: 2611, name: "vBulletin <3.8.5" }
+    - { mode: 2711, name: "vBulletin >=3.8.5" }
+    - { mode: 2811, name: "MyBB / IPB2+" }
+    - { mode: 124, name: "Django (SHA-1)" }
+    - { mode: 10000, name: "Django (PBKDF2-SHA256)" }
+    - { mode: 11000, name: "PrestaShop" }
+    - { mode: 3711, name: "MediaWiki B type" }
+
+- category: "LDAP / mail / app-server"
+  modes:
+    - { mode: 101, name: "SSHA-1 base64 (Netscape LDAP {SHA})" }
+    - { mode: 111, name: "SSHA-1 base64 (LDAP {SSHA})" }
+    - { mode: 1411, name: "SSHA-256 base64 (LDAP {SSHA256})" }
+    - { mode: 1711, name: "SSHA-512 base64 (LDAP {SSHA512})" }
+    - { mode: 1421, name: "hMailServer" }
+    - { mode: 12600, name: "ColdFusion 10+" }
+    - { mode: 15000, name: "FileZilla Server >=0.9.55" }
+
+- category: "Network device"
+  modes:
+    - { mode: 2400, name: "Cisco-PIX MD5" }
+    - { mode: 2410, name: "Cisco-ASA MD5" }
+    - { mode: 5700, name: "Cisco-IOS type 4 (SHA256)" }
+    - { mode: 9200, name: "Cisco-IOS $8$ (PBKDF2-SHA256)" }
+    - { mode: 9300, name: "Cisco-IOS $9$ (scrypt)" }
+    - { mode: 7000, name: "FortiGate (FortiOS)" }
+    - { mode: 8100, name: "Citrix NetScaler" }
+    - { mode: 22, name: "Juniper NetScreen/SSG (ScreenOS)" }
+    - { mode: 501, name: "Juniper IVE" }
+    - { mode: 7200, name: "GRUB 2" }
+
+- category: "Archive / document"
+  modes:
+    - { mode: 11600, name: "7-Zip" }
+    - { mode: 12500, name: "RAR3-hp" }
+    - { mode: 13000, name: "RAR5" }
+    - { mode: 13600, name: "WinZip" }
+    - { mode: 17200, name: "PKZIP (compressed)" }
+    - { mode: 17210, name: "PKZIP (uncompressed)" }
+    - { mode: 9400, name: "MS Office 2007" }
+    - { mode: 9500, name: "MS Office 2010" }
+    - { mode: 9600, name: "MS Office 2013" }
+    - { mode: 10500, name: "PDF 1.4-1.6 (Acrobat 5-8)" }
+    - { mode: 10700, name: "PDF 1.7 L8 (Acrobat 10-11)" }
+
+- category: "Disk / key / wallet"
+  modes:
+    - { mode: 14600, name: "LUKS" }
+    - { mode: 13711, name: "VeraCrypt SHA512+XTS 512" }
+    - { mode: 6211, name: "TrueCrypt RIPEMD160+XTS 512" }
+    - { mode: 13400, name: "KeePass 1/2 (AES/Twofish)" }
+    - { mode: 22911, name: "RSA/DSA/EC/OpenSSH private keys ($sshng$)" }
+    - { mode: 11300, name: "Bitcoin/Litecoin wallet.dat" }
+    - { mode: 15700, name: "Ethereum Wallet (SCRYPT)" }
+    - { mode: 5200, name: "Password Safe v3" }
+    - { mode: 6600, name: "1Password (agilekeychain)" }

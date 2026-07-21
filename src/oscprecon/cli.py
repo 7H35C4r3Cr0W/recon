@@ -454,6 +454,44 @@ def gtfobins_cmd(
     raise typer.Exit(0)
 
 
+@app.command("hashcat")
+def hashcat_cmd(
+    query: str | None = typer.Argument(
+        None, help="Search hash type by name/mode/category (e.g. apr1, ntlm, 1800, kerberos)."
+    ),
+    attack: str = typer.Option("0", "--attack", "-a", help="Attack mode: 0 dict, 1 combo, 3 mask."),
+    hashfile: str = typer.Option("hash.txt", "--hashfile", help="Hash file for the built command."),
+    wordlist: str = typer.Option(
+        "/usr/share/wordlists/rockyou.txt", "--wordlist", "-w", help="Wordlist (attack 0/1/6/7)."
+    ),
+    mask: str = typer.Option("?a?a?a?a?a?a", "--mask", help="Mask (attack 3/6/7)."),
+) -> None:
+    """Hashcat mode helper — find the -m for a hash and build the crack command (display-only)."""
+    from oscprecon.references import hashcat as hc
+
+    results = hc.search(query or "")
+    if not results:
+        typer.echo(f"[no match] '{query}' — try apr1 / ntlm / kerberos / a -m number", err=True)
+        raise typer.Exit(1)
+    if query is None:
+        typer.echo("Hashcat modes (use `nabu-cli hashcat <search>` to narrow + build a command):\n")
+        cat = ""
+        for m in results:
+            if m.category != cat:
+                cat = m.category
+                typer.echo(f"── {cat} ──")
+            typer.echo(f"  -m {m.mode:<6} {m.name}")
+        typer.echo("\nAttack modes: " + " · ".join(f"-a {a} {n}" for a, n, _ in hc.ATTACK_MODES))
+        raise typer.Exit(0)
+    typer.echo(f"# matches for '{query}':\n")
+    for m in results:
+        cmd = hc.build_command(m.mode, attack=attack, hashfile=hashfile, wordlist=wordlist, mask=mask)
+        typer.echo(f"  -m {m.mode:<6} {m.name}  [{m.category}]")
+        typer.echo(f"      {cmd}")
+    typer.echo("")
+    raise typer.Exit(0)
+
+
 @app.command("pivot")
 def pivot_cmd(
     lhost: str = typer.Option(
