@@ -15,8 +15,21 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD `41db300`: Cereal box review + cross-box attack-coverage + GUI-UX round 2** (pushed).
+- **github/main HEAD `7e05421`: full cross-box ATTACK-coverage audit (every reviewed box) + Cereal + GUI-UX round 2** (pushed).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-21) — **owner asked to re-check the ATTACK modules for EVERY box in the whole review
+  series** (Phoenix/Spooktrol/EarlyAccess/Spider/Breadcrumbs/Cereal/Snoopy/Carpediem + earlier
+  Base/Vaccine/Download/Active/Race/BigBang). Ran a **5-agent parallel audit**, each grep-verifying the
+  3,455-action catalog. Most technique classes were ALREADY covered (grep-confirmed) — added the **12
+  genuinely-missing GENERIC, §21-safe techniques** → `feat(exploit)` `7e05421`:
+  - web.py: `uwsgi-ini-magic-exec-rce` (Flask/uWSGI @(exec://)), `sqli-header-second-order`,
+    `dotnet-viewstate-machinekey-forge` (the generic leaked-machineKey ViewState forge — existing
+    ViewState actions were all CVE/app-specific), `web-race-condition-parallel` (TOCTOU) — all victim.
+  - windows.py `cred-hunt-stickynotes` (plum.sqlite, victim); ad.py `gpp-decrypt-cpassword` (offline
+    GPP cpassword, attacker); adb.py `apk-decompile-apktool`+`apk-decompile-jadx` (attacker).
+  - **NEW `exploit/qdpm.py`** per-CMS module (4 attacker curl actions: CHANGELOG version, databases.yml
+    cred leak, authenticated attachment-upload webshell, trigger) + loader + fingerprint-presence entry.
+  - Regression-locked in `test_recent_box_attack_techniques_present`; catalog **3455→3467 / 183 svcs**.
 - Session (2026-07-20l) — **Cereal box + overnight "hammer large chunks": attack-coverage catch-up + GUI-UX round 2 + full-suite hang fix.**
   - **Full-suite hang FIXED (root cause found).** The deterministic ~16% freeze was NOT flaky/env — a
     modal `QMessageBox.information` I'd added to `_on_scan_preset` (no-project path) blocked forever
