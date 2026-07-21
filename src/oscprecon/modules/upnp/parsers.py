@@ -27,7 +27,11 @@ _SENTINEL = ("[missing]", "[blocked]")
 
 _SERVER = re.compile(r"Server:\s*(?P<v>.+?)\s*$", re.MULTILINE | re.IGNORECASE)
 _LOCATION = re.compile(r"Location:\s*(?P<v>https?://\S+)", re.IGNORECASE)
-_NAME = re.compile(r"(?:Friendly Name|Name):\s*(?P<v>.+?)\s*$", re.MULTILINE | re.IGNORECASE)
+# anchor to logical line-start (after an optional nmap "|_" prefix) so a bare/Friendly "Name:"
+# matches but the "Name:" inside "Model Name:" does not (that's owned by _MODEL below).
+_NAME = re.compile(
+    r"^\s*\|?_?\s*(?:Friendly Name|Name):\s*(?P<v>.+?)\s*$", re.MULTILINE | re.IGNORECASE
+)
 _MANUFACTURER = re.compile(r"Manufacturer:\s*(?P<v>.+?)\s*$", re.MULTILINE | re.IGNORECASE)
 _MODEL = re.compile(r"Model(?:\s*Name)?:\s*(?P<v>.+?)\s*$", re.MULTILINE | re.IGNORECASE)
 

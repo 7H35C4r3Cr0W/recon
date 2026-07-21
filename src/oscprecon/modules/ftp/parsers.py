@@ -102,7 +102,7 @@ def parse_curl_list(text: str) -> list[FtpFinding]:
     return _listing_findings(text, "/")
 
 
-_NMAP_VER = re.compile(r"^\d+/tcp\s+open\s+ftp[-\w]*\s+(?P<ver>\S.*)$", re.MULTILINE)
+_NMAP_VER = re.compile(r"^\d+/tcp[^\S\n]+open[^\S\n]+ftp[-\w]*[^\S\n]+(?P<ver>\S.*)$", re.MULTILINE)
 
 
 def nmap_anon_ok(text: str) -> bool:

@@ -54,7 +54,7 @@ def parse_onesixtyone(text: str) -> list[SnmpFinding]:
     return _dedup(findings)
 
 
-_SNMP_VER = re.compile(r"^\d+/udp\s+open\s+snmp\S*\s+(?P<ver>\S.*)$", re.MULTILINE)
+_SNMP_VER = re.compile(r"^\d+/udp[^\S\n]+open[^\S\n]+snmp\S*[^\S\n]+(?P<ver>\S.*)$", re.MULTILINE)
 
 
 def parse_nmap_snmp(text: str) -> list[SnmpFinding]:

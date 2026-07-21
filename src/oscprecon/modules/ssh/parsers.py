@@ -35,7 +35,7 @@ class SshFinding:
 
 
 # `22/tcp open  ssh  OpenSSH 7.6p1 Ubuntu ...` — capture the version/product tail verbatim.
-_SSH_VER = re.compile(r"^\d+/tcp\s+open\s+ssh[-\w]*\s+(?P<ver>\S.*)$", re.MULTILINE)
+_SSH_VER = re.compile(r"^\d+/tcp[^\S\n]+open[^\S\n]+ssh[-\w]*[^\S\n]+(?P<ver>\S.*)$", re.MULTILINE)
 # a host-key line, `| ` prefix stripped: `2048 aa:bb:..:99 (RSA)` or `256 SHA256:… (ED25519)`.
 _HOSTKEY = re.compile(r"^(?P<bits>\d+)\s+(?P<fp>\S+)\s+\((?P<type>[^)]+)\)$")
 

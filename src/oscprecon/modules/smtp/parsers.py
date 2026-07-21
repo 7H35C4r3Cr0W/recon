@@ -38,7 +38,8 @@ class SmtpFinding:
 # -sV prints the TLS-wrapped service as `ssl/smtp` (465) and 587 sometimes as `submission` — the
 # module triggers on those ports/services, so the banner regex must accept them too.
 _SMTP_VER = re.compile(
-    r"^\d+/tcp\s+open\s+(?:ssl/)?(?:smtp[-\w]*|submission)\s+(?P<ver>\S.*)$", re.MULTILINE
+    r"^\d+/tcp[^\S\n]+open[^\S\n]+(?:ssl/)?(?:smtp[-\w]*|submission)[^\S\n]+(?P<ver>\S.*)$",
+    re.MULTILINE,
 )
 # smtp-commands.nse returns TWO payloads — the EHLO extensions AND the HELP response — on two lines.
 # VRFY/EXPN are base SMTP verbs that often surface ONLY on the HELP line, so read both.

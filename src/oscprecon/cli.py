@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
@@ -12,6 +13,10 @@ from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
 from oscprecon.reporter import Reporter
 from oscprecon.workspace import portability
+
+if TYPE_CHECKING:  # annotation-only names (imported at call time in the function bodies)
+    from oscprecon.models import Command, Port
+    from oscprecon.modules.base import Module
 
 app = typer.Typer(
     help=(
@@ -571,9 +576,56 @@ _FULL_ENUM_MODULES: dict[str, int] = {
 }
 
 
+def _tier1_enum_steps(
+    service: str, module: Module, target: Target, port: int, ports: list[Port]
+) -> list[tuple[Command, str]]:
+    # Mirror the GUI's bespoke recon workers: use each module's native step methods, which tag every
+    # step with the correct parser key (`.tool`). The output-file STEM must NOT be used as the key —
+    # stems don't match the _PARSERS dispatch keys (smb `users.txt` vs the "netexec-users" parser,
+    # ldap `rootdse.txt` vs "ldapsearch-rootdse", ftp `curl-root.txt` vs "curl-list", …), so a
+    # stem-keyed raw dict silently parses to zero findings. http/vhost are commands()-driven and
+    # their parse() keys on "<tool>:<port>" / "<tool>:<domain>", so those keys are built explicitly.
+    from oscprecon.modules.dns import DnsModule
+    from oscprecon.modules.ftp import FtpModule
+    from oscprecon.modules.ldap import LdapModule
+    from oscprecon.modules.smb import SmbModule
+    from oscprecon.modules.smtp import SmtpModule
+    from oscprecon.modules.ssh import SshModule
+
+    domain = target.hostname or ""
+    if isinstance(module, SshModule):
+        return [(s.command, s.tool) for s in module.recon_steps(target, port)]
+    if isinstance(module, SmtpModule):
+        return [(s.command, s.tool) for s in module.recon_steps(target, port)]
+    if isinstance(module, DnsModule):
+        return [(s.command, s.tool) for s in module.recon_steps(target, domain or None, port)]
+    if isinstance(module, FtpModule):
+        ftp_steps = [*module.banner_steps(target, port), *module.anon_steps(target, port)]
+        return [(s.command, s.tool) for s in ftp_steps]
+    if isinstance(module, LdapModule):
+        return [(s.command, s.tool) for s in module.rootdse_steps(target, port)]
+    if isinstance(module, SmbModule):
+        smb_steps = [
+            *module.banner_steps(target),
+            *module.null_session_steps(target),
+            *module.guest_steps(target),
+        ]
+        return [(s.command, s.tool) for s in smb_steps]
+    if service == "vhost":  # parse() does label.partition(":") -> (tool, domain)
+        return [(c, f"{Path(c.output_file).stem}:{domain}") for c in module.commands(target, ports)]
+    # http (and any commands()-driven fallback): parse() keys on "<tool>:<port>" where port is the
+    # per-port output subdir; the whatweb/robots battery uses clean stems so stem:port is correct.
+    out: list[tuple[Command, str]] = []
+    for c in module.commands(target, ports):
+        of = Path(c.output_file)
+        key = f"{of.stem}:{of.parent.name}" if of.parent.name.isdigit() else of.stem
+        out.append((c, key))
+    return out
+
+
 def _run_full_module_enum(service: str, profile: str, workspace: Path | None, port: int) -> None:
-    # run a full recon Module (commands -> shell.run -> parse -> record findings), mirroring how
-    # enum drives the simple specs, so http/ssh/ftp/dns/ldap/smb/smtp/vhost are enum-runnable too.
+    # run a full recon Module (native Tier-1 steps -> shell.run -> parse -> record findings),
+    # mirroring the GUI's bespoke workers so http/ssh/ftp/dns/ldap/smb/smtp/vhost are enum-runnable.
     import importlib
     import inspect
     from datetime import UTC, datetime
@@ -612,7 +664,7 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
         ports = [Port(number=default_port, proto=Proto.TCP, service=service)]
     raw: dict[str, str] = {}
     issues: list[str] = []
-    for command in module.commands(prof.target, ports):
+    for command, key in _tier1_enum_steps(service, module, prof.target, default_port, ports):
         out = prof.directory / command.output_file
         result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
         if result.missing_tool is not None:
@@ -623,14 +675,8 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
             text = out.read_text(encoding="utf-8", errors="replace")
         except OSError:
             text = ""
-        # the parsers dispatch on the RAW-dict key: most modules key by the output-file stem
-        # ("nmap-ssh"), but http/vhost key by "<tool>:<port>" (port = the per-port output subdir).
-        of = Path(command.output_file)
-        parent = of.parent.name
-        key = (
-            f"{of.stem}:{parent}" if service in ("http", "vhost") and parent.isdigit() else of.stem
-        )
-        raw[key] = text
+        if key:  # unparsed steps (e.g. smb nmap-smb, http headers) run but carry no parser key
+            raw[key] = text
     found = run_parser(lambda: module.parse(raw), label=service, raw="\n".join(raw.values()))
     if found:
         now = datetime.now(UTC).isoformat()

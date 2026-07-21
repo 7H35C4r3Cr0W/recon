@@ -68,7 +68,12 @@ def search(query: str) -> list[HashMode]:
     return [
         m
         for m in modes
-        if q in m.name.lower() or q in m.category.lower() or q == str(m.mode) or q in str(m.mode)
+        if q in m.name.lower()
+        or q in m.category.lower()
+        or q == str(m.mode)
+        # numeric substring only for 2+ digits, so a partial like "173" finds 17300 but a bare
+        # "0"/"1" doesn't flood every mode that merely contains that digit.
+        or (q.isdigit() and len(q) >= 2 and q in str(m.mode))
     ]
 
 

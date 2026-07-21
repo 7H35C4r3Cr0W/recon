@@ -12,7 +12,11 @@
     - { mode: 1400, name: "SHA-256" }
     - { mode: 10800, name: "SHA-384" }
     - { mode: 1700, name: "SHA-512" }
-    - { mode: 5000, name: "SHA-3 (Keccak)" }
+    - { mode: 17300, name: "SHA3-224" }
+    - { mode: 17400, name: "SHA3-256" }
+    - { mode: 17500, name: "SHA3-384" }
+    - { mode: 17600, name: "SHA3-512" }
+    - { mode: 18000, name: "Keccak-256" }
     - { mode: 6000, name: "RIPEMD-160" }
     - { mode: 6100, name: "Whirlpool" }
     - { mode: 600, name: "BLAKE2b-512" }
@@ -59,7 +63,6 @@
     - { mode: 1800, name: "sha512crypt $6$ (SHA512-Unix / /etc/shadow)" }
     - { mode: 1500, name: "descrypt (DES-Unix, traditional)" }
     - { mode: 12400, name: "BSDi Crypt / Extended DES" }
-    - { mode: 30600, name: "yescrypt $y$" }
     - { mode: 3000, name: "LM" }
     - { mode: 1000, name: "NTLM" }
     - { mode: 1100, name: "Domain Cached Creds (DCC / MS Cache 1)" }
@@ -151,7 +154,7 @@
 - category: "Disk / key / wallet"
   modes:
     - { mode: 14600, name: "LUKS" }
-    - { mode: 13711, name: "VeraCrypt SHA512+XTS 512" }
+    - { mode: 13721, name: "VeraCrypt SHA512+XTS 512" }
     - { mode: 6211, name: "TrueCrypt RIPEMD160+XTS 512" }
     - { mode: 13400, name: "KeePass 1/2 (AES/Twofish)" }
     - { mode: 22911, name: "RSA/DSA/EC/OpenSSH private keys ($sshng$)" }

@@ -25,7 +25,9 @@ class IdentFinding:
 # A missing/blocked wrapped tool writes a sentinel line to the output file (shell.run) — skip those.
 _SENTINEL = ("[missing]", "[blocked]")
 
-_SV_LINE = re.compile(r"^\d+/tcp\s+open\s+(?:ident|auth)\??\s+(?P<v>.+?)\s*$", re.MULTILINE)
+_SV_LINE = re.compile(
+    r"^\d+/tcp[^\S\n]+open[^\S\n]+(?:ident|auth)\??[^\S\n]+(?P<v>.+?)\s*$", re.MULTILINE
+)
 _PREFIX = re.compile(r"^\s*\|_?\s?")  # nmap NSE line prefix ("| " / "|_")
 _USERNAME = re.compile(r"^[A-Za-z0-9_][\w\-]*$")
 

@@ -106,7 +106,9 @@ def parse_dnsrecon(text: str) -> list[DnsFinding]:
     return findings
 
 
-_NMAP_VER = re.compile(r"^\d+/(?:tcp|udp)\s+open\s+domain\s+(?P<ver>\S.*)$", re.MULTILINE)
+_NMAP_VER = re.compile(
+    r"^\d+/(?:tcp|udp)[^\S\n]+open[^\S\n]+domain[^\S\n]+(?P<ver>\S.*)$", re.MULTILINE
+)
 _NSID = re.compile(r"bind\.version:\s*(?P<ver>\S.*?)\s*$", re.MULTILINE)
 
 

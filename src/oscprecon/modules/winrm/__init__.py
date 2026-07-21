@@ -46,6 +46,9 @@ class WinrmModule(Module):
     def recon_steps(self, target: Target, port: int = 0) -> list[WinrmStep]:
         host = target.ip
         port_n = port or _DEFAULT_PORT
+        # 5986 is WinRM-over-HTTPS (self-signed in labs) — GET it over https -k, not plain http.
+        scheme = "https" if port_n == 5986 else "http"
+        insecure = " -k" if scheme == "https" else ""
         return [
             WinrmStep(
                 Command(
@@ -60,7 +63,7 @@ class WinrmModule(Module):
             WinrmStep(
                 Command(
                     "winrm",
-                    f"curl -s -i http://{host}:{port_n}/wsman",
+                    f"curl -s -i{insecure} {scheme}://{host}:{port_n}/wsman",
                     "GET /wsman — a 405 confirms a live WinRM endpoint; Server header (read-only).",
                     "< 30s",
                     "winrm/wsman.txt",
