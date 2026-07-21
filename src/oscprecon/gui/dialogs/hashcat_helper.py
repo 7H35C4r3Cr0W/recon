@@ -43,7 +43,7 @@ class HashcatHelperDialog(QDialog):
         intro.setOpenExternalLinks(True)
 
         self._filter = QLineEdit()
-        self._filter.setPlaceholderText("search hash type… (apr1, ntlm, kerberos, 1800, /etc/shadow)")
+        self._filter.setPlaceholderText("search hash type… (apr1, ntlm, kerberos, 1800, shadow)")
         self._filter.textChanged.connect(self._apply_filter)
 
         self._list = QListWidget()

@@ -485,7 +485,9 @@ def hashcat_cmd(
         raise typer.Exit(0)
     typer.echo(f"# matches for '{query}':\n")
     for m in results:
-        cmd = hc.build_command(m.mode, attack=attack, hashfile=hashfile, wordlist=wordlist, mask=mask)
+        cmd = hc.build_command(
+            m.mode, attack=attack, hashfile=hashfile, wordlist=wordlist, mask=mask
+        )
         typer.echo(f"  -m {m.mode:<6} {m.name}  [{m.category}]")
         typer.echo(f"      {cmd}")
     typer.echo("")

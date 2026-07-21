@@ -65,10 +65,11 @@ class TftpStep:
 
 
 def tftp_get_url(target: str, port: int, filename: str) -> str:
-    # why: the filename may come from nmap tftp-enum output (target-controlled), so URL-encode it
-    # (encode '/' too — a GET targets a single named file) so a hostile name can't smuggle a curl
-    # flag or a second URL when the line is shlex-split at the exec chokepoint.
-    encoded = quote(filename, safe="")
+    # why: keep '/' unencoded so a real PATH (e.g. /etc/squid/squid.conf) fetches — a TFTP GET can
+    # target a path, and %2F-encoding it (the old bug) asked for a file literally named "%2Fetc%2F…"
+    # which never exists. Other chars ARE encoded, and the whole url is shlex.quote'd at the exec
+    # chokepoint below, so a target-controlled name still can't smuggle a curl flag or a 2nd URL.
+    encoded = quote(filename, safe="/")
     authority = target if port == 69 else f"{target}:{port}"
     return f"tftp://{authority}/{encoded}"
 
