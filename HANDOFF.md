@@ -15,8 +15,21 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD `7e05421`: full cross-box ATTACK-coverage audit (every reviewed box) + Cereal + GUI-UX round 2** (pushed).
+- **github/main HEAD `53f9817`: HTB Tentacle box review (Squid recon + MIT-Kerberos-on-Linux attack chain)** (pushed).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-21b) — **HTB Tentacle box review** (Squid proxy → OpenSMTPD RCE → MIT Kerberos
+  lateral + privesc). Ran a 9-dimension survey→adversarial-verify **audit workflow** across BOTH
+  recon and attack sides → `feat` `53f9817`. Already-covered (grep-confirmed, NOT re-added): OpenSMTPD
+  6.6 RCE, Squid proxy pivot (`exploit/squid.py`), DNS PTR-sweep (`modules/dns/manual_commands.yaml`).
+  Added the verified §21-safe gaps:
+  - RECON: `services.yaml` port-3128 **Squid** entry (Squid HackTricks page + proxy-pivot/cache-mgr
+    hints, beats the http-proxy fallback); `patterns/dns.yaml` **WPAD/PAC** discovery next-step.
+  - ATTACK — the **MIT-Kerberos-on-Linux** chain (distinct from the AD/impacket Kerberos set): ad.py
+    `kinit-tgt` (victim) + `krb5-conf-generate` (attacker); ssh.py `connect-gssapi-kerberos` (victim);
+    linux.py new **"MIT Kerberos (keytab/.k5login)"** category — `krb-keytab-list` (klist -kte),
+    `krb-keytab-kinit` (-kt), `krb-keytab-ktutil-dump`, `krb-keytab-kadmin-addprinc` (KDC takeover from
+    a readable keytab), `krb-k5login-plant` (→ passwordless ksu/ssh), `krb-ksu-principal`.
+  - Squid ref + WPAD suggestion verified to FIRE through the engines; catalog **3467→3476**.
 - Session (2026-07-21) — **owner asked to re-check the ATTACK modules for EVERY box in the whole review
   series** (Phoenix/Spooktrol/EarlyAccess/Spider/Breadcrumbs/Cereal/Snoopy/Carpediem + earlier
   Base/Vaccine/Download/Active/Race/BigBang). Ran a **5-agent parallel audit**, each grep-verifying the
