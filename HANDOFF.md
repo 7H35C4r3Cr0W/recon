@@ -15,8 +15,20 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD `7bd9e9a`: HTB Intense box review (source-archive flag + SQLite/hash-ext/binexp attacks)** (pushed).
+- **github/main HEAD `d64391c`: HTB RopeTwo box review (generic recon/attack classes; V8/heap/kernel chains excluded)** (pushed).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-21d) — **HTB RopeTwo box review** (Insane exploit-dev: V8 type-confusion → glibc heap
+  tcache → Linux-kernel-module ROP). The bespoke V8/heap/kernel chains are **box-specific and OUT per §21**
+  (the audit verifier rejected them). 6-dimension survey→verify **audit workflow** → `feat` `d64391c`.
+  Already-covered: known-vuln lookup (searchsploit + git.py). Added the verified GENERIC gaps:
+  - RECON: `services.yaml` GitLab `product_contains` row (labels a fingerprinted GitLab like the
+    Tomcat/Jenkins rows — note bare port-rows still win on alt-HTTP ports by §14 precedence);
+    `patterns/http.yaml` contact/feedback/comment-form path → blind-XSS + client-side-SSRF recon hint.
+  - ATTACK: gitlab.py `gitlab-list-snippets-api` + `gitlab-repo-commits-api` (attacker curl, unauth
+    secret-leak surfaces); web.py `xss-blind-oob-beacon` (OOB callback in a bot/admin browser, victim);
+    linux.py "Kernel exploit" `kmod-enum` + `kmod-modinfo` (enumerate a CUSTOM loaded driver — distinct
+    from the version-only kernel-info/les-run); linux.py "Binary exploitation" `binexp-patchelf-target-libc`
+    (run a looted binary against the target's own libc). Catalog **3481→3487**.
 - Session (2026-07-21c) — **HTB Intense box review** (Flask source-review → SQLite blind SQLi → hash
   length-extension → path traversal → SNMP rwcommunity RCE → custom-binary ROP). 7-dimension
   survey→verify **audit workflow** → `feat` `7bd9e9a`. Already-covered (grep-confirmed): **SNMP
