@@ -120,3 +120,14 @@
     - text: "Joomla detected — read the exact version from the unauthenticated manifest (feeds a version lookup)"
       command: "curl -s 'http://{target}:{port}/administrator/manifests/files/joomla.xml'"
 # source: Obsidian: 0.00 Methodology .../Other Services/80 (Web services)/Joomla.md
+
+- match:
+    service: http
+    field: note
+    value: "(?i)werkzeug|django[\\[/]"
+  suggest:
+    - text: "Python web framework detected (Werkzeug/Flask/Django) — a server-rendered Python app. Check the Werkzeug debug console; if DEBUG was left on it is an interactive Python shell"
+      command: "curl -sik http://{target}:{port}/console"
+    - text: "If the app sets a Flask 'session' cookie it is CLIENT-SIDE signed — decode its structure (read-only) to see which fields the server trusts"
+      command: "flask-unsign --decode --cookie '<paste the session cookie>'"
+# source: walkthroughs/htb-spider.md (Werkzeug/Flask/Django app recon)
