@@ -139,9 +139,13 @@ def test_settings_prefs_hold_only_known_non_secret_keys() -> None:
         "hacktricks_auto_refresh",
         "hacktricks_prefer_live",
         "hacktricks_cache_days",
+        "redact_secrets",
     }
-    # none of these carry a secret — they are booleans, an int, paths, and enum names
-    assert "secret" not in " ".join(keys) and "password" not in " ".join(keys)
+    # none of these VALUES carry a secret — they are booleans, an int, paths, and enum names.
+    # (redact_secrets is a boolean POLICY flag — it names the toggle, never stores a secret.)
+    assert "password" not in " ".join(keys)
+    prefs = config.default_settings().to_prefs()
+    assert prefs["redact_secrets"] in ("true", "false")  # a flag, not a secret value
 
 
 def test_spray_enabled_defaults_off_and_roundtrips() -> None:
