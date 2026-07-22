@@ -1,9 +1,27 @@
 # Boxes completed — running tally
 
-**TOTAL: 50** ( Starting Point tier: 25 · Field reviews: 25 )
+## ⭐ TOTAL: 50 — by difficulty
 
-Single source of truth for every box worked in this project. **Update this file every time a box is
-finished** — add a row, bump the total. Difficulty is the rating from the box's walkthrough / HTB page.
+| Difficulty | Count |
+|------------|-------|
+| Insane | 10 |
+| Hard | 14 |
+| Medium | 0 |
+| Easy | 6 |
+| Very Easy | 18 |
+| Pro Lab (Dante) | 1 |
+| Unrated (Race) | 1 |
+| **TOTAL** | **50** |
+
+> Note: Intense, Carpediem, and Snoopy are counted **Hard** (per their walkthroughs). On current HTB
+> they're labelled **Medium** — using official labels the split is Hard 11 / Medium 3.
+
+Split by source: **Field reviews 25** (Insane 10 · Hard 14 · unrated 1) · **Starting Point 25**
+(Very Easy 18 · Easy 6 · Pro Lab 1).
+
+Single source of truth for every box worked in this project. **Update this file (rows + the breakdown
+table + the total) every time a box is finished** — no exceptions. Difficulty is the rating from the
+box's walkthrough / HTB page.
 
 ## Field reviews — harder retired HTB (25)
 Live recon **and** attack reviews (most run against the live box, foothold→root where practical).
@@ -59,7 +77,7 @@ From `STARTING-POINT-LOG.md` (rows 1–25). Tier I/II are Very-Easy/Easy; Dante 
 | 16 | Ignition | Tier 1 · Very Easy |
 | 17 | Pennyworth | Tier 1 · Very Easy |
 | 18 | Tactics | Tier 1 · Very Easy |
-| 19 | Vaccine | Tier 1 · Very Easy |
+| 19 | Vaccine | Tier 2 · Easy |
 | 20 | Dante | **HTB Pro Lab** (multi-machine) |
 | 21 | Archetype | Tier 2 · Easy |
 | 22 | Unified | Tier 2 · Easy |
@@ -67,5 +85,6 @@ From `STARTING-POINT-LOG.md` (rows 1–25). Tier I/II are Very-Easy/Easy; Dante 
 | 24 | Markup | Tier 2 · Easy |
 | 25 | Base | Tier 2 · Easy |
 
-## Difficulty summary (field reviews)
-Insane: 10 · Hard: 14 · unrated: 1
+## Starting Point difficulty (24 boxes + Dante Pro Lab)
+Very Easy (Tier 0+1): 18 · Easy (Tier 2 — Vaccine, Archetype, Unified, Included, Markup, Base): 6 ·
+Pro Lab (Dante): 1
