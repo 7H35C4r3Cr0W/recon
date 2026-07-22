@@ -64,3 +64,54 @@ def test_manual_commands_are_recon_only() -> None:
         # no PSK-hash capture / cracking flags
         assert "-P" not in shlex.split(command) and "--pskcrack" not in command
         assert "--passwords" not in command
+
+
+def test_suggest_ipsec_tunnel_firewall_bypass() -> None:
+    # HTB Conceal: TCP is all filtered but IKE answers → suggest establishing a transport-mode
+    # tunnel, with the ipsec.conf cipher line derived from the discovered transform.
+    module = IkeModule()
+    raw = (
+        "10.10.10.116  Main Mode Handshake returned HDR=(CKY-R=ee3) "
+        "SA=(Enc=3DES Hash=SHA1 Group=2:modp1024 Auth=PSK LifeType=Seconds "
+        "LifeDuration(4)=0x00007080)"
+    )
+    tips = module.suggest(module.parse({"ike-scan": raw}))
+    tunnel = [t for t in tips if "transport-mode tunnel" in t]
+    assert tunnel, tips
+    # the cipher line is derived from ike-scan's transform (Enc/Hash/Group -> strongswan syntax)
+    assert "ike=3des-sha1-modp1024" in tunnel[0]
+    assert "esp=3des-sha1" in tunnel[0]
+
+
+def test_strongswan_lines_maps_common_transforms() -> None:
+    from oscprecon.modules.ike import _strongswan_lines
+
+    assert _strongswan_lines("Enc=3DES Hash=SHA1 Group=2:modp1024 Auth=PSK") == (
+        "3des-sha1-modp1024",
+        "3des-sha1",
+    )
+    # real ike-scan AES: the key length is a SEPARATE KeyLength attribute, not Enc=AES256
+    assert _strongswan_lines("Enc=AES KeyLength=256 Hash=SHA256 Group=14 Auth=PSK") == (
+        "aes256-sha256-modp2048",
+        "aes256-sha256",
+    )
+    # a bare Enc=AES (no KeyLength) stays aes (strongswan reads it as aes128) — don't guess a length
+    assert _strongswan_lines("Enc=AES Hash=SHA1 Group=2 Auth=PSK") == (
+        "aes-sha1-modp1024",
+        "aes-sha1",
+    )
+
+
+def test_strongswan_lines_uses_authoritative_dh_group_name() -> None:
+    from oscprecon.modules.ike import _strongswan_lines
+
+    # DH keyword encodes the modulus SIZE, not the IANA number: 15->modp3072, 19->ecp256
+    assert _strongswan_lines("Enc=3DES Hash=SHA1 Group=15:modp3072 Auth=PSK")[0] == (
+        "3des-sha1-modp3072"
+    )
+    assert _strongswan_lines("Enc=3DES Hash=SHA1 Group=15 Auth=PSK")[0] == "3des-sha1-modp3072"
+    assert _strongswan_lines("Enc=AES KeyLength=128 Hash=SHA256 Group=19:ecp256 Auth=PSK")[0] == (
+        "aes128-sha256-ecp256"
+    )
+    # an unmapped group is DROPPED, never emitted as an invalid modp<number> keyword
+    assert _strongswan_lines("Enc=3DES Hash=SHA1 Group=99 Auth=PSK") == ("3des-sha1", "3des-sha1")

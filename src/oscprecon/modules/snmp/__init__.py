@@ -132,7 +132,9 @@ class SnmpModule(Module):
             for f in findings
         ):
             out.append(
-                "A value over SNMP looks like a credential (often in process args) — "
-                "read the raw snmpwalk output; do not rely on the redacted finding."
+                "A value over SNMP looks like a credential (in process args, or a system field "
+                "like sysContact — HTB Conceal leaks the IKE PSK there) — read the raw snmpwalk "
+                "output; do not rely on the redacted finding. A PSK/NTLM-looking 32-hex string "
+                "cracks offline (hashkiller/hashcat -m 1000) and can unlock an IKE/IPsec tunnel."
             )
         return out

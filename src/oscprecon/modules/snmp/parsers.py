@@ -28,7 +28,20 @@ _ONESIXTYONE = re.compile(
 )
 # credentials frequently sit in process command-line args exposed over SNMP — flag their presence
 # WITHOUT copying the secret into a finding (§6: reports/findings never carry plaintext secrets).
-_CRED_HINT = re.compile(r"(?<![A-Za-z])pass(?:word|wd)?\s*[=:]", re.IGNORECASE)
+# flags a leaked secret in the SNMP data. Two shapes, plus the bare "pre-shared key" phrase:
+#   (a) a credential LABEL + a separator (-/=/:) + a value: `password=x`, `pwd: y`, `psk:z`, and
+#       `PSK - <hash>` (HTB Conceal leaks the IKE PSK in sysContact as "…password PSK - <hash>");
+#   (b) a credential label sitting near a long hex/NTLM-looking token (a hash written without a
+#       separator). A label with NO separator and NO hash nearby (benign English "password
+#       protected", "secret sauce") does NOT match — avoids the false-positive that suppressed
+#       real notes. The keywords are whole words with a left boundary so `bypass=`/`compass:` (no
+#       real keyword) never fire.
+_CRED_HINT = re.compile(
+    r"(?<![a-z])(?:password|passwd|passphrase|pwd|secret|psk)\s*[-=:]\s*\S+"
+    r"|(?<![a-z])(?:password|passphrase|secret|psk)\b[^\n]{0,15}[0-9a-f]{16,}"
+    r"|pre[-\s]?shared[\s-]?key",
+    re.IGNORECASE,
+)
 
 
 def _dedup(findings: list[SnmpFinding]) -> list[SnmpFinding]:
@@ -90,6 +103,8 @@ def parse_nmap_snmp(text: str) -> list[SnmpFinding]:
 _USER_OID = ".77.1.2.25"  # Microsoft LanMgr user-account table (enterprise 77)
 _PROC_OID = ".25.4.2.1.2."  # hrSWRunName (host-resources running software)
 _SYSDESCR_TAIL = ".1.2.1.1.1.0"  # system.sysDescr.0
+_SYSCONTACT_TAIL = ".1.2.1.1.4.0"  # system.sysContact.0 — admin contact, often a leak (Conceal PSK)
+_SYSLOCATION_TAIL = ".1.2.1.1.6.0"  # system.sysLocation.0 — physical location, sometimes a hint
 
 
 def parse_snmpwalk(text: str) -> list[SnmpFinding]:
@@ -108,6 +123,18 @@ def parse_snmpwalk(text: str) -> list[SnmpFinding]:
             findings.append(SnmpFinding("user", value))
         elif "hrswrunname" in low_oid or _PROC_OID in oid:
             findings.append(SnmpFinding("process", value))
+        elif "syscontact" in low_oid or oid.endswith(_SYSCONTACT_TAIL):
+            # sysContact/sysLocation regularly carry a hint (admin email, a note, or a leaked secret
+            # — Conceal's IKE PSK). Surface it; if it looks like a secret the cred-leak note below
+            # points at the raw file instead of us echoing it here.
+            if not _CRED_HINT.search(value):
+                findings.append(SnmpFinding("note", f"sysContact: {value}"))
+        elif (
+            ("syslocation" in low_oid or oid.endswith(_SYSLOCATION_TAIL))
+            and value.lower() not in ("", "unknown")
+            and not _CRED_HINT.search(value)
+        ):
+            findings.append(SnmpFinding("note", f"sysLocation: {value}"))
     if _CRED_HINT.search(text):
         findings.append(
             SnmpFinding(

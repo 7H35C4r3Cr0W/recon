@@ -21,3 +21,8 @@
 - description: "IKE version / vendor via nmap"
   why: "nmap ike-version cross-checks the responder and vendor-fingerprints it — recon"
   command: "nmap -sU -sV --script ike-version -p 500 {target}"
+
+# The strongSwan IPsec tunnel-establishment step (for the 'TCP all filtered but IKE answers' firewall
+# case — HTB Conceal) is NOT a runnable recon command here: `ipsec`/strongswan modifies local state
+# (writes /etc/ipsec.*, starts a service) and is off the recon allow-list. The full how-to is surfaced
+# by the ike module's suggest() decision-aid instead — establish it by hand, then re-scan TCP (-sT).

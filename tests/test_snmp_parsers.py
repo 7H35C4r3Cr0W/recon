@@ -78,3 +78,35 @@ def test_dispatch_and_garbage() -> None:
     assert parse_snmp_tool("snmpwalk", _read("snmpwalk.txt"))
     assert parse_onesixtyone("no communities here\n") == []
     assert parse_snmpwalk("not an oid line\n") == []
+
+
+def test_snmpwalk_flags_leaked_psk_in_syscontact() -> None:
+    # HTB Conceal leaks the IKE PSK in sysContact (.1.4.0) as "IKE VPN password PSK - <hash>".
+    text = 'iso.3.6.1.2.1.1.4.0 = STRING: "IKE VPN password PSK - 9C8B1A372B1878851BE2C097031B6E43"'
+    notes = [f for f in parse_snmpwalk(text) if f.kind == "note"]
+    assert any("credential" in f.value for f in notes)  # cred-leak note fires
+    # the secret itself is NOT echoed into a finding value (§6 redaction)
+    assert not any("9C8B1A" in f.value for f in parse_snmpwalk(text))
+
+
+def test_snmpwalk_surfaces_benign_syscontact_without_false_cred() -> None:
+    text = 'iso.3.6.1.2.1.1.4.0 = STRING: "admin@corp.local"'
+    findings = parse_snmpwalk(text)
+    assert any(f.kind == "note" and "sysContact: admin@corp.local" in f.value for f in findings)
+    assert not any("credential" in f.value for f in findings)  # a plain email is not a cred
+
+
+def test_cred_hint_no_leak_on_attached_separator_and_no_false_positive() -> None:
+    # review fix: a psk/secret label with an ATTACHED separator (no space) must still be flagged,
+    # so the sysContact branch never echoes the secret (bug #3 was a redaction leak).
+    for leak in ("PSK: 5f4dcc3b5aa765d61d8327deb882cf99", "secret=Summer2023!", "pwd:hunter2long"):
+        text = f'iso.3.6.1.2.1.1.4.0 = STRING: "{leak}"'
+        findings = parse_snmpwalk(text)
+        assert any("credential" in f.value for f in findings), leak  # cred note fires
+        assert not any(leak.split()[-1] in f.value for f in findings), leak  # secret not echoed
+    # and benign English near a keyword must NOT false-fire (bug #4 suppressed real notes)
+    for benign in ("password protected", "secret sauce", "pass the salt"):
+        text = f'iso.3.6.1.2.1.1.4.0 = STRING: "{benign}"'
+        findings = parse_snmpwalk(text)
+        assert not any("credential" in f.value for f in findings), benign
+        assert any(f.value == f"sysContact: {benign}" for f in findings), benign
