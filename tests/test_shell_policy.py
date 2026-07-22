@@ -258,10 +258,7 @@ def test_netexec_non_auth_module_option_is_not_brute() -> None:
     # misclassified as list-driven credential brute and the whole recon command was blocked.
     cmd = ["netexec", "smb", "10.0.0.1", "-u", "guest", "-p", ""]
     cmd += ["-M", "spider_plus", "-o", "OUTPUT=out.txt"]
-    assert (
-        shell.policy_violation(cmd)
-        is None
-    )
+    assert shell.policy_violation(cmd) is None
     # the genuine brute (a wordlist as the -p VALUE) is still blocked
     assert shell.policy_violation(["netexec", "smb", "10.0.0.1", "-p=rockyou.txt"]) is not None
 

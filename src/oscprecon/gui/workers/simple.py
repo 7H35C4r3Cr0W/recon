@@ -13,6 +13,8 @@ from oscprecon.modules.base import Module
 from oscprecon.parsing import run_parser
 from oscprecon.profile import Profile
 
+_STEP_TIMEOUT_S = 300.0  # per-step watchdog, matching the bespoke service workers (service_recon)
+
 
 @dataclass
 class SimpleReconResult:
@@ -48,7 +50,15 @@ class SimpleReconWorker(CancellableThread):
     def _run_step(self, shell_line: str, output_rel: str) -> str:
         base = self._profile.directory
         out = base / output_rel
-        result = shell.run(shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit)
+        result = shell.run(
+            shell_line,
+            out,
+            cwd=base,
+            cancel=self._cancel,
+            on_line=self.line.emit,
+            timeout=_STEP_TIMEOUT_S,  # same watchdog as the bespoke workers (cf. bug #6) — a hung
+            # snmpwalk/onesixtyone/tftp on a tarpit host would otherwise wedge this worker forever.
+        )
         # record steps that could not run so the summary never passes a failure off as "empty" —
         # a recon operator must not read "no findings" as "the service isn't there".
         if result.missing_tool is not None:
