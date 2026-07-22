@@ -177,10 +177,23 @@ def is_data_bearing(name: str) -> bool:
     return extension(name) not in _BINARY_EXT
 
 
+# why: a peeked filename is attacker-controlled (from the target's share/FTP listing) and is
+# interpolated into a client's own command interpreter — smbclient's `-c` string splits on ';' and
+# honours a leading '!' as a shell escape, regardless of shell.run's argv-safe Popen. Never peek a
+# name carrying command-control metacharacters: it is still listed, we only skip the content read.
+_PEEK_UNSAFE_CHARS = frozenset(';`!"\\|&$<>\n\r\t\x00')
+
+
+def has_unsafe_peek_chars(name: str) -> bool:
+    return any(c in _PEEK_UNSAFE_CHARS for c in name)
+
+
 def is_peekable(name: str, is_dir: bool, size: int) -> bool:
     # small (from the listing), non-dir, data-bearing; size 0/unknown is skipped so we never fetch
     # something we can't bound.
     if is_dir or size <= 0 or size > PEEK_MAX_BYTES:
+        return False
+    if has_unsafe_peek_chars(name):
         return False
     return is_data_bearing(name)
 

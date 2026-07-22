@@ -74,16 +74,20 @@ def test_profile_credentials_and_references(tmp_path: Path) -> None:
     assert reloaded.references_visited[0]["url"] == url
 
 
-def test_save_forces_0600_even_with_stale_tmp(tmp_path: Path) -> None:
+def test_save_forces_0600_and_leaves_no_secret_bearing_temp(tmp_path: Path) -> None:
+    # save_creds writes a per-writer UNIQUE temp (mkstemp, 0600) then os.replace — so concurrent
+    # writers never share a temp. The final file is 0600 and no leftover temp holds the secret.
     import os
 
     path = tmp_path / "creds.json"
     stale = tmp_path / "creds.json.tmp"
     stale.write_text("stale", encoding="utf-8")
-    os.chmod(stale, 0o666)  # simulate a leftover world-readable temp
+    os.chmod(stale, 0o666)  # an unrelated leftover from an older fixed-name temp
     creds.save_creds(path, [Credential(username="u", secret="s")])
     assert _mode(path) == "0o600"
-    assert not stale.exists()  # temp was atomically moved into place
+    # the unique temp was atomically moved into place — no creds.json.* temp lingers with the secret
+    leftover = [p for p in tmp_path.glob("creds.json.*") if p.name.endswith(".tmp") and p != stale]
+    assert not leftover
 
 
 def test_delete_credential_removes_the_matching_entry(tmp_path: Path) -> None:

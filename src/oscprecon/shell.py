@@ -291,19 +291,49 @@ _PG_FORBIDDEN_RE = re.compile(
 )
 
 
+# redis-cli / mongo are allow-listed for read-only enum (INFO · CONFIG GET · KEYS · MODULE LIST ·
+# --eval "db.runCommand(...)"); the custom-command box could hand-type a write / destructive / RCE
+# verb, which is not recon. Scoped by client so a redis verb can't false-block a SQL query. Read-
+# only forms are left out: `config get`/`module list` (not set/load); `db.eval(` (server-side JS
+# exec) is matched while `--eval` (the mongosh invocation flag) is not.
+_REDIS_FORBIDDEN_RE = re.compile(
+    r"\b(?:flushall|flushdb|bgsave|save|slaveof|replicaof|shutdown|migrate|restore|debug|swapdb)\b"
+    r"|config\s+set|module\s+load"
+)
+_MONGO_FORBIDDEN_RE = re.compile(
+    r"\.(?:insert|insertone|insertmany|update|updateone|updatemany|replaceone|delete|deleteone"
+    r"|deletemany|remove|save|drop|dropdatabase|renamecollection|createuser|mapreduce|bulkwrite"
+    r"|findandmodify)\s*\(|\$where|db\.eval\s*\("
+)
+
+
 def _db_primitive_violation(tool: str, argv: list[str]) -> str | None:
     raw = " ".join(argv[1:])
     # strip SQL comments (block + line) BEFORE collapsing whitespace, so a comment can't hide/split
     # a keyword; PostgreSQL treats a comment as whitespace, so this mirrors the server's own lexer.
-    raw = re.sub(r"/\*.*?\*/", " ", raw, flags=re.DOTALL)
-    raw = re.sub(r"--[^\n]*", " ", raw)
-    joined = re.sub(r"\s+", " ", raw).lower()
+    # Keep `raw` pristine — the NoSQL check below needs the un-stripped argv (its `--` are flags).
+    sql = re.sub(r"/\*.*?\*/", " ", raw, flags=re.DOTALL)
+    sql = re.sub(r"--[^\n]*", " ", sql)
+    joined = re.sub(r"\s+", " ", sql).lower()
     for primitive in _DB_FORBIDDEN_SUBSTR:
         if primitive in joined:
             return f"{tool} {primitive.strip()} is a file/OS primitive, not recon (forbidden)"
     hit = _PG_FORBIDDEN_RE.search(joined)
     if hit is not None:
         return f"{tool} '{hit.group(0)}' modifies the server / runs code, not recon (forbidden)"
+    nosql_re = (
+        _REDIS_FORBIDDEN_RE
+        if tool == "redis-cli"
+        else (_MONGO_FORBIDDEN_RE if tool in {"mongo", "mongosh"} else None)
+    )
+    if nosql_re is not None:
+        # scan the RAW argv, NOT `joined`: the `--[^\n]*` SQL-comment strip above would eat a NoSQL
+        # client's `--eval` / `--scan` / `--host` FLAGS (they are not SQL line comments), hiding the
+        # payload inside `--eval "db.x.drop()"`.
+        nosql_joined = re.sub(r"\s+", " ", raw).lower()
+        hit = nosql_re.search(nosql_joined)
+        if hit is not None:
+            return f"{tool} '{hit.group(0).strip()}' writes/executes, not recon (forbidden)"
     return None
 
 
@@ -378,7 +408,12 @@ def _ike_scan_violation(argv: list[str]) -> str | None:
 # misses: >1 inline value, a value in 2nd+ position, and '='/concatenated syntax. _netexec_violation
 # handles all three; a single inline literal (`-p ''`, `-p sa`) stays allowed (the Tier-1/2 check).
 _NETEXEC_TOOLS: frozenset[str] = frozenset({"netexec", "nxc", "crackmapexec"})
-_NETEXEC_AUTH_FLAGS: frozenset[str] = frozenset({"-u", "--username", "-p", "--password"})
+# -H/--hashes is pass-the-hash auth: NetExec takes `HASH [HASH ...]` or a hash file exactly like
+# -u/-p, so a multi-value or file-backed `-H` is a PtH spray (Tier 3) and is gated the same way. A
+# single inline `-H <hash>` (Tier-2 single pass-the-hash) still passes the len==1 / no-file check.
+_NETEXEC_AUTH_FLAGS: frozenset[str] = frozenset(
+    {"-u", "--username", "-p", "--password", "-H", "--hash", "--hashes"}
+)
 _WORDLIST_EXTS: frozenset[str] = frozenset({"txt", "lst", "list", "dic", "dict"})
 
 

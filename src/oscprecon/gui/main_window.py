@@ -248,7 +248,9 @@ class MainWindow(QMainWindow):
         self._live_workers: set[QThread] = set()
         self._current_service: DiscoveredService | None = None  # for reload after the cred vault
         self._spray_ctl = SprayController(self)  # owns the opt-in credential-spray flow (§2a)
-        self._pending_visits: list[tuple[str, str]] = []
+        # (label, url, originating-profile-dir): tag each buffered visit so a mid-scan switch
+        # can't flush it into the now-active (wrong) project.
+        self._pending_visits: list[tuple[str, str, str]] = []
 
         left = QWidget()
         left_layout = QVBoxLayout(left)
@@ -1297,7 +1299,7 @@ class MainWindow(QMainWindow):
         if self._tasks.active_count > 0:
             # why: a worker may be saving profile.json on its thread — buffer the visit and persist
             # it in _post_run_refresh rather than dropping it or racing the save.
-            self._pending_visits.append((label, url))
+            self._pending_visits.append((label, url, str(self._profile.directory)))
             return
         self._profile.add_reference_visited(label, url)
         self._profile.save()
@@ -1970,10 +1972,21 @@ class MainWindow(QMainWindow):
         # context mid-work). The tree/notes widgets are idempotent, so an unchanged set is a no-op.
         if self._profile is not None:
             if self._pending_visits and not self._profile.read_only:
-                for label, url in self._pending_visits:
-                    self._profile.add_reference_visited(label, url)
-                self._pending_visits.clear()
-                self._profile.save()
+                # flush ONLY the visits recorded under the currently-active profile; keep any that
+                # belong to a since-switched project buffered for when it is active again, so a
+                # mid-scan switch never contaminates the wrong profile.json.
+                active_dir = str(self._profile.directory)
+                remaining: list[tuple[str, str, str]] = []
+                flushed = False
+                for label, url, pdir in self._pending_visits:
+                    if pdir == active_dir:
+                        self._profile.add_reference_visited(label, url)
+                        flushed = True
+                    else:
+                        remaining.append((label, url, pdir))
+                self._pending_visits = remaining
+                if flushed:
+                    self._profile.save()
             self._service_tree.populate(
                 self._profile.discovered_services,
                 self._profile.discovered_hosts,

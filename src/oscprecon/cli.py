@@ -1192,6 +1192,9 @@ def spray_cmd(
         typer.echo(f"[spray] {command}")
         redactor = spray_mod.make_redactor(passwords)
         out = prof.directory / f"spray/{service}.txt"
+        spray_mod.secure_output_file(
+            out
+        )  # 0600 — the spray log holds the winning cred in cleartext
         shell.run(
             command,
             out,

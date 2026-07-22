@@ -49,11 +49,18 @@ class SnmpModule(Module):
 
     def discovery_steps(self, target: Target, port: int = 161) -> list[SnmpStep]:
         host = target.ip
+        # onesixtyone probes 161 by default; a non-standard SNMP port needs `-p`. Keep the default
+        # (161) command byte-identical so nothing downstream/fixtured changes.
+        one_six = (
+            f"onesixtyone -c {_COMMUNITY_LIST} {host}"
+            if port == 161
+            else f"onesixtyone -c {_COMMUNITY_LIST} -p {port} {host}"
+        )
         return [
             SnmpStep(
                 Command(
                     "snmp",
-                    f"onesixtyone -c {_COMMUNITY_LIST} {host}",
+                    one_six,
                     "Enumerate valid community strings from a small default list (read-only).",
                     "< 30s",
                     "snmp/onesixtyone.txt",
@@ -73,7 +80,7 @@ class SnmpModule(Module):
             ),
         ]
 
-    def walk_step(self, target: Target, community: str = "public") -> SnmpStep:
+    def walk_step(self, target: Target, community: str = "public", port: int = 161) -> SnmpStep:
         # why: community is an untrusted token reaching a command line — a discovered value
         # (onesixtyone echoes hits verbatim, and the shipped list holds valid space-bearing entries
         # like "all private") or a GUI/Tier-2 entry. shlex.quote keeps it a single argv token so a
@@ -81,10 +88,12 @@ class SnmpModule(Module):
         # sanitized separately so a '/' can't escape the profile's snmp/ dir.
         safe = shlex.quote(community)
         slug = re.sub(r"[^A-Za-z0-9._-]", "_", community) or "community"
+        # net-snmp transport syntax: HOST[:PORT]. Keep the default (161) command byte-identical.
+        host = target.ip if port == 161 else f"{target.ip}:{port}"
         return SnmpStep(
             Command(
                 "snmp",
-                f"snmpwalk -v2c -c {safe} {target.ip}",
+                f"snmpwalk -v2c -c {safe} {host}",
                 f"Full MIB walk with community '{community}' — system, users, processes, software.",
                 "1-5 min",
                 f"snmp/snmpwalk-{slug}.txt",

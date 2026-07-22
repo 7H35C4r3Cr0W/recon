@@ -70,7 +70,8 @@ def _nfs_steps(target: Target, port: int) -> list[tuple[Command, str]]:
 
 def _snmp_steps(target: Target, port: int) -> list[tuple[Command, str]]:
     module = snmp.SnmpModule()
-    steps = [*module.discovery_steps(target), module.walk_step(target)]
+    p = port or 161  # honour a non-standard discovered SNMP port, not a hardcoded 161
+    steps = [*module.discovery_steps(target, p), module.walk_step(target, port=p)]
     return [(s.command, s.tool) for s in steps]
 
 

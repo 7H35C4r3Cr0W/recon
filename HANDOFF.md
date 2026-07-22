@@ -15,8 +15,24 @@ is opt-in/off-by-default. Wraps standard tools, links HackTricks/Exploit-DB, dra
 graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at runtime.
 
 ## Current state (update this line as you go)
-- **github/main HEAD `3d085d1`: HTB DarkCorp box review (LIVE-validated) — AD relay/loot + PG-superuser + SSSD** (pushed).
+- **github/main HEAD: final chunked code review — 9 confirmed bugs fixed (1 HIGH) + author→Lagus branding + one-page site** (pushed).
   `origin` = local Gitea (often offline) — push to the **`github`** remote (`git push github main`).
+- Session (2026-07-22) — **branding + docs + full chunked code review.** (1) Credited **Lagus** +
+  repo + `buymeacoffee.com/lagus` across CLI banner/`--version`/help, GUI About + status footer,
+  pyproject (author + Funding), README, in-app guide (single source: `branding.py`). (2) Docs sync:
+  catalog count → verified **183 svc / 3,187 actions**; removed redaction drift (secrets shown IN
+  FULL by default per §6; `redact_secrets` toggle ships off). (3) A 10-chunk multi-agent review
+  (review → adversarial verify, 22 agents) found **9 confirmed bugs, all fixed + regression-tested**:
+  **HIGH** SMB-peek command-injection (target-controlled share filename with `;`/`!`/backtick reached
+  smbclient's `-c` interpreter during Tier-1 recon → guard in `peek.has_unsafe_peek_chars`); netexec
+  `-H`/`--hashes` PtH spray ungated in recon mode; CLI spray output world-readable (now 0600); shared
+  fixed `.tmp` corruption race in `profile.save`/`save_graph`/`save_creds` (→ unique `mkstemp` temps);
+  tar inode-bomb cap ran after `getmembers()` (→ streaming cap); redis/mongo write/RCE verbs bypassed
+  the read-only DB guard; buffered ref-visits flushed to the wrong profile after a mid-scan switch;
+  SNMP enum hardcoded port 161; webpage duplicate tree-node id. Tests: `tests/test_final_review_fixes.py`
+  + `tests/gui/test_pending_visits.py`; all four gates green. (4) Built a single **one-page site**
+  (overview + agent/tool map + 249-node decision tree + build timeline), by Lagus, published as an
+  Artifact — see memory [[agent-control-plane-artifact]].
 - Session (2026-07-21e) — **HTB DarkCorp box review, HIT LIVE** (Insane Win/AD). Owner (angrily, twice)
   established the standing rule now at the top of "How I work": **hit the live box AND run the
   walkthrough together; warn if the VPN is down.** Ran Nabu against 10.129.232.7 over VPN → 22/ssh +

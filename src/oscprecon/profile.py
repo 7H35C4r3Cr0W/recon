@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import tempfile
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,6 +29,23 @@ from oscprecon.workspace.models import (
 # v2 adds discovered_hosts (the pivot topology). Loading a v1 profile is unchanged — the field
 # simply defaults to [] — so no migration is needed and old projects open exactly as before.
 SCHEMA_VERSION = 2
+
+
+def _atomic_write_json(path: Path, payload: Any) -> None:
+    # a per-process-UNIQUE tmp (not a fixed <name>.tmp): two writers — the GUI thread and a running
+    # scan worker's orchestrator — sharing one fixed temp interleave bytes and leave a corrupt file
+    # behind the atomic replace. mkstemp gives each writer its own temp; os.replace stays atomic.
+    # Mirrors findings.add_findings.
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2))
+        os.replace(tmp_name, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
+        raise
 
 
 class ReadOnlyError(RuntimeError):
@@ -271,11 +291,10 @@ class Profile:
             "tags": self.tags,
             "organization": Organization.from_dict(self.organization).to_dict(),
         }
-        # why: a concurrent read (or a crash mid-write) must never see a half-written
-        # profile.json — write a sibling temp then atomically replace.
-        tmp = self.directory / "profile.json.tmp"
-        tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        tmp.replace(self.profile_json_path)
+        # why: a concurrent read (or a crash mid-write) must never see a half-written profile.json,
+        # and two concurrent writers (GUI thread + scan worker) must not share a temp — write a
+        # per-writer unique sibling temp then atomically replace.
+        _atomic_write_json(self.profile_json_path, payload)
 
     def set_services(self, services: list[DiscoveredService]) -> None:
         self._ensure_writable()  # never mutate in-memory state on a read-only profile [#43]
@@ -569,10 +588,9 @@ class Profile:
 
     def save_graph(self, data: dict[str, Any]) -> None:
         self._ensure_writable()
-        # why: mirror profile.json's atomic write — a crash mid-write must not corrupt graph.json.
-        tmp = self.directory / "graph.json.tmp"
-        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        tmp.replace(self.graph_path)
+        # why: mirror profile.json's atomic write (unique temp) — a crash mid-write or a concurrent
+        # writer must not corrupt graph.json.
+        _atomic_write_json(self.graph_path, data)
 
     def add_reference_visited(self, service: str, url: str) -> None:
         if any(entry.get("url") == url for entry in self.references_visited):

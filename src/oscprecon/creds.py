@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -67,20 +69,22 @@ def save_creds(path: Path, credentials: list[Credential]) -> None:
         "entries": [_to_dict(cred) for cred in credentials],
     }
     data = json.dumps(payload, indent=2).encode("utf-8")
-    tmp = path.with_name(path.name + ".tmp")
-    # why: the TEMP file holds the plaintext secret first — create/force it 0600 before writing
-    # (not at the process umask, which is often world/group-readable), then atomically replace. On
-    # ANY failure, drop the partial temp and re-raise: the prior valid creds.json is left untouched.
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    # why: the TEMP file holds the plaintext secret first — use a per-writer UNIQUE temp (mkstemp
+    # creates at 0600, not the process umask which is often world-readable); a fixed <name>.tmp
+    # shared by two concurrent writers interleaves bytes and corrupts creds.json behind the atomic
+    # replace. Force 0600, write, atomically replace. On ANY failure, drop the partial temp and
+    # re-raise: the prior valid creds.json is left untouched.
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
     try:
         try:
             os.fchmod(fd, 0o600)
             os.write(fd, data)
         finally:
             os.close(fd)
-        tmp.replace(path)  # atomic — only swaps in once the full write succeeded
+        os.replace(tmp_name, path)  # atomic — only swaps in once the full write succeeded
     except OSError:
-        tmp.unlink(missing_ok=True)
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
         raise
 
 

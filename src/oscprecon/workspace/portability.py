@@ -111,7 +111,16 @@ def import_project_archive(archive: Path, workspace_root: Path, *, overwrite: bo
     workspace_root = workspace_root.resolve()
     workspace_root.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive, "r:*") as tar:
-        members = tar.getmembers()
+        # bound the member count DURING enumeration — getmembers() materializes every header first,
+        # so a crafted archive with millions of entries exhausts memory/CPU before the cap in
+        # _validate_members could fire. Streaming with a hard cap fails fast on an inode bomb.
+        members: list[tarfile.TarInfo] = []
+        for member in tar:
+            members.append(member)
+            if len(members) > _MAX_MEMBERS:
+                raise ProjectArchiveError(
+                    f"archive has too many entries (>{_MAX_MEMBERS}); refusing (inode bomb)"
+                )
         if not members:
             raise ProjectArchiveError("archive is empty")
         name = _validate_members(members, workspace_root)
