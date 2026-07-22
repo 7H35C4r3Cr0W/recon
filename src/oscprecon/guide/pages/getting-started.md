@@ -28,7 +28,7 @@ nabu-cli scan 10.10.10.5 --profile htb-active   # headless staged nmap
 nabu-cli enum smb -p htb-active                 # run a service's Tier-1 recon headlessly
 nabu-cli findings -p htb-active                 # browse what was found
 nabu-cli list                                   # your workspace projects
-nabu-cli creds list -p htb-active               # the vault (secrets masked)
+nabu-cli creds list -p htb-active               # the vault (secrets shown in full)
 nabu-cli docs           # this documentation, in the terminal
 ```
 

@@ -26,13 +26,14 @@ credentials, commands) with frontmatter + wikilinks. It's a snapshot — re-expo
 ## The credential vault
 
 Credentials you collect (or parse from loot) live in **`creds.json`** (chmod `0600`), editable in the
-GUI: add / edit / delete. In the vault dialog they're **masked**, autosave on click-away.
+GUI: add / edit / delete. In the vault dialog secrets are shown **in full**, autosave on click-away.
 
 - Successful anonymous / null-session enumerations auto-write an entry (`source: <module>-anon-enum`),
   so LDAP / RPC / WinRM modules reuse them without re-prompting.
-- **Reports, audit log, and diagnostics always redact secret values** (`password=<redacted len=12>`).
-  The one exception is the Exploitation tab's loot table, which shows dumped secrets in full so you
-  can use them — those are your own data.
+- **Secrets are shown in full everywhere** — vault, reports, audit log, graph, and loot table (owner
+  policy 2026-07-22: the loot is the deliverable and this is your own tool against your own authorized
+  targets, so nothing is redacted). A `redact_secrets` setting exists but ships **off**; flip it on only
+  for a hypothetical shared/public build. The graph keeps secrets out of its **search index** only.
 
 ## Project portability
 

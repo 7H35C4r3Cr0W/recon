@@ -266,12 +266,15 @@ graph, exports Obsidian markdown. Never auto-exploits, never calls an LLM at run
   Commits `b1a2584`→`71e8efb`. (Also, non-repo: a `/etc/cron.d/nabu-maint` system-maintenance job on
   this Kali box — Timeshift snapshot → `apt full-upgrade` → junk cleanup, 3-day self-guarded; script at
   `/usr/local/sbin/nabu-maintenance.sh`.)
-- Exploit catalog: **182 services / 3,434 actions**. Pattern library: **140 rules**.
+- Exploit catalog: **183 services / 3,187 actions** (verified from `base._REGISTRY`; top: ad 143 · web
+  124 · linux 73 · windows 40 · shells 39). Pattern library: **52 YAML files**.
   CLI (`nabu-cli`) and GUI (`nabu`) are now at **feature parity** for automatable work (see the
   parity note above for the intentional GUI-primary panels).
 - Full test suite green (**pytest EXIT=0**), all four gates clean.
-- Author/maintainer: **Andre Boyle · its.lagus@proton.me · github.com/7H35C4r3Cr0W/recon**
-  (single source of truth: `src/oscprecon/branding.py`).
+- Author/maintainer: **Lagus · its.lagus@proton.me · github.com/7H35C4r3Cr0W/recon ·
+  ☕ buymeacoffee.com/lagus** (single source of truth: `src/oscprecon/branding.py` — CLI banner +
+  `--version`, GUI About dialog + status-footer watermark all read from it; pyproject `Funding` URL +
+  README carry the coffee link too).
 
 ## The four gates — run before EVERY commit, pause for approval only if the user asked
 ```bash
@@ -346,8 +349,8 @@ and confirm the tool actually AIDS the operator's decisions — not to harvest e
 - **Reports: concise, to the point.** No long-winded write-ups; a TLDR per box/bug/change.
 - **Don't break functions.** Additive/guarded fixes; no tech-stack changes (§3 is locked); no big
   risky refactors unless asked.
-- **Commit trailers** (already enforced by the harness): `Co-Authored-By: Andre Boyle
-  <its.lagus@proton.me>` + the Claude line.
+- **Commit trailers** (enforced by the harness): commits are authored by the git user (Lagus/Andre);
+  the harness appends `Co-Authored-By: Claude ... <noreply@anthropic.com>` + a `Claude-Session:` line.
 
 ## The highest-value activity: adversarial review → fix → test
 This session, background review agents + sweeps found **27 real bugs, all fixed + regression-tested**.

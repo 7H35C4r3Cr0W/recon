@@ -34,7 +34,8 @@ It runs **offline** and makes **no LLM calls at runtime**.
 3. Work the **three panes**: services on the left, the command builder + output in the middle,
    HackTricks + Exploit-DB on the right.
 4. Flip to the **graph** (`Ctrl+G`) to see the attack surface, annotate nodes, mark status.
-5. Everything lands in an **Obsidian-ready `report.md`** and a masked **credential vault**.
+5. Everything lands in an **Obsidian-ready `report.md`** and a **credential vault** (loot is shown in
+   full — this is your own tool against your own authorized targets, so nothing is redacted).
 
 ## Names
 
@@ -42,3 +43,10 @@ Internal Python package `oscprecon`; installs as `oscp-recon`. Entry points: **`
 **`nabu-cli`** (headless). The `oscprecon` / `oscprecon-cli` aliases still work.
 
 > The whole design brief lives in `CLAUDE.md`; this guide is the user-facing subset.
+
+## Credits
+
+Nabu is built and maintained by **Lagus** — [github.com/7H35C4r3Cr0W/recon](https://github.com/7H35C4r3Cr0W/recon)
+· [its.lagus@proton.me](mailto:its.lagus@proton.me). If it saves you time on a box or the exam, you can
+[**buy me a coffee** ☕](https://buymeacoffee.com/lagus). Same credit shows in **Help → About** and
+`nabu-cli --version`.

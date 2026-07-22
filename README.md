@@ -71,7 +71,7 @@ shipped as actions.
   **Single-click** a node for its full detail (IP / OS / service+version / a /24's host count) and a
   note, without leaving the graph. Zoom with +/− or the wheel, drag to pan (hand cursor), drag a node
   to move it. Plus a native always-visible summary tree so scan data shows even where QtWebEngine can't
-  render, a **credential vault** (masked, `0600`, click-away autosave), **audit trail**, and an
+  render, a **credential vault** (shown in full, `0600`, click-away autosave), **audit trail**, and an
   **Obsidian-ready `report.md`** with a pivot-topology section.
 - **Exploitation tab** (owner-authorized, human-driven) — clearly separated from Recon. It surfaces the
   services found on *this* box first and, across **182 services / 2,300+ attacker actions** mined from
@@ -161,7 +161,7 @@ same engine, nothing GUI-only:
   panels run), `nabu-cli findings -p <profile>` (browse structured findings).
 - **Project management:** `nabu-cli list` (workspace dashboard), `open`/`import-project`/`export-project`
   /`export-vault`/`delete-project`, `nabu-cli health -p <profile> [--repair]`, `nabu-cli activity`.
-- **Credentials:** `nabu-cli creds add|list|rm -p <profile>` (the vault, chmod-600, secrets masked).
+- **Credentials:** `nabu-cli creds add|list|rm -p <profile>` (the vault, chmod-600, secrets shown in full).
 - **References / helpers:** `nabu-cli doctor [--install]`, `nabu-cli searchsploit <product> [version]`,
   `nabu-cli exploit [service]` (the Exploitation catalog, display-only), `nabu-cli payload` (msfvenom
   builder), `nabu-cli gtfobins [binary]`, `nabu-cli pivot` (ligolo-ng, `--os linux|windows`), `nabu-cli docs`.
@@ -233,7 +233,7 @@ and service/finding/**credential counts** (counts only — secret values never a
   Windows, PostgreSQL, …) plus your own.
 - **Health** — a read-only per-profile scan (corrupt/truncated JSON, stale temp files, orphaned
   output, world-readable creds, path escapes) with opt-in safe repairs that back up before changing.
-- **Activity** — a human-readable timeline derived from the audit log (secrets redacted).
+- **Activity** — a human-readable timeline derived from the audit log (secrets shown in full).
 - **Locking & read-only** — opening a profile takes an advisory `<profile>/.lock`; a profile already
   open elsewhere offers **read-only** (title shows `[READ-ONLY]`, every write is blocked, export still
   works). Stale locks (dead PID, same host) are recovered automatically; live/foreign ones are never
@@ -253,7 +253,8 @@ and service/finding/**credential counts** (counts only — secret values never a
 - **Tool paths** — wordlist search paths (password lists are always filtered out and never shown).
 - **Scan** — default scan profile (quick/default/full/exam) + opt-in full UDP port sweep (default
   stays UDP top-100).
-- **Reports** — the fixed redaction/archiving guarantees, shown for reference.
+- **Reports** — the fixed report-archiving guarantees, shown for reference (secrets are shown in full
+  by default; a `redact_secrets` toggle ships off for a hypothetical shared build).
 - **Privacy** — the mandatory secret protections (§2), displayed locked-on; they cannot be disabled.
 - **Performance** — cap on concurrent recon workers.
 - **Advanced** — config-file location and *Reset all settings to defaults*.

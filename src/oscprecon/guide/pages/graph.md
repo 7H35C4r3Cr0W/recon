@@ -9,7 +9,7 @@ note). The colour key is in the on-canvas **Legend**:
 
 - **Target** — the entry host (dark blue, a radar disc).
 - **Service** — light blue (TCP) / green (UDP).
-- **Finding** — yellow. **Credential** — red (always redacted on the canvas).
+- **Finding** — yellow. **Credential** — red (shown in full on the canvas; kept out of the search index only).
 - **Exploit-DB reference** — lavender (something to *read*, never a confirmed vuln).
 
 A red ring marks a *notable* finding (anonymous access, writable share, weak signing).
