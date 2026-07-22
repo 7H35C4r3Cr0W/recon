@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from pytestqt.qtbot import QtBot
 
 from oscprecon.gui.widgets.http_panel import HttpPanel
@@ -223,9 +224,15 @@ def test_contained_path_rejects_escapes(tmp_path: Path) -> None:
     assert _contained_path(tmp_path, "../../etc/passwd") is None
 
 
-def test_http_manual_follow_ups_surface_webdav(qtbot: QtBot, tmp_path: Path) -> None:
+def test_http_manual_follow_ups_surface_webdav(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from oscprecon.gui.widgets import http_panel as httppanel
     from oscprecon.gui.widgets.http_panel import _MANUAL_ROLE
 
+    # configure() now routes through effective_web_host, which falls back to the IP when the vhost
+    # name doesn't resolve — force it resolvable so this deterministically tests the hostname path.
+    monkeypatch.setattr(httppanel.http_mod, "host_resolves", lambda _n: True)
     prof = Profile.create(tmp_path, "web", Target(ip="10.10.10.9", hostname="box.htb"))
     svc = DiscoveredService(80, Proto.TCP, "http")
     prof.set_services([svc])
