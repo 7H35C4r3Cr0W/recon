@@ -103,10 +103,18 @@ def parse_curl_list(text: str) -> list[FtpFinding]:
 
 
 _NMAP_VER = re.compile(r"^\d+/tcp[^\S\n]+open[^\S\n]+ftp[-\w]*[^\S\n]+(?P<ver>\S.*)$", re.MULTILINE)
+# nmap ftp-anon reports this when the server advertises a data-channel IP the client can't reach —
+# almost always a NAT/lab box handing back its internal address in the PASV 227 reply.
+_PASV_MISMATCH = re.compile(r"PASV IP (?P<pasv>\d{1,3}(?:\.\d{1,3}){3}) is not the same as", re.I)
 
 
 def nmap_anon_ok(text: str) -> bool:
     return "Anonymous FTP login allowed" in text
+
+
+def pasv_private_ip(text: str) -> str:
+    match = _PASV_MISMATCH.search(text)
+    return match.group("pasv") if match else ""
 
 
 def parse_nmap_ftp(text: str) -> list[FtpFinding]:
@@ -119,6 +127,15 @@ def parse_nmap_ftp(text: str) -> list[FtpFinding]:
     if "bounce working" in text.lower():
         findings.append(
             FtpFinding("note", "ftp-bounce", "FTP bounce accepted (PORT to a third party)")
+        )
+    pasv = pasv_private_ip(text)
+    if pasv:
+        findings.append(
+            FtpFinding(
+                "note",
+                "pasv-private-ip",
+                f"PASV advertised {pasv} (unreachable) — the listing needs ACTIVE mode",
+            )
         )
     # ftp-anon prints the root listing prefixed with "| " / "|_" and appends " [NSE: writeable]" to
     # any world-writable entry. Strip both — otherwise the marker is folded into the file/dir name —

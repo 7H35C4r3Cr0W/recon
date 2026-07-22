@@ -10,6 +10,7 @@ from oscprecon.modules.base import Module
 from oscprecon.modules.http.parsers import (
     HttpFinding,
     detect_api_server,
+    detect_invalid_hostname,
     detect_ua_gate,
     detect_wordpress,
     email_domains_from_plugins,
@@ -37,6 +38,7 @@ __all__ = [
     "default_output",
     "default_url",
     "detect_api_server",
+    "detect_invalid_hostname",
     "detect_ua_gate",
     "detect_wordpress",
     "effective_web_host",
@@ -381,6 +383,15 @@ class HttpModule(Module):
                 "only serve a full browser string). Re-probe with a browser UA: curl -A 'Mozilla/"
                 "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' {url} — if content appears, "
                 "set that User-Agent for content discovery (feroxbuster -a / ffuf -H)."
+            )
+        # a bare-IP 400 "Invalid Hostname" means the port is host-header-gated (IIS/HTTPAPI binding,
+        # or a default-vhost-only server) — the app is unreachable by IP; a vhost name is required.
+        if detect_invalid_hostname(blob):
+            out.append(
+                "Web port answers the bare IP with 400 'Invalid Hostname' — it is host-header-"
+                "gated and only serves a named vhost. Find the name (nmap/cert CN-SAN, page or "
+                "redirect hostnames, or vhost brute: ffuf -H 'Host: FUZZ.{domain}' -u {url} -fs "
+                "<wildcard>), add it to /etc/hosts, Set Target Hostname, then re-enumerate."
             )
         # a Location is a bare host (whatweb), a full URL (ferox/gobuster/ffuf) or a relative path;
         # vhost_from_redirect pulls the hostname from any of them, so 'http://internal.htb/' shows.

@@ -174,3 +174,25 @@ def test_ftp_file_url_and_peek_step() -> None:
     )
     assert "--max-time" in step.command.shell_line  # bounded even if the listed size was wrong
     assert "-r 0-8191" in step.command.shell_line  # byte cap so a mis-reported size can't OOM (#23)
+
+
+def test_pasv_private_ip_flags_active_mode_needed() -> None:
+    # nmap ftp-anon reports this when the server hands back a NAT-internal PASV data IP the client
+    # can't reach — the anonymous login works but the listing needs ACTIVE mode (HTB Ethereal).
+    text = (
+        "| ftp-anon: Anonymous FTP login allowed (FTP code 230)\n"
+        "|_Can't get directory listing: PASV IP 172.16.249.135 is not the same as 10.129.43.12\n"
+    )
+    from oscprecon.modules.ftp.parsers import pasv_private_ip
+
+    assert pasv_private_ip(text) == "172.16.249.135"
+    notes = [(f.kind, f.value) for f in parse_nmap_ftp(text) if f.kind == "note"]
+    assert ("note", "pasv-private-ip") in notes
+
+
+def test_pasv_private_ip_absent_on_clean_listing() -> None:
+    from oscprecon.modules.ftp.parsers import pasv_private_ip
+
+    text = "| ftp-anon: Anonymous FTP login allowed (FTP code 230)\n| drwxr-xr-x 2 0 0 4096 pub\n"
+    assert pasv_private_ip(text) == ""
+    assert not any(f.value == "pasv-private-ip" for f in parse_nmap_ftp(text))

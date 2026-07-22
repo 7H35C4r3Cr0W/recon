@@ -19,6 +19,10 @@
   why: "Some servers need PASV when the data channel is firewalled — retry the listing passively"
   command: "curl -s --ftp-pasv ftp://{target}/"
 
+- description: "Active-mode mirror (when PASV advertises an unreachable IP)"
+  why: "If nmap ftp-anon says 'PASV IP x.x.x.x is not the same as target', the server hands back a NAT-internal data IP — force ACTIVE mode to list/pull"
+  command: "wget -m --no-passive-ftp 'ftp://anonymous:anonymous@{target}/'"
+
 - description: "Mirror the whole anonymous tree (explicit bulk download)"
   why: "Recursive download is Tier-2 — heavy and never automatic (§12)"
   command: "wget -m --no-remove-listing ftp://{target}/"

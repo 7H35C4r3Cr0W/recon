@@ -201,4 +201,13 @@ class FtpModule(Module):
             out.append(
                 "FTP bounce accepted — can proxy port scans; note for pivoting (recon only)."
             )
+        if any(
+            f.fields.get("kind") == "note" and f.fields.get("value") == "pasv-private-ip"
+            for f in findings
+        ):
+            out.append(
+                "PASV returned an unreachable IP — the passive listing will hang/fail. Retry in "
+                "ACTIVE mode: wget -m --no-passive-ftp 'ftp://anonymous:anonymous@{target}/' "
+                "(or curl --ftp-port - 'ftp://{target}/')."
+            )
         return out

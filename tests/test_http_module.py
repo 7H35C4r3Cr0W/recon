@@ -190,6 +190,29 @@ def test_suggest_ua_gate_hint() -> None:
     )
 
 
+def test_suggest_invalid_hostname_vhost_gate() -> None:
+    # HTB Ethereal: port 8080 answers the bare IP with 400 Invalid Hostname (host-header-gated).
+    module = HttpModule()
+    out = module.suggest(
+        [
+            Finding(
+                service="http",
+                title="400 /",
+                detail="host-header-gated: bare IP returns 400 Invalid Hostname",
+            )
+        ]
+    )
+    hits = [line for line in out if "Invalid Hostname" in line]
+    assert hits and "Host:" in hits[0]
+    # a normal 200 page never triggers the vhost-gate nudge
+    assert not any(
+        "Invalid Hostname" in line
+        for line in module.suggest(
+            [Finding(service="http", title="200 /", detail="whatweb: Apache[2.4.52], Title[Home]")]
+        )
+    )
+
+
 def test_effective_web_host_falls_back_on_unresolvable_hostname(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     # HTB Falafel/Holiday: a profile hostname not in /etc/hosts makes every http probe fail with
     # "no address" → recon silently returns nothing. effective_web_host must fall back to the IP.

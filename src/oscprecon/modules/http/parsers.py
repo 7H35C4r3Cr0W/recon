@@ -786,6 +786,35 @@ def parse_robots(text: str, port: int) -> list[HttpFinding]:
     return [HttpFinding(port=port, path="/robots.txt", status=0, note=note)]
 
 
+# an open web port that answers the bare IP with HTTP 400 "Invalid Hostname" is bound to a specific
+# host header (IIS/Microsoft-HTTPAPI host-header binding, or an nginx/Apache default vhost that only
+# serves a named vhost). You CANNOT reach the real app by IP — you must supply Host: <name>. The
+# recon move is vhost/subdomain enumeration to discover that name (§10). Matches the two canonical
+# IIS phrasings; specific enough that a normal page body never false-fires.
+_INVALID_HOST_RE = re.compile(r"invalid hostname|request hostname is invalid", re.IGNORECASE)
+
+
+def detect_invalid_hostname(*texts: str) -> bool:
+    return _INVALID_HOST_RE.search(" ".join(texts)) is not None
+
+
+def parse_headers(text: str, port: int) -> list[HttpFinding]:
+    # the `curl -sIk` response-header snapshot. Its one recon-worthy signal is a host-header-gated
+    # service: a 400 "Invalid Hostname" means the bare IP is refused and a vhost name is required.
+    if not detect_invalid_hostname(text):
+        return []
+    return [
+        HttpFinding(
+            port=port,
+            path="/",
+            status=400,
+            note="host-header-gated: the bare IP returns 400 Invalid Hostname — the app only "
+            "answers a named vhost. Enumerate vhosts (ffuf -H 'Host: FUZZ.<domain>') and reach it "
+            "with that Host header / an /etc/hosts entry.",
+        )
+    ]
+
+
 _PARSERS = {
     "feroxbuster": parse_feroxbuster,
     "gobuster": parse_gobuster,
@@ -796,6 +825,7 @@ _PARSERS = {
     "wpscan": parse_wpscan,
     "webpage": parse_webpage,
     "robots": parse_robots,
+    "headers": parse_headers,
 }
 
 

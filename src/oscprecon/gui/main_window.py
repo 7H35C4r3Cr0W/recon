@@ -97,6 +97,7 @@ from oscprecon.models import Credential, DiscoveredHost, DiscoveredService, Targ
 from oscprecon.modules.http import (
     default_url,
     detect_api_server,
+    detect_invalid_hostname,
     detect_ua_gate,
     detect_wordpress,
     parse_tool,
@@ -2392,6 +2393,14 @@ class MainWindow(QMainWindow):
                 "[ua-gate] Root returned a 404/Error — possibly a User-Agent filter. Re-probe "
                 "browser UA (set the User-Agent field, or feroxbuster -a / ffuf -H 'User-Agent: "
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')."
+            )
+        # a bare-IP 400 'Invalid Hostname' means the port is host-header-gated — the app only serves
+        # a named vhost, so enumerate vhosts to find the name (parity with the CLI enum suggest()).
+        if detect_invalid_hostname(text) and profile is self._profile:
+            self._tool_panel.append_output(
+                "[vhost-gated] Web port returned 400 'Invalid Hostname' — host-header-gated. "
+                "Find the vhost name (cert CN-SAN, nmap, or ffuf -H 'Host: FUZZ.<domain>'), add it "
+                "to /etc/hosts, Set Target Hostname, then re-enumerate with that Host header."
             )
 
     def _on_vhost_run(self, command: str, output_rel: str, tool: str, domain: str) -> None:

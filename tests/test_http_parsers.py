@@ -475,3 +475,27 @@ def test_whatweb_json_yields_redirect_vhost() -> None:
         [{"target": "http://10.10.10.5/", "plugins": {"RedirectLocation": ["http://blog.x.htb/"]}}]
     )
     assert [f.redirect_to for f in parse_whatweb(doc2, 80) if f.redirect_to] == ["blog.x.htb"]
+
+
+def test_detect_invalid_hostname_and_parse_headers() -> None:
+    from oscprecon.modules.http.parsers import detect_invalid_hostname, parse_headers
+
+    # a bare-IP HTTP 400 from a host-header-gated service (IIS/Microsoft-HTTPAPI — HTB Ethereal)
+    hdr = (
+        "HTTP/1.1 400 Bad Request\nServer: Microsoft-HTTPAPI/2.0\n"
+        "<h2>Bad Request - Invalid Hostname</h2>\n"
+        "<p>HTTP Error 400. The request hostname is invalid.</p>\n"
+    )
+    assert detect_invalid_hostname(hdr) is True
+    hits = parse_headers(hdr, 8080)
+    assert len(hits) == 1 and hits[0].status == 400
+    assert "vhost" in hits[0].note.lower() or "host header" in hits[0].note.lower()
+    assert parse_tool("headers", hdr, 8080)  # wired into the dispatch
+
+
+def test_detect_invalid_hostname_negative_on_normal_response() -> None:
+    from oscprecon.modules.http.parsers import detect_invalid_hostname, parse_headers
+
+    ok = "HTTP/1.1 200 OK\nServer: Microsoft-IIS/10.0\nContent-Type: text/html; charset=utf-8\n"
+    assert detect_invalid_hostname(ok) is False
+    assert parse_headers(ok, 80) == []

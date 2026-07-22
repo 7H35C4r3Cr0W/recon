@@ -95,3 +95,16 @@ def test_parse_and_suggest() -> None:
     assert "banner" in kinds
     suggestions = module.suggest(findings)
     assert suggestions and "anonymous ftp allowed" in suggestions[0].lower()
+
+
+def test_suggest_active_mode_when_pasv_unreachable() -> None:
+    # HTB Ethereal: PASV advertises a NAT-internal IP → passive listing fails; suggest active mode.
+    module = FtpModule()
+    findings = module.parse(
+        {
+            "nmap-ftp": "| ftp-anon: Anonymous FTP login allowed (FTP code 230)\n"
+            "|_Can't get directory listing: PASV IP 172.16.249.135 is not the same as 10.10.10.6\n"
+        }
+    )
+    hits = [s for s in module.suggest(findings) if "ACTIVE mode" in s]
+    assert hits and "--no-passive-ftp" in hits[0]
