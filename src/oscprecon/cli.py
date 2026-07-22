@@ -92,23 +92,34 @@ def scan(
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(2) from exc
     directory = Path(root) / profile
-    # why: --resume must LOAD the prior profile so its command_history survives — Profile.create
-    # would overwrite profile.json and erase every record of what already finished.
-    if resume and (directory / "profile.json").exists():
-        prof = Profile.load(directory)
-        # why: on resume the loaded profile's stored target is authoritative (run_nmap scans it),
-        # so a differing CLI ip would be silently ignored — scanning the wrong host. Refuse the
-        # mismatch rather than guess; the user opens the right profile or creates a new one.
-        # Compare the NORMALIZED target (Target() canonicalizes a host-bit CIDR to its network
-        # address), so `10.10.5.5/24` resuming a profile stored as `10.10.5.0/24` isn't rejected.
+    # why: an EXISTING profile is always LOADED, never re-created — Profile.create overwrites
+    # profile.json and erases command_history/tags/started_at (bug #2: re-running `scan` on a
+    # profile without --resume silently wiped its history, the GUI's New-Project guard has no CLI
+    # equivalent). --resume additionally controls whether finished commands re-run (Orchestrator).
+    if (directory / "profile.json").exists():
+        try:
+            prof = Profile.load(directory)
+        except (ValueError, OSError) as exc:
+            typer.echo(f"[error] cannot read profile '{profile}': {exc}", err=True)
+            raise typer.Exit(2) from exc
+        # the loaded profile's stored target is authoritative (run_nmap scans it), so a differing
+        # ip would be silently ignored — scanning the wrong host. Refuse the mismatch rather than
+        # guess (Target() canonicalizes a host-bit CIDR, so 10.10.5.5/24 vs stored 10.10.5.0/24 is
+        # not a mismatch); the user opens the right profile or picks a new name for a fresh scan.
         if prof.target.ip != target.ip:
             typer.echo(
-                f"[error] --resume target mismatch: profile '{profile}' targets {prof.target.ip}, "
-                f"but you gave {ip}. Use the matching IP, or drop --resume to start a new scan.",
+                f"[error] target mismatch: profile '{profile}' targets {prof.target.ip}, but you "
+                f"gave {ip}. Use the matching IP, or a new profile name to start a fresh scan.",
                 err=True,
             )
             raise typer.Exit(2)
-        typer.echo(f"[resume] {prof.directory} — {len(prof.command_history)} prior commands")
+        if resume:
+            typer.echo(f"[resume] {prof.directory} — {len(prof.command_history)} prior commands")
+        else:
+            typer.echo(
+                f"[profile] reusing {prof.directory} — history preserved "
+                f"(use a new name for a fresh profile)"
+            )
     else:
         prof = Profile.create(root, profile, target)
     config.add_recent(prof.directory)
@@ -132,12 +143,7 @@ def export_vault_cmd(
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     """Export a profile to an Obsidian vault as linked markdown (creds redacted)."""
-    root = workspace if workspace is not None else config.workspace_root()
-    directory = Path(root) / profile
-    if not (directory / "profile.json").exists():
-        typer.echo(f"[error] no profile at {directory}", err=True)
-        raise typer.Exit(2)
-    out = vault_export.export_vault(Profile.load(directory), dest)
+    out = vault_export.export_vault(_load_profile(profile, workspace), dest)
     typer.echo(f"[exported] {out} (snapshot — creds.json values redacted)")
 
 
@@ -324,12 +330,7 @@ def exploit_cmd(
     values["lport"] = "4444"
     prof: Profile | None = None
     if profile is not None:
-        root = workspace if workspace is not None else config.workspace_root()
-        directory = Path(root) / profile
-        if not (directory / "profile.json").exists():
-            typer.echo(f"[error] no profile '{profile}' in {root}", err=True)
-            raise typer.Exit(2)
-        prof = Profile.load(directory)
+        prof = _load_profile(profile, workspace)
         values["target"] = prof.target.ip
         values["dc"] = prof.target.ip
         # no trailing slash: templates use {url}/path — a trailing slash double-slashed them
@@ -601,6 +602,17 @@ def _profile_dir(profile: str, workspace: Path | None) -> Path:
     return directory
 
 
+def _load_profile(profile: str, workspace: Path | None) -> Profile:
+    # a corrupt / foreign profile.json makes Profile.load raise ValueError; catch it and exit with
+    # the clean `[error] … / exit 2` convention instead of dumping a traceback (bug #17).
+    directory = _profile_dir(profile, workspace)
+    try:
+        return Profile.load(directory)
+    except (ValueError, OSError) as exc:
+        typer.echo(f"[error] cannot read profile '{profile}': {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+
 # the richer recon modules (their own commands()/parse(), not simple-spec steps). enum runs the
 # LIGHT Tier-1 battery each emits (banner/whatweb/curl/nmap-scripts) headlessly — the same engine
 # the GUI panels drive. default ports pick the module's port when the profile hasn't discovered one.
@@ -690,7 +702,7 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
         typer.echo(f"[error] no recon module class for '{service}'", err=True)
         raise typer.Exit(2)
     module = cls()
-    prof = Profile.load(_profile_dir(profile, workspace))
+    prof = _load_profile(profile, workspace)
     # ports for this module: the discovered ports whose service name matches, else the CLI override
     # or the module's default port — so it still runs a Tier-1 pass even before a versioned scan.
     default_port = port or _FULL_ENUM_MODULES[service]
@@ -702,10 +714,10 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
     ]
     if not ports:
         ports = [Port(number=default_port, proto=Proto.TCP, service=service)]
-    # the scalar port the single-port step modules (ssh/ftp/ldap/smtp/dns/smb) actually probe: the
-    # DISCOVERED port when the scan found the service on a non-standard port, else the default. Was
-    # a bug: the step methods got default_port and probed 22 while the service lived on 2222.
-    probe_port = ports[0].number
+    # the scalar port the single-port step modules (ssh/ftp/ldap/smtp/dns/smb) actually probe: an
+    # explicit --port wins (bug #15: it was silently ignored once the service was discovered), else
+    # the DISCOVERED port when the scan found the service on a non-standard port, else the default.
+    probe_port = port or ports[0].number
     if service == "http":
         # an unresolved profile hostname makes every http probe fail with "no address" — warn and
         # let the module fall back to the IP so recon still works (add /etc/hosts for a real vhost).
@@ -801,19 +813,25 @@ def enum_cmd(
             err=True,
         )
         raise typer.Exit(2)
-    prof = Profile.load(_profile_dir(profile, workspace))
+    prof = _load_profile(profile, workspace)
     # use the DISCOVERED port when the scan found this service on a non-standard port (mirrors the
     # GUI, which passes service.port). Was a bug: the raw --port default (0) made steps_fn fall back
     # to the module default and miss a service on an odd port. Same fix as _run_full_module_enum.
+    from oscprecon.exploit import services_present
     from oscprecon.models import Proto as _Proto
 
     probe_port = port
     if probe_port == 0:
+        # match through the service-name alias table (bug #16): the enum key is mssql/rdp/winrm
+        # but nmap names the port "ms-sql-s"/"ms-wbt-server"/"wsman" — an exact compare missed those
+        # and fell back to the default port, so a scan that found the service was ignored.
         probe_port = next(
             (
                 s.port
                 for s in prof.discovered_services
-                if s.proto == _Proto.TCP and s.service == service and s.state == "open"
+                if s.proto == _Proto.TCP
+                and s.state == "open"
+                and (s.service == service or service in services_present([(s.port, s.service)]))
             ),
             0,
         )
@@ -1040,7 +1058,7 @@ def creds_list_cmd(
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     """List stored credentials (secrets masked, like the GUI vault)."""
-    prof = Profile.load(_profile_dir(profile, workspace))
+    prof = _load_profile(profile, workspace)
     entries = prof.credentials()
     if not entries:
         typer.echo("[creds] none stored.")
@@ -1066,7 +1084,7 @@ def creds_add_cmd(
     """Record a credential in the vault (creds.json is written chmod 600)."""
     from oscprecon.models import Credential
 
-    prof = Profile.load(_profile_dir(profile, workspace))
+    prof = _load_profile(profile, workspace)
     prof.add_credential(
         Credential(
             username=username, secret=secret, secret_type=secret_type, domain=domain, source=source
@@ -1085,7 +1103,7 @@ def creds_rm_cmd(
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     """Delete a credential from the vault by username (+ optional domain)."""
-    prof = Profile.load(_profile_dir(profile, workspace))
+    prof = _load_profile(profile, workspace)
     matches = [
         c
         for c in prof.credentials()
@@ -1146,7 +1164,7 @@ def spray_cmd(
             err=True,
         )
         raise typer.Exit(2)
-    prof = Profile.load(_profile_dir(profile, workspace))
+    prof = _load_profile(profile, workspace)
     users, passwords = spray_mod.vault_material(prof.credentials())
     if not users or not passwords:
         typer.echo(

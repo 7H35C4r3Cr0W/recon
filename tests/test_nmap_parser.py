@@ -107,6 +107,14 @@ def test_parse_port_line_strips_reason_column() -> None:
     # a product that is not a known reason word is never stripped even if shaped like one
     telnet = parse_port_line("23/tcp open telnet Linux telnetd")
     assert telnet is not None and telnet.product == "Linux telnetd"
+    # bug #1: reason+ttl as the WHOLE remainder (no -sV banner — a bare `--reason` scan) must strip
+    # to an EMPTY product, not leave "ttl 64" -> product='ttl' version='64' polluting every service
+    bare_ssh = parse_port_line("22/tcp open ssh syn-ack ttl 64")
+    assert bare_ssh is not None and bare_ssh.product == "" and bare_ssh.version == ""
+    bare_http = parse_port_line("80/tcp open http syn-ack ttl 63")
+    assert bare_http is not None and bare_http.product == "" and bare_http.version == ""
+    udp = parse_port_line("161/udp open|filtered snmp no-response")
+    assert udp is not None and udp.product == "" and udp.version == ""
 
 
 def test_findings_derived_from_services() -> None:

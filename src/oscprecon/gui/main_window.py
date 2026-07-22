@@ -1200,23 +1200,33 @@ class MainWindow(QMainWindow):
             / "references"
             / f"edb-{selected.port}-{selected.proto.value}.json"
         )
-        self._edb_context = (
+        edb_context = (
             f"{selected.port}/{selected.proto.value} {selected.service}".strip(),
             edb_product,
             edb_version,
         )
+        self._edb_context = edb_context
+        # capture the ORIGINATING profile + context and bind them to the callback (bug #3): a lookup
+        # opened from the graph (no tree selection to re-fire) could complete AFTER a profile switch
+        # and _persist_edb wrote its hits into whatever profile was then active. Persist to the
+        # captured profile; only echo to the UI if that profile is still the active one.
+        prof = self._profile
         worker = SearchsploitWorker(edb_product, edb_version, output_file, self._edb_request_id)
-        worker.done.connect(self._on_edb_done)
+        worker.done.connect(
+            lambda search, rid, p=prof, ctx=edb_context: self._on_edb_done(search, rid, p, ctx)
+        )
         worker.finished.connect(lambda w=worker: self._edb_workers.discard(w))
         self._edb_workers.add(worker)
         worker.start()
 
-    def _on_edb_done(self, search: object, request_id: int) -> None:
-        if request_id != self._edb_request_id:
-            return  # a newer selection superseded this lookup
-        if isinstance(search, references.EdbSearch):
-            self._reference_pane.show_exploits(search)
-            self._persist_edb(search.hits)
+    def _on_edb_done(
+        self, search: object, request_id: int, profile: Profile, context: tuple[str, str, str]
+    ) -> None:
+        if not isinstance(search, references.EdbSearch):
+            return
+        self._persist_edb(search.hits, profile, context)  # always the ORIGINATING profile
+        if profile is self._profile and request_id == self._edb_request_id:
+            self._reference_pane.show_exploits(search)  # UI echo only if still the active selection
 
     # ----- live HackTricks (§14a) ------------------------------------------
 
@@ -1262,19 +1272,16 @@ class MainWindow(QMainWindow):
         if isinstance(result, LiveResult):
             self._reference_pane.apply_live_result(result)
 
-    def _persist_edb(self, hits: list[Any]) -> None:
-        # record the EDB references (lookup-only) into report.md; skipped in read-only mode.
-        if (
-            self._profile is None
-            or self._profile.read_only
-            or not hits
-            or self._edb_context is None
-        ):
+    def _persist_edb(
+        self, hits: list[Any], profile: Profile, context: tuple[str, str, str]
+    ) -> None:
+        # record the EDB references (lookup-only) into the ORIGINATING profile's report.md; skipped
+        # in read-only mode. profile/context are captured at launch so a mid-lookup profile switch
+        # can't redirect the write to the wrong project (bug #3).
+        if profile.read_only or not hits:
             return
-        service, product, version = self._edb_context
-        edb.add_edb(
-            self._profile.directory, service=service, product=product, version=version, hits=hits
-        )
+        service, product, version = context
+        edb.add_edb(profile.directory, service=service, product=product, version=version, hits=hits)
 
     def _on_page_visited(self, label: str, url: str) -> None:
         if self._profile is None or self._profile.read_only:

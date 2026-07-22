@@ -237,10 +237,33 @@ def test_blocks_db_client_file_and_os_primitives() -> None:
     assert blocked(["psql", "-h", "x", "-c", "SELECT pg_read_file('/etc/passwd')"])
     assert blocked(["psql", "-h", "x", "-c", "SELECT lo_export(1, '/tmp/x')"])
     assert blocked(["mysql", "-h", "x", "-u", "root", "-e", "\\! id"])  # client shell escape
+    # bug #9: impacket-mssqlclient is allow-listed for recon, so the MSSQL OS/file RCE primitives
+    # must be blocked in the DEFAULT recon mode (they only run in exploit mode + confirmation)
+    mssql = ["impacket-mssqlclient", "sa:pw@x", "-q"]
+    assert blocked([*mssql, "EXEC xp_cmdshell 'whoami'"])
+    assert blocked([*mssql, "EXEC sp_OACreate 'x', @o OUT"])
+    assert blocked([*mssql, "EXEC master..xp_dirtree '\\\\10.0.0.1\\s'"])
+    assert blocked([*mssql, "SELECT * FROM OPENROWSET(BULK '/etc/passwd', SINGLE_CLOB) a"])
+    # but in exploit mode the same command runs (operator opted in + confirmed)
+    assert shell.policy_violation([*mssql, "EXEC xp_cmdshell 'whoami'"], exploit=True) is None
     # read-only enum queries stay allowed
     assert not blocked(["mysql", "-h", "x", "-u", "root", "-e", "SHOW DATABASES;"])
     assert not blocked(["psql", "-h", "x", "-U", "postgres", "-c", "SELECT version();"])
     assert not blocked(["redis-cli", "-h", "x", "INFO"])
+    assert not blocked([*mssql, "SELECT name FROM sys.databases"])  # MSSQL read-only enum
+
+
+def test_netexec_non_auth_module_option_is_not_brute() -> None:
+    # bug #19: a netexec module option whose value looks like a file (`-o OUT=loot.txt`) was
+    # misclassified as list-driven credential brute and the whole recon command was blocked.
+    cmd = ["netexec", "smb", "10.0.0.1", "-u", "guest", "-p", ""]
+    cmd += ["-M", "spider_plus", "-o", "OUTPUT=out.txt"]
+    assert (
+        shell.policy_violation(cmd)
+        is None
+    )
+    # the genuine brute (a wordlist as the -p VALUE) is still blocked
+    assert shell.policy_violation(["netexec", "smb", "10.0.0.1", "-p=rockyou.txt"]) is not None
 
 
 def test_blocks_postgresql_server_modifying_primitives() -> None:

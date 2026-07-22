@@ -18,8 +18,15 @@ _SMB_LS = re.compile(
     r"^\s+(?P<name>.*\S)\s+(?P<attrs>[DAHRSNL]+)\s+(?P<size>\d+)\s+"
     r"\w{3}\s+\w{3}\s+\d+\s+[\d:]+\s+\d{4}\s*$"
 )
-# lines smbclient interleaves with a streamed file's content (`get file -`), plus its banners
-_SMB_NOISE = re.compile(r"^(getting file |NT_STATUS|\s*\d+ blocks of size|Domain=|OS=|Try \"help)")
+# lines smbclient interleaves with a streamed file's content (`get file -`), plus its banners. Match
+# each shape TIGHTLY, not a bare `Domain=`/`OS=`/`NT_STATUS` prefix: a peeked config file whose own
+# content starts with `Domain=EXAMPLE`, `OS=Linux`, or `NT_STATUS...` was being silently dropped
+# (bug #11). The connection banner is the full `Domain=[..] OS=[..] Server=[..]` line; NT_STATUS
+# chatter is an uppercase error CODE; the ls footer is `<n> blocks of size <n>`.
+_SMB_NOISE = re.compile(
+    r'^(?:getting file |Try "help|\s*\d+ blocks of size \d+|NT_STATUS_[A-Z_]+\b)'
+    r"|^Domain=\[[^\]]*\] OS=\[[^\]]*\] Server=\["
+)
 
 
 def parse_smbclient_ls(text: str) -> list[SmbEntry]:

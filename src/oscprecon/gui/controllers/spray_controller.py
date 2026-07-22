@@ -63,10 +63,13 @@ class SprayController:
         profile = w._profile  # capture: results/cleanup always target the ORIGINATING profile
         target = profile.target.ip
         redact = spray.make_redactor(passwords)  # mask winning secrets in streamed tool output
+        selected = list(dialog.selected_services())
         launched = 0
-        for service in dialog.selected_services():
+        skipped: list[str] = []
+        for service in selected:
             if not w._tasks.can_start():
-                break
+                skipped.append(service)
+                continue  # keep scanning the list so the skipped set is complete for the message
             port = spray.discovered_port(service, profile.discovered_services)
             command = spray.build_spray_command(service, target, users_path, passwords_path, port)
             output_file = profile.directory / "spray" / f"{service}.txt"
@@ -83,12 +86,24 @@ class SprayController:
             )
             launched += 1
         self._pending = launched  # set before any queued done-callback runs (GUI thread)
+        if skipped:  # no silent failures (§24): tell the operator which sprays did not start
+            w._tool_panel.append_output(
+                f"[spray] deferred {len(skipped)} service(s) — task pool full or a scan is "
+                f"running: {', '.join(skipped)}. Re-run spray once it frees up."
+            )
         if launched == 0:
             # nothing ran — don't leave the plaintext users/passwords lists orphaned with no worker
             spray.clean_spray_artifacts(profile.directory)
 
     def _done(self, code: int, profile: Profile, service: str, output_file: Path) -> None:
-        self._record_success(profile, service, output_file)
+        # a creds.json write error in _record_success must NOT jam the subsystem (bug #5): without
+        # this guard _worker_finished never ran, _pending never reached 0, and the plaintext spray
+        # lists were never cleaned. Surface the error, but always finish the worker.
+        try:
+            self._record_success(profile, service, output_file)
+        except Exception as exc:  # noqa: BLE001 — best-effort; never let it wedge the spray pool
+            if profile is self._w._profile:
+                self._w._tool_panel.append_output(f"[spray] could not record result: {exc}")
         self._w._command_done(code, None)
         self._worker_finished(profile)
 

@@ -38,6 +38,11 @@ class SimpleReconWorker(CancellableThread):
         except Exception as exc:  # boundary: surface worker failures to the UI thread
             self.failed.emit(str(exc))
             return
+        if self._cancel.is_set():
+            # a cancelled walk (snmp/tftp/…) still collected + persisted partial findings — mark it
+            # so the UI/report doesn't read a half-done run as a complete enumeration (bug #18,
+            # matching the bespoke service workers' cancelled-is-partial marker).
+            result.summary.insert(0, "⚠ recon cancelled — results are partial")
         self.done.emit(result)
 
     def _run_step(self, shell_line: str, output_rel: str) -> str:

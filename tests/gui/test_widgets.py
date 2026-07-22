@@ -312,15 +312,19 @@ def test_reference_pane_show_exploits_none(qtbot: QtBot) -> None:
     assert "skipped" in pane._exploits.item(0).text()
 
 
-def test_main_window_edb_stale_result_ignored(qtbot: QtBot) -> None:
+def test_main_window_edb_stale_result_ignored(qtbot: QtBot, tmp_path: Path) -> None:
     window = MainWindow()
     qtbot.addWidget(window)
+    prof = Profile.create(tmp_path, "edb", Target(ip="10.0.0.1"))
+    window._set_profile(prof)
+    prof.read_only = True  # skip the disk persist; assert only the UI-show gate here
     window._edb_request_id = 5
     hit = ExploitHit("1", "title", "https://www.exploit-db.com/exploits/1", "")
     search = EdbSearch([hit], "apache 2.4", "version")
-    window._on_edb_done(search, 4)  # stale id -> ignored
+    ctx = ("80/tcp http", "apache", "2.4")
+    window._on_edb_done(search, 4, prof, ctx)  # stale id -> not shown
     assert window._reference_pane._exploits.count() == 0
-    window._on_edb_done(search, 5)  # current id -> shown
+    window._on_edb_done(search, 5, prof, ctx)  # current id -> shown
     assert window._reference_pane._exploits.count() == 1
 
 

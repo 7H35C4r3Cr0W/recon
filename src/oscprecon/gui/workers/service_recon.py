@@ -114,7 +114,12 @@ class SmbReconWorker(CancellableThread):
                 break
             out = base / step.command.output_file
             shell.run(
-                step.command.shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit
+                step.command.shell_line,
+                out,
+                cwd=base,
+                cancel=self._cancel,
+                on_line=self.line.emit,
+                timeout=_STEP_TIMEOUT_S,  # bug #6: a hung enum4linux-ng/tarpit wedged this worker
             )
             if not step.tool:
                 continue
@@ -173,7 +178,12 @@ class SmbReconWorker(CancellableThread):
         base = self._profile.directory
         out = base / step.command.output_file
         shell.run(
-            step.command.shell_line, out, cwd=base, cancel=self._cancel, on_line=self.line.emit
+            step.command.shell_line,
+            out,
+            cwd=base,
+            cancel=self._cancel,
+            on_line=self.line.emit,
+            timeout=_STEP_TIMEOUT_S,  # bug #6: match the watchdog the other service workers use
         )
         try:
             return out.read_text(encoding="utf-8", errors="replace")

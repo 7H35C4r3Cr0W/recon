@@ -59,6 +59,11 @@ def _mask(value: str) -> str:
 _URI_CRED_RE = re.compile(r"^([A-Za-z][\w+.-]*://[^:/@\s]+):([^@\s]+)@")
 _USER_PCT_RE = re.compile(r"^(--user=|-U)([^%\s]+)%(.+)$")
 _IMPACKET_CRED_RE = re.compile(r"^([^/\s:]+/[^/\s:]+):([^@\s]+)(@.*)?$")
+# the DOMAINLESS positional `user:PASS@host` — impacket-mssqlclient sa:pw@t, local-account
+# psexec/wmiexec (no domain slash), the pymysql/psql `user:pw@host` form. The impacket regex above
+# needs a `domain/user`, so this shape leaked in cleartext (bug #8). `@\S+$` (a host tail, anchored)
+# keeps it specific to connection strings, not an arbitrary `a:b` token.
+_USERPASS_HOST_RE = re.compile(r"^([^/\s:@]+):([^@\s]+)@\S+$")
 
 
 def _mask_userpct(value: str) -> str:
@@ -78,6 +83,9 @@ def _mask_secret_shapes(tok: str) -> str:
         m = _IMPACKET_CRED_RE.match(tok)
         if m:
             return f"{m.group(1)}:{_mask(m.group(2))}{m.group(3) or ''}"
+        m = _USERPASS_HOST_RE.match(tok)  # domainless user:PASS@host (mssqlclient/local-account)
+        if m:
+            return tok[: m.start(2)] + _mask(m.group(2)) + tok[m.end(2) :]
     return tok
 
 
@@ -225,9 +233,14 @@ SPRAY_TOOLS: frozenset[str] = frozenset({"hydra", "medusa"})
 
 # why: the DB clients are allow-listed for read-only enum (§12), but the custom-command path lets a
 # user hand-type a query — refuse file-write / read / OS-exec / DDL primitives (not recon).
-_DB_CLIENTS: frozenset[str] = frozenset({"mysql", "psql", "mongosh", "mongo", "redis-cli"})
+_DB_CLIENTS: frozenset[str] = frozenset(
+    {"mysql", "psql", "mongosh", "mongo", "redis-cli", "impacket-mssqlclient", "mssqlclient.py"}
+)
 # plain file/OS primitives (any DB client): substring-matched on the normalised query. The PG
 # pg_*_file / pg_ls_*dir family is a regex below (variants like pg_read_binary_file evade a substr).
+# The MSSQL OS/file primitives (xp_cmdshell / sp_OA* OLE automation / xp_dirtree / OPENROWSET BULK)
+# are the MSSQL RCE-in-recon-mode gap (bug #9) — they are never recon, so a substring block is safe
+# (sp_configure is deliberately NOT listed: it also drives legitimate read-only config queries).
 _DB_FORBIDDEN_SUBSTR: tuple[str, ...] = (
     "into outfile",
     "into dumpfile",
@@ -237,6 +250,14 @@ _DB_FORBIDDEN_SUBSTR: tuple[str, ...] = (
     "sys_eval",
     "lo_import",
     "lo_export",
+    "xp_cmdshell",
+    "sp_oacreate",
+    "sp_oamethod",
+    "xp_dirtree",
+    "xp_regwrite",
+    "xp_regread",
+    "openrowset",
+    "bulk insert",
     "\\!",
 )
 # PostgreSQL server-modifying / file / OS primitives — a keyword regex, NOT a blunt substring, so
@@ -361,9 +382,14 @@ def _netexec_violation(argv: list[str]) -> str | None:
     while i < len(argv):
         token = argv[i]
         flag, sep, inline = token.partition("=")
-        if sep:  # `-p=X` / `--password=X`
+        if sep and flag in _NETEXEC_AUTH_FLAGS:  # `-p=X` / `--password=X`
             values = [inline]
             i += 1
+        elif sep:
+            # a non-auth `KEY=value` netexec module option (`-o OUT=x.txt`) is not a credential, so
+            # don't evaluate its value for spray/brute — doing so was a false block (bug #19).
+            i += 1
+            continue
         elif not token.startswith("--") and len(token) > 2 and token[:2] in _NETEXEC_AUTH_FLAGS:
             flag, values = token[:2], [token[2:]]  # concatenated short form: `-pX`
             i += 1

@@ -53,14 +53,18 @@ _NMAP_REASONS = frozenset(
         "host-prohibited", "net-prohibited", "source-quench", "redirect", "user-set", "script-set",
     }
 )  # fmt: skip
-_REASON_PREFIX = re.compile(r"^(?P<reason>[a-z][a-z-]*)(?: ttl \d+)?\s+")
+# why: anchor the tail on (?=\s|$), NOT a mandatory \s+ — otherwise when "<reason> ttl <n>" is the
+# WHOLE remainder (no -sV banner follows, the common case for a bare `--reason` scan), the trailing
+# \s+ can't match after the digits, the engine backtracks and drops the ttl group, and only
+# "<reason> " is stripped — leaving "ttl 64" to be mis-parsed as product='ttl' version='64' (#1).
+_REASON_PREFIX = re.compile(r"^(?P<reason>[a-z][a-z-]*)(?:\s+ttl\s+\d+)?(?=\s|$)")
 
 
 def _strip_reason(rest: str) -> str:
     # drop a leading "<reason> [ttl <n>] " column that `--reason` prepends to the version banner.
     match = _REASON_PREFIX.match(rest)
     if match is not None and match.group("reason") in _NMAP_REASONS:
-        return rest[match.end() :]
+        return rest[match.end() :].lstrip()
     return rest
 
 

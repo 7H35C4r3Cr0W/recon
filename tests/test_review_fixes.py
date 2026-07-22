@@ -59,6 +59,28 @@ def test_redact_masks_credential_token_shapes() -> None:
     assert "Passw0rd" not in u2
 
 
+def test_redact_masks_domainless_userpass_host() -> None:
+    # bug #8: `user:PASS@host` with NO domain slash (impacket-mssqlclient sa, local psexec, the
+    # pymysql/psql user:pw@host form) was NOT masked — the domain/user impacket regex needs a slash.
+    m = _redact_cmdline(["impacket-mssqlclient", "sa:S3cretPass@10.0.0.5"])
+    assert "S3cretPass" not in m and "sa:" in m and "@10.0.0.5" in m
+    # the anchored @host tail keeps it specific — a bare `a:b` (no @host) is left alone
+    assert _redact_cmdline(["curl", "-H", "Accept:text/html"]) == "curl -H Accept:text/html"
+
+
+def test_fingerprint_grav_does_not_fire_on_gravatar() -> None:
+    # bug #12: the short "grav" (Grav CMS) fragment matched WordPress's ubiquitous Gravatar/Gravity
+    # tokens, falsely marking Grav CMS present on nearly every WP page. The real prefix still fires.
+    from oscprecon.exploit import base
+
+    if "grav" in base._REGISTRY:  # only meaningful if the grav service is registered
+        assert "grav" not in base.web_app_keys_from_fingerprints(
+            ["WordPress 6.4, secure.gravatar.com, Gravity Forms 2.7"]
+        )
+        assert "grav" in base.web_app_keys_from_fingerprints(["GravCMS 1.7.0"])
+        assert "grav" in base.web_app_keys_from_fingerprints(["Grav 1.7"])
+
+
 def test_redact_masks_all_trailing_nargs_after_secret_flag() -> None:
     # -p with several inline values (blocked spray) must mask EVERY password, not just the first,
     # since the blocked-command message is written to the profile's output file on disk

@@ -397,13 +397,15 @@ def _json_plugin_pairs(plugins: dict[str, Any]) -> list[tuple[str, str]]:
             for key in ("string", "version", "module", "account"):
                 v = detail.get(key)
                 if isinstance(v, list) and v:
-                    value = str(v[0])
+                    # keep EVERY element, not just v[0] — an Email plugin lists several addresses;
+                    # the plain parser delivers all, so [0] dropped extra vhost leads (bug #10).
+                    value = ", ".join(str(x) for x in v)
                     break
                 if isinstance(v, str) and v:
                     value = v
                     break
         elif isinstance(detail, list) and detail:
-            value = str(detail[0])
+            value = ", ".join(str(x) for x in detail)
         pairs.append((str(name), value))
     return pairs
 
