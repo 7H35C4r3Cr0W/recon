@@ -97,6 +97,7 @@ from oscprecon.models import Credential, DiscoveredHost, DiscoveredService, Targ
 from oscprecon.modules.http import (
     default_url,
     detect_api_server,
+    detect_ua_gate,
     detect_wordpress,
     parse_tool,
 )
@@ -2383,6 +2384,14 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(
                 "[api] JSON API server detected — enumerate routes/params, not files: "
                 "curl /openapi.json /docs /redoc /swagger.json /api/v1"
+            )
+        # parity with the CLI enum suggest() UA-gate hint: a 404/error root on a live web server
+        # often a User-Agent filter (site looks empty to feroxbuster/no-UA but serves a browser).
+        if detect_ua_gate(text) and profile is self._profile:
+            self._tool_panel.append_output(
+                "[ua-gate] Root returned a 404/Error — possibly a User-Agent filter. Re-probe "
+                "browser UA (set the User-Agent field, or feroxbuster -a / ffuf -H 'User-Agent: "
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')."
             )
 
     def _on_vhost_run(self, command: str, output_rel: str, tool: str, domain: str) -> None:

@@ -313,8 +313,16 @@ def exploit_cmd(
 ) -> None:
     """Show exploitation command templates (§2b). CLI is display-only — copy a command to run it."""
     from oscprecon import exploit as exploit_mod
+    from oscprecon import ligolo
 
     values: dict[str, str] = {}
+    # mirror the GUI ExploitPanel fill: reverse-shell templates need {lhost}/{lport} filled even
+    # without a profile (else a copied command still shows literal {lhost}). tun0 is best-effort.
+    lhost = ligolo.detect_tun_ip("tun0") or ligolo.detect_tun_ip("tun1")
+    if lhost:
+        values["lhost"] = lhost
+    values["lport"] = "4444"
+    prof: Profile | None = None
     if profile is not None:
         root = workspace if workspace is not None else config.workspace_root()
         directory = Path(root) / profile
@@ -372,6 +380,38 @@ def exploit_cmd(
     if spec is None:
         typer.echo(f"[error] unknown service '{service}'", err=True)
         raise typer.Exit(2)
+    if prof is not None:
+        # bind {port} to the DISCOVERED port for this service (mirrors the GUI ExploitPanel), so
+        # port-parameterised templates aren't left with a literal {port}; fall back to the catalog
+        # default. And emit the GUI's "attacks belong to identified services" decision-aid warning.
+        open_svcs = [(s.port, s.service) for s in prof.discovered_services if s.state == "open"]
+        discovered_port = exploit_mod.port_for_service(open_svcs, key)
+        if discovered_port is not None:
+            values["port"] = str(discovered_port)
+        elif spec.ports:
+            values["port"] = str(spec.ports[0])
+        from oscprecon import findings as _findings
+
+        fp_texts: list[str] = []
+        for s in prof.discovered_services:
+            fp_texts.append(f"{s.product} {s.version}")
+            if s.nmap_scripts_output:
+                fp_texts.append(s.nmap_scripts_output)
+        try:
+            for f in _findings.load_findings(prof.directory):
+                note = str(f.get("note") or f.get("detail") or "")
+                if note:
+                    fp_texts.append(note)
+        except OSError:
+            pass
+        present = set(exploit_mod.services_present(open_svcs)) | set(
+            exploit_mod.web_app_keys_from_fingerprints(fp_texts)
+        )
+        if spec.ports and key not in present:  # portless catalogs (linux/windows/shells) never warn
+            typer.echo(
+                f"⚠ {spec.label} was NOT found on this target by the scan — attacks belong to "
+                f"identified services; only run this if you confirmed it's really there.\n"
+            )
     typer.echo(f"# {spec.label} — {spec.note}\n")
     for category in spec.categories():
         typer.echo(f"── {category} ──")
@@ -762,9 +802,24 @@ def enum_cmd(
         )
         raise typer.Exit(2)
     prof = Profile.load(_profile_dir(profile, workspace))
+    # use the DISCOVERED port when the scan found this service on a non-standard port (mirrors the
+    # GUI, which passes service.port). Was a bug: the raw --port default (0) made steps_fn fall back
+    # to the module default and miss a service on an odd port. Same fix as _run_full_module_enum.
+    from oscprecon.models import Proto as _Proto
+
+    probe_port = port
+    if probe_port == 0:
+        probe_port = next(
+            (
+                s.port
+                for s in prof.discovered_services
+                if s.proto == _Proto.TCP and s.service == service and s.state == "open"
+            ),
+            0,
+        )
     raw: dict[str, str] = {}
     issues: list[str] = []
-    for command, tool in spec.steps_fn(prof.target, port):
+    for command, tool in spec.steps_fn(prof.target, probe_port):
         out = prof.directory / command.output_file
         result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
         if result.missing_tool is not None:
@@ -847,7 +902,9 @@ def findings_cmd(
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     """Print the structured findings a profile has collected (the Findings view, headless)."""
+    from oscprecon import finding_severity
     from oscprecon import findings as findings_mod
+    from oscprecon.modules.http.parsers import interesting_path_reason
 
     rows = findings_mod.load_findings(_profile_dir(profile, workspace))
     if service is not None:
@@ -860,7 +917,13 @@ def findings_cmd(
         head = str(r.get("kind") or r.get("path") or "").strip()
         val = str(r.get("value") or r.get("status") or "").strip()
         detail = str(r.get("detail") or r.get("note") or "").replace("\n", " ").strip()
-        typer.echo(f"  [{mod}] {head} {val}  {detail}".rstrip())
+        # parity with the GUI FindingsView / DiscoveredUrlsPanel: show the severity category + a
+        # notable mark, and flag a source/backup/VCS disclosure or upload dir (was CLI-silent).
+        category = finding_severity.classify(str(r.get("kind", "")), val, detail)
+        mark = "‼" if finding_severity.is_notable(category) else " "
+        reason = interesting_path_reason(str(r.get("path", ""))) if r.get("path") else ""
+        warn = f"   ⚠ {reason}" if reason else ""
+        typer.echo(f"{mark} [{category}][{mod}] {head} {val}  {detail}{warn}".rstrip())
 
 
 @app.command("health")

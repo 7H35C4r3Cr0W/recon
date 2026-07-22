@@ -75,6 +75,7 @@ class HttpPanel(QWidget):
     dry_run_requested = Signal(str)
     add_report_requested = Signal(str)
     manual_requested = Signal(str)  # a Tier-2 follow-up command (WebDAV, endpoints, methods)
+    notice = Signal(str)  # an informational line for the output pane (e.g. unresolved-hostname)
 
     def __init__(self) -> None:
         super().__init__()
@@ -143,6 +144,10 @@ class HttpPanel(QWidget):
         self._status_preset.addItems([*STATUS_PRESETS, "Custom"])
         self._status_preset.setCurrentText("All informative")
         self._status_csv = QLineEdit(",".join(str(c) for c in STATUS_PRESETS["All informative"]))
+        self._user_agent = QLineEdit()
+        self._user_agent.setPlaceholderText(
+            "empty = tool default; set a browser UA to defeat a UA filter (see the [ua-gate] hint)"
+        )
         self._output = QLineEdit()
 
         form = QFormLayout()
@@ -156,6 +161,7 @@ class HttpPanel(QWidget):
         form.addRow("", self._skip_tls)
         form.addRow("Status codes:", self._status_preset)
         form.addRow("", self._status_csv)
+        form.addRow("User-Agent:", self._user_agent)
         form.addRow("Output file:", self._output)
 
         self._preview = QPlainTextEdit()
@@ -287,6 +293,7 @@ class HttpPanel(QWidget):
         self._url.textChanged.connect(self._refresh)
         self._url.textChanged.connect(self._reload_manual)  # follow-ups embed the current {url}
         self._custom_exts.textChanged.connect(self._refresh)
+        self._user_agent.textChanged.connect(self._refresh)
         self._threads.valueChanged.connect(self._refresh)
         self._depth.valueChanged.connect(self._refresh)
         self._timeout.valueChanged.connect(self._refresh)
@@ -313,10 +320,20 @@ class HttpPanel(QWidget):
         tls = is_tls(service.service, service.port)
         if host_ip:  # a pivoted host — target its IP, not the entry box (no hostname for it)
             host = host_ip
+        elif self._profile is not None:
+            # parity with the CLI http enum: a set-but-unresolvable vhost name makes every probe
+            # fail ("no address") and recon silently returns nothing — effective_web_host falls
+            # back to the IP so it works, and we surface the "add to /etc/hosts" warning here.
+            host, unresolved = http_mod.effective_web_host(self._profile.target)
+            if unresolved:
+                self.notice.emit(
+                    f"[http] hostname '{self._profile.target.hostname}' does not resolve — probing "
+                    f"the IP {self._profile.target.ip} instead. Add "
+                    f"'{self._profile.target.ip} {self._profile.target.hostname}' to /etc/hosts"
+                    "the vhost, then reselect the port."
+                )
         else:
-            host = self._profile.target.ip if self._profile is not None else ""
-            if self._profile is not None and self._profile.target.hostname:
-                host = self._profile.target.hostname
+            host = ""
         self._url.setText(default_url(host, service.port, tls))
         self._output_is_custom = False  # a new port re-derives the default output path
         self._refresh()
@@ -410,6 +427,7 @@ class HttpPanel(QWidget):
             skip_tls=self._skip_tls.isChecked(),
             status_codes=self._current_status_codes(),
             output_file=self._output.text().strip(),
+            user_agent=self._user_agent.text().strip(),
         )
 
     def _refresh(self) -> None:
@@ -443,6 +461,7 @@ class HttpPanel(QWidget):
             "rate": self._rate.value(),
             "skip_tls": self._skip_tls.isChecked(),
             "status_csv": self._status_csv.text(),
+            "user_agent": self._user_agent.text(),
             "custom_exts": self._custom_exts.text(),
             "wide_net": self._wide_net.isChecked(),
             "groups": [g for g, b in self._group_boxes.items() if b.isChecked()],
@@ -477,6 +496,8 @@ class HttpPanel(QWidget):
         self._skip_tls.setChecked(bool(data.get("skip_tls", True)))
         if isinstance(data.get("status_csv"), str):
             self._status_csv.setText(data["status_csv"])
+        if isinstance(data.get("user_agent"), str):
+            self._user_agent.setText(data["user_agent"])
         if isinstance(data.get("custom_exts"), str):
             self._custom_exts.setText(data["custom_exts"])
         self._wide_net.setChecked(bool(data.get("wide_net", False)))

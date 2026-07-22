@@ -128,6 +128,7 @@ class ToolPanel(QWidget):
         self._http.dry_run_requested.connect(self.http_dry_run_requested)
         self._http.add_report_requested.connect(self.http_add_report_requested)
         self._http.manual_requested.connect(self.run_requested)  # Tier-2 follow-ups (WebDAV, …)
+        self._http.notice.connect(self.append_output)  # unresolved-hostname warning, etc.
         self._vhost = VhostPanel()
         self._vhost.run_requested.connect(self.vhost_run_requested)
         self._vhost.dry_run_requested.connect(self.vhost_dry_run_requested)

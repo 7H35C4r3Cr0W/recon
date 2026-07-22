@@ -8,7 +8,7 @@ from PySide6.QtCore import Signal
 
 from oscprecon import findings, shell
 from oscprecon.gui.workers.base import CancellableThread
-from oscprecon.models import Credential, Target
+from oscprecon.models import Credential, Finding, Target
 from oscprecon.modules.dns import DnsFinding, DnsModule, parse_dns_tool
 from oscprecon.modules.ftp import (
     FtpFinding,
@@ -52,6 +52,25 @@ from oscprecon.profile import Profile
 
 # per-step watchdog (seconds): enum steps are quick; this only kills a wedged/tarpit transfer. [#24]
 _STEP_TIMEOUT_S = 300.0
+
+
+def _suggest_tips(module: object, collected: list[object], service: str) -> list[str]:
+    # parity with the CLI enum + SimpleReconWorker: surface the module's suggest() decision-aids in
+    # the GUI too (SMB-signing->relay, FTP-anon, SSH-password-auth, DNS-zone-transfer, LDAP-anon).
+    # The bespoke findings carry kind/value/detail; wrap as generic Findings (what suggest reads).
+    suggest = getattr(module, "suggest", None)
+    if suggest is None:
+        return []
+    generic = [
+        Finding(
+            service=service,
+            title="",
+            detail=str(getattr(f, "detail", "")),
+            fields={"kind": str(getattr(f, "kind", "")), "value": str(getattr(f, "value", ""))},
+        )
+        for f in collected
+    ]
+    return [f"→ {tip}" for tip in suggest(generic)]
 
 
 @dataclass
@@ -220,6 +239,7 @@ class SmbReconWorker(CancellableThread):
             summary.append(f"Anonymous access: {method} session OK")
         else:
             summary.append("Anonymous access: none (null/guest denied)")
+        summary.extend(_suggest_tips(self._module, list(collected), "smb"))
         return summary or ["No SMB findings."]
 
 
@@ -386,6 +406,7 @@ class FtpReconWorker(CancellableThread):
         if any(f.kind == "note" and "bounce" in f.value for f in collected):
             summary.append("Note: FTP bounce accepted (recon)")
         summary.append("Anonymous access: allowed" if anon else "Anonymous access: denied")
+        summary.extend(_suggest_tips(self._module, list(collected), "ftp"))
         return summary
 
 
@@ -474,6 +495,7 @@ class SshReconWorker(CancellableThread):
             summary.append(f"Auth methods: {', '.join(methods)}")
             if "password" in methods:
                 summary.append("Password auth enabled — single default-cred checks are Tier-2")
+        summary.extend(_suggest_tips(self._module, list(collected), "ssh"))
         return summary or ["No SSH findings."]
 
 
@@ -563,6 +585,7 @@ class DnsReconWorker(CancellableThread):
         if records:
             summary.append(f"Records ({len(records)}):")
             summary.extend(f"  {r}" for r in records)
+        summary.extend(_suggest_tips(self._module, list(collected), "dns"))
         return summary or ["No DNS findings."]
 
 
@@ -677,4 +700,5 @@ class LdapReconWorker(CancellableThread):
         if basedn is not None:
             summary.append(f"Base DN used: {basedn}")
         summary.append("Anonymous bind: allowed" if anon else "Anonymous bind: denied")
+        summary.extend(_suggest_tips(self._module, list(collected), "ldap"))
         return summary
