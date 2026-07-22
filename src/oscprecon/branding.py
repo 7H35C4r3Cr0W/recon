@@ -15,15 +15,22 @@ DIST_NAME = "oscp-recon"
 
 # Author / maintainer attribution — the single source of truth, surfaced on every brand surface
 # (GUI header watermark + About dialog, CLI banner + `--version`). Edit here only.
-AUTHOR_NAME = "Andre Boyle"
+AUTHOR_NAME = "Lagus"
 AUTHOR_EMAIL = "its.lagus@proton.me"
-AUTHOR_GITHUB = "https://github.com/7H35C4r3Cr0W/recon"
+AUTHOR_REPO = "7H35C4r3Cr0W/recon"  # short "owner/repo" form for compact display
+AUTHOR_GITHUB = f"https://github.com/{AUTHOR_REPO}"
+AUTHOR_COFFEE = "https://buymeacoffee.com/lagus"  # support link — kept subtle, never nagging
 AUTHOR_CREDIT = f"{AUTHOR_NAME} · {AUTHOR_EMAIL}"
 
 
 def author_line() -> str:
-    """One-line credit for banners/footers: 'Nabu by Andre Boyle · its.lagus@proton.me'."""
+    """One-line credit for banners/footers: 'Nabu by Lagus · its.lagus@proton.me'."""
     return f"{APP_NAME} by {AUTHOR_NAME} · {AUTHOR_EMAIL}"
+
+
+def coffee_line() -> str:
+    """One-line support credit: 'Enjoying Nabu? Buy me a coffee — https://buymeacoffee.com/lagus'."""
+    return f"Enjoying {APP_NAME}? Buy me a coffee — {AUTHOR_COFFEE}"
 
 
 # the Nabu mascot — a little owl-furby (Nabu, god of scribes & wisdom → owl). The GUI shows the SVG
@@ -47,4 +54,5 @@ def cli_banner() -> str:
         f"   |)__)   v{app_version()} · recon-first · OSCP exam-legal by default\n"
         f'   -"-"-   by {AUTHOR_NAME} · {AUTHOR_EMAIL}\n'
         f"           {AUTHOR_GITHUB}\n"
+        f"           ☕ support: {AUTHOR_COFFEE}\n"
     )

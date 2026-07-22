@@ -34,6 +34,7 @@ from oscprecon.branding import (
     APP_NAME,
     APP_SUBTITLE,
     APP_TAGLINE,
+    AUTHOR_COFFEE,
     AUTHOR_EMAIL,
     AUTHOR_GITHUB,
     AUTHOR_NAME,
@@ -333,7 +334,8 @@ class MainWindow(QMainWindow):
         legal.setStyleSheet(f"color: {tokens.active_palette().text_muted};")
         author = QLabel(f"by {AUTHOR_NAME}")  # persistent author watermark (§19a brand mark)
         author.setToolTip(
-            f"{APP_NAME} — created by {AUTHOR_NAME} · {AUTHOR_EMAIL}\n{AUTHOR_GITHUB}"
+            f"{APP_NAME} — created by {AUTHOR_NAME} · {AUTHOR_EMAIL}\n"
+            f"{AUTHOR_GITHUB}\n☕ Buy me a coffee — {AUTHOR_COFFEE}"
         )
         author.setStyleSheet(f"color: {tokens.active_palette().text_muted};")
         status = self.statusBar()
@@ -666,7 +668,9 @@ class MainWindow(QMainWindow):
             "<hr>"
             f"<p><b>Created by {AUTHOR_NAME}</b><br>"
             f"<a href='mailto:{AUTHOR_EMAIL}'>{AUTHOR_EMAIL}</a><br>"
-            f"<a href='{AUTHOR_GITHUB}'>{AUTHOR_GITHUB}</a></p>",
+            f"<a href='{AUTHOR_GITHUB}'>{AUTHOR_GITHUB}</a></p>"
+            f"<p>☕ <a href='{AUTHOR_COFFEE}'>Buy me a coffee</a> "
+            "— support Nabu's development</p>",
         )
 
     def _rebuild_recent_menu(self) -> None:

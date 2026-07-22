@@ -338,9 +338,11 @@ uv run ruff format --check
 
 ## Author
 
-**Nabu** is created and maintained by **Andre Boyle**
+**Nabu** is created and maintained by **Lagus**
 · [its.lagus@proton.me](mailto:its.lagus@proton.me)
 · [github.com/7H35C4r3Cr0W/recon](https://github.com/7H35C4r3Cr0W/recon)
+
+☕ If Nabu saves you time, you can **[buy me a coffee](https://buymeacoffee.com/lagus)** — it keeps the project going.
 
 ## License
 

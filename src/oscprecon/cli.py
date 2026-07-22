@@ -21,7 +21,8 @@ if TYPE_CHECKING:  # annotation-only names (imported at call time in the functio
 app = typer.Typer(
     help=(
         "Nabu — headless recon CLI (recon-only, OSCP exam-legal). "
-        f"Created by {branding.AUTHOR_NAME} · {branding.AUTHOR_EMAIL} · {branding.AUTHOR_GITHUB}"
+        f"Created by {branding.AUTHOR_NAME} · {branding.AUTHOR_EMAIL} · {branding.AUTHOR_GITHUB} "
+        f"· ☕ {branding.AUTHOR_COFFEE}"
     ),
     add_completion=False,
 )
@@ -32,6 +33,7 @@ def _version_callback(value: bool) -> None:
         typer.echo(f"{branding.APP_NAME} v{branding.app_version()} ({branding.DIST_NAME})")
         typer.echo(f"Created by {branding.AUTHOR_NAME} · {branding.AUTHOR_EMAIL}")
         typer.echo(branding.AUTHOR_GITHUB)
+        typer.echo(f"Buy me a coffee — {branding.AUTHOR_COFFEE}")
         raise typer.Exit()
 
 

@@ -7,8 +7,8 @@ name = "oscp-recon"
 version = "0.1.0"
 description = "Nabu — PySide6 desktop recon workspace for OSCP prep and exam day (recon-only, exam-legal)."
 requires-python = ">=3.11"
-authors = [{ name = "Andre Boyle", email = "its.lagus@proton.me" }]
-maintainers = [{ name = "Andre Boyle", email = "its.lagus@proton.me" }]
+authors = [{ name = "Lagus", email = "its.lagus@proton.me" }]
+maintainers = [{ name = "Lagus", email = "its.lagus@proton.me" }]
 license = { text = "MIT" }
 classifiers = [
     "License :: OSI Approved :: MIT License",
@@ -31,6 +31,7 @@ dependencies = [
 Homepage = "https://github.com/7H35C4r3Cr0W/recon"
 Repository = "https://github.com/7H35C4r3Cr0W/recon"
 Issues = "https://github.com/7H35C4r3Cr0W/recon/issues"
+Funding = "https://buymeacoffee.com/lagus"
 
 [project.scripts]
 # Preferred Nabu entry points.
