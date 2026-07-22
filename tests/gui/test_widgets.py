@@ -345,7 +345,10 @@ def test_page_visit_buffered_during_scan(qtbot: QtBot, tmp_path: Path) -> None:
     window._tasks.add(worker, "nmap", exclusive=True)  # simulate a run in progress
     window._on_page_visited("smb", "https://book.hacktricks.wiki/smb")
     assert prof.references_visited == []  # buffered, not recorded yet
-    assert window._pending_visits == [("smb", "https://book.hacktricks.wiki/smb")]
+    # each buffered visit is tagged with its originating profile dir (finding #7)
+    assert window._pending_visits == [
+        ("smb", "https://book.hacktricks.wiki/smb", str(prof.directory))
+    ]
     window._tasks.remove(worker)
     window._post_run_refresh()  # drains the buffer once the run clears
     assert any(v["url"] == "https://book.hacktricks.wiki/smb" for v in prof.references_visited)
