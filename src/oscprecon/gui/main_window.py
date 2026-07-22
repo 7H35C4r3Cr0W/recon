@@ -1280,6 +1280,10 @@ class MainWindow(QMainWindow):
         # can't redirect the write to the wrong project (bug #3).
         if profile.read_only or not hits:
             return
+        # don't resurrect a project the user DELETED while this lookup was in flight — add_edb would
+        # mkdir the folder back and write edb.json into a zombie stub. Skip if it's gone.
+        if not profile.directory.exists():
+            return
         service, product, version = context
         edb.add_edb(profile.directory, service=service, product=product, version=version, hits=hits)
 

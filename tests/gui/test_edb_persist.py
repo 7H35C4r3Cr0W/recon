@@ -54,3 +54,24 @@ def test_edb_persists_to_originating_profile_after_switch(qtbot: QtBot, tmp_path
     window._on_edb_done(search, window._edb_request_id, a, ("80/tcp http", "nginx", "1.18"))
     assert edb.load_edb(a.directory)  # A got the hits
     assert not edb.edb_path(b.directory).exists()  # B was never contaminated
+
+
+def test_edb_persist_does_not_resurrect_a_deleted_project(qtbot: QtBot, tmp_path: Path) -> None:
+    # bug: deleting the active project while a searchsploit lookup was in flight let add_edb mkdir
+    # the folder back and write edb.json (a zombie stub). _persist_edb must skip a gone directory.
+    import shutil
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+    prof = Profile.create(config.workspace_root(), "gone", Target(ip="10.0.0.1"))
+    d = prof.directory
+    shutil.rmtree(d)  # simulate the project being deleted mid-lookup
+    window._persist_edb([_hit()], prof, ("80/tcp http", "nginx", "1.18"))
+    assert not d.exists()  # not resurrected
+
+
+def test_certsrv_enroll_template_uses_a_single_backslash() -> None:
+    from oscprecon.exploit import ad
+
+    tpl = next(a for a in ad._ACTIONS if a.id == "certsrv-web-enroll-cert").template
+    assert "{domain}\\{user}" in tpl and "\\\\" not in tpl  # one literal backslash, not two

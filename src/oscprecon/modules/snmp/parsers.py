@@ -37,7 +37,9 @@ _ONESIXTYONE = re.compile(
 #       real notes. The keywords are whole words with a left boundary so `bypass=`/`compass:` (no
 #       real keyword) never fire.
 _CRED_HINT = re.compile(
-    r"(?<![a-z])(?:password|passwd|passphrase|pwd|secret|psk)\s*[-=:]\s*\S+"
+    # `=`/`:` may be attached (psk:x, secret=y); a hyphen separator must be SPACE-delimited
+    # (`PSK - <hash>`) so an ordinary hyphenated word (psk-config, secret-key) is NOT a false hit.
+    r"(?<![a-z])(?:password|passwd|passphrase|pwd|secret|psk)(?:\s*[=:]\s*|\s+-\s+)\S+"
     r"|(?<![a-z])(?:password|passphrase|secret|psk)\b[^\n]{0,15}[0-9a-f]{16,}"
     r"|pre[-\s]?shared[\s-]?key",
     re.IGNORECASE,

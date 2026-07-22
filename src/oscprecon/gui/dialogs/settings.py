@@ -39,13 +39,13 @@ from oscprecon.references import live_hacktricks
 # Mandatory, non-negotiable protections (CLAUDE.md §2) surfaced in the Privacy tab as locked-on
 # controls — the settings UI must never offer a way to switch these off.
 _MANDATORY_PROTECTIONS = (
-    "Never index or display credential secrets (creds.json values)",
-    "Exclude password wordlists (Passwords/, rockyou) from every picker",
-    "Redact secrets in reports and the audit log (password=<redacted len=N>)",
+    "Credential secrets are kept out of the graph SEARCH index (they are still shown in full)",
+    "Password wordlists (Passwords/, rockyou) are hidden from the default recon-only picker",
 )
 
 _REPORT_GUARANTEES = (
-    "Secrets are redacted — reports record only field names, source, and length.",
+    "Secrets are shown IN FULL — the loot is the deliverable, so nothing is redacted "
+    "(owner policy 2026-07-22; toggle redact_secrets to opt into masking).",
     "The prior report.md is archived to report-archive/ before every overwrite.",
     "Single-file Obsidian frontmatter (YAML) is emitted so reports drop into a vault.",
 )
@@ -348,6 +348,9 @@ class SettingsDialog(QDialog):
             hacktricks_auto_refresh=self._ht_auto.isChecked(),
             hacktricks_prefer_live=self._ht_prefer.isChecked(),
             hacktricks_cache_days=self._ht_days.value(),
+            # no dialog control for this yet — carry the existing value so a Preferences save does
+            # not silently reset it to the default (rebuilding Settings() had dropped it to False).
+            redact_secrets=config.load_settings().redact_secrets,
         ).normalized()
 
     # ----- actions ----------------------------------------------------------

@@ -499,3 +499,20 @@ def test_detect_invalid_hostname_negative_on_normal_response() -> None:
     ok = "HTTP/1.1 200 OK\nServer: Microsoft-IIS/10.0\nContent-Type: text/html; charset=utf-8\n"
     assert detect_invalid_hostname(ok) is False
     assert parse_headers(ok, 80) == []
+
+
+def test_lab_hostnames_is_linear_no_redos() -> None:
+    import time
+
+    from oscprecon.modules.http.parsers import lab_hostnames_from_text
+
+    # a crafted contiguous dotted run (no lab TLD) used to backtrack O(n^2) -> minutes. Bounded now.
+    payload = "a." * 40000 + "a"
+    start = time.perf_counter()
+    lab_hostnames_from_text(payload)
+    assert time.perf_counter() - start < 1.0  # linear, well under a second
+    # real lab hostnames still mined
+    assert lab_hostnames_from_text("see admin.sizzle.htb and dev.htb") == [
+        "admin.sizzle.htb",
+        "dev.htb",
+    ]

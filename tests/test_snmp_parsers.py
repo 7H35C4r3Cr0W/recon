@@ -110,3 +110,17 @@ def test_cred_hint_flags_attached_separator_and_no_false_positive() -> None:
         findings = parse_snmpwalk(text)
         assert not any("credential" in f.value for f in findings), benign
         assert any(f.value == f"sysContact: {benign}" for f in findings), benign
+
+
+def test_cred_hint_hyphen_only_when_space_delimited() -> None:
+    from oscprecon.modules.snmp.parsers import _CRED_HINT
+
+    def c(v: str) -> bool:
+        return _CRED_HINT.search(v) is not None
+
+    # a hyphen inside a compound word is NOT a value separator -> no false credential flag
+    assert not c("psk-config profile") and not c("secret-key rotation")
+    # a space-delimited hyphen IS a separator (HTB Conceal: "PSK - <hash>"), and =/: stay attached
+    assert (
+        c("PSK - 9C8B1A372B1878851BE2C097031B6E43") and c("secret=Summer2023!") and c("pwd:hunter2")
+    )

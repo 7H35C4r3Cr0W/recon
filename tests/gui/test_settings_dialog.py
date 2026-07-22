@@ -222,3 +222,21 @@ def test_mainwindow_apply_settings_updates_concurrency_and_theme_menu(qtbot: QtB
     assert window._tasks.max_concurrency == 11
     checked = [a.text().lower() for a in window._theme_group.actions() if a.isChecked()]
     assert checked == ["dark"]
+
+
+def test_settings_dialog_preserves_redact_secrets_on_save(
+    qtbot: QtBot, monkeypatch: "pytest.MonkeyPatch"
+) -> None:
+    # bug: selected_settings() rebuilt Settings() without redact_secrets, forcing it to False on
+    # every Preferences save. It must carry the current value through.
+    from dataclasses import replace
+
+    from oscprecon import config
+    from oscprecon.gui.dialogs import settings as settings_mod
+    from oscprecon.gui.dialogs.settings import SettingsDialog
+
+    d = SettingsDialog(config.default_settings())
+    qtbot.addWidget(d)
+    on = replace(config.default_settings(), redact_secrets=True)
+    monkeypatch.setattr(settings_mod.config, "load_settings", lambda: on)
+    assert d.selected_settings().redact_secrets is True  # carried through, not reset to False

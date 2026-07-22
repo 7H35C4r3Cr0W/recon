@@ -706,17 +706,23 @@ def parse_wpscan(text: str, port: int) -> list[HttpFinding]:
 # these. Restricting to pentesting-lab TLDs keeps it clean: a real page's CDN hosts (.com/.org/.net)
 # are ignored, and a *.htb/.vl/.thm host in a page is a lead by definition, never noise.
 _LAB_TLDS = ("htb", "vl", "thm", "local", "lab", "corp", "internal", "offsec", "pg")
+# why: BOUND the label-repetition at {1,10} instead of `+`. The input is an untrusted target page
+# snapshot, and an unbounded `(?:label\.)+` before the TLD alternation backtracks O(n^2) on a long
+# contiguous dotted run that doesn't end in a lab TLD (a crafted body of "a.a.a…" hangs the parse —
+# ReDoS). A real hostname never has >10 labels, so {1,10} keeps every legit match while making the
+# scan linear. lab_hostnames_from_text also caps the input length as defence-in-depth.
 _LAB_HOST_RE = re.compile(
-    r"\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:" + "|".join(_LAB_TLDS) + r")\b",
+    r"\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.){1,10}(?:" + "|".join(_LAB_TLDS) + r")\b",
     re.IGNORECASE,
 )
+_LAB_HOST_MAX_INPUT = 512_000  # never mine more than ~500 KB of a (target-controlled) page body
 
 
 def lab_hostnames_from_text(text: str) -> list[str]:
     # pull every pentesting-lab hostname (dotted name ending in a lab TLD) disclosed in the text,
     # lower-cased + deduped in first-seen order — feeds the domain/vhost recon lead.
     hosts: list[str] = []
-    for match in _LAB_HOST_RE.finditer(text):
+    for match in _LAB_HOST_RE.finditer(text[:_LAB_HOST_MAX_INPUT]):
         host = match.group(0).lower().strip(".")
         if host and host not in hosts:
             hosts.append(host)

@@ -707,11 +707,20 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
     # ports for this module: the discovered ports whose service name matches, else the CLI override
     # or the module's default port — so it still runs a Tier-1 pass even before a versioned scan.
     default_port = port or _FULL_ENUM_MODULES[service]
+    # match discovered services through the SAME name-alias table the simple-spec path uses, so
+    # nmap's name (dns->"domain", smb->"microsoft-ds") is recognised — an exact string compare made
+    # `enum dns` (etc.) miss the real port and fall back to the default.
+    from oscprecon.exploit import services_present
+
     ports = [
         Port(number=s.port, proto=s.proto, service=s.service, product=s.product, version=s.version)
         for s in prof.discovered_services
         if s.proto == Proto.TCP
-        and (s.service == service or (service == "http" and "http" in s.service))
+        and (
+            s.service == service
+            or (service == "http" and "http" in s.service)
+            or service in services_present([(s.port, s.service)])
+        )
     ]
     if not ports:
         ports = [Port(number=default_port, proto=Proto.TCP, service=service)]
