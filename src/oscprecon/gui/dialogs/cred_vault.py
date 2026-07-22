@@ -37,11 +37,11 @@ def _confirmed_label(cred: Credential) -> str:
 class CredentialVaultDialog(QDialog):
     """Editable credential vault (add / edit / delete) — the store the spray workflow (§2a) uses.
 
-    Secrets are ALWAYS masked in the table (length only); the plaintext is only ever placed on the
-    clipboard via the explicit "Copy secret" action, never shown.
+    Owner policy (2026-07-22): secrets are shown IN FULL in the table (the loot is the deliverable);
+    the "Copy secret" action is a convenience for putting one straight on the clipboard.
     """
 
-    secret_copied = Signal(str)  # emits the USERNAME only (never the secret) for the audit trail
+    secret_copied = Signal(str)  # emits the USERNAME for the audit trail (secret is also recorded)
 
     def __init__(self, profile: Profile, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -81,7 +81,7 @@ class CredentialVaultDialog(QDialog):
         row.addWidget(self._copy_secret)
 
         note = QLabel(
-            "Secrets are masked (length only) and only leave via <b>Copy secret</b>. Credentials "
+            "Secrets are shown in full — use <b>Copy secret</b> to grab one quickly. Credentials "
             "are durable project data — they persist until you edit or delete them here."
         )
         note.setWordWrap(True)

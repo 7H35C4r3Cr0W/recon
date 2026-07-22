@@ -16,6 +16,14 @@ from pathlib import Path
 
 logger = logging.getLogger("oscprecon.shell")
 
+# Owner policy (2026-07-22): NEVER redact. This is the operator's own tool run against their own
+# authorized targets, and the loot (hashes, PSKs, passwords) IS the assessment deliverable — hiding
+# it is counter-productive. So secret masking is OFF: command logs, the audit trail, reports, spray
+# output, and SNMP findings all carry the full value. The masking helpers below are kept intact but
+# only fire when this flag is explicitly flipped True (e.g. a future multi-tenant/public build); the
+# whole tool ships with it False. See config.Settings.redact_secrets + docs/OWNER_DECISIONS.md.
+REDACT_SECRETS = False
+
 # Redact credential-bearing tokens before a command line is LOGGED or written to a blocked/missing
 # output file — secrets must never persist in the diagnostics log or on disk (CLAUDE.md). The run
 # argv is untouched; only the string we log/echo is masked. -p/-a/-w/-H are overloaded (nmap=ports,
@@ -92,6 +100,8 @@ def _mask_secret_shapes(tok: str) -> str:
 def _redact_cmdline(argv: list[str]) -> str:
     if not argv:
         return ""
+    if not REDACT_SECRETS:  # owner policy: show the full command line (secrets included)
+        return " ".join(argv)
     base = os.path.basename(argv[0]).lower()
     cred_tool = base in _CRED_TOOLS or base.startswith("impacket-")
     out: list[str] = []
@@ -137,6 +147,8 @@ def redact_command(command: str) -> str:
     domain/user:pass@host, -p …), and the audit layer only redacts by key-name — so scrub the
     command string itself here. The returned string is for display only (quoting is not preserved).
     """
+    if not REDACT_SECRETS:  # owner policy: never redact — return the command verbatim
+        return command
     try:
         argv = shlex.split(command)
     except ValueError:

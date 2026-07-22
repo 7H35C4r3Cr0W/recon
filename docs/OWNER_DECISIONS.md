@@ -58,8 +58,12 @@ file records *why* the relevant sections read as they do. Concise by design — 
   world-readable / writable / no_root_squash → exposure; SMB signing **disabled** (not merely
   present) / open-relay / weak-algo → relay-risk. A username or share *name* stays informational.
 - Exploit-DB is a **reference badge**, never a confirmed vuln, and never the graph's danger ring.
-- **Credential secrets** are redacted in all graph/report data and are **excluded from graph search**
-  (proven by test); reveal/copy stays explicit.
+- **NO REDACTION (owner, 2026-07-22).** The tool never hides secrets — hashes/PSKs/passwords are the
+  assessment deliverable and this is the operator's own tool on their own authorized targets. Command
+  logs, audit, reports, the graph credential nodes, spray output, SNMP findings, and the credential
+  vault all show the **full** value. Masking helpers remain but ship **off** (`shell.REDACT_SECRETS` /
+  `config.Settings.redact_secrets`, default `False`). Secrets stay **excluded from graph search** only
+  to keep the search index clean, not to hide them.
 
 ## Process
 

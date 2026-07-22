@@ -11,7 +11,12 @@ SCHEMA_VERSION = 1
 
 
 def redact(secret: str) -> str:
-    # why: reports/logs must never carry plaintext secrets (§6) — length only.
+    # Owner policy (2026-07-22): NEVER redact by default — the credential IS the deliverable, so
+    # reports/exports show the full value. Only masks when shell.REDACT_SECRETS is flipped on.
+    from oscprecon import shell
+
+    if not shell.REDACT_SECRETS:
+        return secret
     return f"<redacted len={len(secret)}>"
 
 

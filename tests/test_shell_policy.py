@@ -327,3 +327,18 @@ def test_aws_allows_readonly_s3_blocks_writes_and_other_services() -> None:
     assert blocked("aws s3api get-object --bucket b --key k out")  # download writes local disk
     assert blocked("aws ec2 describe-instances")  # non-S3 service
     assert blocked("aws iam list-users")
+
+
+def test_default_never_redacts_secrets() -> None:
+    # OWNER POLICY (2026-07-22): the shipping default is shell.REDACT_SECRETS=False — the tool NEVER
+    # hides loot. Command logs, the audit trail, reports, spray output and cred exports all carry
+    # the full value. (The masking helpers still exist for a hypothetical opt-in build.)
+    from oscprecon import audit, creds, spray
+
+    assert shell.REDACT_SECRETS is False  # ships off
+    cmd = "netexec smb 10.0.0.1 -u administrator -p SuperSecret123"
+    assert shell.redact_command(cmd) == cmd  # full command, unredacted
+    assert "SuperSecret123" in shell._redact_cmdline(cmd.split())
+    assert creds.redact("Ashare1972") == "Ashare1972"  # full cred value
+    assert audit._redact({"secret": "9C8B1A"}) == {"secret": "9C8B1A"}  # audit shows full
+    assert spray.make_redactor(["Password123"])("got Password123 win") == "got Password123 win"

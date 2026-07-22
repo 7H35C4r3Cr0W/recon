@@ -24,6 +24,16 @@ from oscprecon.shell import _redact_cmdline, policy_violation
 from oscprecon.workspace import portability
 
 
+@pytest.fixture(autouse=True)
+def _redaction_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The _redact_* tests below exercise the secret-MASKING capability. The shipping default is
+    # shell.REDACT_SECRETS=False (owner policy 2026-07-22: never redact loot), so enable it here to
+    # verify the masking logic still works when a build opts in.
+    from oscprecon import shell
+
+    monkeypatch.setattr(shell, "REDACT_SECRETS", True)
+
+
 # --- #2 secret redaction before logging -------------------------------------------------------
 def test_redact_masks_mysql_inline_password() -> None:
     line = _redact_cmdline(["mysql", "-h", "10.10.10.5", "-u", "root", "-pRootPass1"])

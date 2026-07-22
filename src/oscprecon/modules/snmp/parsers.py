@@ -125,15 +125,13 @@ def parse_snmpwalk(text: str) -> list[SnmpFinding]:
             findings.append(SnmpFinding("process", value))
         elif "syscontact" in low_oid or oid.endswith(_SYSCONTACT_TAIL):
             # sysContact/sysLocation regularly carry a hint (admin email, a note, or a leaked secret
-            # — Conceal's IKE PSK). Surface it; if it looks like a secret the cred-leak note below
-            # points at the raw file instead of us echoing it here.
-            if not _CRED_HINT.search(value):
-                findings.append(SnmpFinding("note", f"sysContact: {value}"))
+            # — Conceal's IKE PSK). Owner policy: show the FULL value (the PSK is loot the operator
+            # needs); the _CRED_HINT note below is an ADDITIONAL flag that points at it, not a
+            # replacement that hides it.
+            findings.append(SnmpFinding("note", f"sysContact: {value}"))
         elif (
-            ("syslocation" in low_oid or oid.endswith(_SYSLOCATION_TAIL))
-            and value.lower() not in ("", "unknown")
-            and not _CRED_HINT.search(value)
-        ):
+            "syslocation" in low_oid or oid.endswith(_SYSLOCATION_TAIL)
+        ) and value.lower() not in ("", "unknown"):
             findings.append(SnmpFinding("note", f"sysLocation: {value}"))
     if _CRED_HINT.search(text):
         findings.append(

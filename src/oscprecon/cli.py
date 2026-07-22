@@ -44,6 +44,7 @@ def _root(
     # why: a callback keeps `scan` an explicit subcommand — Typer otherwise collapses a
     # single-command app and drops the subcommand name (`oscprecon-cli scan <ip>` would break).
     diagnostics.install("cli")  # capture uncaught crashes to the log; best-effort, never blocks
+    config.apply_redaction_policy()  # owner policy: never redact (unless the pref is flipped on)
     # cosmetic owl-furby banner — stderr + TTY only, so it never pollutes piped stdout or tests
     if sys.stderr.isatty():
         sys.stderr.write("\n" + branding.cli_banner() + "\n")

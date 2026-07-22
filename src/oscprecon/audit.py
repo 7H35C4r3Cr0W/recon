@@ -30,6 +30,8 @@ def _now_iso() -> str:
 def _redact(details: dict[str, Any]) -> dict[str, Any]:
     from oscprecon import shell  # local import: shell is heavy-ish and only needed for command keys
 
+    if not shell.REDACT_SECRETS:  # owner policy: the audit trail carries the full value, unredacted
+        return dict(details)
     out: dict[str, Any] = {}
     for key, value in details.items():
         if key.lower() in _REDACT_KEYS and isinstance(value, str):

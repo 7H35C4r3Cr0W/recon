@@ -162,6 +162,10 @@ class Settings:
     hacktricks_auto_refresh: bool = False  # auto-refresh stale cached pages when live is on
     hacktricks_prefer_live: bool = False  # prefer a fresh live-cached page over vendored offline
     hacktricks_cache_days: int = DEFAULT_HACKTRICKS_CACHE_DAYS
+    # OFF by default (owner, 2026-07-22): NEVER redact secrets. Loot (hashes/PSKs/passwords) is the
+    # assessment deliverable, so command logs, the audit trail, reports, spray output and SNMP
+    # findings all show the full value. Flip True only for a hypothetical shared/public build.
+    redact_secrets: bool = False
 
     def normalized(self) -> Settings:
         font = self.font_size
@@ -184,6 +188,7 @@ class Settings:
             hacktricks_auto_refresh=bool(self.hacktricks_auto_refresh),
             hacktricks_prefer_live=bool(self.hacktricks_prefer_live),
             hacktricks_cache_days=_clamp(self.hacktricks_cache_days, *HACKTRICKS_CACHE_DAYS_RANGE),
+            redact_secrets=bool(self.redact_secrets),
         )
 
     def to_prefs(self) -> dict[str, str]:
@@ -203,6 +208,7 @@ class Settings:
             "hacktricks_auto_refresh": "true" if self.hacktricks_auto_refresh else "false",
             "hacktricks_prefer_live": "true" if self.hacktricks_prefer_live else "false",
             "hacktricks_cache_days": str(self.hacktricks_cache_days),
+            "redact_secrets": "true" if self.redact_secrets else "false",
         }
 
 
@@ -257,7 +263,16 @@ def load_settings() -> Settings:
             base.hacktricks_cache_days,
             *HACKTRICKS_CACHE_DAYS_RANGE,
         ),
+        redact_secrets=_parse_bool(prefs.get("redact_secrets"), base.redact_secrets),
     ).normalized()
+
+
+def apply_redaction_policy() -> None:
+    """Push the redact_secrets preference into shell.REDACT_SECRETS (the runtime switch every
+    redaction path reads). Called once at GUI/CLI startup. Default is OFF — never redact."""
+    from oscprecon import shell
+
+    shell.REDACT_SECRETS = load_settings().redact_secrets
 
 
 def spray_enabled() -> bool:

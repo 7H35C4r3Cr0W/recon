@@ -176,12 +176,13 @@ def test_findings_link_to_owning_service(tmp_path: Path) -> None:
     assert snmp_edge["data"]["source"] == "service-161-udp"
 
 
-def test_credential_is_redacted(tmp_path: Path) -> None:
+def test_credential_shown_in_full(tmp_path: Path) -> None:
+    # owner policy (2026-07-22): NEVER redact — the graph credential node carries the full secret so
+    # the operator can read/use their loot straight off the map.
     els = build_elements(_profile(tmp_path))
     cred = next(n for n in els["nodes"] if n["data"]["type"] == "credential")
     assert cred["data"]["label"] == "svc@active.htb"
-    assert cred["data"]["secret"] == "<redacted len=11>"
-    assert "Sup3rSecret" not in str(els)  # the secret never reaches the graph
+    assert cred["data"]["secret"] == "Sup3rSecret"
 
 
 def test_graph_overrides_and_user_edges(tmp_path: Path) -> None:

@@ -8,6 +8,16 @@ from oscprecon import shell, spray
 from oscprecon.models import Credential
 
 
+@pytest.fixture(autouse=True)
+def _redaction_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    # These tests exercise the secret-MASKING capability. The shipping default is
+    # shell.REDACT_SECRETS=False (owner policy 2026-07-22: never redact loot), so enable it
+    # here to verify the masking logic still works when a build opts in.
+    from oscprecon import shell
+
+    monkeypatch.setattr(shell, "REDACT_SECRETS", True)
+
+
 def test_build_spray_command_interpolates_and_is_gated(tmp_path: Path) -> None:
     users = tmp_path / "users.txt"
     passwords = tmp_path / "passwords.txt"

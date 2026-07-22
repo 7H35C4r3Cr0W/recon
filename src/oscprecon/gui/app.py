@@ -19,6 +19,9 @@ def main() -> int:
     # Diagnostics Log surfaces it). Best-effort — never blocks startup.
     diagnostics.install("gui")
     diagnostics.install_qt_message_handler()
+    from oscprecon import config
+
+    config.apply_redaction_policy()  # owner policy: never redact (unless the pref is flipped on)
     # why: QtWebEngine needs shared GL contexts set before the QApplication, and lab boxes / VMs
     # often have no GPU, no sandbox, and a tiny /dev/shm. --no-sandbox + --disable-gpu let the
     # embedded browser initialise; --disable-gpu-compositing avoids a blank canvas under software

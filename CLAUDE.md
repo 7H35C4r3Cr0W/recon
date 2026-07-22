@@ -76,7 +76,7 @@ Password spraying / credential brute against **your own authorized targets** is 
 - **What Spray mode unlocks (only when on):** `hydra`, `medusa`, list-driven `netexec` spraying (`-u <list> -p <list>`, `--continue-on-success`), `wpscan --passwords`, and password wordlists in the picker — against SMB / FTP / SSH / WinRM / HTTP-login etc. on the **active profile's single target**.
 - **Still forbidden even in Spray mode:** Metasploit / meterpreter, SQLMap, commercial scanners, LLM calls, automated exploit *chains*, and spraying anything other than the assigned target (never the exam VPN / control panel or an out-of-scope host — that is a hard, non-negotiable scope limit).
 - **Cred vault:** sprays draw from the editable `creds.json` store (add / edit / delete in the GUI). The user selects which credentials / combinations to spray and **confirms before anything runs** — it never auto-sprays.
-- **Tooling preference:** prefer `netexec` (already wrapped) for SMB/WinRM; `hydra`/`medusa` for FTP/SSH/etc. Secrets stay redacted in reports / audit / logs as always. UX: a clean, Burp-style surface.
+- **Tooling preference:** prefer `netexec` (already wrapped) for SMB/WinRM; `hydra`/`medusa` for FTP/SSH/etc. Cracked/winning secrets are shown **in full** (owner decision, § 6 — no redaction). UX: a clean, Burp-style surface.
 
 ### 2b. Exploitation tab — owner-authorized, human-driven attack console
 
@@ -91,7 +91,7 @@ Rules (non-negotiable):
 - **The DEFAULT recon mode is unchanged and exam-legal.** With `exploit=False`/`spray=False`, `policy_violation` still enforces the `ALLOWED_TOOLS` allow-list exactly as before, so the base tool (and the recon custom-command box) stays recon-only. Exploit mode is reached ONLY from the Exploitation tab's confirmed Run.
 - **We don't SHIP exam-restricted tools as actions.** No module offers SQLmap / Metasploit / a mass scanner as a one-click action (they're exam-restricted; a test enforces this). The operator is responsible if they hand-type one — the banner says so. **Never add sqlmap/Metasploit/scanner actions.**
 - **Execution ON by default** (`exploit_enabled` default `true`, owner 2026-07-16) — the user wants the tab usable, and stays in control because **nothing runs automatically**: every Run is user-initiated and confirmed. A user who wants the tab shown-only can uncheck it in Preferences. This is a distribution posture, not a per-command gate — the per-run confirmation is the real gate.
-- **Loot is the operator's own data — shown in full, not redacted.** Run streams into the output pane (or paste tool output), **Parse** extracts hashes/creds, **Add to vault** writes `creds.json`. The loot table shows the dumped secrets **in full** (the owner wants to see/use them — do NOT redact them). Exploit commands are audited + logged raw; recon commands keep their existing redaction. (The recon-side "secrets redacted in reports" rule, §6/§18, is unchanged.)
+- **Loot is the operator's own data — shown in full, not redacted.** Run streams into the output pane (or paste tool output), **Parse** extracts hashes/creds, **Add to vault** writes `creds.json`. The loot table shows the dumped secrets **in full** (the owner wants to see/use them — do NOT redact them). **As of 2026-07-22 this extends to the RECON side too: nothing is redacted anywhere** (command logs, audit, reports, graph, spray, SNMP findings, vault) — see § 6. The old "recon commands keep their existing redaction" note is superseded.
 - **`runs_on` distinguishes attacker vs victim.** `"attacker"` = runs FROM Kali against the target → **Run** (a single Popen-safe argv). `"victim"` = a command you paste into an already-obtained shell ON the target (SUID checks, `sudo -l`, GTFOBins, winPEAS, reverse shells, mimikatz) → **copy-only**, never executed here. An action is only `attacker` if its filled command is a single Popen-safe argv beginning with a real program (no shell pipes/redirects/subshells, no payload fragment, not a victim-only tool).
 - **Tied to discovered services/ports.** Each `ServiceExploits` declares the `ports` that signal its presence; the picker surfaces the surfaces open on *this* box first (`●`-marked, mirrors Recon's service focus) and binds `{port}`/`{url}` to the actual discovered port. **Presence must be a *strong* signal:** a shared web port (80/443/8080/…) alone marks only the generic `web`/`webdav` present — a *specific* web app (Drupal, WordPress, …) is `●` only via a service-name/fingerprint match or a service-specific (non-web) port, never merely because port 80 is open (else a bare web server marks ~70 apps present). Portless post-ex catalogs (`linux`/`windows` privesc, `shells`) are never "present" and never warn. Selecting an action for a *network* service the scan did **not** find shows a loud, non-blocking warning ("⚠ … was NOT found on this target by the scan") — it never disables Run (the human confirm stays the guardrail per this section), it just tells the operator they're acting on a service discovery didn't see.
 - **Engine lives in `src/oscprecon/exploit/`** (`base.py` registry + `fill_template` + `runs_on`/`ports`, one module per service, `parsers.py`). Every action cites a `source=`. GUI is `gui/widgets/exploit_panel.py`; execution is `main_window._on_exploit_run` (confirm → `CommandWorker(exploit=True)` → stream → auto-parse). Headless: `nabu-cli exploit [service] [-p profile]` (display view, RUN vs COPY).
@@ -354,7 +354,13 @@ Default workspace: `~/oscprecon/`. Each profile is a folder:
 ```
 
 - File mode `0600` on write.
-- Never log secret values. Reports redact: `password=<redacted len=12>`.
+- **NO REDACTION (owner decision, 2026-07-22).** The tool NEVER hides secrets. Hashes, PSKs, and
+  passwords are the assessment deliverable, and this is the operator's own tool against their own
+  authorized targets — so command logs, the audit trail, reports, the graph, spray output, the SNMP
+  findings, and the credential vault all show the **full** value. The masking helpers still exist but
+  ship **off** (`config.Settings.redact_secrets` / `shell.REDACT_SECRETS`, both default `False`); flip
+  the flag on only for a hypothetical shared/public build. Do **not** re-introduce redaction as a
+  default. (Supersedes the earlier "reports redact `password=<redacted len=12>`" rule.)
 - Successful anonymous/null-session enumerations auto-write an entry with `source: <module>-anon-enum`.
 
 ### graph.json schema

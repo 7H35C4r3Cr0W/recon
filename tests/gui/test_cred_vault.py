@@ -52,14 +52,16 @@ def test_vault_click_away_closes_but_child_dialog_keeps_it_open(
     assert not d.isVisible()
 
 
-def test_vault_table_shows_masked_secrets(qtbot: QtBot, tmp_path: Path) -> None:
+def test_vault_table_shows_secrets_in_full(qtbot: QtBot, tmp_path: Path) -> None:
+    # owner policy (2026-07-22): NEVER redact — the vault table shows the plaintext secret so the
+    # operator can read their loot. (Copy actions still exist for convenience.)
     d = CredentialVaultDialog(_profile(tmp_path))
     qtbot.addWidget(d)
     assert d._table.rowCount() == 2
     joined = _all_cell_text(d)
     assert "alice" in joined and "bob" in joined and "corp" in joined
-    assert "secret1" not in joined and "hunter2" not in joined  # plaintext never shown
-    assert "redacted" in joined
+    assert "secret1" in joined and "hunter2" in joined  # plaintext shown in full
+    assert "redacted" not in joined
 
 
 def test_vault_delete_removes_selected(
@@ -132,9 +134,11 @@ def test_vault_copy_actions_use_clipboard_never_the_ui(qtbot: QtBot, tmp_path: P
     copied: list[str] = []
     d.secret_copied.connect(copied.append)
     d._on_copy_secret()
-    assert QGuiApplication.clipboard().text() == "hunter2"  # secret only ever on the clipboard
-    assert "hunter2" not in _all_cell_text(d)  # never rendered in the table
-    assert copied == ["bob"]  # audit signal carries the username only, never the secret
+    assert QGuiApplication.clipboard().text() == "hunter2"  # Copy-secret puts it on the clipboard
+    assert "hunter2" in _all_cell_text(d)  # and the table also shows it in full (no redaction)
+    assert copied == [
+        "bob"
+    ]  # audit signal carries the username (the secret itself is also audited)
 
 
 def test_vault_confirmed_column_reflects_spray_confirmation(qtbot: QtBot, tmp_path: Path) -> None:

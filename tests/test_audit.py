@@ -6,6 +6,16 @@ import pytest
 from oscprecon import audit
 
 
+@pytest.fixture(autouse=True)
+def _redaction_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    # These tests exercise the secret-MASKING capability. The shipping default is
+    # shell.REDACT_SECRETS=False (owner policy 2026-07-22: never redact loot), so enable it
+    # here to verify the masking logic still works when a build opts in.
+    from oscprecon import shell
+
+    monkeypatch.setattr(shell, "REDACT_SECRETS", True)
+
+
 def test_record_appends_jsonl_entry(tmp_path: Path) -> None:
     audit.record(tmp_path, "htb-active", "run-command", details={"shell_line": "nmap -p- x"})
     audit.record(tmp_path, "htb-active", "profile-saved")

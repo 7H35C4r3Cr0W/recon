@@ -129,10 +129,14 @@ def make_redactor(secrets: list[str]) -> Callable[[str], str]:
     """A line filter that masks every vault secret in tool output before it reaches the UI/logs.
 
     netexec/hydra echo the winning secret in plaintext (``[+] user:Password! (Pwn3d!)`` /
-    ``login: user password: Password!``). Secrets come from the vault, so we know them exactly and
-    replace each with a length-only marker. Longest-first so a short secret can't partially mask a
-    longer one it is a substring of.
+    ``login: user password: Password!``). Owner policy (2026-07-22): DON'T hide it — a cracked/valid
+    credential is exactly the loot the operator needs, so by default this is a pass-through and the
+    winning secret is shown in full. Masking only happens if shell.REDACT_SECRETS is flipped on.
     """
+    from oscprecon import shell
+
+    if not shell.REDACT_SECRETS:
+        return lambda line: line
     masks = [
         (secret, f"<redacted len={len(secret)}>")
         for secret in sorted({s for s in secrets if s}, key=len, reverse=True)
