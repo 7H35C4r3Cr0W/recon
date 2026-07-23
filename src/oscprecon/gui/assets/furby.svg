@@ -1,47 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 100 100" role="img" aria-label="Nabu — the owl-furby mascot">
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 100 100" role="img" aria-label="Nabu — the owl mascot (shonen anime)">
   <defs>
-    <linearGradient id="nbBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#52a1a8"></stop><stop offset="0.55" stop-color="#37858c"></stop><stop offset="1" stop-color="#235d64"></stop>
+    <linearGradient id="nbBody" x1="0.15" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#63b8bf"></stop><stop offset="0.5" stop-color="#37858c"></stop><stop offset="1" stop-color="#1c5057"></stop>
     </linearGradient>
-    <radialGradient id="nbSclera" cx="0.42" cy="0.36" r="0.72">
-      <stop offset="0" stop-color="#f4feff"></stop><stop offset="0.5" stop-color="#86f1f8"></stop><stop offset="1" stop-color="#12c3d4"></stop>
+    <radialGradient id="nbSclera" cx="0.42" cy="0.34" r="0.78">
+      <stop offset="0" stop-color="#f6feff"></stop><stop offset="0.45" stop-color="#8ff2f9"></stop><stop offset="1" stop-color="#11c1d2"></stop>
     </radialGradient>
     <radialGradient id="nbGlow" cx="0.5" cy="0.5" r="0.5">
       <stop offset="0" stop-color="#15e4f1" stop-opacity="0.6"></stop><stop offset="1" stop-color="#15e4f1" stop-opacity="0"></stop>
     </radialGradient>
     <linearGradient id="nbTuft" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f5d15a"></stop><stop offset="1" stop-color="#d3a52a"></stop>
+      <stop offset="0" stop-color="#ffe270"></stop><stop offset="1" stop-color="#cf991c"></stop>
+    </linearGradient>
+    <linearGradient id="nbLit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9fe4e9" stop-opacity="0.6"></stop><stop offset="0.6" stop-color="#9fe4e9" stop-opacity="0"></stop>
     </linearGradient>
   </defs>
-  <ellipse cx="39" cy="90" rx="8.5" ry="5.2" fill="#e9c24a"></ellipse>
-  <ellipse cx="61" cy="90" rx="8.5" ry="5.2" fill="#e9c24a"></ellipse>
-  <path d="M34 32 C 27 20 23 9 27 7 C 34 10 41 20 44 30 Z" fill="#2a636a"></path>
-  <path d="M34 30 C 29 21 27 14 29 12 C 33 15 38 22 40 29 Z" fill="#16454b"></path>
-  <path d="M66 32 C 73 20 77 9 73 7 C 66 10 59 20 56 30 Z" fill="#2a636a"></path>
-  <path d="M66 30 C 71 21 73 14 71 12 C 67 15 62 22 60 29 Z" fill="#16454b"></path>
-  <path d="M47 24 C 44 14 47 6 51 5 C 49 10 52 12 55 13 C 51 15 50 20 53 24 Z" fill="url(#nbTuft)"></path>
-  <circle cx="50.5" cy="5.5" r="3" fill="url(#nbGlow)"></circle>
-  <circle cx="50.5" cy="5.5" r="1.5" fill="#3df0fb"></circle>
-  <ellipse cx="50" cy="56" rx="33" ry="37" fill="url(#nbBody)"></ellipse>
-  <ellipse cx="50" cy="56" rx="32.2" ry="36.2" fill="none" stroke="#7fd0d6" stroke-opacity="0.3" stroke-width="1"></ellipse>
-  <ellipse cx="50" cy="66" rx="18.5" ry="20.5" fill="#ece3cb"></ellipse>
-  <circle cx="28.5" cy="62" r="4" fill="#e79aa0" opacity="0.32"></circle>
-  <circle cx="71.5" cy="62" r="4" fill="#e79aa0" opacity="0.32"></circle>
+  <!-- feet -->
+  <ellipse cx="39" cy="90" rx="8" ry="4.8" fill="#e9b53a"></ellipse>
+  <ellipse cx="61" cy="90" rx="8" ry="4.8" fill="#e9b53a"></ellipse>
+  <!-- spiky anime-hair feather tufts (bold dark lineart) -->
+  <g stroke="#0a2327" stroke-width="1.7" stroke-linejoin="round">
+    <path d="M31 33 L18 5 L28 20 L26 6 L36 24 L33 12 L42 29 Z" fill="url(#nbTuft)"></path>
+    <path d="M69 33 L82 5 L72 20 L74 6 L64 24 L67 12 L58 29 Z" fill="url(#nbTuft)"></path>
+    <path d="M45 25 L47 2 L51 15 L55 3 L56 25 Z" fill="url(#nbTuft)"></path>
+  </g>
+  <circle cx="51" cy="4" r="3" fill="url(#nbGlow)"></circle>
+  <circle cx="51" cy="4" r="1.4" fill="#3df0fb"></circle>
+  <!-- body with bold outline + cel-shade -->
+  <path d="M50 19 C 73 19 82 38 82 57 C 82 81 68 92 50 92 C 32 92 18 81 18 57 C 18 38 27 19 50 19 Z" fill="url(#nbBody)" stroke="#0a2226" stroke-width="2.4"></path>
+  <ellipse cx="38" cy="43" rx="21" ry="23" fill="url(#nbLit)"></ellipse>
+  <ellipse cx="50" cy="66" rx="17" ry="19" fill="#f1e8d0"></ellipse>
+  <path d="M33 66 C 37 82 63 82 67 66" fill="none" stroke="#0c2b30" stroke-opacity="0.25" stroke-width="1.4"></path>
+  <circle cx="29" cy="61" r="3.4" fill="#e79aa0" opacity="0.30"></circle>
+  <circle cx="71" cy="61" r="3.4" fill="#e79aa0" opacity="0.30"></circle>
+  <!-- eyes: cyan sclera (anchors kept at 38,47 / 62,47 r9.5) -->
   <circle cx="38" cy="47" r="12" fill="url(#nbGlow)"></circle>
   <circle cx="62" cy="47" r="12" fill="url(#nbGlow)"></circle>
-  <circle cx="38" cy="47" r="9.5" fill="url(#nbSclera)" stroke="#1c4f55" stroke-width="1.4"></circle>
-  <circle cx="62" cy="47" r="9.5" fill="url(#nbSclera)" stroke="#1c4f55" stroke-width="1.4"></circle>
-  <circle cx="39.5" cy="48" r="4.6" fill="#08252b"></circle>
-  <circle cx="60.5" cy="48" r="4.6" fill="#08252b"></circle>
-  <circle cx="37" cy="45" r="2" fill="#ffffff"></circle>
-  <circle cx="58" cy="45" r="2" fill="#ffffff"></circle>
-  <circle cx="41.5" cy="50" r="0.9" fill="#ffffff" opacity="0.8"></circle>
-  <circle cx="62.5" cy="50" r="0.9" fill="#ffffff" opacity="0.8"></circle>
-  <g fill="none" stroke-linecap="round" stroke="#153f45" stroke-width="2.6">
-    <path d="M29 34 Q37 33 46 37"></path>
-    <path d="M54 33 Q62 27 71 30"></path>
-    <path d="M41 69 Q50 75.5 61 68" stroke="#0c2b30" stroke-width="2.4"></path>
-  </g>
-  <path d="M50 55 L44.5 62 L55.5 62 Z" fill="url(#nbTuft)" stroke="#b9902a" stroke-width="1" stroke-linejoin="round"></path>
-  <path d="M53.5 69.5 L56.8 69.5 L55.1 73.2 Z" fill="#f4f8f5"></path>
+  <circle cx="38" cy="47" r="9.5" fill="url(#nbSclera)" stroke="#0c2a30" stroke-width="1.8"></circle>
+  <circle cx="62" cy="47" r="9.5" fill="url(#nbSclera)" stroke="#0c2a30" stroke-width="1.8"></circle>
+  <!-- sharp winged upper eyelids (anime) + outer eyeliner flicks -->
+  <path d="M29 43.5 Q38 39.4 47 43" fill="none" stroke="#0c2a30" stroke-width="2.8" stroke-linecap="round"></path>
+  <path d="M71 43.5 Q62 39.4 53 43" fill="none" stroke="#0c2a30" stroke-width="2.8" stroke-linecap="round"></path>
+  <path d="M29.5 43.8 L22.4 40.4 L29.8 46 Z" fill="#0c2a30"></path>
+  <path d="M70.5 43.8 L77.6 40.4 L70.2 46 Z" fill="#0c2a30"></path>
+  <!-- pupils (OwlMark strips + repaints these live) -->
+  <circle cx="39.5" cy="48.5" r="4.4" fill="#08252b"></circle>
+  <circle cx="60.5" cy="48.5" r="4.4" fill="#08252b"></circle>
+  <!-- eye highlights (stripped live too) -->
+  <circle cx="37" cy="45.5" r="2" fill="#ffffff"></circle>
+  <circle cx="58" cy="45.5" r="2" fill="#ffffff"></circle>
+  <circle cx="41.6" cy="50.6" r="0.9" fill="#ffffff"></circle>
+  <circle cx="62.6" cy="50.6" r="0.9" fill="#ffffff"></circle>
+  <!-- determined shonen brows (thick, angled inward) -->
+  <path d="M26 34 L46.5 39.6 L45.4 42.8 L27 37.6 Z" fill="#0a2226"></path>
+  <path d="M74 34 L53.5 39.6 L54.6 42.8 L73 37.6 Z" fill="#0a2226"></path>
+  <!-- sharp beak -->
+  <path d="M50 54 L45 61 L50 64.4 L55 61 Z" fill="url(#nbTuft)" stroke="#a8791f" stroke-width="1" stroke-linejoin="round"></path>
+  <!-- confident smirk -->
+  <path d="M43 70 Q50 74.4 57 70" fill="none" stroke="#0c2b30" stroke-width="2.3" stroke-linecap="round"></path>
+  <path d="M53.6 68.4 L56.7 68.4 L55.1 71.7 Z" fill="#f4f8f5"></path>
 </svg>

@@ -53,8 +53,19 @@ _REACTIONS: tuple[tuple[str, int], ...] = (
     ("dizzy", 1200),
     ("cry", 1200),
     ("nod", 700),
-    ("powerup", 1200),  # DBZ: gold super-saiyan aura flare
-    ("kamehameha", 1400),  # DBZ: charge a cyan energy ball, then fire a beam
+    # anime moves — 2s each so they're actually seen
+    ("powerup", 2000),  # gold super-saiyan aura flare
+    ("kamehameha", 2000),  # charge a cyan energy ball, then fire a beam
+    ("flex", 2000),  # shoulder-press show-off
+    ("taz", 2000),  # spin like the Tasmanian devil (dust tornado)
+    ("breakdance", 2000),  # spin + floor slides
+    ("pullups", 2000),  # rhythmic pull-ups
+    ("jump", 2000),  # double leap
+    ("vibrate", 2000),  # excited jitter
+    ("faint", 2000),  # topple over
+    ("boing", 2000),  # springy stretch/squash
+    ("sneeze", 2000),  # rear back + achoo
+    ("love", 2000),  # pink float-up
 )
 
 
@@ -221,6 +232,56 @@ class OwlMark(QWidget):
             # lean back to charge, then thrust forward to fire
             self._dx = -4.0 * (t * 2) if t < 0.5 else 4.0 * ((t - 0.5) * 2)
             self._fx = "kamehameha"
+        elif r == "flex":  # shoulder press — bulge up on each rep
+            reps = abs(math.sin(2.5 * pi * t))
+            self._dy = -10.0 * reps
+            self._scale = 1.0 + 0.11 * reps
+            self._tint = QColor(255, 190, 60, int(45 * reps))
+        elif r == "taz":  # Tasmanian-devil tornado spin
+            self._angle = 1440.0 * t
+            self._dx = 8.0 * math.sin(3 * pi * t) * (1.0 - t)
+            self._scale = 0.9 + 0.14 * abs(math.sin(6 * pi * t))
+            self._fx = "taz"
+        elif r == "breakdance":
+            self._angle = 720.0 * t
+            self._dx = 11.0 * math.cos(2 * pi * t)
+            self._dy = 5.0 * math.sin(4 * pi * t)
+            self._scale = 0.95 + 0.1 * abs(math.sin(3 * pi * t))
+        elif r == "pullups":
+            reps = abs(math.sin(2.5 * pi * t))
+            self._dy = -13.0 * reps
+            self._scale = 1.0 - 0.04 * reps
+        elif r == "jump":
+            h = abs(math.sin(2 * pi * t))
+            self._dy = -16.0 * h
+            self._scale = 1.0 + 0.07 * h
+        elif r == "vibrate":
+            d = 1.0 - t
+            self._dx = 2.4 * math.sin(46 * pi * t) * d
+            self._dy = 2.0 * math.cos(42 * pi * t) * d
+        elif r == "faint":
+            e = min(t * 1.4, 1.0)
+            self._angle = 90.0 * e
+            self._dy = 12.0 * e
+            self._tint = QColor(120, 160, 255, int(55 * math.sin(pi * t)))
+        elif r == "boing":
+            b = math.sin(3 * pi * t) * (1.0 - t)
+            self._scale = 1.0 + 0.24 * b
+            self._dy = -12.0 * b
+        elif r == "sneeze":
+            if t < 0.65:
+                u = t / 0.65
+                self._dy = -5.0 * u
+                self._angle = -7.0 * u
+            else:
+                k = (t - 0.65) / 0.35
+                self._dy = -5.0 + 12.0 * k
+                self._angle = -7.0 + 16.0 * k
+                self._scale = 1.0 + 0.08 * (1.0 - k)
+        elif r == "love":
+            self._scale = 1.0 + 0.15 * math.sin(pi * t)
+            self._dy = -12.0 * t
+            self._tint = QColor(255, 110, 150, int(70 * math.sin(pi * t)))
         self.update()
 
     def _reset_reaction(self) -> None:
@@ -343,4 +404,12 @@ class OwlMark(QWidget):
                         painter.fillRect(
                             self.rect(), QColor(255, 255, 255, int(130 * (1 - k / 0.35)))
                         )
+            elif self._fx == "taz":  # dust-tornado swirl arcs
+                painter.setPen(QPen(QColor(190, 160, 120, 150), max(1.0, w * 0.03)))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                for i in range(3):
+                    rr = w * (0.30 + 0.12 * i)
+                    a0 = int((tt * 1440 + i * 130) % 360)
+                    painter.drawArc(QRectF(c - rr, c - rr, rr * 2, rr * 2), a0 * 16, 210 * 16)
+                painter.setPen(Qt.PenStyle.NoPen)
         painter.end()
