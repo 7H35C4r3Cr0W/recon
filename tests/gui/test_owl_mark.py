@@ -24,7 +24,8 @@ def _asset_circle_count() -> int:
 def test_owl_mark_constructs_and_paints(qtbot: QtBot) -> None:
     widget = OwlMark(34)
     qtbot.addWidget(widget)
-    assert widget.size().width() == 34
+    widget.resize(240, 42)  # a wide stage (fixed height, expanding width — fills the header gap)
+    assert widget._sprite == 34 and widget.height() == 42
     pix = widget.grab()  # forces paintEvent — base SVG + live pupils/highlights, no crash
     assert not pix.isNull()
 
@@ -44,7 +45,7 @@ def test_owl_reactions_transform_and_render(qtbot: QtBot) -> None:
     # easter egg: each reaction drives a transform/tint and renders without error
     owl = OwlMark(60)
     qtbot.addWidget(owl)
-    assert len(_REACTIONS) == 22  # incl. the anime/DBZ show-off reactions
+    assert len(_REACTIONS) == 25  # anime/DBZ + run-around moves (moonwalk, jailbreak, runaround)
 
     owl._reaction = "spin"
     owl._on_react(0.25)

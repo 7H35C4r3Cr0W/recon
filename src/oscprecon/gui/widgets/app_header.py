@@ -56,15 +56,19 @@ class AppHeader(QWidget):
         self._brand_name = QLabel("Nabu")
         self._brand_name.setObjectName("hdrBrandName")
         self._brand_name.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self._furby = OwlMark(34)  # the mascot as a live mark — follows the cursor + blinks
+        # the mascot lives on a WIDE stage that fills the header gap, so its click easter egg can
+        # run across that space (kamehameha, moonwalk, jailbreak…). It rests at the stage's right,
+        # just left of the wordmark; the wordmark stays in the brand column.
+        self._furby = OwlMark(34)
         brand_col.addWidget(self._brand_name, alignment=Qt.AlignmentFlag.AlignHCenter)
-        brand_col.addWidget(self._furby, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         layout.addWidget(self._home)
         layout.addWidget(self._project)
         layout.addWidget(self._target)
         layout.addWidget(self._read_only)
-        layout.addStretch(1)
+        layout.addWidget(
+            self._furby, 1
+        )  # expanding: takes the gap between the target and the brand
         layout.addWidget(self._tasks)
         layout.addWidget(self._brand)
         self.restyle(theme_name)

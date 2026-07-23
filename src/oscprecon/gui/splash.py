@@ -37,8 +37,8 @@ _CHAMBER_H = 262
 _FOOTER_H = 128
 _CARD_H = _TOPBAR_H + _CHAMBER_H + _FOOTER_H
 _MARGIN = 26  # transparent gutter around the card for the drop shadow
-_LOOP_MS = 5200  # the full fight beat
-_MIN_SHOW_MS = 2000  # keep the splash up at least this long so the fight is actually seen
+_LOOP_MS = 1900  # the full fight beat — fast so the whole saga plays inside the show window
+_MIN_SHOW_MS = 2050  # keep the splash up ≥ one full loop so the entire fight is seen
 
 # fixed non-theme colours — the Toonami-era broadcast palette (environment quiet, energy loud)
 _VOID = QColor("#060a12")  # deep-space ground
