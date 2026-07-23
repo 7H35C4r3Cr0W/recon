@@ -3,24 +3,24 @@
 - description: "Repository info (root URL, UUID, HEAD revision)"
   why: "svn info gives the repo root + the latest revision number — the upper bound for walking history read-only"
   command: "svn info svn://{target}:{port}/"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Commit history (verbose)"
   why: "svn log -v shows every revision + changed paths — often leaks removed files/credentials"
   command: "svn log -v svn://{target}:{port}/"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Recover an OLD revision (deleted files / leaked secrets)"
   why: "a file removed in a later commit still lives at an earlier revision — check out -r 1 to recover it (a classic on SVN boxes, e.g. HTB Worker)"
   command: "svn checkout -r 1 svn://{target}:{port}/ ./svn-r1"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Read a file at HEAD (read-only)"
   why: "svn cat prints a file's contents without checking out — read-only"
   command: "svn cat svn://{target}:{port}/trunk/README"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Recursive listing"
   why: "svn ls -R walks the whole repo tree read-only (keep it bounded)"
   command: "svn ls -R svn://{target}:{port}/"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

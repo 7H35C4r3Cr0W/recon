@@ -3,14 +3,14 @@
 - description: "Encryption + NTLM info"
   why: "telnet-encryption + telnet-ntlm-info re-run confirm cleartext exposure + AD domain — read-only"
   command: "nmap -p {port} --script telnet-encryption,telnet-ntlm-info {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Grab the login banner (nmap -sV)"
   why: "the -sV banner often reveals the OS / device behind the telnet prompt — read-only"
   command: "nmap -sV -p {port} {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Look up references for the banner (searchsploit, display-only)"
   why: "surfaces documented issues for the identified telnet daemon/device — lookup only"
   command: "searchsploit telnet"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

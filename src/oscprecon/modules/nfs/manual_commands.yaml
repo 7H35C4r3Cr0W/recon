@@ -39,4 +39,4 @@
 - description: "NFS NSE sweep incl. statfs + portmapper"
   why: "nfs-ls/showmount/statfs across 111+2049 in one pass — read-only recon"
   command: "nmap -sV --script nfs-ls,nfs-showmount,nfs-statfs -p 111,2049 {target}"
-# source: Obsidian: 0.00 Methdology/.../OSCP Random/2049 NFS.md
+# source: Obsidian: .../OSCP Random/2049 NFS.md

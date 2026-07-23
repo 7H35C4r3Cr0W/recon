@@ -139,6 +139,12 @@ def import_project_archive(archive: Path, workspace_root: Path, *, overwrite: bo
             if dest.exists():
                 shutil.rmtree(dest)  # overwrite: replace only now that the new copy is validated
             shutil.move(str(extracted), str(dest))
+            # why: a foreign archive may store creds.json world/group-readable — re-tighten it to
+            # 0600, matching the invariant creds.save_creds enforces (the tarfile data filter keeps
+            # group/other READ bits, so import must not rely on the archived mode)
+            creds = dest / "creds.json"
+            if creds.is_file():
+                creds.chmod(0o600)
         except tarfile.TarError as exc:
             raise ProjectArchiveError(f"failed to extract archive: {exc}") from exc
         finally:

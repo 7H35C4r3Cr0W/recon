@@ -7,7 +7,7 @@
   suggest:
     - text: "An rsync module is exposed — list its contents read-only (no download)"
       command: "rsync --list-only rsync://{target}/{module}/"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - match:
     service: rsync
@@ -16,4 +16,4 @@
   suggest:
     - text: "Modules listed without auth — walk each one read-only for readable config/backup data"
       command: "rsync -r --list-only rsync://{target}/{module}/"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

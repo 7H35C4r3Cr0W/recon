@@ -7,7 +7,7 @@
   suggest:
     - text: "A CUPS printer is exposed — read its attributes/jobs (read-only, no job submission)"
       command: "curl -s 'http://{target}:631/printers/{printer}?op=get-printer-attributes'"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - match:
     service: ipp
@@ -16,4 +16,4 @@
   suggest:
     - text: "Match the CUPS version against documented issues for reference (searchsploit, display-only)"
       command: "searchsploit cups"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

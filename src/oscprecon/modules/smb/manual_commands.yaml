@@ -53,17 +53,17 @@
 - description: "List domain users over a null session (SAMR)"
   why: "rpcclient enumdomusers over the null session enumerates users read-only"
   command: "rpcclient -U '' -N {target} -c 'enumdomusers'"
-# source: Obsidian: 0.00 Methdology/.../Other Services/Other/135 _ RPC.md
+# source: Obsidian: .../Other Services/Other/135 _ RPC.md
 
 - description: "List active SMB logon sessions (null)"
   why: "--sessions maps who is currently connected — read-only recon"
   command: "netexec smb {target} -u '' -p '' --sessions"
-# source: Obsidian: 0.00 Methdology/.../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: .../Active Directory methodology/Full AD enum.md
 
 - description: "Enumerate every filename in a null-readable share"
   why: "--spider (edit SHARE) lists share contents recursively — read-only recon"
   command: "netexec smb {target} -u '' -p '' --spider SHARE --regex ."
-# source: Obsidian: 0.00 Methdology/.../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: .../Active Directory methodology/Full AD enum.md
 
 - description: "SAMR users + groups dump over null session"
   why: "impacket-samrdump enumerates domain users/groups anonymously (read-only)"
@@ -73,12 +73,12 @@
 - description: "SID lookup + RID cycling over null session"
   why: "impacket-lookupsid resolves the domain SID and cycles RIDs to names (recon, like --rid-brute)"
   command: "impacket-lookupsid :@{target}"
-# source: Obsidian: 0.00 Methdology/.../General impacket syntax/lookupsid.md
+# source: Obsidian: .../General impacket syntax/lookupsid.md
 
 - description: "Domain password policy over null session"
   why: "rpcclient getdompwinfo reads the password policy anonymously — read-only recon"
   command: "rpcclient -U '' -N {target} -c getdompwinfo"
-# source: Obsidian: 0.00 Methdology/.../OSCP Random/oncybersec.md
+# source: Obsidian: .../OSCP Random/oncybersec.md
 
 # --- CrackMapExec / netexec — credentialed AD enum (HTB AD Path) ----------------------------------
 # {user}/{password} pre-fill from the first collected credential. All read-only enumeration.

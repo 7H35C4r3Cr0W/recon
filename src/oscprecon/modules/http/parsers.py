@@ -280,7 +280,7 @@ def parse_feroxbuster(text: str, port: int) -> list[HttpFinding]:
 
 
 _GOBUSTER = re.compile(
-    r"^(?P<path>/\S*)\s+\(Status:\s*(?P<status>\d+)\)\s+\[Size:\s*(?P<size>\d+)\]"
+    r"^(?P<path>/\S*)\s+\(Status:\s*(?P<status>\d+)\)\s+\[Size:\s*(?P<size>-?\d+)\]"
     r"(?:\s+\[-->\s*(?P<redir>[^\]]+)\])?"
 )
 
@@ -296,7 +296,7 @@ def parse_gobuster(text: str, port: int) -> list[HttpFinding]:
                 port=port,
                 path=match.group("path"),
                 status=int(match.group("status")),
-                size=int(match.group("size")),
+                size=max(0, int(match.group("size"))),  # gobuster emits -1 for unknown length
                 redirect_to=(match.group("redir") or "").strip(),
             )
         )

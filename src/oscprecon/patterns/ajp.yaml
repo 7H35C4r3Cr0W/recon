@@ -7,7 +7,7 @@
   suggest:
     - text: "AJP13 is live — enumerate the paired Tomcat HTTP connector (usually 8080) for /manager"
       command: "nmap -sV -p 8080 --script http-title,http-server-header {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - match:
     service: ajp
@@ -16,4 +16,4 @@
   suggest:
     - text: "Fingerprint the Tomcat version from the fronted HTTP app to match documented CVEs"
       command: "whatweb http://{target}:8080"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

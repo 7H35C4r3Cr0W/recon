@@ -3,14 +3,14 @@
 - description: "Allowed methods on the AJP connector"
   why: "ajp-methods in isolation confirms GET/POST/PUT support — read-only"
   command: "nmap -p {port} --script ajp-methods {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "AJP response headers (Server banner)"
   why: "ajp-headers dumps the connector's response headers — read-only fingerprint"
   command: "nmap -p {port} --script ajp-headers {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Fingerprint the paired Tomcat HTTP connector"
   why: "AJP fronts the same webapps as the HTTP connector (usually 8080) — enumerate it read-only"
   command: "nmap -sV -p 8080 --script http-title,http-server-header {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

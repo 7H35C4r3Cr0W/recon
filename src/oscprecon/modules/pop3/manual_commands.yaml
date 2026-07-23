@@ -3,17 +3,17 @@
 - description: "Capabilities + NTLM info"
   why: "pop3-capabilities + pop3-ntlm-info re-run confirm STLS/SASL + AD domain — read-only"
   command: "nmap -p {port} --script pop3-capabilities,pop3-ntlm-info {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Banner over implicit TLS (995)"
   why: "openssl s_client reads the +OK greeting + cert on the TLS port — read-only"
   command: "openssl s_client -connect {target}:995 -quiet"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Banner after STLS (110)"
   why: "openssl -starttls pop3 upgrades 110 then reads the encrypted CAPA — read-only"
   command: "openssl s_client -connect {target}:110 -starttls pop3 -quiet"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "List messages (with a credential)"
   why: "curl LISTs the mailbox — message numbers + sizes — read-only; the cred goes in the URL so it's redacted in logs."

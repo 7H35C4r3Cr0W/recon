@@ -3,14 +3,14 @@
 - description: "Dump the portmapper (rpcinfo)"
   why: "rpcinfo lists every registered RPC program, port and service name — unauth read-only"
   command: "rpcinfo {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "NFS exports (if nfs/mountd is registered)"
   why: "showmount -e lists world-readable NFS exports advertised via the portmapper — read-only"
   command: "showmount -e {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "UDP-only RPC programs (rpcinfo -T udp)"
   why: "some programs register only over UDP and are missed by the TCP probe — read-only"
   command: "rpcinfo -T udp {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

@@ -1,4 +1,4 @@
-# NetBIOS recon next-steps from Andre's Obsidian notes.
+# NetBIOS recon next-steps from the maintainer's methodology notes.
 # netbios findings the module emits: hostname, domain, role, user, mac.
 
 - match:

@@ -1,4 +1,4 @@
-# Redis recon next-steps from Andre's notes (unauth read-only; no key writes / no RCE).
+# Redis recon next-steps from the maintainer's notes (unauth read-only; no key writes / no RCE).
 - match:
     service: redis
     field: value

@@ -1,4 +1,4 @@
-# LDAP recon next-steps from Andre's Obsidian notes (anonymous enumeration).
+# LDAP recon next-steps from the maintainer's methodology notes (anonymous enumeration).
 # ldap findings the module emits: bind, info, naming-context, user.
 
 - match:
@@ -19,7 +19,7 @@
       command: "netexec ldap {target} -u '' -p '' --users --groups --get-sid --password-not-required --trusted-for-delegation"
     - text: "AS-REP roast attempt — request tickets for pre-auth-disabled accounts (enumeration; crack off-host only if in scope, not run here)"
       command: "netexec ldap {target} -u '' -p '' --asreproast /tmp/asrep.txt"
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Full AD enum.md
 
 - match:
     service: ldap
@@ -57,7 +57,7 @@
   suggest:
     - text: "Anonymous bind confirmed — run the full SAFE ldap NSE set (rootDSE + ldap-search); the 'not brute' guard excludes every credential script"
       command: "nmap -n -sV -p 389,636,3268 --script 'ldap* and not brute' {target}"
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Enumeration/User discovery/nmap-ldap-script.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Enumeration/User discovery/nmap-ldap-script.md
 
 - match:
     service: ldap
@@ -69,4 +69,4 @@
       command: "netexec ldap {target} -u USER -p PASS -M adcs"
     - text: "Read exposed managed secrets + risky attributes over LDAP (gMSA / LAPS / machine-account-quota / adminCount)"
       command: "netexec ldap {target} -u USER -p PASS --gmsa; netexec ldap {target} -u USER -p PASS -M laps"
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/{Bloodhound,ADCS,Full AD enum}.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/{Bloodhound,ADCS,Full AD enum}.md

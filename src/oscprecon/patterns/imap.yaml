@@ -7,7 +7,7 @@
   suggest:
     - text: "IMAP NTLM leaks the AD domain (Exchange) — pivot into LDAP / SMB / Kerberos enumeration"
       command: "nmap -p 389 --script ldap-rootdse {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - match:
     service: imap
@@ -16,4 +16,4 @@
   suggest:
     - text: "Read the TLS banner on 993 to confirm the mail product/version and certificate identity"
       command: "openssl s_client -connect {target}:993 -quiet"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

@@ -1,4 +1,4 @@
-# NTP recon next-steps from Andre's Obsidian notes. ntp findings the module emits: info, stratum.
+# NTP recon next-steps from the maintainer's methodology notes. ntp findings the module emits: info, stratum.
 
 - match:
     service: ntp

@@ -1,4 +1,4 @@
-# HTTP/web recon next-steps, derived from Andre's Obsidian methodology notes (content discovery +
+# HTTP/web recon next-steps, derived from the maintainer's methodology notes (content discovery +
 # fingerprint + WordPress ENUMERATION only — the notes' password-brute lines are excluded per §2).
 # http findings are {port, path, status, note}.
 

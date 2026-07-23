@@ -1,6 +1,6 @@
-# oscp-recon — Claude Code project brief
+# oscp-recon — project brief & hard constraints
 
-**This file is auto-loaded by Claude Code as project context.** It is the single source of truth for what this project is, what it must NOT do, how it is built, and how you (Claude Code) should behave when working on it. Read it fully before proposing any change.
+**The single source of truth for what this project is, what it must NOT do, and how it is built.** It is the contract every contributor and every change works against. Read it fully before proposing any change.
 
 > **▶ CONTINUING PRIOR WORK / CONTEXT WAS RESET?** Read `HANDOFF.md` — it points you to the maintainer's local `HANDOFF.local.md` (kept off the public repo) with the full state — it has the current repo HEAD, the four gates, how the owner wants work done, the adversarial-review workflow, what's already been swept, and what to do next. This file (CLAUDE.md) is the full brief and the rules.
 
@@ -80,7 +80,7 @@ Password spraying / credential brute against **your own authorized targets** is 
 
 ### 2b. Exploitation tab — owner-authorized, human-driven attack console
 
-Owner-authorized (Andre, 2026-07-15): the tool carries an **Exploitation** tab, clearly separated from Recon, for **manual** exploitation / post-exploitation. It **builds** the exact attack command (pre-filled from the profile + a chosen vault credential), **runs** it when the user presses **Run** (after a confirmation), and **parses** the output into loot. This is the AutoRecon/Tier-2 "you select it, you run it" model extended to attack tools — **never an autopwn chain**.
+Owner-authorized (Lagus, 2026-07-15): the tool carries an **Exploitation** tab, clearly separated from Recon, for **manual** exploitation / post-exploitation. It **builds** the exact attack command (pre-filled from the profile + a chosen vault credential), **runs** it when the user presses **Run** (after a confirmation), and **parses** the output into loot. This is the AutoRecon/Tier-2 "you select it, you run it" model extended to attack tools — **never an autopwn chain**.
 
 **The guardrail is the human, not a tool block-list.** The owner's rule (2026-07-16): *"running scripts for attacks is OK; I just want a human to attack, not blind auto-attacking."* The OSCP+ Exam Guide backs this — it forbids **automatic exploitation tools** (SQLmap, SQLninja, db_autopwn), **mass vulnerability scanners** (Nessus, OpenVAS, NeXpose, Canvas, Core Impact, SAINT), **commercial tools** (Metasploit Pro, Burp Pro), **Metasploit/Meterpreter** (one target only; msfvenom + multi/handler allowed), **spoofing**, and **AI chatbots** — but explicitly **allows** Nmap/NSE, Nikto, Burp Free, DirBuster, and **manual attack scripts** (impacket, evil-winrm, netexec, responder, certipy, hashcat/john, public PoCs). A per-command, user-selected, single-shot, human-confirmed attack is exam-legal.
 
@@ -100,7 +100,7 @@ Rules (non-negotiable):
 
 ### 2c. msfvenom payload builder — owner-authorized, copy-only reverse-shell helper
 
-Owner-requested (Andre, 2026-07-16): a guided **msfvenom payload builder** so reverse-shell syntax is easy to get right. This is a **narrow, explicit carve-out** of the §2 Metasploit ban, justified because the **OSCP+ Exam Guide explicitly allows `msfvenom` + `multi/handler`** (what it restricts to one target is Metasploit's *exploitation modules* + meterpreter-as-shell). Non-negotiable rules:
+Owner-requested (Lagus, 2026-07-16): a guided **msfvenom payload builder** so reverse-shell syntax is easy to get right. This is a **narrow, explicit carve-out** of the §2 Metasploit ban, justified because the **OSCP+ Exam Guide explicitly allows `msfvenom` + `multi/handler`** (what it restricts to one target is Metasploit's *exploitation modules* + meterpreter-as-shell). Non-negotiable rules:
 
 - **Copy-only. It NEVER executes anything.** The builder assembles the exact `msfvenom` command + its matching listener as text; the operator copies and runs them. It does **not** call `shell.run` (no exploit-mode gate interaction, no execution path). This is the same "shown, you run it" model as the Ligolo helper.
 - **Exam-safe by default.** Defaults to non-meterpreter `*_reverse_tcp` shells caught with a bare `nc -lvnp` listener — these have **no exam limit**. Staged / meterpreter payloads pair with a `multi/handler` listener and carry a visible **note** that meterpreter counts toward the one-Metasploit-use limit.
@@ -171,7 +171,7 @@ python -m oscprecon
 
 ```
 oscp-recon/
-├── CLAUDE.md                 ← this file (auto-loaded by Claude Code)
+├── CLAUDE.md                 ← this file (project brief & constraints)
 ├── ROADMAP.md                ← phased build plan (superseded by this file where they differ)
 ├── pyproject.toml
 ├── src/oscprecon/
@@ -1349,7 +1349,7 @@ uv run ruff format --check
 
 ---
 
-## 27. AI collaboration rules (Claude Code specifically)
+## 27. Contribution & design rules
 
 ### Read before proposing
 
@@ -1394,7 +1394,7 @@ uv run ruff format --check
 - Speculative abstractions for features not in the roadmap
 - Telemetry, update checks, login flows, cloud sync (an **offline, no-network branded splash screen** for the public-release build is the one allowed exception — owner-requested; see "Yes to propose")
 
-### When Claude Code proposes something outside the current scope
+### When a proposed change is outside the current scope
 
 Decline politely. Note it as a TODO in `ROADMAP.md` (cross-cutting) or `boxes/<box>.md` (box-specific). Return to the active work.
 
@@ -1404,7 +1404,7 @@ Ask, don't guess. But make the reasonable call on trivial things (naming, file p
 
 ---
 
-## 28. Quick-start checklist for Claude Code
+## 28. Quick-start checklist for contributors
 
 New session? Do these first:
 

@@ -3,14 +3,14 @@
 - description: "SendTargets discovery"
   why: "iscsiadm discovery lists exported targets/LUNs without a login — read-only"
   command: "iscsiadm -m discovery -t st -p {target}:{port}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Target + auth info (nmap NSE)"
   why: "iscsi-info reports the targets and whether CHAP authentication is required — read-only"
   command: "nmap -sV -p {port} --script iscsi-info {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - description: "Show a discovered target's node record"
   why: "iscsiadm node -T lists the stored parameters for a target — read-only, no login"
   command: "iscsiadm -m node -T {iqn} -p {target}:{port}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

@@ -4,19 +4,19 @@
 - description: "Configure awscli with throwaway credentials"
   why: "awscli refuses to run with no creds even when the endpoint ignores auth (localstack)"
   command: "aws configure set aws_access_key_id test && aws configure set aws_secret_access_key test"
-# source: Obsidian: 0.00 Methdology/.../Cloud/AWS/Enumeration/S3 Buckets.md
+# source: Obsidian: .../Cloud/AWS/Enumeration/S3 Buckets.md
 
 - description: "List S3 buckets on the endpoint"
   why: "read-only listing of the buckets the endpoint exposes"
   command: "aws --endpoint=http://{target} s3 ls"
-# source: Obsidian: 0.00 Methdology/.../Cloud/AWS/Enumeration/S3 Buckets.md
+# source: Obsidian: .../Cloud/AWS/Enumeration/S3 Buckets.md
 
 - description: "List objects in a bucket (webroot recon)"
   why: "read-only listing of a bucket's objects — often the site's webroot (index.php, .htaccess)"
   command: "aws --endpoint=http://{target} s3 ls s3://{target}"
-# source: Obsidian: 0.00 Methdology/.../Cloud/AWS/Enumeration/S3 Buckets.md
+# source: Obsidian: .../Cloud/AWS/Enumeration/S3 Buckets.md
 
 - description: "Bucket ACL / policy (s3api, read-only)"
   why: "reveals who can read/write the bucket — a world-writable bucket is a notable finding"
   command: "aws --endpoint=http://{target} s3api get-bucket-acl --bucket {target}"
-# source: Obsidian: 0.00 Methdology/.../Cloud/AWS/Enumeration/S3 Buckets.md
+# source: Obsidian: .../Cloud/AWS/Enumeration/S3 Buckets.md

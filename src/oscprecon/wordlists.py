@@ -166,7 +166,7 @@ def favorites() -> list[str]:
         return []
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (OSError, ValueError):  # ValueError covers JSONDecodeError + UnicodeDecodeError
         return []
     return [str(p) for p in data] if isinstance(data, list) else []
 

@@ -7,7 +7,7 @@
     value: "service"
   suggest:
     - text: "Kerberos KDC on 88 → this host is a Domain Controller. Enumerate users (SMB RID cycling / LDAP), then AS-REP-check known users and list SPNs with valid creds."
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Full AD enum.md
 
 - match:
     service: kerberos
@@ -15,7 +15,7 @@
     value: "user-no-preauth"
   suggest:
     - text: "{value} has Kerberos pre-auth disabled (AS-REP roastable) — a notable misconfiguration; record it. Collecting the AS-REP is enumeration; cracking is out of scope."
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Full AD enum.md
 
 - match:
     service: kerberos
@@ -23,7 +23,7 @@
     value: "spn"
   suggest:
     - text: "SPN {value} is Kerberoastable — record the service account. Requesting the ticket is enumeration; cracking is out of scope."
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Full AD enum.md
 
 - match:
     service: kerberos
@@ -31,7 +31,7 @@
     value: "server-time"
   suggest:
     - text: "KDC server time is {value} — note the clock skew; Kerberos auth fails beyond ~5 minutes. Sync the local clock (faketime / ntpdate) before authenticated AD enum."
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Full AD enum.md
 
 - match:
     service: kerberos
@@ -50,4 +50,4 @@
       command: "GetUserSPNs.py {domain}/USER:PASS -dc-ip {target} -request"
     - text: "Enumerate AS-REP-roastable accounts (pre-auth disabled) with the allowed impacket enum script"
       command: "GetNPUsers.py {domain}/USER:PASS -dc-ip {target} -request"
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Enumeration/General impacket syntax/GetUserSPNs.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Enumeration/General impacket syntax/GetUserSPNs.md

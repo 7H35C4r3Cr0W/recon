@@ -1,4 +1,4 @@
-# FTP recon next-steps from Andre's Obsidian notes (recon only — no upload/exploit).
+# FTP recon next-steps from the maintainer's methodology notes (recon only — no upload/exploit).
 # ftp findings the module emits: auth, banner, note.
 
 - match:

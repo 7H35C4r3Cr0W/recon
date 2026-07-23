@@ -1,4 +1,4 @@
-# DNS recon next-steps from Andre's Obsidian notes. Set {domain} if the profile has no hostname yet.
+# DNS recon next-steps from the maintainer's methodology notes. Set {domain} if the profile has no hostname yet.
 # dns findings the module emits: record, recursion, version, zone-transfer.
 
 - match:

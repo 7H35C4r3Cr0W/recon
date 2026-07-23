@@ -1,4 +1,4 @@
-# SMB recon next-steps, derived from Andre's Obsidian methodology notes (enumeration only — no brute
+# SMB recon next-steps, derived from the maintainer's methodology notes (enumeration only — no brute
 # force / no exploitation). Findings the smb module emits: signing, auth, share, user, policy.
 
 - match:
@@ -50,7 +50,7 @@
       command: "netexec smb {target} -u '' -p '' --groups --computers --loggedon-users"
     - text: "Grab common AD shares anonymously (SYSVOL/NETLOGON often hold GPP creds + scripts)"
       command: "smbclient -N \"//{target}/SYSVOL\" -c 'recurse on; ls'"
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Full AD enum.md
 
 - match:
     service: smb
@@ -62,7 +62,7 @@
       command: "netexec ldap {target} -u USER -p PASS --kerberoasting kerb.out --asreproast asrep.out"
     - text: "Hunt Group Policy Preferences creds in SYSVOL (cpassword / cached autologin)"
       command: "netexec smb {target} -u USER -p PASS -M gpp_password -M gpp_autologin"
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Full AD enum.md
 
 - match:
     service: smb
@@ -73,7 +73,7 @@
       command: "netexec smb {target} -u 'guest' -p '' --rid-brute 4000"
     - text: "Read the domain password policy over the null/guest session — the account-lockout threshold is essential context before any later spray"
       command: "netexec smb {target} -u 'guest' -p '' --pass-pol"
-# source: Obsidian: 0.00 Methodology .../Active Directory Methdology/Enumeration/User discovery/{netexec rid-brute,enum4linux-ng null & guest session}.md
+# source: Obsidian: 0.00 Methodology .../Active Directory methodology/Enumeration/User discovery/{netexec rid-brute,enum4linux-ng null & guest session}.md
 
 - match:
     service: smb

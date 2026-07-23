@@ -7,7 +7,7 @@
   suggest:
     - text: "Telnet NTLM leaks the AD domain — pivot the domain into LDAP / SMB / Kerberos enumeration"
       command: "nmap -p 389 --script ldap-rootdse {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - match:
     service: telnet
@@ -16,4 +16,4 @@
   suggest:
     - text: "No transport encryption — record that any telnet login would be sent in cleartext"
       command: "nmap -p 23 --script telnet-encryption {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

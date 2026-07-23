@@ -84,6 +84,30 @@ def test_export_then_import_roundtrips(tmp_path: Path) -> None:
     assert (dest / "notes.md").read_text(encoding="utf-8") == "recon notes\n"
 
 
+def test_import_tightens_creds_permissions(tmp_path: Path) -> None:
+    # regression: a foreign archive may carry creds.json world/group-readable; import must re-chmod
+    # it to 0600 rather than trust the archived mode (tarfile's data filter keeps group/other READ)
+    def build(tar: tarfile.TarFile) -> None:
+        for member, data, mode in (
+            (
+                "htb-active/profile.json",
+                b'{"schema_version": 1, "profile_name": "htb-active"}',
+                0o644,
+            ),
+            ("htb-active/creds.json", b'{"schema_version": 1, "entries": []}', 0o644),
+        ):
+            info = tarfile.TarInfo(member)
+            info.size = len(data)
+            info.mode = mode
+            tar.addfile(info, io.BytesIO(data))
+
+    archive = _write_tar(tmp_path / "foreign.tar.gz", build)
+    dest = portability.import_project_archive(archive, tmp_path / "ws")
+    creds = dest / "creds.json"
+    assert creds.is_file()
+    assert (creds.stat().st_mode & 0o777) == 0o600
+
+
 # ---- delete_project (guarded, irreversible) --------------------------------------------------
 
 

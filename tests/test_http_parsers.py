@@ -70,6 +70,16 @@ def test_gobuster() -> None:
     assert by_path["/server-status"].status == 403
 
 
+def test_gobuster_unknown_length_size_not_dropped() -> None:
+    # gobuster emits [Size: -1] for unknown-length responses (HEAD / chunked); the endpoint must
+    # still be captured, with the negative size clamped to 0
+    findings = parse_gobuster("/admin (Status: 200) [Size: -1]\n/ok (Status: 200) [Size: 512]", 80)
+    by_path = {f.path: f for f in findings}
+    assert set(by_path) == {"/admin", "/ok"}
+    assert by_path["/admin"].size == 0
+    assert by_path["/ok"].size == 512
+
+
 def test_ffuf() -> None:
     findings = parse_ffuf(_read("ffuf.json"), 8080)
     by_path = {f.path: f for f in findings}

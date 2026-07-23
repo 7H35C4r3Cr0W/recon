@@ -7,7 +7,7 @@
   suggest:
     - text: "VNC 'None' auth — the display is open with no password; confirm read-only with a viewer"
       command: "nmap -p 5900 --script vnc-title {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - match:
     service: vnc
@@ -16,7 +16,7 @@
   suggest:
     - text: "Note the offered VNC security types + version for reference (no password guessing here)"
       command: "nmap -p 5900 --script vnc-info {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)
 
 - match:
     service: vnc
@@ -25,4 +25,4 @@
   suggest:
     - text: "Read the desktop name to identify the host/session behind the VNC display"
       command: "nmap -p 5900 --script vnc-title {target}"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (per-port enum reference)
+# source: Obsidian: .../Ports and tools.md (per-port enum reference)

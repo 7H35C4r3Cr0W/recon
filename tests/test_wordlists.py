@@ -78,6 +78,14 @@ def test_favorites_roundtrip() -> None:
     assert not wordlists.is_favorite(target)
 
 
+def test_favorites_corrupt_file_degrades_to_empty() -> None:
+    # a non-UTF-8 / corrupt favorites.json must not crash GUI startup — degrade to []
+    path = wordlists._favorites_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"\xff\xfe not json \x00")
+    assert wordlists.favorites() == []
+
+
 def test_uncategorized_files_are_withheld(tmp_path: Path) -> None:
     # affirmative allowlist: recon-looking-but-uncategorized files are NOT surfaced
     (tmp_path / "Web-Content").mkdir()

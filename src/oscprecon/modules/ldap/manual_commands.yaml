@@ -35,24 +35,24 @@
 - description: "Dump AD-integrated DNS records over a null bind"
   why: "netexec ldap get-network reads AD DNS zones anonymously — read-only recon"
   command: "netexec ldap {target} -u '' -p '' -M get-network -o ALL=true"
-# source: Obsidian: 0.00 Methdology/.../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: .../Active Directory methodology/Full AD enum.md
 
 - description: "Enumerate AdminSDHolder-protected accounts"
   why: "--admin-count lists high-value protected accounts — read-only recon"
   command: "netexec ldap {target} -u USER -p PASS --admin-count"
   requires: ["creds"]
-# source: Obsidian: 0.00 Methdology/.../Active Directory Methdology/Full AD enum.md
+# source: Obsidian: .../Active Directory methodology/Full AD enum.md
 
 - description: "All users with last-logon + pwdLastSet"
   why: "GetADUsers enumerates account metadata (enumeration script, no cracking)"
   command: "GetADUsers.py -all {domain}/USER:PASS -dc-ip {target}"
   requires: ["creds"]
-# source: Obsidian: 0.00 Methdology/.../OSCP Random/445 SMB.md
+# source: Obsidian: .../OSCP Random/445 SMB.md
 
 - description: "Anonymous LDAP user enumeration (windapsearch)"
   why: "windapsearch lists users over an anonymous bind — read-only recon"
   command: "windapsearch --dc-ip {target} -u '' -U"
-# source: Obsidian: 0.00 Methdology/.../Other Services/Other/389 _ LDAP.md
+# source: Obsidian: .../Other Services/Other/389 _ LDAP.md
 
 - description: "Dump AD to HTML/CSV over anonymous bind"
   why: "ldapdomaindump writes users/groups/computers/policy files — read-only recon"
@@ -63,19 +63,19 @@
   why: "Bitwise filter lists pre-auth-disabled accounts — read-only enum (no ticket request)"
   command: 'ldapsearch -x -H ldap://{target} -D USER@DOMAIN -w PASSWORD -b {basedn} "(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=4194304))" sAMAccountName'
   requires: ["creds"]
-# source: Obsidian: 0.00 Methdology/.../Credentialed LDAP Enumeration.md
+# source: Obsidian: .../Credentialed LDAP Enumeration.md
 
 - description: "SPN-owning (kerberoastable) accounts via LDAP filter"
   why: "Lists accounts with a servicePrincipalName — read-only enum (no ticket request)"
   command: 'ldapsearch -x -H ldap://{target} -D USER@DOMAIN -w PASSWORD -b {basedn} "(&(objectClass=user)(servicePrincipalName=*))" sAMAccountName servicePrincipalName'
   requires: ["creds"]
-# source: Obsidian: 0.00 Methdology/.../Credentialed LDAP Enumeration.md
+# source: Obsidian: .../Credentialed LDAP Enumeration.md
 
 - description: "Unconstrained-delegation accounts via LDAP filter"
   why: "Bitwise filter lists TRUSTED_FOR_DELEGATION accounts — read-only enum"
   command: 'ldapsearch -x -H ldap://{target} -D USER@DOMAIN -w PASSWORD -b {basedn} "(&(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=524288))" sAMAccountName'
   requires: ["creds"]
-# source: Obsidian: 0.00 Methdology/.../Credentialed LDAP Enumeration.md
+# source: Obsidian: .../Credentialed LDAP Enumeration.md
 
 - description: "Enumerate AD Certificate Services (CAs + templates)"
   why: "netexec adcs module lists CAs / cert templates — read-only recon that surfaces ESC misconfigs"

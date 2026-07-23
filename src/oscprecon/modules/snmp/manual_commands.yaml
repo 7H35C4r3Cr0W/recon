@@ -43,12 +43,12 @@
 - description: "Human-readable SNMP dump (snmp-check)"
   why: "snmp-check renders users/uptime/network/processes/storage in one view — read-only"
   command: "snmp-check -c public {target}"
-# source: Obsidian: 0.00 Methdology/.../OSCP Random/saisathvik1.md
+# source: Obsidian: .../OSCP Random/saisathvik1.md
 
 - description: "Bulk-walk the whole MIB (fewer round-trips)"
   why: "snmpbulkwalk pulls the MIB far faster than snmpwalk on large trees — read-only"
   command: "snmpbulkwalk -v2c -c public {target}"
-# source: Obsidian: 0.00 Methdology/.../OSCP Random/Random Cheat Sheet.md
+# source: Obsidian: .../OSCP Random/Random Cheat Sheet.md
 
 - description: "System info (sysDescr/sysName/sysContact/sysLocation)"
   why: "The system MIB names the OS, host, admin contact and location — a quick host fingerprint. Recon"

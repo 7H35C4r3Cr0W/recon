@@ -1,4 +1,4 @@
-# SMTP recon next-steps from Andre's Obsidian notes. smtp findings: banner, verb, open-relay, ntlm.
+# SMTP recon next-steps from the maintainer's methodology notes. smtp findings: banner, verb, open-relay, ntlm.
 
 - match:
     service: smtp

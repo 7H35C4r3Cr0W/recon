@@ -7,7 +7,7 @@
   suggest:
     - text: "Printer on 9100 — enumerate its web admin (address book + stored SMB/LDAP/email creds)"
       command: "whatweb http://{target}/"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (9100 – JetDirect)
+# source: Obsidian: .../Ports and tools.md (9100 – JetDirect)
 
 - match:
     service: jetdirect
@@ -16,4 +16,4 @@
   suggest:
     - text: "Match the printer firmware against documented issues for reference (searchsploit)"
       command: "searchsploit printer"
-# source: Obsidian: 0.00 Methdology/.../Ports and tools.md (9100 – JetDirect)
+# source: Obsidian: .../Ports and tools.md (9100 – JetDirect)

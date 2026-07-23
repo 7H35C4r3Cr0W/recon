@@ -8,7 +8,7 @@
       command: "aws --endpoint=http://{target} s3 ls s3://{target}"
     - text: "Check the bucket ACL/policy — a world-writable bucket enables webroot upload (note only)"
       command: "aws --endpoint=http://{target} s3api get-bucket-acl --bucket {target}"
-# source: Obsidian: 0.00 Methdology/.../Cloud/AWS/Enumeration/S3 Buckets.md
+# source: Obsidian: .../Cloud/AWS/Enumeration/S3 Buckets.md
 
 - match:
     service: s3
@@ -17,4 +17,4 @@
   suggest:
     - text: "Objects are the site's files — fetch the webroot files over HTTP to read source (recon)"
       command: "curl -s http://{target}/index.php"
-# source: Obsidian: 0.00 Methdology/.../Cloud/AWS/Enumeration/S3 Buckets.md
+# source: Obsidian: .../Cloud/AWS/Enumeration/S3 Buckets.md

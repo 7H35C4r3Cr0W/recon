@@ -1,4 +1,4 @@
-# NFS recon next-steps from Andre's Obsidian notes (read-only mount; unmount when done).
+# NFS recon next-steps from the maintainer's methodology notes (read-only mount; unmount when done).
 # nfs findings the module emits: export, world-readable, access, file, banner.
 
 - match:

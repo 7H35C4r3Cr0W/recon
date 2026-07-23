@@ -19,7 +19,7 @@
 - description: "Show which account the connection is authorized as"
   why: "connectionStatus reveals whether the anonymous connection has any roles — read-only"
   command: "mongosh --host {target} --port {port} --quiet --eval \"printjson(db.runCommand({connectionStatus:1}))\""
-# source: Obsidian: 0.00 Methdology/.../Other Services/3306/MongoDB
+# source: Obsidian: .../Other Services/3306/MongoDB
 
 - description: "Legacy mongo shell for old servers (wire v6)"
   why: "modern mongosh refuses MongoDB <=3.6 (wire-version too low); the legacy client speaks it — read-only"
@@ -29,4 +29,4 @@
 - description: "Replica set / sharding status"
   why: "rs.status()/sh.status() reveal cluster topology — read-only"
   command: "mongosh --host {target} --port {port} --quiet --eval \"printjson(rs.status())\""
-# source: Obsidian: 0.00 Methdology/.../Other Services/3306/MongoDB
+# source: Obsidian: .../Other Services/3306/MongoDB

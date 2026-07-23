@@ -1,4 +1,4 @@
-# SNMP recon next-steps from Andre's Obsidian notes.
+# SNMP recon next-steps from the maintainer's methodology notes.
 # snmp findings the module emits: community, banner, user, process, interface, note.
 
 - match:
