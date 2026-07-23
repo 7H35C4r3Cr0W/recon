@@ -334,7 +334,6 @@ uv run ruff format --check
 - [`CLAUDE.md`](CLAUDE.md) — the full project brief and hard constraints.
 - [`ROADMAP.md`](ROADMAP.md) — the phase-by-phase build plan.
 - [`PROJECT_MAP.md`](PROJECT_MAP.md) — subsystem-by-subsystem status map and forward plan.
-- [`PROGRESS.md`](PROGRESS.md) — the detailed build log.
 
 ## Author
 

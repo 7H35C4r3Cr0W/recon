@@ -2,8 +2,7 @@
 
 Project-control map of what the application **actually is** right now, confirmed from code and tests
 — not from prose. `CLAUDE.md` remains authoritative for safety and architecture boundaries; this file
-is the single "what is done / partial / next / blocked" view. Historical build detail stays in
-`PROGRESS.md`; the phase plan stays in `ROADMAP.md`.
+is the single "what is done / partial / next / blocked" view. The phase plan stays in `ROADMAP.md`.
 
 - **Product name:** **Nabu** (*Local Recon Workspace*) · internal package `oscprecon`, distribution
   `oscp-recon` (unchanged; see [`docs/OWNER_DECISIONS.md`](docs/OWNER_DECISIONS.md)).
@@ -235,13 +234,13 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 ## 12. Packaging and deployment — ✅
 
 - **Status:** ✅ Complete.
-- **Files:** `pyproject.toml` (hatchling), `.gitea/workflows/ci.yaml`, `tests/test_packaging.py`,
+- **Files:** `pyproject.toml` (hatchling), `.github/workflows/ci.yml`, `tests/test_packaging.py`,
   `share/applications/oscp-recon.desktop`, `py.typed`.
 - **Does:** wheel bundles all package resources (patterns, references YAML, templates, graph_html,
-  manual_commands); three console scripts; Gitea CI runs the gates; `oscprecon-cli doctor` reports
+  manual_commands); three console scripts; GitHub Actions CI runs the gates; `oscprecon-cli doctor` reports
   missing host tools.
 - **Complete:** clean-venv install verified imports `workspace/` + `gui/workspace/` + resources.
-- **Remaining:** none. (Push to the Gitea remote is on-network only — commits land locally on `main`.)
+- **Remaining:** none.
 - **Depends on:** all packages + resources.
 - **Risks:** a new non-`.py` resource not shipping — `test_packaging` is the guard.
 - **Tests:** `test_packaging`, `test_cli_doctor`.
@@ -379,7 +378,7 @@ flowchart TD
 | Obsidian export | ✅ | High (`test_vault_export`) | None | None |
 | Project portability | ✅ | High (`test_workspace_portability`, `test_cli_project`, GUI) | Malicious archive on import | Done — traversal-safe + bomb cap |
 | Packaging | ✅ | Medium (`test_packaging`) | Unshipped new resource | Keep `test_packaging` current |
-| CI | ✅ | n/a (Gitea workflow) | Remote unreachable off-LAN | Push on-network via `autosave.sh` |
+| CI | ✅ | GitHub Actions (`.github/workflows/ci.yml`) | — | — |
 | Workspace dashboard | ✅ | High (`test_dashboard`, `test_workspace_index`) | Index staleness | None |
 | Global search | ✅ | High (`test_workspace_search`) | Secret leakage in results | None — usernames/domains only |
 | Profile locking | ✅ | High (`test_workspace_locks`) | PID reuse / foreign host | None — conservative already |
@@ -433,7 +432,7 @@ remaining order, so the forward plan is re-cast below (≤5 phases). One major c
 - Do **not** add a service module merely because a port or tool exists.
 - Do **not** claim live validation without a real authorized target.
 - Classify every new idea as **core / optional / later / blocked / out-of-scope** before implementation.
-- Every completed chunk **updates `PROJECT_MAP.md`, `ROADMAP.md`, and `PROGRESS.md`** and **passes all
+- Every completed chunk **updates `PROJECT_MAP.md` and `ROADMAP.md`** and **passes all
   quality gates** (`mypy --strict`, `pytest`, `ruff check`, `ruff format --check`, offscreen GUI tests,
   packaging check).
 - Prefer a finished smaller chunk over several partially-implemented features.

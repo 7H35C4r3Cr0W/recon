@@ -2,7 +2,7 @@
 
 **This file is auto-loaded by Claude Code as project context.** It is the single source of truth for what this project is, what it must NOT do, how it is built, and how you (Claude Code) should behave when working on it. Read it fully before proposing any change.
 
-> **▶ CONTINUING PRIOR WORK / CONTEXT WAS RESET?** Read [`HANDOFF.md`](HANDOFF.md) first — it has the current repo HEAD, the four gates, how the owner wants work done, the adversarial-review workflow, what's already been swept, and what to do next. This file (CLAUDE.md) is the full brief and the rules; HANDOFF.md is the short "pick up where we left off" companion.
+> **▶ CONTINUING PRIOR WORK / CONTEXT WAS RESET?** Read `HANDOFF.md` (the maintainer's local working notes — kept locally, not in the public repo) first — it has the current repo HEAD, the four gates, how the owner wants work done, the adversarial-review workflow, what's already been swept, and what to do next. This file (CLAUDE.md) is the full brief and the rules.
 
 Companion files in this repo elaborate specific slices — `ROADMAP.md` for phase-by-phase build order, `prompts/*.md` for paste-able sequenced work chunks, `boxes/TRACKER.md` for the study list — but everything critical is in this file.
 
@@ -1133,7 +1133,7 @@ Drop walkthrough markdowns into `walkthroughs/<platform>-<box>.md` (e.g. `htb-ac
 
 ## 22. Box study list
 
-**Lain Kusanagi's OSCP-like list** — the source of truth. Extracted tracker at [`boxes/TRACKER.md`](boxes/TRACKER.md). 267 boxes across:
+**Lain Kusanagi's OSCP-like list** — the source of truth. Extracted tracker kept locally at `boxes/TRACKER.md` (not published). 267 boxes across:
 
 - Hack The Box (79)
 - Proving Grounds Practice (72)
@@ -1146,7 +1146,7 @@ Drop walkthrough markdowns into `walkthroughs/<platform>-<box>.md` (e.g. `htb-ac
 
 Source sheet: https://docs.google.com/spreadsheets/d/18weuz_Eeynr6sXFQ87Cd5F0slOj9Z6rt/htmlview
 
-Refresh procedure in [`boxes/README.md`](boxes/README.md).
+Refresh procedure in `boxes/README.md` (maintainer's local notes).
 
 Suggested starting order for validating the tool: HTB Linux easies (Sea, Nibbles, Bashed) → HTB Windows easies (Jerry, Netmon) → PG Practice for volume → AD-flavored boxes.
 

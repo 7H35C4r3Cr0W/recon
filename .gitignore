@@ -52,3 +52,11 @@ walkthroughs/*
 # Local-only helper / backup scripts (personal infra — not project assets)
 autosave.sh
 mirror.sh
+
+# Internal working docs — kept on disk for the maintainer's own workflow, not published
+/HANDOFF.md
+/PROGRESS.md
+/boxes/BOX-REVIEW-SOP.md
+/boxes/STARTING-POINT-LOG.md
+/boxes/BOXES-COMPLETED.md
+/.private/

@@ -1,6 +1,6 @@
 # oscp-recon — ROADMAP
 
-Phase-by-phase build order. **`CLAUDE.md` is authoritative**; where this file disagrees with it, `CLAUDE.md` wins. A phase is "done" when the tool has been used on ≥ 3 boxes from `boxes/TRACKER.md` without major gaps for that phase's features (see `CLAUDE.md` §23).
+Phase-by-phase build order. **`CLAUDE.md` is authoritative**; where this file disagrees with it, `CLAUDE.md` wins. A phase is "done" when the tool has been used on ≥ 3 boxes from the study list without major gaps for that phase's features (see `CLAUDE.md` §23).
 
 Status legend: ✅ done · 🚧 in progress · ⬜ not started
 
@@ -67,7 +67,7 @@ run it on ≥3 real boxes.
 
 ## Phase 2 — Core service modules — ✅ built & verified
 <!-- All 14 core modules + Redis/MongoDB/MSSQL/MySQL DB modules ship engine + parser tests +
-     manual_commands.yaml + services.yaml tool-hints + GUI panels. See PROGRESS.md per-module logs. -->
+     manual_commands.yaml + services.yaml tool-hints + GUI panels. -->
 
 
 Order: `http` (granular controls + non-standard ports) → `vhost` → `smb` (tiered) → `ftp` → `ssh` → `dns` → `ldap` → `smtp` → `nfs` → `snmp` → `tftp` → `netbios` → `ike` → `ntp`.
