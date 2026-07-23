@@ -20,7 +20,8 @@ is the single "what is done / partial / next / blocked" view. Historical build d
   tokens/styles/icons, conservative `finding_severity`, primary-nav shell + compact header,
   Findings/Activity views, dashboard + recon polish, reference tier badge + Tier-1 ranking, vault/
   spray/dialog uniformity, richer Findings filter, feedback banner, keyboard+a11y sweep, performance
-  caching, `docs/screenshots/`. Remaining: interactive HTML module-flow mind-map for management (last).
+  caching, `docs/screenshots/`. Management-facing walkthrough: the single [`docs/presentation.html`](docs/presentation.html)
+  (also live as an interactive artifact — linked from the README).
 - Visual companion: [`docs/project-map.mmd`](docs/project-map.mmd) (Mermaid mind map).
 - Owner-approved policy decisions: [`docs/OWNER_DECISIONS.md`](docs/OWNER_DECISIONS.md) (live
   HackTricks fetch/cache is approved; project credentials are durable in `<project>/creds.json`).

@@ -7,8 +7,7 @@ not a live click-through). Drives the Nabu UI/UX pass. Concise by design.
 > UI/UX pass; every gap listed below was subsequently addressed (compact header, dashboard empty
 > state + illustration, dedicated Findings view, graph legend, feedback banner, accessibility sweep,
 > and the Nabu + owl-furby brand mark). Kept as a record of what the pass fixed. For the **current**
-> UI see the [README](../README.md), [`how-nabu-works.html`](how-nabu-works.html), and
-> [`PROJECT_MAP.md`](../PROJECT_MAP.md). Shipped nav: Workspace · Recon · Graph · Findings ·
+> UI see the [README](../README.md) and [`PROJECT_MAP.md`](../PROJECT_MAP.md). Shipped nav: Workspace · Recon · Graph · Findings ·
 > Credentials · Notes · Report · Activity; the header carries the brand mark, and
 > **Help → View Diagnostics Log** opens the crash/error log (§ 19a).
 

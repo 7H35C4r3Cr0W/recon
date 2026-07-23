@@ -8,7 +8,7 @@ tools you already use (nmap, feroxbuster/gobuster/ffuf, nikto/whatweb, smbclient
 structures what they find, links each service to HackTricks and Exploit-DB, draws a BloodHound-style
 attack-surface graph, and produces Obsidian-friendly reports. It runs **offline** and makes **no LLM
 calls at runtime**. Recon is **exam-legal by default**; a separate, **owner-authorized Exploitation
-tab** lets you build and Run **human-confirmed** attacks by hand — **182 services / 3,400+ actions**
+tab** lets you build and Run **human-confirmed** attacks by hand — **183 services / 3,187 actions**
 (impacket, evil-winrm, netexec, public PoCs, port-80 web attacks) plus an **msfvenom payload
 builder** — nothing auto-runs, you confirm every command, and SQLmap/Metasploit-modules are never
 shipped as actions.
@@ -17,11 +17,10 @@ shipped as actions.
 
 ![Nabu — the three-pane recon workspace](docs/screenshots/shell-dark.png)
 
-> **See it in action** (open these local HTML files in a browser):
-> [`docs/presentation.html`](docs/presentation.html) — **What's New: Recon → Exploitation** (a team-facing
-> showcase of the Exploitation tab, msfvenom builder, port-80 attacks &amp; the Dante multi-network graph) ·
-> [`docs/nabu-demo.html`](docs/nabu-demo.html) — a 20-slide guided tour ·
-> [`docs/how-nabu-works.html`](docs/how-nabu-works.html) — an interactive pipeline + system map ·
+> **See it in action:**
+> **[▶ Interactive presentation](https://claude.ai/code/artifact/49ea815c-382c-484a-b6af-75e656d4a832)** — one page
+> covering the finished tool, its agent/tool map, a recon→root decision tree, and where it goes next (also saved
+> offline as [`docs/presentation.html`](docs/presentation.html)) ·
 > [`docs/screenshots/`](docs/screenshots/) — the screenshot set ·
 > [`docs/keyboard-shortcuts.md`](docs/keyboard-shortcuts.md) — shortcuts.
 
@@ -74,13 +73,13 @@ shipped as actions.
   render, a **credential vault** (shown in full, `0600`, click-away autosave), **audit trail**, and an
   **Obsidian-ready `report.md`** with a pivot-topology section.
 - **Exploitation tab** (owner-authorized, human-driven) — clearly separated from Recon. It surfaces the
-  services found on *this* box first and, across **182 services / 2,300+ attacker actions** mined from
+  services found on *this* box first and, across **183 services / 3,187 actions** mined from
   the vault (AD, web/port-80, SMB, databases, mail, app servers, CVE-technique targets, …), shows the
   exact attack command pre-filled from the profile + a chosen vault credential. **Nothing auto-runs**:
   you pick an action and press **Run ▸**, which confirms the target before executing **one** command
   (never a chain), then **Parse** extracts dumped hashes/creds into the vault. Attacker-side actions get
   a Run button; victim-side privesc/reverse-shells are copy-only. The **Active Directory** service is
-  exhaustively covered (130+ actions: PowerView/LOTL/BloodHound enum, Kerberos incl. Rubeus, ADCS ESC,
+  exhaustively covered (143 actions: PowerView/LOTL/BloodHound enum, Kerberos incl. Rubeus, ADCS ESC,
   coercion, delegation/ACL abuse, DCSync/gMSA/DPAPI, DCOM/winrs lateral, noPac/PrintNightmare/Zerologon,
   SCCM). Two copy-only helpers: a **🔍 GTFOBins** lookup (search a SUID/sudo binary → the break-out)
   and a **🎯 msfvenom payload builder** (platform → payload → format → the command **plus its listener**;
