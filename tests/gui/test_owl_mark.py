@@ -44,7 +44,7 @@ def test_owl_reactions_transform_and_render(qtbot: QtBot) -> None:
     # easter egg: each reaction drives a transform/tint and renders without error
     owl = OwlMark(60)
     qtbot.addWidget(owl)
-    assert len(_REACTIONS) == 10
+    assert len(_REACTIONS) == 12  # incl. the DBZ powerup + kamehameha reactions
 
     owl._reaction = "spin"
     owl._on_react(0.25)

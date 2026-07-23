@@ -10,10 +10,13 @@ from PySide6.QtGui import (
     QCursor,
     QGuiApplication,
     QHideEvent,
+    QLinearGradient,
     QMouseEvent,
     QPainter,
     QPainterPath,
     QPaintEvent,
+    QPen,
+    QRadialGradient,
     QShowEvent,
 )
 from PySide6.QtSvg import QSvgRenderer
@@ -50,6 +53,8 @@ _REACTIONS: tuple[tuple[str, int], ...] = (
     ("dizzy", 1200),
     ("cry", 1200),
     ("nod", 700),
+    ("powerup", 1200),  # DBZ: gold super-saiyan aura flare
+    ("kamehameha", 1400),  # DBZ: charge a cyan energy ball, then fire a beam
 )
 
 
@@ -82,6 +87,8 @@ class OwlMark(QWidget):
         self._dy = 0.0
         self._tear = 0.0
         self._tint = QColor(0, 0, 0, 0)
+        self._fx = ""  # DBZ overlay to paint ("powerup" / "kamehameha"), driven by _t
+        self._t = 0.0
         self._react_anim = QVariantAnimation(self)
         self._react_anim.setStartValue(0.0)
         self._react_anim.setEndValue(1.0)
@@ -173,6 +180,8 @@ class OwlMark(QWidget):
         self._angle = self._dx = self._dy = self._tear = 0.0
         self._scale = 1.0
         self._tint = QColor(0, 0, 0, 0)
+        self._fx = ""
+        self._t = t
         pi = math.pi
         if r == "spin":
             self._angle = 360.0 * t
@@ -202,6 +211,16 @@ class OwlMark(QWidget):
             self._tear = t
         elif r == "nod":
             self._dy = 6.0 * math.sin(6 * pi * t) * (1.0 - 0.5 * t)
+        elif r == "powerup":
+            inten = math.sin(pi * t)
+            self._scale = 1.0 + 0.16 * inten
+            self._dy = -3.0 * inten
+            self._tint = QColor(255, 205, 70, int(70 * inten))
+            self._fx = "powerup"
+        elif r == "kamehameha":
+            # lean back to charge, then thrust forward to fire
+            self._dx = -4.0 * (t * 2) if t < 0.5 else 4.0 * ((t - 0.5) * 2)
+            self._fx = "kamehameha"
         self.update()
 
     def _reset_reaction(self) -> None:
@@ -209,6 +228,8 @@ class OwlMark(QWidget):
         self._angle = self._dx = self._dy = self._tear = 0.0
         self._scale = 1.0
         self._tint = QColor(0, 0, 0, 0)
+        self._fx = ""
+        self._t = 0.0
         self.update()
 
     def paintEvent(self, event: QPaintEvent) -> None:
@@ -255,4 +276,71 @@ class OwlMark(QWidget):
             painter.setBrush(QColor(90, 170, 255, 220))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(QPointF(tx, ty), 2.2 * s, 3.0 * s)
+
+        # DBZ energy overlays (widget coords, over the owl)
+        if self._fx and self._t > 0.0:
+            w = float(self.width())
+            tt = self._t
+            painter.setPen(Qt.PenStyle.NoPen)
+            if self._fx == "powerup":
+                inten = math.sin(math.pi * tt)
+                aura = QRadialGradient(c, c, w * 0.78)
+                aura.setColorAt(0.0, QColor(255, 244, 190, int(150 * inten)))
+                aura.setColorAt(0.35, QColor(255, 196, 60, int(120 * inten)))
+                aura.setColorAt(0.7, QColor(255, 130, 30, int(70 * inten)))
+                aura.setColorAt(1.0, QColor(255, 120, 20, 0))
+                painter.setBrush(aura)
+                painter.drawEllipse(QPointF(c, c), w * 0.78, w * 0.86)
+                painter.setBrush(QColor(255, 226, 130, int(210 * inten)))
+                for i in range(6):
+                    ph = (tt * 3 + i * 0.5) % 1.0
+                    fx = c + (i - 2.5) * w * 0.14
+                    fy = c + w * 0.28 - ph * w * 0.7
+                    painter.drawEllipse(QPointF(fx, fy), w * 0.032 * (1 - ph), w * 0.06 * (1 - ph))
+            elif self._fx == "kamehameha":
+                bx, by = c + w * 0.30, c + w * 0.05
+                if tt < 0.5:  # charge the ball
+                    r = (tt / 0.5) * w * 0.2
+                    halo = QRadialGradient(bx, by, r * 2.0)
+                    halo.setColorAt(0.0, QColor(150, 225, 255, 200))
+                    halo.setColorAt(0.5, QColor(60, 150, 255, 70))
+                    halo.setColorAt(1.0, QColor(60, 150, 255, 0))
+                    painter.setBrush(halo)
+                    painter.drawEllipse(QPointF(bx, by), r * 2.0, r * 2.0)
+                    core = QRadialGradient(bx - r * 0.2, by - r * 0.2, r)
+                    core.setColorAt(0.0, QColor(255, 255, 255))
+                    core.setColorAt(0.6, QColor(140, 220, 255, 235))
+                    core.setColorAt(1.0, QColor(60, 150, 255, 140))
+                    painter.setBrush(core)
+                    painter.drawEllipse(QPointF(bx, by), r, r)
+                    painter.setPen(QPen(QColor(255, 255, 255, 220), max(1.0, w * 0.012)))
+                    painter.drawLine(QPointF(bx - r * 2.4, by), QPointF(bx + r * 2.4, by))
+                    painter.drawLine(QPointF(bx, by - r * 2.4), QPointF(bx, by + r * 2.4))
+                    painter.setPen(Qt.PenStyle.NoPen)
+                else:  # fire the beam
+                    k = min(1.0, (tt - 0.5) / 0.3)
+                    h = w * 0.13 * (1.25 - 0.45 * k)
+                    x2 = w + 4.0
+                    og = QLinearGradient(0.0, by - h * 2.4, 0.0, by + h * 2.4)
+                    og.setColorAt(0.0, QColor(92, 208, 255, 0))
+                    og.setColorAt(0.5, QColor(92, 208, 255, 150))
+                    og.setColorAt(1.0, QColor(92, 208, 255, 0))
+                    painter.setBrush(og)
+                    painter.drawRoundedRect(QRectF(bx, by - h * 2.4, x2 - bx, h * 4.8), h, h)
+                    painter.setBrush(QColor(92, 208, 255, 235))
+                    painter.drawRoundedRect(QRectF(bx, by - h, x2 - bx, h * 2), h, h)
+                    painter.setBrush(QColor(255, 255, 255, 245))
+                    painter.drawRoundedRect(
+                        QRectF(bx, by - h * 0.42, x2 - bx, h * 0.84), h * 0.4, h * 0.4
+                    )
+                    mb = QRadialGradient(bx, by, h * 2.6)
+                    mb.setColorAt(0.0, QColor(255, 255, 255, 235))
+                    mb.setColorAt(0.5, QColor(140, 220, 255, 140))
+                    mb.setColorAt(1.0, QColor(92, 208, 255, 0))
+                    painter.setBrush(mb)
+                    painter.drawEllipse(QPointF(bx, by), h * 2.6, h * 2.6)
+                    if k < 0.35:
+                        painter.fillRect(
+                            self.rect(), QColor(255, 255, 255, int(130 * (1 - k / 0.35)))
+                        )
         painter.end()

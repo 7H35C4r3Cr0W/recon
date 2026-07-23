@@ -40,17 +40,22 @@ _MARGIN = 26  # transparent gutter around the card for the drop shadow
 _LOOP_MS = 5200  # the full fight beat
 _MIN_SHOW_MS = 2000  # keep the splash up at least this long so the fight is actually seen
 
-# fixed non-theme colours — the DBZ palette
-_KI = QColor("#5cd0ff")  # kamehameha cyan-blue
-_KI_DEEP = QColor("#1f8fff")
+# fixed non-theme colours — the Toonami-era broadcast palette (environment quiet, energy loud)
+_VOID = QColor("#060a12")  # deep-space ground
+_VOID2 = QColor("#0c1826")  # upper sky
+_STEEL = QColor("#24384f")  # blue-biased neutral rock (chosen, not default grey)
+_CYAN = QColor("#46d5ff")  # Toonami cyan — HUD, rim light, ki
+_AMBER = QColor("#ff8a3f")  # Toonami warm accent
+_GOLD = QColor("#ffcf4a")  # super-saiyan aura
+_KI = _CYAN  # kamehameha
+_KI_DEEP = QColor("#1f7fff")
 _KI_CORE = QColor("#ffffff")
-_AURA = QColor("#ffd23f")  # super-saiyan gold
-_AURA2 = QColor("#ff8a1f")  # orange aura edge
-_OPP = QColor("#7a4fb0")  # opponent (Piccolo-ish) purple
-_OPP_DK = QColor("#39235a")
+_AURA = _GOLD
+_AURA2 = QColor("#ff7a1f")
+_OPP = QColor("#2b2246")  # indigo villain — reads by rim light + glowing eyes, not bright fill
+_OPP_DK = QColor("#150d24")
 _GREEN = QColor("#3ddc84")
 _PINK = QColor("#ff5c7a")
-_AMBER = QColor("#f5c518")
 
 _STATUS = (
     "charging ki…",
@@ -153,7 +158,15 @@ _FLASH = [
     (0.90, 0.0),
     (1.0, 0.0),
 ]
-_GOLD = [(0.0, 0.0), (0.14, 0.0), (0.30, 0.22), (0.44, 0.26), (0.63, 0.12), (0.80, 0.0), (1.0, 0.0)]
+_GOLD_K = [
+    (0.0, 0.0),
+    (0.14, 0.0),
+    (0.30, 0.22),
+    (0.44, 0.26),
+    (0.63, 0.12),
+    (0.80, 0.0),
+    (1.0, 0.0),
+]
 _IMPACT = [(0.0, 0.0), (0.02, 1.0), (0.12, 0.0), (1.0, 0.0)]  # left-mountain hit dust
 
 
@@ -283,278 +296,400 @@ class NabuSplash(QWidget):
             "secure boot",
         )
 
-    # ---- the fight -------------------------------------------------------------------------------
+    # ---- the fight (Toonami-era broadcast) -------------------------------------------------------
     def _paint_chamber(self, p: QPainter, x0: float, top: float, t: float, ms: int) -> None:
         chamber = QRectF(x0, top, _CARD_W, _CHAMBER_H)
-        ground_y = top + 206.0
-        owl_x = x0 + 196.0 + _kf(t, _OWL_TX)
-        opp_x = x0 + 496.0 + _kf(t, _OPP_TX)
+        ground_y = top + 210.0
+        owl_x = x0 + 200.0 + _kf(t, _OWL_TX)
+        opp_x = x0 + 494.0 + _kf(t, _OPP_TX)
         opp_y = ground_y + _kf(t, _OPP_TY)
         aura = _kf(t, _AURA_K)
         ball_r = _kf(t, _BALL)
         beam = _kf(t, _BEAM)
-        ball_x, ball_y = owl_x + 40.0, ground_y - 52.0
+        ball_x, ball_y = owl_x + 42.0, ground_y - 52.0
 
         p.save()
         p.setClipRect(chamber)
+        self._scene_bg(p, x0, top, ground_y, ms)
+        self._grid_ground(p, x0, top, ground_y)
+        self._mountain(p, x0 - 26, ground_y, 150.0, 126.0)
+        self._mountain(p, x0 + 424, ground_y, 244.0, 150.0)
 
-        # --- battlefield sky + ground ---
-        sky = QLinearGradient(0, top, 0, ground_y)
-        sky.setColorAt(0.0, QColor(8, 14, 22))
-        sky.setColorAt(0.6, QColor(14, 22, 34))
-        sky.setColorAt(1.0, QColor(20, 30, 44))
-        p.fillRect(QRectF(x0, top, _CARD_W, ground_y - top), sky)
-        gnd = QLinearGradient(0, ground_y, 0, top + _CHAMBER_H)
-        gnd.setColorAt(0.0, QColor(26, 22, 20))
-        gnd.setColorAt(1.0, QColor(10, 9, 9))
-        p.fillRect(QRectF(x0, ground_y, _CARD_W, top + _CHAMBER_H - ground_y), gnd)
-
-        # power-up gold wash on the whole scene
-        gold = _kf(t, _GOLD)
+        gold = _kf(t, _GOLD_K)
         if gold > 0.01:
-            gg = QRadialGradient(owl_x, ground_y - 40, 260)
-            gg.setColorAt(0.0, QColor(_AURA.red(), _AURA.green(), _AURA.blue(), int(120 * gold)))
-            gg.setColorAt(1.0, QColor(_AURA.red(), _AURA.green(), _AURA.blue(), 0))
+            gg = QRadialGradient(owl_x, ground_y - 46, 250)
+            gg.setColorAt(0.0, QColor(_GOLD.red(), _GOLD.green(), _GOLD.blue(), int(90 * gold)))
+            gg.setColorAt(1.0, QColor(_GOLD.red(), _GOLD.green(), _GOLD.blue(), 0))
             p.fillRect(chamber, gg)
 
-        # mountains (left = where the fighter got slammed, right = where the opponent gets blasted)
-        self._mountain(p, x0 + 8, ground_y, 150.0, 132.0, QColor(15, 27, 34), QColor(10, 19, 24))
-        self._mountain(p, x0 + 402, ground_y, 236.0, 150.0, QColor(13, 24, 30), QColor(8, 16, 20))
-        p.setPen(QPen(QColor(0, 0, 0, 90), 1))
-        p.drawLine(QPointF(x0, ground_y), QPointF(x0 + _CARD_W, ground_y))
-
-        # ambient rising ki sparks
-        for i in range(16):
-            ph = (ms / 900.0 + i * 0.61) % 1.0
-            sx = x0 + 40 + (i * 89 % (_CARD_W - 80))
-            sy = ground_y - ph * 150
-            a = int(120 * (1 - ph))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(_KI.red(), _KI.green(), _KI.blue(), a))
-            p.drawEllipse(QPointF(sx, sy), 1.4, 1.4 + 2 * (1 - ph))
-
-        # left-mountain impact dust (the knockback)
-        imp = _kf(t, _IMPACT)
-        if imp > 0.01:
-            self._burst(p, owl_x - 6, ground_y - 34, 70 * imp, QColor(210, 200, 170), imp)
-
-        # --- opponent (Piccolo-ish) on the right ---
         self._opponent(p, opp_x, opp_y, beam)
 
-        # --- kamehameha beam: fighter -> opponent ---
         if beam > 0.01:
             reach = _kf(t, _BEAMLEN)
-            bx1 = ball_x + 6
-            bx2 = bx1 + (opp_x - 18 - bx1) * reach
+            bx1 = ball_x + 4
+            bx2 = bx1 + (opp_x - 12 - bx1) * reach
             self._beam(p, bx1, bx2, ball_y, beam, ms)
 
-        # --- shockwave where the opponent slams the far mountain ---
         shock = _kf(t, _SHOCK)
         if shock > 2:
-            for k in range(2):
-                rr = shock * (1.0 - 0.28 * k)
-                a = int(150 * (1 - shock / 210.0) * (1 - 0.3 * k))
-                p.setPen(QPen(QColor(_KI.red(), _KI.green(), _KI.blue(), max(0, a)), 2.4 - k))
-                p.setBrush(Qt.BrushStyle.NoBrush)
-                p.drawEllipse(QPointF(opp_x + 10, opp_y - 40), rr, rr * 0.8)
+            self._shock(p, opp_x + 8, opp_y - 48, shock)
+            self._lens_flare(
+                p, opp_x, opp_y - 48, 26 * min(1.0, shock / 60), _CYAN, min(1.0, shock / 44)
+            )
 
-        # --- the fighter: aura + owl + charging ball ---
         self._fighter(p, owl_x, ground_y, t, aura, ms)
         if ball_r > 1:
             self._energy_ball(p, ball_x, ball_y, ball_r, ms)
 
-        # --- full-screen flash (impacts + the blast) ---
         flash = _kf(t, _FLASH)
         if flash > 0.01:
-            p.fillRect(chamber, QColor(255, 255, 255, int(150 * flash)))
-
+            p.fillRect(chamber, QColor(210, 240, 255, int(150 * flash)))
         p.restore()  # clip
 
-        # vignette
-        vg = QLinearGradient(0, top, 0, top + _CHAMBER_H)
-        vg.setColorAt(0.0, QColor(4, 8, 12, 120))
-        vg.setColorAt(0.4, QColor(4, 8, 12, 0))
-        vg.setColorAt(1.0, QColor(4, 8, 12, 150))
-        p.fillRect(chamber, vg)
+        self._broadcast_overlay(p, x0, top, chamber, ms)
+
+    def _scene_bg(self, p: QPainter, x0: float, top: float, ground_y: float, ms: int) -> None:
+        sky = QLinearGradient(0, top, 0, ground_y)
+        sky.setColorAt(0.0, _VOID2)
+        sky.setColorAt(0.7, QColor(9, 15, 24))
+        sky.setColorAt(1.0, QColor(14, 22, 32))
+        p.fillRect(QRectF(x0, top, _CARD_W, ground_y - top), sky)
+        # nebula washes
+        for cxr, cyr, rr, col in (
+            (x0 + 150, top + 60, 210, QColor(70, 120, 200)),
+            (x0 + 470, top + 120, 230, QColor(120, 70, 160)),
+        ):
+            ng = QRadialGradient(cxr, cyr, rr)
+            ng.setColorAt(0.0, QColor(col.red(), col.green(), col.blue(), 34))
+            ng.setColorAt(1.0, QColor(col.red(), col.green(), col.blue(), 0))
+            p.fillRect(QRectF(x0, top, _CARD_W, ground_y - top), ng)
+        # a planet, upper-right, dark with an amber crescent rim
+        px, py, pr = x0 + 556, top + 44, 62.0
+        pg = QRadialGradient(px - pr * 0.4, py - pr * 0.4, pr * 1.6)
+        pg.setColorAt(0.0, QColor(40, 52, 70))
+        pg.setColorAt(1.0, QColor(10, 14, 22))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(pg)
+        p.drawEllipse(QPointF(px, py), pr, pr)
+        p.setPen(QPen(QColor(_AMBER.red(), _AMBER.green(), _AMBER.blue(), 150), 2.4))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawArc(QRectF(px - pr, py - pr, pr * 2, pr * 2), -70 * 16, 130 * 16)
+        # starfield (deterministic + twinkle)
+        p.setPen(Qt.PenStyle.NoPen)
+        span = int(ground_y - top - 16)
+        for i in range(48):
+            sx = x0 + (i * 71 + 13) % _CARD_W
+            sy = top + 6 + (i * 137 + 29) % span
+            tw = 0.5 + 0.5 * math.sin(ms / 720.0 + i * 1.7)
+            a = int((30 + 150 * tw) * (0.4 if i % 4 else 1.0))
+            p.setBrush(QColor(210, 235, 255, a))
+            p.drawEllipse(QPointF(sx, sy), 0.8 + 0.6 * tw, 0.8 + 0.6 * tw)
+        # horizon haze
+        hz = QLinearGradient(0, ground_y - 40, 0, ground_y + 8)
+        hz.setColorAt(0.0, QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), 0))
+        hz.setColorAt(1.0, QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), 45))
+        p.fillRect(QRectF(x0, ground_y - 40, _CARD_W, 48), hz)
+
+    def _grid_ground(self, p: QPainter, x0: float, top: float, ground_y: float) -> None:
+        bottom = top + _CHAMBER_H
+        cx = x0 + _CARD_W / 2
+        gnd = QLinearGradient(0, ground_y, 0, bottom)
+        gnd.setColorAt(0.0, QColor(12, 16, 24))
+        gnd.setColorAt(1.0, _VOID)
+        p.fillRect(QRectF(x0, ground_y, _CARD_W, bottom - ground_y), gnd)
+        # perspective grid (Tron/Toonami floor)
+        for k in range(1, 8):
+            fy = ground_y + (bottom - ground_y) * (k / 8.0) ** 1.7
+            a = int(70 * (1 - k / 8.0))
+            p.setPen(QPen(QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), a), 1))
+            p.drawLine(QPointF(x0, fy), QPointF(x0 + _CARD_W, fy))
+        for vx in range(-6, 7):
+            fx = cx + vx * 46
+            p.setPen(QPen(QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), 40), 1))
+            p.drawLine(QPointF(cx + vx * 8, ground_y), QPointF(fx, bottom))
 
     def _mountain(
-        self,
-        p: QPainter,
-        base_x: float,
-        base_y: float,
-        peak_dx: float,
-        h: float,
-        c1: QColor,
-        c2: QColor,
+        self, p: QPainter, base_x: float, base_y: float, peak_dx: float, h: float
     ) -> None:
         path = QPainterPath()
         path.moveTo(base_x - 80, base_y)
-        path.lineTo(base_x + peak_dx * 0.35, base_y - h * 0.62)
+        path.lineTo(base_x + peak_dx * 0.34, base_y - h * 0.60)
         path.lineTo(base_x + peak_dx * 0.5, base_y - h * 0.82)
         path.lineTo(base_x + peak_dx * 0.62, base_y - h)
-        path.lineTo(base_x + peak_dx * 0.78, base_y - h * 0.7)
-        path.lineTo(base_x + peak_dx * 0.92, base_y - h * 0.88)
-        path.lineTo(base_x + peak_dx + 120, base_y)
+        path.lineTo(base_x + peak_dx * 0.76, base_y - h * 0.68)
+        path.lineTo(base_x + peak_dx * 0.9, base_y - h * 0.86)
+        path.lineTo(base_x + peak_dx + 130, base_y)
         path.closeSubpath()
         g = QLinearGradient(0, base_y - h, 0, base_y)
-        g.setColorAt(0.0, c1)
-        g.setColorAt(1.0, c2)
+        g.setColorAt(0.0, _STEEL)
+        g.setColorAt(1.0, QColor(9, 15, 21))
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(g)
         p.drawPath(path)
+        # cool rim light on the ridge
+        p.setPen(QPen(QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), 70), 1.4))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawPath(path)
+
+    def _opponent(self, p: QPainter, cx: float, feet_y: float, hit: float) -> None:
+        # a cel-shaded caped warrior, backlit by the incoming ki (cyan rim), with glowing eyes
+        p.save()
+        p.translate(cx, feet_y)
+        lit = min(1.0, hit)
+        base = _lerp(_OPP, QColor(255, 244, 235), lit * 0.85)
+        dk = _lerp(_OPP_DK, QColor(200, 170, 195), lit * 0.6)
+        p.setPen(Qt.PenStyle.NoPen)
+        # billowing cape (behind)
+        cape = QPainterPath()
+        cape.moveTo(4, -116)
+        cape.cubicTo(48, -94, 46, -34, 32, -2)
+        cape.lineTo(8, -2)
+        cape.cubicTo(0, -54, -2, -92, 4, -116)
+        cape.closeSubpath()
+        cg = QLinearGradient(0, -116, 0, 0)
+        cg.setColorAt(0.0, dk)
+        cg.setColorAt(1.0, _OPP_DK)
+        p.setBrush(cg)
+        p.drawPath(cape)
+        # body silhouette (broad shoulders -> V-taper -> planted stance)
+        body = QPainterPath()
+        body.moveTo(-25, -102)
+        body.cubicTo(-32, -94, -17, -90, -14, -62)
+        body.lineTo(-16, -2)
+        body.lineTo(-7, -2)
+        body.lineTo(-4, -56)
+        body.lineTo(4, -56)
+        body.lineTo(7, -2)
+        body.lineTo(16, -2)
+        body.lineTo(14, -62)
+        body.cubicTo(17, -90, 32, -94, 25, -102)
+        body.cubicTo(15, -110, -15, -110, -25, -102)
+        body.closeSubpath()
+        bg = QLinearGradient(0, -110, 0, 0)
+        bg.setColorAt(0.0, _lerp(base, QColor(255, 255, 255), 0.14))
+        bg.setColorAt(0.5, base)
+        bg.setColorAt(1.0, dk)
+        p.setBrush(bg)
+        p.drawPath(body)
+        # fists up (fighting guard) + head + antennae
+        p.setBrush(base)
+        p.drawEllipse(QPointF(-13, -70), 6.5, 6.5)
+        p.drawEllipse(QPointF(13, -70), 6.5, 6.5)
+        p.setBrush(bg)
+        p.drawEllipse(QPointF(0, -117), 11.5, 12.5)
+        p.setPen(QPen(base, 3.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawLine(QPointF(-4, -126), QPointF(-9, -140))
+        p.drawLine(QPointF(4, -126), QPointF(9, -140))
+        p.setPen(Qt.PenStyle.NoPen)
+        # cyan rim light on the contour facing the blast (grows as it's hit)
+        rimw = 1.6 + 2.8 * hit
+        p.setPen(QPen(QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), int(110 + 130 * hit)), rimw))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.save()
+        p.translate(-1.6, 0)
+        p.drawPath(body)
+        p.restore()
+        p.setPen(Qt.PenStyle.NoPen)
+        # glowing eyes (amber -> white when blasted)
+        eye = _lerp(_AMBER, QColor(255, 255, 255), lit)
+        eg = QRadialGradient(0, -118, 11)
+        eg.setColorAt(0.0, QColor(eye.red(), eye.green(), eye.blue(), 200))
+        eg.setColorAt(1.0, QColor(eye.red(), eye.green(), eye.blue(), 0))
+        p.setBrush(eg)
+        p.drawEllipse(QPointF(0, -118), 11, 7)
+        p.setBrush(eye)
+        p.drawEllipse(QPointF(-4, -118), 2.2, 1.7)
+        p.drawEllipse(QPointF(4, -118), 2.2, 1.7)
+        p.restore()
 
     def _fighter(
         self, p: QPainter, owl_x: float, ground_y: float, t: float, aura: float, ms: int
     ) -> None:
         sx, sy = _kf(t, _OWL_SX), _kf(t, _OWL_SY)
         oy = ground_y + _kf(t, _OWL_TY)
-        # ground shadow
         p.setPen(Qt.PenStyle.NoPen)
-        sg = QRadialGradient(owl_x, ground_y - 2, 52)
-        sg.setColorAt(0.0, QColor(0, 0, 0, 150))
-        sg.setColorAt(0.72, QColor(0, 0, 0, 0))
-        p.setBrush(sg)
-        p.drawEllipse(QPointF(owl_x, ground_y - 2), 46 * sx, 9)
-        # gold super-saiyan aura (flame spikes + radial glow) behind the fighter
+        # floor glow / reflection
+        rg = QRadialGradient(owl_x, ground_y + 2, 60)
+        rg.setColorAt(0.0, QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), int(50 + 90 * aura)))
+        rg.setColorAt(1.0, QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), 0))
+        p.setBrush(rg)
+        p.drawEllipse(QPointF(owl_x, ground_y + 1), 50 * sx, 11)
+        # gold super-saiyan aura behind the fighter
         if aura > 0.02:
-            cx, cy = owl_x, oy - 42
-            glow = QRadialGradient(cx, cy, 78)
-            glow.setColorAt(0.0, QColor(_AURA.red(), _AURA.green(), _AURA.blue(), int(150 * aura)))
-            glow.setColorAt(
-                0.5, QColor(_AURA2.red(), _AURA2.green(), _AURA2.blue(), int(70 * aura))
-            )
+            cx, cy = owl_x, oy - 44
+            glow = QRadialGradient(cx, cy, 82)
+            glow.setColorAt(0.0, QColor(255, 244, 190, int(150 * aura)))
+            glow.setColorAt(0.5, QColor(_AURA.red(), _AURA.green(), _AURA.blue(), int(90 * aura)))
             glow.setColorAt(1.0, QColor(_AURA2.red(), _AURA2.green(), _AURA2.blue(), 0))
             p.setBrush(glow)
-            p.drawEllipse(QPointF(cx, cy), 74, 92)
+            p.drawEllipse(QPointF(cx, cy), 74, 96)
             flame = QPainterPath()
             n = 11
             for i in range(n + 1):
-                ang = math.pi + (i / n) * math.pi  # top half sweep
-                wob = 1.0 + 0.5 * math.sin(ms / 90.0 + i * 1.7) * aura
+                ang = math.pi + (i / n) * math.pi
+                wob = 1.0 + 0.5 * math.sin(ms / 85.0 + i * 1.7) * aura
                 rad = (40 + 34 * wob) * (0.7 + 0.3 * aura)
-                px = cx + math.cos(ang) * rad * 0.66
+                px = cx + math.cos(ang) * rad * 0.64
                 py = cy + math.sin(ang) * rad
                 (flame.moveTo if i == 0 else flame.lineTo)(px, py)
             flame.lineTo(cx + 30, oy)
             flame.lineTo(cx - 30, oy)
             flame.closeSubpath()
-            fg = QLinearGradient(cx, cy - 90, cx, oy)
-            fg.setColorAt(0.0, QColor(255, 240, 180, int(150 * aura)))
+            fg = QLinearGradient(cx, cy - 92, cx, oy)
+            fg.setColorAt(0.0, QColor(255, 246, 200, int(160 * aura)))
             fg.setColorAt(0.45, QColor(_AURA.red(), _AURA.green(), _AURA.blue(), int(120 * aura)))
             fg.setColorAt(1.0, QColor(_AURA2.red(), _AURA2.green(), _AURA2.blue(), int(30 * aura)))
             p.setBrush(fg)
             p.drawPath(flame)
-            # rising debris while powering up
+            # lightning arcs
+            p.setPen(QPen(QColor(210, 240, 255, int(200 * aura)), 1.3))
+            for j in range(3):
+                a0 = ms / 70.0 + j * 2.1
+                lx, ly = cx + math.cos(a0) * 30, cy + math.sin(a0) * 40
+                seg = QPainterPath()
+                seg.moveTo(lx, ly)
+                for s in range(3):
+                    lx += math.cos(a0) * 14 + math.sin(ms / 40.0 + s) * 6
+                    ly += math.sin(a0) * 14
+                    seg.lineTo(lx, ly)
+                p.setBrush(Qt.BrushStyle.NoBrush)
+                p.drawPath(seg)
+            p.setPen(Qt.PenStyle.NoPen)
             for i in range(7):
-                ph = (ms / 620.0 + i * 0.37) % 1.0
+                ph = (ms / 600.0 + i * 0.37) % 1.0
                 dx = owl_x + (i - 3) * 15
-                dy = ground_y - ph * 90 * aura
-                p.setBrush(QColor(120, 110, 95, int(180 * (1 - ph) * aura)))
+                dy = ground_y - ph * 92 * aura
+                p.setBrush(QColor(130, 118, 100, int(180 * (1 - ph) * aura)))
                 p.drawEllipse(QPointF(dx, dy), 2.2, 2.2)
+        # cool rim halo so the owl reads against the dark scene
+        halo = QRadialGradient(owl_x, oy - 44, 58)
+        halo.setColorAt(0.0, QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), int(60 + 90 * aura)))
+        halo.setColorAt(1.0, QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), 0))
+        p.setBrush(halo)
+        p.drawEllipse(QPointF(owl_x, oy - 44), 46, 58)
         # the owl fighter
         p.save()
         p.translate(owl_x, oy)
         p.scale(sx, sy)
-        self._svg.render(p, QRectF(-46, -94, 92, 92))
+        self._svg.render(p, QRectF(-45, -92, 90, 90))
         p.restore()
 
     def _energy_ball(self, p: QPainter, cx: float, cy: float, r: float, ms: int) -> None:
-        halo = QRadialGradient(cx, cy, r * 1.9)
-        halo.setColorAt(0.0, QColor(_KI.red(), _KI.green(), _KI.blue(), 150))
+        halo = QRadialGradient(cx, cy, r * 2.0)
+        halo.setColorAt(0.0, QColor(_KI.red(), _KI.green(), _KI.blue(), 160))
         halo.setColorAt(0.5, QColor(_KI_DEEP.red(), _KI_DEEP.green(), _KI_DEEP.blue(), 60))
         halo.setColorAt(1.0, QColor(_KI_DEEP.red(), _KI_DEEP.green(), _KI_DEEP.blue(), 0))
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(halo)
-        p.drawEllipse(QPointF(cx, cy), r * 1.9, r * 1.9)
-        core = QRadialGradient(cx - r * 0.2, cy - r * 0.2, r)
+        p.drawEllipse(QPointF(cx, cy), r * 2.0, r * 2.0)
+        core = QRadialGradient(cx - r * 0.22, cy - r * 0.22, r)
         core.setColorAt(0.0, _KI_CORE)
-        core.setColorAt(0.55, QColor(_KI.red(), _KI.green(), _KI.blue(), 235))
-        core.setColorAt(1.0, QColor(_KI_DEEP.red(), _KI_DEEP.green(), _KI_DEEP.blue(), 120))
+        core.setColorAt(0.55, QColor(_KI.red(), _KI.green(), _KI.blue(), 240))
+        core.setColorAt(1.0, QColor(_KI_DEEP.red(), _KI_DEEP.green(), _KI_DEEP.blue(), 130))
         p.setBrush(core)
         p.drawEllipse(QPointF(cx, cy), r, r)
-        # electric crackle
-        p.setPen(QPen(QColor(_KI_CORE.red(), _KI_CORE.green(), _KI_CORE.blue(), 200), 1.4))
+        self._lens_flare(p, cx, cy, r * 1.4, _KI_CORE, 1.0)
+        p.setPen(QPen(QColor(_KI_CORE.red(), _KI_CORE.green(), _KI_CORE.blue(), 210), 1.3))
         for i in range(5):
-            a = ms / 60.0 + i * 1.257
-            r1, r2 = r * 1.05, r * 1.7
+            a = ms / 55.0 + i * 1.257
             p.drawLine(
-                QPointF(cx + math.cos(a) * r1, cy + math.sin(a) * r1),
-                QPointF(cx + math.cos(a + 0.5) * r2, cy + math.sin(a + 0.5) * r2),
+                QPointF(cx + math.cos(a) * r * 1.05, cy + math.sin(a) * r * 1.05),
+                QPointF(cx + math.cos(a + 0.5) * r * 1.7, cy + math.sin(a + 0.5) * r * 1.7),
             )
 
     def _beam(self, p: QPainter, x1: float, x2: float, y: float, k: float, ms: int) -> None:
         if x2 <= x1:
             return
-        h = (16 + 10 * math.sin(ms / 70.0)) * k
-        # outer glow
-        og = QLinearGradient(0, y - h * 2, 0, y + h * 2)
-        og.setColorAt(0.0, QColor(_KI.red(), _KI.green(), _KI.blue(), 0))
-        og.setColorAt(0.5, QColor(_KI.red(), _KI.green(), _KI.blue(), int(120 * k)))
-        og.setColorAt(1.0, QColor(_KI.red(), _KI.green(), _KI.blue(), 0))
+        h = (16 + 9 * math.sin(ms / 65.0)) * k
         p.setPen(Qt.PenStyle.NoPen)
+        og = QLinearGradient(0, y - h * 2.4, 0, y + h * 2.4)
+        og.setColorAt(0.0, QColor(_KI.red(), _KI.green(), _KI.blue(), 0))
+        og.setColorAt(0.5, QColor(_KI.red(), _KI.green(), _KI.blue(), int(130 * k)))
+        og.setColorAt(1.0, QColor(_KI.red(), _KI.green(), _KI.blue(), 0))
         p.setBrush(og)
-        p.drawRoundedRect(QRectF(x1, y - h * 2, x2 - x1, h * 4), h, h)
-        # cyan body
-        p.setBrush(QColor(_KI.red(), _KI.green(), _KI.blue(), int(230 * k)))
+        p.drawRoundedRect(QRectF(x1, y - h * 2.4, x2 - x1, h * 4.8), h, h)
+        p.setBrush(QColor(_KI.red(), _KI.green(), _KI.blue(), int(235 * k)))
         p.drawRoundedRect(QRectF(x1, y - h, x2 - x1, h * 2), h, h)
-        # white core
-        p.setBrush(QColor(255, 255, 255, int(240 * k)))
-        p.drawRoundedRect(QRectF(x1, y - h * 0.42, x2 - x1, h * 0.84), h * 0.4, h * 0.4)
-        # muzzle burst at the fighter's hands
-        mb = QRadialGradient(x1, y, h * 2.4)
-        mb.setColorAt(0.0, QColor(255, 255, 255, int(230 * k)))
-        mb.setColorAt(0.5, QColor(_KI.red(), _KI.green(), _KI.blue(), int(150 * k)))
-        mb.setColorAt(1.0, QColor(_KI.red(), _KI.green(), _KI.blue(), 0))
-        p.setBrush(mb)
-        p.drawEllipse(QPointF(x1, y), h * 2.4, h * 2.4)
-        # streaking particles along the beam
-        for i in range(9):
-            ph = (ms / 200.0 + i * 0.31) % 1.0
+        p.setBrush(QColor(255, 255, 255, int(245 * k)))
+        p.drawRoundedRect(QRectF(x1, y - h * 0.4, x2 - x1, h * 0.8), h * 0.4, h * 0.4)
+        self._lens_flare(p, x1, y, h * 2.2, _KI_CORE, k)  # muzzle
+        for i in range(10):
+            ph = (ms / 190.0 + i * 0.29) % 1.0
             px = x1 + (x2 - x1) * ph
-            py = y + math.sin(ms / 80.0 + i) * h * 0.7
+            py = y + math.sin(ms / 75.0 + i) * h * 0.7
             p.setBrush(QColor(255, 255, 255, int(200 * k * (1 - ph))))
             p.drawEllipse(QPointF(px, py), 1.6, 1.6)
 
-    def _opponent(self, p: QPainter, cx: float, feet_y: float, hit: float) -> None:
-        # a lean Piccolo-ish silhouette: cape, body, head + two antennae; braces on the blast
-        p.save()
-        p.translate(cx, feet_y)
-        col = _OPP if hit < 0.2 else _lerp(_OPP, QColor(255, 210, 180), min(1.0, hit))
-        cape = QPainterPath()
-        cape.moveTo(-4, -96)
-        cape.cubicTo(-34, -70, -30, -18, -20, 0)
-        cape.lineTo(22, 0)
-        cape.cubicTo(30, -20, 32, -66, 4, -96)
-        cape.closeSubpath()
+    def _lens_flare(
+        self, p: QPainter, cx: float, cy: float, r: float, col: QColor, k: float
+    ) -> None:
+        if r <= 0 or k <= 0:
+            return
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(_OPP_DK)
-        p.drawPath(cape)
-        body = QPainterPath()
-        body.moveTo(-11, -2)
-        body.lineTo(-13, -70)
-        body.cubicTo(-13, -84, 13, -84, 13, -70)
-        body.lineTo(11, -2)
-        body.closeSubpath()
-        p.setBrush(col)
-        p.drawPath(body)
-        p.drawEllipse(QPointF(0, -92), 12, 13)  # head
-        p.setPen(QPen(col, 3.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        p.drawLine(QPointF(-4, -101), QPointF(-8, -114))  # antennae
-        p.drawLine(QPointF(4, -101), QPointF(8, -114))
-        p.restore()
-
-    def _burst(self, p: QPainter, cx: float, cy: float, r: float, col: QColor, a: float) -> None:
-        p.setPen(Qt.PenStyle.NoPen)
-        g = QRadialGradient(cx, cy, max(1.0, r))
-        g.setColorAt(0.0, QColor(col.red(), col.green(), col.blue(), int(200 * a)))
+        g = QRadialGradient(cx, cy, r)
+        g.setColorAt(0.0, QColor(col.red(), col.green(), col.blue(), int(230 * k)))
+        g.setColorAt(0.4, QColor(col.red(), col.green(), col.blue(), int(80 * k)))
         g.setColorAt(1.0, QColor(col.red(), col.green(), col.blue(), 0))
         p.setBrush(g)
         p.drawEllipse(QPointF(cx, cy), r, r)
-        for i in range(8):
-            ang = i * math.pi / 4
-            dr = r * (0.7 + 0.3 * (i % 3))
-            p.setBrush(QColor(col.red(), col.green(), col.blue(), int(180 * a)))
-            p.drawEllipse(QPointF(cx + math.cos(ang) * dr, cy + math.sin(ang) * dr), 2.4, 2.4)
+        p.setPen(QPen(QColor(col.red(), col.green(), col.blue(), int(200 * k)), max(1.0, r * 0.06)))
+        p.drawLine(QPointF(cx - r * 1.6, cy), QPointF(cx + r * 1.6, cy))
+        p.drawLine(QPointF(cx, cy - r * 1.15), QPointF(cx, cy + r * 1.15))
+        p.setPen(Qt.PenStyle.NoPen)
+
+    def _shock(self, p: QPainter, cx: float, cy: float, r: float) -> None:
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        for kk in range(2):
+            rr = r * (1.0 - 0.28 * kk)
+            a = int(150 * (1 - r / 210.0) * (1 - 0.3 * kk))
+            p.setPen(QPen(QColor(_KI.red(), _KI.green(), _KI.blue(), max(0, a)), 2.4 - kk))
+            p.drawEllipse(QPointF(cx, cy), rr, rr * 0.78)
+
+    def _broadcast_overlay(
+        self, p: QPainter, x0: float, top: float, chamber: QRectF, ms: int
+    ) -> None:
+        # scanlines
+        p.setPen(QPen(QColor(0, 0, 0, 26), 1))
+        yy = top + 1
+        while yy < top + _CHAMBER_H:
+            p.drawLine(QPointF(x0, yy), QPointF(x0 + _CARD_W, yy))
+            yy += 3
+        # vignette
+        vg = QLinearGradient(0, top, 0, top + _CHAMBER_H)
+        vg.setColorAt(0.0, QColor(4, 8, 12, 130))
+        vg.setColorAt(0.4, QColor(4, 8, 12, 0))
+        vg.setColorAt(1.0, QColor(4, 8, 12, 150))
+        p.fillRect(chamber, vg)
+        # cinematic letterbox
+        p.fillRect(QRectF(x0, top, _CARD_W, 8), QColor(0, 0, 0, 235))
+        p.fillRect(QRectF(x0, top + _CHAMBER_H - 8, _CARD_W, 8), QColor(0, 0, 0, 235))
+        # HUD corner brackets
+        cyhud = QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), 150)
+        p.setPen(QPen(cyhud, 1.4))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        b, ln = 14.0, 16.0
+        for hx, hy, dx, dy in (
+            (x0 + b, top + b + 4, 1, 1),
+            (x0 + _CARD_W - b, top + b + 4, -1, 1),
+            (x0 + b, top + _CHAMBER_H - b - 4, 1, -1),
+            (x0 + _CARD_W - b, top + _CHAMBER_H - b - 4, -1, -1),
+        ):
+            p.drawLine(QPointF(hx, hy), QPointF(hx + dx * ln, hy))
+            p.drawLine(QPointF(hx, hy), QPointF(hx, hy + dy * ln))
+        # transmission readout
+        p.setFont(_font(mono=True, size=8))
+        p.setPen(QColor(_CYAN.red(), _CYAN.green(), _CYAN.blue(), 170))
+        p.drawText(QPointF(x0 + 36, top + 24), "// TRANSMISSION  ·  NABU-TV")
+        p.setPen(QColor(_AMBER.red(), _AMBER.green(), _AMBER.blue(), 190))
+        p.drawText(
+            QRectF(x0, top + 14, _CARD_W - 36, 14),
+            int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
+            "SECTOR 07  ▸  LIVE",
+        )
+        if (ms % 1000) < 600:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(255, 70, 70, 220))
+            p.drawEllipse(QPointF(x0 + _CARD_W - 96, top + 19), 3.0, 3.0)
 
     def _paint_footer(self, p: QPainter, x0: float, top: float, ms: int) -> None:
         foot = QRectF(x0, top, _CARD_W, _FOOTER_H)
