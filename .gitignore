@@ -54,7 +54,7 @@ autosave.sh
 mirror.sh
 
 # Internal working docs — kept on disk for the maintainer's own workflow, not published
-/HANDOFF.md
+/HANDOFF.local.md
 /PROGRESS.md
 /boxes/BOX-REVIEW-SOP.md
 /boxes/STARTING-POINT-LOG.md
