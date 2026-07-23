@@ -55,22 +55,22 @@ class AppHeader(QWidget):
         brand_col.setSpacing(0)
         self._brand_name = QLabel("Nabu")
         self._brand_name.setObjectName("hdrBrandName")
-        self._brand_name.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        # the mascot lives on a WIDE stage that fills the header gap, so its click easter egg can
-        # run across that space (kamehameha, moonwalk, jailbreak…). It rests at the stage's right,
-        # just left of the wordmark; the wordmark stays in the brand column.
+        self._brand_name.setAlignment(Qt.AlignmentFlag.AlignRight)
+        # the mascot lives on a WIDE stage INSIDE the brand column, resting at its right edge —
+        # directly under the right-aligned "Nabu" wordmark — and runs left into the header gap on a
+        # click (kamehameha, moonwalk, jailbreak…). The brand column expands to give it room.
         self._furby = OwlMark(34)
-        brand_col.addWidget(self._brand_name, alignment=Qt.AlignmentFlag.AlignHCenter)
+        brand_col.addWidget(self._brand_name, alignment=Qt.AlignmentFlag.AlignRight)
+        brand_col.addWidget(self._furby)
 
         layout.addWidget(self._home)
         layout.addWidget(self._project)
         layout.addWidget(self._target)
         layout.addWidget(self._read_only)
-        layout.addWidget(
-            self._furby, 1
-        )  # expanding: takes the gap between the target and the brand
         layout.addWidget(self._tasks)
-        layout.addWidget(self._brand)
+        layout.addWidget(
+            self._brand, 1
+        )  # brand column expands into the gap; owl rests under "Nabu"
         self.restyle(theme_name)
 
     def restyle(self, theme_name: str) -> None:

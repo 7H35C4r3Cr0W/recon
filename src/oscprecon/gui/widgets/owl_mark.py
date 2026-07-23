@@ -80,6 +80,12 @@ _REACTIONS: tuple[tuple[str, int], ...] = (
     ("runaround", 2000),  # dash left and back
 )
 
+# reactions that already move horizontally on their own; every OTHER reaction gets a default
+# left-and-back run added so the mascot is always running across the stage on a click.
+_SELF_MOVING = frozenset(
+    {"dance", "taz", "breakdance", "kamehameha", "moonwalk", "jailbreak", "runaround"}
+)
+
 
 def _base_svg() -> bytes:
     # the mascot minus its pupils (#08252b) + highlights (#ffffff) — OwlMark paints those live.
@@ -348,6 +354,8 @@ class OwlMark(QWidget):
             self._run = -0.9 * math.sin(pi * t)
             self._flip = -1.0 if t < 0.5 else 1.0
             self._dy = -1.6 * abs(math.sin(12 * pi * t))
+        if r and r not in _SELF_MOVING:  # every click also runs across the stage
+            self._run = -0.6 * math.sin(pi * t)
         self.update()
 
     def _reset_reaction(self) -> None:

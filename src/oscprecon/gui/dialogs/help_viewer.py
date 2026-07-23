@@ -1,7 +1,20 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon, QKeyEvent
+import math
+
+from PySide6.QtCore import QByteArray, QPointF, QRectF, Qt
+from PySide6.QtGui import (
+    QColor,
+    QIcon,
+    QKeyEvent,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPaintEvent,
+    QPen,
+    QRadialGradient,
+)
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -17,9 +30,14 @@ from PySide6.QtWidgets import (
 
 from oscprecon import guide
 from oscprecon.branding import APP_NAME
-from oscprecon.gui.assets import ICON, asset_path
+from oscprecon.gui.assets import FURBY, ICON, asset_path
 from oscprecon.gui.theme import tokens
 from oscprecon.gui.theme.tokens import palette
+
+
+def _rgba(hex_str: str, a: float) -> str:
+    c = QColor(hex_str)
+    return f"rgba({c.red()},{c.green()},{c.blue()},{a})"
 
 
 class HelpPopup(QFrame):
@@ -34,6 +52,8 @@ class HelpPopup(QFrame):
     def __init__(self, theme_name: str = "htb", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         pal = palette(theme_name)
+        self._pal = pal
+        self._furby = QSvgRenderer(QByteArray(asset_path(FURBY).read_bytes()))
         accent = pal.accent
         self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
@@ -117,10 +137,15 @@ class HelpPopup(QFrame):
     def _build_view(self, pal: tokens.Palette) -> QWidget:
         self._view = QTextBrowser()
         self._view.setOpenExternalLinks(False)  # offline — never launch a browser
+        # semi-transparent so the DBZ furby skin painted behind the popup glows through the docs
         self._view.setStyleSheet(
-            f"QTextBrowser {{ background: {pal.bg}; color: {pal.text}; border: none;"
+            f"QTextBrowser {{ background: {_rgba(pal.bg, 0.70)}; color: {pal.text}; border: none;"
             f" padding: {tokens.SPACE_LG}px; font-size: 14px; }}"
         )
+        vp = self._view.viewport()
+        if vp is not None:
+            vp.setAutoFillBackground(False)
+            vp.setStyleSheet("background: transparent;")
         doc = self._view.document()
         if doc is not None:
             doc.setDefaultStyleSheet(
@@ -142,6 +167,75 @@ class HelpPopup(QFrame):
         bar = self._view.verticalScrollBar()
         if bar is not None:
             bar.setValue(0)
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        super().paintEvent(event)  # frame bg + border from the stylesheet
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        clip = QPainterPath()
+        clip.addRoundedRect(QRectF(self.rect()), float(tokens.RADIUS_LG), float(tokens.RADIUS_LG))
+        p.setClipPath(clip)
+        self._paint_skin(p)
+        p.end()
+
+    def _paint_skin(self, p: QPainter) -> None:
+        # a low-opacity DBZ skin behind the docs: the furby powering up (super-saiyan aura) and
+        # cupping a kamehameha ball, on a cool energy backdrop. Faint, so the text stays readable.
+        w, h = float(self.width()), float(self.height())
+        ac = QColor(self._pal.accent)
+        gold = QColor("#ffcf4a")
+        eg = QRadialGradient(w * 0.80, h * 0.74, w * 0.6)
+        eg.setColorAt(0.0, QColor(ac.red(), ac.green(), ac.blue(), 42))
+        eg.setColorAt(0.5, QColor(120, 80, 180, 24))
+        eg.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.fillRect(QRectF(230.0, 44.0, w - 230.0, h - 44.0), eg)
+        p.setPen(QPen(QColor(255, 255, 255, 13), 2))
+        for i in range(12):
+            x = 300.0 + i * 60.0
+            p.drawLine(QPointF(x, h), QPointF(x + 130.0, h - 240.0))
+        cx, cy, sz = w * 0.72, h * 0.60, h * 0.68
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setOpacity(0.26)
+        aura = QRadialGradient(cx, cy - sz * 0.04, sz * 0.9)
+        aura.setColorAt(0.0, QColor(gold.red(), gold.green(), gold.blue(), 210))
+        aura.setColorAt(0.5, QColor(255, 130, 30, 90))
+        aura.setColorAt(1.0, QColor(255, 120, 20, 0))
+        p.setBrush(aura)
+        p.drawEllipse(QPointF(cx, cy - sz * 0.04), sz * 0.82, sz * 0.98)
+        flame = QPainterPath()
+        n = 12
+        for i in range(n + 1):
+            ang = math.pi + (i / n) * math.pi
+            rad = sz * (0.55 + 0.28 * (0.5 + 0.5 * math.sin(i * 1.7)))
+            px = cx + math.cos(ang) * rad * 0.62
+            py = (cy - sz * 0.04) + math.sin(ang) * rad
+            (flame.moveTo if i == 0 else flame.lineTo)(px, py)
+        flame.lineTo(cx + sz * 0.3, cy + sz * 0.5)
+        flame.lineTo(cx - sz * 0.3, cy + sz * 0.5)
+        flame.closeSubpath()
+        fg = QLinearGradient(cx, cy - sz, cx, cy + sz * 0.5)
+        fg.setColorAt(0.0, QColor(255, 246, 200, 150))
+        fg.setColorAt(0.5, QColor(gold.red(), gold.green(), gold.blue(), 110))
+        fg.setColorAt(1.0, QColor(255, 122, 31, 10))
+        p.setBrush(fg)
+        p.drawPath(flame)
+        p.setOpacity(0.55)
+        p.save()
+        p.translate(cx, cy)
+        p.rotate(-8)
+        p.scale(1.05, 1.05)
+        p.translate(-sz / 2, -sz / 2)
+        self._furby.render(p, QRectF(0.0, 0.0, sz, sz))
+        p.restore()
+        bx, by, r = cx - sz * 0.42, cy + sz * 0.14, sz * 0.17
+        p.setOpacity(0.30)
+        ball = QRadialGradient(bx, by, r * 1.9)
+        ball.setColorAt(0.0, QColor(255, 255, 255, 230))
+        ball.setColorAt(0.45, QColor(92, 208, 255, 150))
+        ball.setColorAt(1.0, QColor(31, 143, 255, 0))
+        p.setBrush(ball)
+        p.drawEllipse(QPointF(bx, by), r * 1.9, r * 1.9)
+        p.setOpacity(1.0)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         if event.key() == Qt.Key.Key_Escape:
