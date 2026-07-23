@@ -18,7 +18,7 @@ shipped as actions.
 ![Nabu — the three-pane recon workspace](docs/screenshots/shell-dark.png)
 
 > **See it in action:**
-> **[▶ Interactive presentation](https://claude.ai/code/artifact/49ea815c-382c-484a-b6af-75e656d4a832)** — one page
+> **[▶ Interactive presentation](https://claude.ai/code/artifact/11e5bc74-ffa2-426b-b890-d11250e7e757)** — one page
 > covering the finished tool, its agent/tool map, a recon→root decision tree, and where it goes next (also saved
 > offline as [`docs/presentation.html`](docs/presentation.html)) ·
 > [`docs/screenshots/`](docs/screenshots/) — the screenshot set ·
