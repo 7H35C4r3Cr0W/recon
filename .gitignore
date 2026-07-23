@@ -30,3 +30,25 @@ mirror.sh
 
 # Runtime workspace (profiles live at ~/oscprecon/, never in the repo)
 /oscprecon/
+
+# Secrets / credentials — never commit
+*.pem
+*.key
+*.ppk
+id_rsa*
+id_ed25519*
+*.ovpn
+.env
+.env.*
+creds.json
+*_creds.json
+*.kdbx
+
+# Walkthroughs — third-party writeups stay local (CLAUDE.md §21)
+walkthroughs/*
+!walkthroughs/README.md
+!walkthroughs/_sample-*.md
+
+# Local-only helper / backup scripts (personal infra — not project assets)
+autosave.sh
+mirror.sh
