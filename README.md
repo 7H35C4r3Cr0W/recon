@@ -21,6 +21,7 @@ shipped as actions.
 > **[▶ Interactive presentation](https://claude.ai/code/artifact/11e5bc74-ffa2-426b-b890-d11250e7e757)** — one page
 > covering the finished tool, its agent/tool map, a recon→root decision tree, and where it goes next (also saved
 > offline as [`docs/presentation.html`](docs/presentation.html)) ·
+> [`docs/decision-tree.html`](docs/decision-tree.html) — the interactive **recon→root flowchart** (node boxes + lines, click-to-trace) ·
 > [`docs/screenshots/`](docs/screenshots/) — the screenshot set ·
 > [`docs/keyboard-shortcuts.md`](docs/keyboard-shortcuts.md) — shortcuts.
 
