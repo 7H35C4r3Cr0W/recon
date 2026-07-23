@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<!-- Nabu — one giant page: overview + agents/tools + embedded visual flowchart + implementation roadmap. -->
+<!-- Nabu one giant page: overview + agents/tools + typed decision-tree flowchart + roadmap. -->
 <title>Nabu — Recon Workspace &amp; Agent Platform · by Lagus</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
@@ -202,7 +202,7 @@
   @media (max-width:900px){.grid2{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}.counts{grid-template-columns:repeat(2,1fr)}.proc{grid-template-columns:repeat(2,1fr)}.scope{grid-template-columns:1fr}.rail{display:none}}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
-/* embedded recon-to-root flowchart */
+/* embedded flowchart */
 .board{border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden;margin-top:8px}
 .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel-2)}
 .fclegend{display:flex;gap:11px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
@@ -234,6 +234,9 @@ svg.edges path.on{stroke:var(--pc,var(--brand));stroke-width:2.6px}
 .trace{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 .trace .t{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line-2);background:var(--panel);border-radius:6px;padding:3px 7px;color:var(--ink-2)}
 .trace .sep{color:var(--muted)}
+.node .a2a{font-weight:800;letter-spacing:.02em}
+.node .who{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:5px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.node{min-height:96px}
 </style>
 </head>
 <body>
@@ -362,7 +365,7 @@ svg.edges path.on{stroke:var(--pc,var(--brand));stroke-width:2.6px}
   <div class="view" id="v-tr"><div class="wrap">
     <section>
       <div class="sec-head"><span class="num">01</span><h2>Recon-to-root decision tree</h2></div>
-      <p class="sec-sub">One scan at the top; every path to root branching below. Recon fans out autonomously; every <span class="mono" style="color:var(--gated)">attack</span> step passes the human gate before it runs. Click a node to open its detail and light up its path from the scan; click ▸ to expand a branch. Covers all 52 recon modules, every technique class in the 183-service catalog, and the cross-cutting engines.</p>
+      <p class="sec-sub">One scan at the top; every path to root branching below. Recon fans out autonomously; every <span class="mono" style="color:var(--gated)">attack</span> step passes the human gate before it runs. Click a node to open its detail and light up its path from the scan; click ▸ to expand a branch. Covers all 52 recon modules, every technique class in the 183-service catalog, and the cross-cutting engines. <b>Every box is typed so you can see what is an agent and what is not</b> — ● AGENT (autonomous), ⛿ human-gated, ▷ TOOL (what agents call), ▪ GROUP (a service category, not an agent), ◇ DATA.</p>
       <div class="fcwrap">
         <div style="display:flex;gap:8px;margin:2px 0 12px;flex-wrap:wrap;align-items:center">
           <button class="btn" id="fc-expand">Expand all</button><button class="btn" id="fc-fit">⤢ Fit</button><button class="btn" id="fc-reset">↺ Reset</button>
@@ -379,7 +382,7 @@ svg.edges path.on{stroke:var(--pc,var(--brand));stroke-width:2.6px}
   <div class="view" id="v-fl"><div class="wrap">
     <section>
       <div class="sec-head"><span class="num">01</span><h2>How we get there — from today’s GUI/CLI tool to an agent platform</h2></div>
-      <p class="sec-sub"><b>Nabu today is a GUI/CLI recon tool.</b> This is the staged plan to augment it into an agent-to-agent platform — <b>6 stages across three tiers (Crawl → Walk → Run), ~22 weeks</b>. The engine is wrapped, never rewritten; each stage ships something usable, keeps the four commit gates green, and never breaks the exam-legal offline core. Autonomy is added last, and attack agents only after the human approval queue exists. Click a stage to expand its builds, the agents it adds, its milestone and risks.</p>
+      <p class="sec-sub"><b>Nabu today is a GUI/CLI recon tool.</b> This is the staged plan to augment it into an agent-to-agent platform — <b>6 stages across three tiers (Crawl → Walk → Run), ~22 weeks</b>. The engine is wrapped, never rewritten; each stage ships something usable, keeps the four commit gates green, and never breaks the exam-legal offline core. Autonomy is added last; attack agents only after the human approval queue exists. Click a stage to expand.</p>
       <div class="rail" id="rail"></div>
       <div id="phases"></div>
     </section>
@@ -619,6 +622,28 @@ function computeLayout(){
 const stage=document.getElementById('fc-stage'), svg=document.getElementById('fc-edges');
 const nodeEls={};
 function kc(k){return `var(--k-${k})`;}
+const A2A={
+ scan:{t:'▷ TOOL',col:'var(--tool)',d:'entry scan (nmap) — the Recon Coordinator agent runs this tool'},
+ control:{t:'● AGENT',col:'var(--agent)',d:'an autonomous agent — it decides and drives, no human needed'},
+ service:{t:'▪ GROUP',col:'var(--infra)',d:'a service category — NOT an agent; the recon lead spawns one agent per service under it'},
+ enum:{t:'● AGENT',col:'var(--agent)',d:'an autonomous recon agent — it calls the read-only enum tool for its service'},
+ decision:{t:'● AGENT',col:'var(--agent)',d:'autonomous — the Exploitation Strategist agent picks the attack; it PLANS, it never runs anything'},
+ attack:{t:'⛿ TOOL',col:'var(--gated)',d:'an exploit-catalog technique (a TOOL) — a human-gated attack agent runs it, and only after you approve'},
+ post:{t:'⛿ TOOL',col:'var(--gated)',d:'post-exploitation — victim-side, run by hand after you approve'},
+ loot:{t:'◇ DATA',col:'var(--good)',d:'loot / findings written to the shared project state'},
+ report:{t:'● AGENT',col:'var(--agent)',d:'an autonomous agent — the Reporting agent, assembles the report + graph'}
+};
+function groupOf(id){ let c=id; while(c!==null && parent[c]!=='orch') c=parent[c]; return c; }
+function typeColor(k){ return A2A[k].col; }
+function agentName(id){ const n=nodes[id], g=groupOf(id);
+ if(n.kind==='control') return 'Recon Coordinator agent';
+ if(n.kind==='report') return 'Reporting agent';
+ if(n.kind==='decision') return 'Exploitation Strategist agent';
+ if(n.kind==='enum') return g==='web'?'Web-Recon agent':(g==='ad'?'AD-Mapper agent':'Service-Enum agent');
+ if(n.kind==='attack') return (g==='web'?'Web Exploitation agent':(g==='ad'?'AD Attack agent':'Service Exploitation agent'))+' · ⛿ human-gated';
+ if(n.kind==='scan') return 'Recon Coordinator agent (runs this tool)';
+ return null;
+}
 function render(){
   computeLayout();
   stage.style.width=CW+'px'; stage.style.height=CH+'px';
@@ -638,10 +663,11 @@ function render(){
       path.dataset.to=id; svg.appendChild(path); edgePaths[id]=path;
     }
     const n=nodes[id];
-    const el=document.createElement('div'); el.className='node'; el.style.cssText=`left:${x}px;top:${y}px;--kc:${kc(n.kind)}`; el.dataset.id=id;
+    const el=document.createElement('div'); el.className='node'; el.style.cssText=`left:${x}px;top:${y}px;--kc:${typeColor(n.kind)}`; el.dataset.id=id;
     const hasKids=kids[id].length>0;
     const toggle = hasKids ? `<button class="tgl" data-tgl="1" title="collapse / expand branch">${collapsed.has(id)?'▸':'▾'}</button>` : '';
-    el.innerHTML=`<div class="k">${KINDS[n.kind]}${toggle}</div><div class="nm">${n.name}</div><div class="tg">${n.tg}</div>${n.gate?'<span class="gate">⚿ human-gated</span>':''}`;
+    const _a=A2A[n.kind], _an=agentName(id);
+    el.innerHTML=`<div class="k"><span class="a2a">${_a.t}</span>${toggle}</div><div class="nm">${n.name}</div><div class="tg">${n.tg}</div>${_an?`<div class="who">${(n.kind==='control'||n.kind==='enum'||n.kind==='decision'||n.kind==='report')?'▸ '+_an:'run by '+_an}</div>`:''}`;
     el.addEventListener('click',(e)=>{ e.stopPropagation();
       if(e.target.closest('[data-tgl]')){ toggleCollapse(id); return; }
       selectNode(id);
@@ -691,15 +717,16 @@ function selectNode(id){ selected=id; applyHighlight(id); openDrawer(id); }
 /* ---------------- drawer ---------------- */
 const drawer=document.getElementById('fc-drawer'), scrim=document.getElementById('fc-scrim');
 function openDrawer(id){
-  const n=nodes[id]; drawer.style.setProperty('--kc',kc(n.kind));
-  document.getElementById('fc-dKind').textContent=KINDS[n.kind];
-  document.getElementById('fc-dKind').style.color=kc(n.kind);
+  const n=nodes[id]; drawer.style.setProperty('--kc',typeColor(n.kind));
+  document.getElementById('fc-dKind').textContent=A2A[n.kind].t.replace(/^[●▷⛿▪◇] ?/,'')+(agentName(id)?' · '+agentName(id).replace(' · ⛿ human-gated',''):'');
+  document.getElementById('fc-dKind').style.color=typeColor(n.kind);
   document.getElementById('fc-dName').textContent=n.name;
   const tr=ancestry(id).reverse();
   const trace=tr.map((t,i)=>`<span class="t">${nodes[t].name.replace(/^① /,'')}</span>${i<tr.length-1?'<span class="sep">→</span>':''}`).join('');
   const tools=(n.tools||[]).map(t=>`<code>${esc(t)}</code>`).join('');
   document.getElementById('fc-dBody').innerHTML=`
     ${n.gate?`<div class="gateb"><span class="l">⚿</span><p><b>Human-gated.</b> This step only runs after the operator reviews the exact command and approves it — the tool never auto-attacks.</p></div>`:''}
+    <div><div class="lab">In the agent system</div><p><b style="color:${typeColor(n.kind)}">${A2A[n.kind].t}</b> — ${esc(A2A[n.kind].d)}</p></div>
     <div><div class="lab">What it does</div><p>${esc(n.detail||n.tg)}</p></div>
     <div><div class="lab">Tools it wraps</div><div class="tools">${tools||'<code>—</code>'}</div></div>
     <div><div class="lab">Path from the scan</div><div class="trace">${trace}</div></div>`;
@@ -730,8 +757,7 @@ document.getElementById('fc-fit').addEventListener('click',()=>{closeDrawer();fi
 document.getElementById('fc-reset').addEventListener('click',()=>{collapsed.clear();closeDrawer();render();fit();});
 document.getElementById('fc-expand').addEventListener('click',()=>{collapsed.clear();render();fit();});
 
-const legendKinds=['scan','control','service','enum','decision','attack','post','loot'];
-document.getElementById('fc-legend').innerHTML=legendKinds.map(k=>`<span class="lg"><span class="sw" style="--c:${kc(k)}"></span>${KINDS[k]}</span>`).join('');
+document.getElementById('fc-legend').innerHTML=[['var(--agent)','● AGENT — autonomous'],['var(--gated)','⛿ human-gated — waits for your approval'],['var(--tool)','▷ TOOL — a capability agents call'],['var(--infra)','▪ GROUP — a category, not an agent'],['var(--good)','◇ DATA — loot / findings']].map(([c,t])=>`<span class="lg"><span class="sw" style="--c:${c}"></span>${t}</span>`).join('');
 
 
 
@@ -740,7 +766,7 @@ document.getElementById('fc-legend').innerHTML=legendKinds.map(k=>`<span class="
 order.forEach(id=>{ if(id!=='scan' && id!=='orch' && kids[id].length) collapsed.add(id); });
 render(); setTimeout(fit,30);
 
-var _tr=document.querySelector('[data-v=\"tr\"]'); if(_tr) _tr.addEventListener('click',function(){setTimeout(fit,60);});
+var _tr=document.querySelector('[data-v=\"tr\"]'); if(_tr)_tr.addEventListener('click',function(){setTimeout(fit,60);});
 setTimeout(function(){var p=document.querySelector('#phases .phase'); if(p)p.classList.add('open');},120);
 })();
 </script>
