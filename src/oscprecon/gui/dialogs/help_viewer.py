@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import math
 
 from PySide6.QtCore import QByteArray, QPointF, QRectF, Qt
 from PySide6.QtGui import (
+    QCloseEvent,
     QColor,
     QIcon,
     QKeyEvent,
@@ -21,14 +23,13 @@ from PySide6.QtWidgets import (
     QLabel,
     QListWidget,
     QListWidgetItem,
-    QPushButton,
     QSplitter,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
 
-from oscprecon import guide
+from oscprecon import config, guide
 from oscprecon.branding import APP_NAME
 from oscprecon.gui.assets import FURBY, ICON, asset_path
 from oscprecon.gui.theme import tokens
@@ -41,12 +42,13 @@ def _rgba(hex_str: str, a: float) -> str:
 
 
 class HelpPopup(QFrame):
-    """On-brand documentation popup with a TOC + markdown viewer.
+    """On-brand documentation window with a TOC + markdown viewer.
 
-    A frameless Qt.Popup, so it dismisses the moment the user clicks outside it (or presses Esc) —
-    no OK button to hunt for. Reads the bundled guide (single source shared with `nabu-cli docs`),
-    renders each page with the native QTextBrowser markdown engine (no QtWebEngine). Recolours from
-    the active theme at construction; it is transient, so it is rebuilt on each open.
+    A REAL top-level window (not a popup): the window manager gives it move, resize, maximize and
+    minimize, it appears in the taskbar, and it stays open beside the app while you work — the
+    operator decides how big the docs are and where they sit. Its size/position persist between
+    sessions. Reads the bundled guide (single source shared with `nabu-cli docs`), rendering each
+    page with the native QTextBrowser markdown engine (no QtWebEngine).
     """
 
     def __init__(self, theme_name: str = "htb", parent: QWidget | None = None) -> None:
@@ -55,9 +57,19 @@ class HelpPopup(QFrame):
         self._pal = pal
         self._furby = QSvgRenderer(QByteArray(asset_path(FURBY).read_bytes()))
         accent = pal.accent
-        self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+        # a normal window with the full system title bar: drag it anywhere, resize from any edge,
+        # maximize, minimize, snap it beside the main window. (It used to be a frameless Qt.Popup
+        # pinned to a fixed 900×620 — hence "why can't I move or resize the docs?")
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.WindowMinMaxButtonsHint
+            | Qt.WindowType.WindowCloseButtonHint
+        )
+        self.setWindowTitle(f"{APP_NAME} — Documentation")
+        self.setWindowIcon(QIcon(str(asset_path(ICON))))
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        self.setFixedSize(900, 620)
+        self.setMinimumSize(420, 320)  # a floor that keeps the TOC + a readable column
+        self.resize(900, 620)
         self.setObjectName("helpPopup")
         self.setStyleSheet(
             f"#helpPopup {{ background: {pal.bg}; border: 1px solid {accent};"
@@ -69,14 +81,15 @@ class HelpPopup(QFrame):
         root.setSpacing(0)
         root.addWidget(self._build_header(pal))
 
-        split = QSplitter(Qt.Orientation.Horizontal)
-        split.addWidget(self._build_toc(pal))
-        split.addWidget(self._build_view(pal))
-        split.setStretchFactor(0, 0)
-        split.setStretchFactor(1, 1)
-        root.addWidget(split, stretch=1)
+        self._split = QSplitter(Qt.Orientation.Horizontal)
+        self._split.addWidget(self._build_toc(pal))
+        self._split.addWidget(self._build_view(pal))
+        self._split.setStretchFactor(0, 0)
+        self._split.setStretchFactor(1, 1)
+        root.addWidget(self._split, stretch=1)
 
         self._toc.setCurrentRow(0)  # load the first page
+        self._restore_geometry()
 
     def _build_header(self, pal: tokens.Palette) -> QWidget:
         header = QWidget()
@@ -100,24 +113,19 @@ class HelpPopup(QFrame):
         row.addWidget(brand)
         row.addWidget(title)
         row.addStretch(1)
-        hint = QLabel("Esc or click away to close")
+        hint = QLabel("Esc to close · drag or resize this window as you like")
         hint.setStyleSheet(f"color: {pal.text_muted}; font-size: 11px;")
         row.addWidget(hint)
-        close = QPushButton("✕")
-        close.setFixedSize(26, 26)
-        close.setCursor(Qt.CursorShape.PointingHandCursor)
-        close.setStyleSheet(
-            f"QPushButton {{ border: none; color: {pal.text_muted}; font-size: 15px; }}"
-            f" QPushButton:hover {{ color: {pal.accent}; }}"
-        )
-        close.clicked.connect(self.close)
-        row.addWidget(close)
         return header
 
     def _build_toc(self, pal: tokens.Palette) -> QWidget:
         self._toc = QListWidget()
         self._toc.setObjectName("helpToc")
-        self._toc.setFixedWidth(230)
+        # a floor and a ceiling instead of a fixed width, so the splitter can be dragged to give
+        # the page more room on a small window (or the TOC more on a wide one)
+        self._toc.setMinimumWidth(150)
+        self._toc.setMaximumWidth(360)
+        self._toc.resize(230, self._toc.height())
         self._toc.setStyleSheet(
             f"#helpToc {{ background: {pal.surface}; border: none; padding: {tokens.SPACE_SM}px;"
             f" font-size: 13px; }}"
@@ -188,7 +196,10 @@ class HelpPopup(QFrame):
         eg.setColorAt(0.0, QColor(ac.red(), ac.green(), ac.blue(), 42))
         eg.setColorAt(0.5, QColor(120, 80, 180, 24))
         eg.setColorAt(1.0, QColor(0, 0, 0, 0))
-        p.fillRect(QRectF(230.0, 44.0, w - 230.0, h - 44.0), eg)
+        # start the skin where the TOC ends — the splitter is draggable now, so this can't be a
+        # hard-coded 230px or the glow bleeds under the contents list.
+        toc_w = float(max(0, self._toc.width()))
+        p.fillRect(QRectF(toc_w, 44.0, max(0.0, w - toc_w), h - 44.0), eg)
         p.setPen(QPen(QColor(255, 255, 255, 13), 2))
         for i in range(12):
             x = 300.0 + i * 60.0
@@ -243,10 +254,37 @@ class HelpPopup(QFrame):
             return
         super().keyPressEvent(event)
 
+    _GEOMETRY_KEY = "help"
+
+    def _restore_geometry(self) -> bool:
+        # come back the size and place the operator left it. Best-effort: a stale/corrupt blob (or
+        # a screen that no longer exists) must never stop the docs from opening.
+        blob = config.window_geometry(self._GEOMETRY_KEY)
+        if not blob:
+            return False
+        try:
+            return bool(self.restoreGeometry(QByteArray.fromHex(QByteArray(blob.encode("ascii")))))
+        except (ValueError, UnicodeEncodeError):
+            return False
+
+    def _store_geometry(self) -> None:
+        if self.isMinimized() or self.isFullScreen():
+            return  # never persist a minimized/fullscreen frame — it reopens unusable
+        with contextlib.suppress(OSError):
+            config.save_window_geometry(
+                self._GEOMETRY_KEY, self.saveGeometry().toHex().toStdString()
+            )
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._store_geometry()
+        super().closeEvent(event)
+
     def open_centered(self, over: QWidget | None) -> None:
-        # centre over the parent window before showing (a Popup must be positioned pre-show)
-        if over is not None:
+        # first open: centre over the main window. After that the remembered geometry wins, so the
+        # docs reopen exactly where the operator parked them.
+        if not self._restore_geometry() and over is not None:
             center = over.window().frameGeometry().center()
             self.move(center.x() - self.width() // 2, center.y() - self.height() // 2)
         self.show()
-        self.setFocus()
+        self.raise_()
+        self.activateWindow()

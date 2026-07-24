@@ -33,6 +33,7 @@
 | `Ctrl+7` | Notes |
 | `Ctrl+8` | Report |
 | `Ctrl+9` | Activity |
+| `Ctrl+Shift+F` | Add a finding of your own (host, port, PoC, notes) |
 | `Ctrl+G` | Toggle graph view |
 | `Ctrl+R` | Report preview |
 

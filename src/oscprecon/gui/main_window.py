@@ -186,6 +186,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(800, 560)
         self._profile: Profile | None = None
         self._auditor: Auditor | None = None
+        self._help_window: HelpPopup | None = None  # the one docs window, raised on re-open
         self._locked_dir: Path | None = None  # the profile dir we currently hold an edit-lock on
         self._tasks = TaskManager(settings.max_concurrency)
         self._task_bar = TaskStatusBar(self._tasks, theme.normalize(settings.theme))
@@ -616,8 +617,22 @@ class MainWindow(QMainWindow):
         help_menu.addAction(about_action)
 
     def _on_documentation(self) -> None:
-        popup = HelpPopup(theme.normalize(config.load_settings().theme), self)
-        popup.open_centered(self)
+        # one docs window, reused: it's a real window now (movable/resizable/minimizable), so a
+        # second F1 must raise the existing one rather than stack copies on top of each other.
+        if self._help_window is not None:
+            self._help_window.showNormal()  # un-minimize if it was parked in the taskbar
+            self._help_window.raise_()
+            self._help_window.activateWindow()
+            return
+        window = HelpPopup(theme.normalize(config.load_settings().theme), self)
+        self._help_window = window
+        window.destroyed.connect(self._on_help_window_closed)
+        window.open_centered(self)
+
+    def _on_help_window_closed(self) -> None:
+        # WA_DeleteOnClose destroys the C++ object; drop our reference so the next F1 builds a
+        # fresh window instead of touching a dangling one.
+        self._help_window = None
 
     def _on_doctor(self) -> None:
         DoctorDialog(self).exec()
@@ -644,6 +659,7 @@ class MainWindow(QMainWindow):
             ("Ctrl+7", "Notes"),
             ("Ctrl+8", "Report"),
             ("Ctrl+9", "Activity"),
+            ("Ctrl+Shift+F", "Add a finding of your own (host/port/PoC)"),
             ("Ctrl+G", "Toggle graph view"),
             ("Ctrl+R", "Report preview"),
             ("Ctrl+F", "Find (reference pane / dashboard / findings — context-aware)"),
@@ -1693,10 +1709,10 @@ class MainWindow(QMainWindow):
         self._show_findings()
         self._findings_view.add_finding()
 
-    def _on_findings_changed(self) -> None:
+    def _on_findings_changed(self, action: str = "finding-edited") -> None:
         # a hand-written finding is real project data: it belongs in the report, the graph and the
         # audit trail exactly like a parsed one.
-        self._audit_action("finding-edited")
+        self._audit_action(action)
         if self._profile is None:
             return
         self._graph_view.set_profile(self._profile)

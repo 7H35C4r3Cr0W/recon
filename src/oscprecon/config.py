@@ -116,6 +116,22 @@ def save_prefs(prefs: dict[str, str]) -> None:
     _write_json_atomic(_prefs_path(), prefs)
 
 
+# Window geometry (size + position) for the app's secondary windows, so a window the operator
+# resized or moved comes back the way they left it. Stored as the hex of Qt's saveGeometry() blob
+# under its own prefs key — free-standing, so it never touches the Settings schema.
+_GEOMETRY_PREFIX = "window_geometry."
+
+
+def window_geometry(name: str) -> str:
+    return load_prefs().get(_GEOMETRY_PREFIX + name, "")
+
+
+def save_window_geometry(name: str, value: str) -> None:
+    prefs = load_prefs()  # preserve unrelated keys
+    prefs[_GEOMETRY_PREFIX + name] = value
+    save_prefs(prefs)
+
+
 def _clamp(value: int, lo: int, hi: int) -> int:
     return max(lo, min(hi, value))
 

@@ -21,8 +21,33 @@ def test_help_popup_selecting_a_topic_renders_its_page(qtbot: QtBot) -> None:
     assert "F1" in popup._view.toPlainText()  # the shortcuts page content is now shown
 
 
-def test_help_popup_is_a_clickaway_popup(qtbot: QtBot) -> None:
-    # frameless Qt.Popup => Qt dismisses it on a click outside its geometry (and on Esc)
+def test_help_window_is_movable_resizable_and_minimizable(qtbot: QtBot) -> None:
+    # user request: the docs are a REAL window — the WM gives move/resize/minimize/maximize, so it
+    # must NOT be a fixed-size frameless popup (the old behaviour) any more.
     popup = HelpPopup("light")
     qtbot.addWidget(popup)
-    assert popup.windowFlags() & Qt.WindowType.Popup
+    flags = popup.windowFlags()
+    # the window-type bits (masked — Popup's value shares the Window bit) must say "normal window"
+    assert (flags & Qt.WindowType.WindowType_Mask) == Qt.WindowType.Window
+    assert not (flags & Qt.WindowType.FramelessWindowHint)
+    assert flags & Qt.WindowType.WindowMinMaxButtonsHint  # minimize + maximize buttons
+    # resizable: a real range between the minimum and the maximum, not a pinned size
+    assert popup.minimumWidth() < popup.maximumWidth()
+    assert popup.minimumHeight() < popup.maximumHeight()
+    # a modest size that fits any (virtual) screen, so this asserts resizability, not a screen size
+    popup.resize(640, 480)
+    assert popup.size().width() == 640 and popup.size().height() == 480
+
+
+def test_help_window_remembers_its_geometry(qtbot: QtBot, tmp_path: object) -> None:
+    from oscprecon import config
+
+    popup = HelpPopup("light")
+    qtbot.addWidget(popup)
+    popup.resize(640, 480)
+    popup._store_geometry()
+    assert config.window_geometry("help")  # persisted for the next session
+    reopened = HelpPopup("light")
+    qtbot.addWidget(reopened)
+    assert reopened._restore_geometry()
+    assert reopened.size() == popup.size()  # reopens the size the operator left it
