@@ -10,7 +10,15 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt, QThread, QTimer
-from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import (
+    QAction,
+    QActionGroup,
+    QCloseEvent,
+    QGuiApplication,
+    QIcon,
+    QKeySequence,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
     QDialog,
     QDockWidget,
@@ -28,7 +36,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import alive, config, edb, findings, nmap_scan, references, vault_export
+from oscprecon import alive, config, edb, findings, hosts, nmap_scan, references, vault_export
 from oscprecon.audit import Auditor
 from oscprecon.branding import (
     APP_NAME,
@@ -523,6 +531,10 @@ class MainWindow(QMainWindow):
         set_hostname_action.setStatusTip("Recon host-based services by vhost name (e.g. box.htb)")
         set_hostname_action.triggered.connect(self._on_set_hostname)
         edit_menu.addAction(set_hostname_action)
+        add_hosts_action = QAction("Add Host to /etc/hosts...", self)
+        add_hosts_action.setStatusTip("Map a discovered vhost to the target IP in /etc/hosts")
+        add_hosts_action.triggered.connect(self._on_add_hosts_entry)
+        edit_menu.addAction(add_hosts_action)
         add_cred_action = QAction("Add Credential...", self)
         add_cred_action.triggered.connect(self._on_add_credential)
         edit_menu.addAction(add_cred_action)
@@ -1438,6 +1450,52 @@ class MainWindow(QMainWindow):
             self._announce_hostname(self._profile.target)
         else:
             self._tool_panel.append_output("[hostname] cleared — recon targets the IP again.")
+
+    def _on_add_hosts_entry(self) -> None:
+        # quick "add a discovered vhost to /etc/hosts" — recon on HTB/PG constantly turns up
+        # name-based vhosts (research.bedside.htb) that only resolve once mapped to the target IP.
+        # Writes directly when Nabu is root; else copies the exact sudo command to the clipboard.
+        if self._profile is None:
+            QMessageBox.information(self, "No project", "Open or create a project first.")
+            return
+        ip = self._profile.target.ip
+        default = f"{ip} {self._profile.target.hostname or ''}".strip()
+        text, ok = QInputDialog.getText(
+            self,
+            "Add Host to /etc/hosts",
+            "Entry to add — an IP then one or more vhosts (space-separated):\n"
+            "e.g. 10.10.10.5 research.bedside.htb admin.bedside.htb",
+            text=default + " ",
+        )
+        if not ok:
+            return
+        parts = text.split()
+        if len(parts) < 2:
+            QMessageBox.warning(self, "Add Host", "Enter an IP followed by at least one hostname.")
+            return
+        entry_ip, names = parts[0], parts[1:]
+        try:
+            result = hosts.add_entry(entry_ip, names)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Add Host", str(exc))
+            return
+        except OSError:
+            cmd = hosts.sudo_append_command(entry_ip, names)
+            clip = QGuiApplication.clipboard()
+            if clip is not None:
+                clip.setText(cmd)
+            QMessageBox.information(
+                self,
+                "Add Host — needs root",
+                "Nabu isn't running as root, so it can't edit /etc/hosts directly.\n\n"
+                "The command has been copied to your clipboard — paste it in a terminal:\n\n"
+                f"  {cmd}",
+            )
+            self._tool_panel.append_output(f"[hosts] copied (needs root):  {cmd}")
+            return
+        self._audit_action("add-hosts-entry", ip=entry_ip, names=" ".join(names))
+        self._tool_panel.append_output(f"[hosts] {result.message}")
+        QMessageBox.information(self, "Add Host", result.message)
 
     def _announce_hostname(self, target: Target) -> None:
         # the tool can't edit /etc/hosts (needs sudo); surface the exact line so the user can, and

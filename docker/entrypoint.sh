@@ -9,10 +9,13 @@ mkdir -p "$HOME/oscprecon" "$HOME/.config/oscprecon" 2>/dev/null || true
 
 case "${1:-}" in
     gui | nabu)
-        # the desktop GUI — requires -e DISPLAY + -v /tmp/.X11-unix:/tmp/.X11-unix from the host
-        if [ -z "${DISPLAY:-}" ]; then
-            echo "[nabu] 'gui' needs an X11 display. Re-run via docker/nabu-docker.sh gui, or pass" >&2
-            echo "       -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix (and 'xhost +local:' on the host)." >&2
+        # the desktop GUI — requires -e DISPLAY + -v /tmp/.X11-unix:/tmp/.X11-unix from the host.
+        # Check BOTH: a bare DISPLAY with no mounted socket still aborts Qt with a cryptic xcb error.
+        if [ -z "${DISPLAY:-}" ] || [ ! -e /tmp/.X11-unix ]; then
+            echo "[nabu] 'gui' needs a forwarded X11 display. Easiest: docker/nabu-docker.sh gui" >&2
+            echo "       Manual: -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix  (+ 'xhost +local:' on host)." >&2
+            echo "       No display? Recon works fully headless — just drop 'gui':" >&2
+            echo "         docker run ... nabu doctor | scan IP -p NAME   (no display needed)." >&2
             exit 2
         fi
         exec nabu

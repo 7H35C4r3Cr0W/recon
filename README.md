@@ -130,7 +130,38 @@ uv run nabu                   # launch the GUI  (uv run python -m oscprecon is e
 > scripts are in `.venv/bin`, which isn't on your PATH. Use `uv run nabu …`, or run
 > `packaging/install-desktop.sh` (or `./install.sh`) once to add the `~/.local/bin` symlinks.
 
+**Docker (any host — Kali, Parrot, Ubuntu, Fedora, Arch, macOS, Windows).** Don't want to touch your
+host's packages at all? Run Nabu as a container — the whole Kali toolset (nmap, feroxbuster, netexec,
+seclists, exploitdb, …) is baked **into the image**, so your host's `apt` is never involved and it runs
+the same everywhere Docker does. **The host distro doesn't matter — Parrot works exactly like Kali**,
+because the tools live in the container, not on your host.
+
+```bash
+git clone https://github.com/7H35C4r3Cr0W/recon.git ~/oscp-recon && cd ~/oscp-recon
+
+docker/nabu-docker.sh build                    # build once (~4GB: all tools + Nabu)
+
+docker/nabu-docker.sh doctor                   # headless: check the toolset
+docker/nabu-docker.sh scan 10.10.10.5 -p box   # a scan — persists to ~/.nabu on your host
+docker/nabu-docker.sh searchsploit vsftpd 2.3.4
+docker/nabu-docker.sh gui                       # the desktop GUI (forwards your X11 display)
+docker/nabu-docker.sh shell                     # a shell inside the container
+```
+
+- **Persistent data** lives on your host at `~/.nabu` (override with `NABU_DATA=…`) → `/data` in the
+  container; scans, creds, notes and config survive across runs. Files are root-owned by default —
+  set `NABU_USER="$(id -u):$(id -g)"` to own them as yourself.
+- Uses `--network host` so a **VPN tun** and **raw-socket nmap** work on Linux hosts (Kali/Parrot/…).
+  On macOS/Windows Docker Desktop host networking is limited — the CLI still works for non-raw tasks.
+- The **GUI** needs an X11 server: native on Linux/Parrot; **XQuartz** on macOS; **WSLg/VcXsrv** on
+  Windows. Build a slim image without the ~2GB wordlists with `WITH_WORDLISTS=0 docker/nabu-docker.sh build`.
+- `docker compose run --rm nabu doctor` works too (see `docker-compose.yml`).
+
 On first launch Nabu creates its workspace at `~/oscprecon/` and opens to the Workspace dashboard.
+
+> **Confused about a command's flags?** Every command self-documents — `nabu-cli --help` lists the
+> workflow, and `nabu-cli scan --help` shows the scan batteries (quick/default/full/exam), every flag,
+> and copy-paste examples. Same for `enum`, `searchsploit`, `payload`, `creds`, etc.
 
 ## Requirements
 
@@ -189,7 +220,9 @@ same engine, nothing GUI-only:
 - **Credentials:** `nabu-cli creds add|list|rm -p <profile>` (the vault, chmod-600, secrets shown in full).
 - **References / helpers:** `nabu-cli doctor [--install]`, `nabu-cli searchsploit <product> [version]`,
   `nabu-cli exploit [service]` (the Exploitation catalog, display-only), `nabu-cli payload` (msfvenom
-  builder), `nabu-cli gtfobins [binary]`, `nabu-cli pivot` (ligolo-ng, `--os linux|windows`), `nabu-cli docs`.
+  builder), `nabu-cli gtfobins [binary]`, `nabu-cli pivot` (ligolo-ng, `--os linux|windows`),
+  `nabu-cli hosts <ip> <vhost…>` (add a discovered vhost to `/etc/hosts`; also **Edit → Add Host to
+  /etc/hosts** in the GUI), `nabu-cli docs`.
 - **Opt-in modes (§2a/§2b):** `nabu-cli config --spray/--exploit` toggles the gates; `nabu-cli spray
   <service> -p <profile>` runs an OSCP-legal spray from the vault (refused while Spray mode is off,
   the exam-legal default).

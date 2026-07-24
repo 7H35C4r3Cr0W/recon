@@ -174,6 +174,13 @@ oscp-recon/
 ├── CLAUDE.md                 ← this file (project brief & constraints)
 ├── ROADMAP.md                ← phased build plan (superseded by this file where they differ)
 ├── pyproject.toml
+├── install.sh                ← host bootstrap (only-missing tools, dry-run guarded — never breaks apt)
+├── Dockerfile                ← containerized Nabu (Kali toolset baked in; runs on ANY host incl. Parrot)
+├── docker-compose.yml        ← `docker compose run --rm nabu <cmd>`
+├── .dockerignore
+├── docker/
+│   ├── entrypoint.sh         ← in-container dispatch: gui / shell / nabu-cli <args>
+│   └── nabu-docker.sh        ← host launcher (network host, /data volume, X11 for the GUI)
 ├── src/oscprecon/
 │   ├── __main__.py           ← `python -m oscprecon` launches the GUI
 │   ├── cli.py                ← Typer headless entry (`oscprecon-cli`)

@@ -16,12 +16,21 @@ from oscprecon.gui.splash import NabuSplash, make_splash
 
 def _has_display() -> bool:
     # why: on a headless box / over SSH / a distro missing Qt's xcb libs, QApplication() aborts at
-    # the C++ level ("could not load the Qt platform plugin xcb") with a coredump Python can't catch.
-    # Detect the no-display case first so we can exit with an actionable message instead. This is the
-    # "GUI works for some, not others" split: the CLI never needs a display; the GUI always does.
+    # the C++ level ("could not load the Qt platform plugin xcb") with a coredump Python can't
+    # catch. Detect the no-display case first so we can exit with an actionable message instead.
+    # This is the "GUI works for some, not others" split: the CLI never needs a display; GUI does.
     platform = os.environ.get("QT_QPA_PLATFORM", "")
-    if platform:  # an explicit platform (offscreen/minimal/vnc/wayland/…) — trust it, let Qt decide
+    if platform in (
+        "offscreen",
+        "minimal",
+        "vnc",
+    ):  # explicitly headless/rendered — no display needed
         return True
+    if platform in ("wayland", "wayland-egl"):
+        return bool(os.environ.get("WAYLAND_DISPLAY"))
+    # xcb (incl. the value baked into the Docker image) or unset -> we still need a real X/XWayland
+    # display. Don't short-circuit on "xcb is set" — that made the container skip this check and hit
+    # Qt's uncatchable xcb abort instead of the friendly message below.
     if sys.platform in ("win32", "darwin"):  # native window server is always present
         return True
     return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))

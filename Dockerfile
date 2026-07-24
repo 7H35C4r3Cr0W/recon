@@ -32,14 +32,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       nmap feroxbuster gobuster ffuf dirsearch nikto whatweb wpscan curl wget \
       smbclient smbmap enum4linux-ng impacket-scripts netexec \
       ldap-utils snmp onesixtyone dnsrecon bind9-dnsutils ike-scan nbtscan \
-      ntpsec-ntpdate redis-tools nfs-common rpcbind dnsenum openssh-client rsync \
+      ntpsec-ntpdate ntpsec redis-tools nfs-common rpcbind dnsenum openssh-client rsync \
       ca-certificates git libcap2-bin procps iproute2 \
       python3 python3-venv \
       libgl1 libegl1 libglib2.0-0t64 libdbus-1-3 fontconfig fonts-dejavu-core \
-      libxkbcommon0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
-      libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 \
-      libnss3 libnspr4 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxi6 \
-      libasound2t64 libcups2t64 libpango-1.0-0 \
+      libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+      libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 libxcb-xkb1 \
+      libnss3 libnspr4 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxi6 libxfixes3 libxkbfile1 \
+      libasound2t64 libcups2t64 libpango-1.0-0 libwayland-cursor0 \
     && rm -rf /var/lib/apt/lists/*
 
 # 2) Wordlists + Exploit-DB (heavy: ~2GB). On by default for a self-contained image; turn OFF for a
@@ -50,18 +50,17 @@ RUN if [ "$WITH_WORDLISTS" = "1" ]; then \
         && rm -rf /var/lib/apt/lists/* ; \
     else echo "WITH_WORDLISTS=0 — skipping seclists/exploitdb (mount host wordlists at runtime)"; fi
 
-# let a non-root (--user) container still run SYN/UDP scans when granted CAP_NET_RAW
-RUN setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip "$(command -v nmap)" || true
-
-# 3) uv — pinned into /usr/local/bin; never let its installer rewrite shell rc files.
-ENV UV_INSTALL_DIR=/usr/local/bin \
-    INSTALLER_NO_MODIFY_PATH=1 \
-    UV_NO_MODIFY_PATH=1
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && uv --version
+# 3) uv — copied from the official distroless image (no `curl | sh` piped to a root shell at build
+#    time; reproducible and signed via the image digest).
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+RUN uv --version
 
 # 4) Nabu into its own venv. Copy ONLY what the wheel needs (no dev cruft, no private files).
+#    Install DEPENDENCIES first (this heavy layer — PySide6 etc. — is cached across source edits),
+#    then the project itself, so iterating on src doesn't re-download Qt every build.
 WORKDIR /opt/nabu
 COPY pyproject.toml uv.lock README.md LICENSE ./
+RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
 RUN uv sync --frozen --no-dev \
     && rm -rf /root/.cache/uv
@@ -73,7 +72,18 @@ ENV PATH="/opt/nabu/.venv/bin:${PATH}"
 ENV HOME=/data \
     QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-gpu-compositing --disable-dev-shm-usage" \
     QT_QPA_PLATFORM=xcb
-RUN mkdir -p /data/oscprecon /data/.config/oscprecon && chmod -R 0777 /data
+# /data is the single persistence mount (workspace/config/cache/state all live under HOME=/data).
+# Make ONLY the mount point writable by any uid so a --user (non-root) run can create its subtree on a
+# fresh named volume; the entrypoint mkdir -p's the actual dirs, owned by the runtime user.
+RUN mkdir -p /data && chmod 0777 /data
+
+# Kali's nmap ships the REAL binary /usr/lib/nmap/nmap (/usr/bin/nmap is a wrapper script) with
+# cap_net_admin set — that cap is NOT in Docker's default bounding set, so with the effective bit the
+# kernel REFUSES to exec nmap (EPERM: "Operation not permitted") in a normal container. Re-cap the
+# real binary to cap_net_raw ONLY (which IS in the default set): raw scans work everywhere — a bare
+# `docker run` as root, or --user + --cap-add=NET_RAW — and nmap never fails to launch. (Kept as a
+# late layer so tweaking it doesn't invalidate the cached dependency install above.)
+RUN setcap cap_net_raw+ep /usr/lib/nmap/nmap 2>/dev/null || true
 
 COPY docker/entrypoint.sh /usr/local/bin/nabu-entrypoint
 RUN chmod +x /usr/local/bin/nabu-entrypoint

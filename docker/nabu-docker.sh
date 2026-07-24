@@ -44,9 +44,11 @@ COMMANDS
 
 NOTES
   • Persistent data lives on the host at \$NABU_DATA (${DATA}) → /data in the container.
-  • Uses --network host so a VPN tun + raw-socket nmap work (Linux hosts). On macOS/Windows
-    Docker Desktop, host networking is limited — the CLI still works for non-raw tasks.
+  • Uses --network host so a VPN tun + raw-socket nmap work on rootful Docker Engine (the Kali/
+    Parrot/Ubuntu default). On macOS/Windows Docker Desktop — and under rootless Docker / Podman —
+    host networking + raw sockets are limited; the CLI still works and nmap degrades to connect scans.
   • GUI needs an X11 server on the host (Linux/Parrot: native; macOS: XQuartz; Windows: WSLg/VcXsrv).
+    On SELinux-enforcing hosts the GUI may also need --security-opt label=disable for the X socket.
   • Files in \$NABU_DATA are root-owned by default; set NABU_USER="\$(id -u):\$(id -g)" for host ownership.
 EOF
 }
@@ -72,8 +74,10 @@ common_flags() {
     printf '%s\0' --rm -i
     [ -t 0 ] && printf '%s\0' -t
     printf '%s\0' --network host
-    printf '%s\0' --cap-add=NET_RAW --cap-add=NET_ADMIN --cap-add=NET_BIND_SERVICE
-    printf '%s\0' -v "$DATA:/data"
+    # only cap scanning needs; nmap has cap_net_raw+ep so this also enables SYN scans under --user.
+    printf '%s\0' --cap-add=NET_RAW
+    # :z relabels for SELinux hosts (Fedora/RHEL) and is a no-op elsewhere (Kali/Parrot/Ubuntu/Arch).
+    printf '%s\0' -v "$DATA:/data:z"
     [ -n "${NABU_USER:-}" ] && printf '%s\0' --user "$NABU_USER"
 }
 
@@ -92,15 +96,19 @@ case "$cmd" in
     gui)
         ensure_image
         [ -n "${DISPLAY:-}" ] || c_die "no \$DISPLAY set — start an X11 server (Parrot/Kali have one) or use the CLI."
-        # allow the container to reach the host X server (best-effort; revoke later with: xhost -local:)
-        command -v xhost >/dev/null 2>&1 && xhost +local: >/dev/null 2>&1 || true
         local_flags=()
         while IFS= read -r -d '' f; do local_flags+=("$f"); done < <(common_flags)
-        exec docker run "${local_flags[@]}" \
+        # grant the container access to the host X server, then REVOKE it when the GUI exits — run
+        # docker in the FOREGROUND (not exec) so this trap fires. (No --ipc=host: MIT-SHM is off and
+        # QtWebEngine runs --disable-dev-shm-usage, so sharing the host IPC namespace buys nothing.)
+        if command -v xhost >/dev/null 2>&1; then
+            xhost +local: >/dev/null 2>&1 || true
+            trap 'xhost -local: >/dev/null 2>&1 || true' EXIT INT TERM
+        fi
+        docker run "${local_flags[@]}" \
             -e DISPLAY="$DISPLAY" \
             -e QT_X11_NO_MITSHM=1 \
             -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-            --ipc=host \
             "$IMAGE" gui
         ;;
     shell)

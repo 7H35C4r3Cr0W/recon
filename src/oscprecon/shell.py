@@ -203,6 +203,12 @@ ALLOWED_TOOLS: frozenset[str] = frozenset(
         "impacket-GetADUsers.py",
         "impacket-GetNPUsers.py",
         "impacket-GetUserSPNs.py",
+        # the Kali `impacket-scripts` package installs these WITHOUT the .py suffix — the real
+        # on-PATH names, so the allow-list + doctor detection must include them (else the tool looks
+        # "missing" on a box where impacket-scripts is actually installed).
+        "impacket-GetADUsers",
+        "impacket-GetNPUsers",
+        "impacket-GetUserSPNs",
         # read-only impacket enum scripts (§2 "impacket enum scripts", no cracking on-host)
         "impacket-samrdump",
         "impacket-lookupsid",
@@ -504,6 +510,9 @@ _INSTALL_HINTS: dict[str, str] = {
     "impacket-GetADUsers.py": "apt install impacket-scripts",
     "impacket-GetNPUsers.py": "apt install impacket-scripts",
     "impacket-GetUserSPNs.py": "apt install impacket-scripts",
+    "impacket-GetADUsers": "apt install impacket-scripts",
+    "impacket-GetNPUsers": "apt install impacket-scripts",
+    "impacket-GetUserSPNs": "apt install impacket-scripts",
     "crackmapexec": "apt install crackmapexec  (or use netexec)",
     "nxc": "apt install netexec",
     "dirb": "apt install dirb",

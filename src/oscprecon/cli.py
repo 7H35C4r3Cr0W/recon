@@ -24,9 +24,6 @@ app = typer.Typer(
         "Run `nabu-cli COMMAND --help` for a command's full syntax, flags, and examples "
         "(e.g. `nabu-cli scan --help`). A **profile** (`-p NAME`) is a folder under your workspace "
         "(`~/oscprecon`) that holds all output for one target.\n\n"
-        f"By {branding.AUTHOR_NAME} · {branding.AUTHOR_GITHUB} · ☕ {branding.AUTHOR_COFFEE}"
-    ),
-    epilog=(
         "**Typical workflow:**\n\n"
         "```\n"
         "nabu-cli doctor                      # check the wrapped tools are installed\n"
@@ -39,7 +36,8 @@ app = typer.Typer(
         "**Docker** (any host — Kali/Parrot/Ubuntu/macOS/Windows):\n\n"
         "```\n"
         "docker/nabu-docker.sh doctor | scan 10.10.10.5 -p box | gui | shell\n"
-        "```"
+        "```\n\n"
+        f"By {branding.AUTHOR_NAME} · {branding.AUTHOR_GITHUB} · ☕ {branding.AUTHOR_COFFEE}"
     ),
     add_completion=False,
     rich_markup_mode="markdown",
@@ -70,25 +68,14 @@ def _root(
         sys.stderr.write("\n" + branding.cli_banner() + "\n")
 
 
-@app.command(
-    epilog=(
-        "Examples:\n\n"
-        "  nabu-cli scan 10.10.10.5 -p box\n"
-        "      Staged nmap into profile 'box' using your default battery.\n"
-        "  nabu-cli scan 10.10.10.5 -p box --scan-profile quick\n"
-        "      Fast top-1000 triage only (no full sweep, no UDP).\n"
-        "  nabu-cli scan 10.10.10.5 -p box --scan-profile exam\n"
-        "      Full 65535-port sweep, rate-boosted to finish fast under exam time.\n"
-        "  nabu-cli scan target.htb -p box --hostname target.htb --udp-full\n"
-        "      Set a hostname (vhost-aware modules) and add the slow full UDP sweep.\n"
-        "  nabu-cli scan 10.10.10.5 -p box --resume\n"
-        "      Continue a profile, skipping commands that already finished."
-    ),
-)
+@app.command()
 def scan(
     ip: str = typer.Argument(..., help="Target IP or hostname (e.g. 10.10.10.5 or target.htb)."),
     profile: str = typer.Option(
-        ..., "--profile", "-p", help="Profile name = the folder under ~/oscprecon holding all output."
+        ...,
+        "--profile",
+        "-p",
+        help="Profile = the ~/oscprecon folder holding this target's output.",
     ),
     hostname: str | None = typer.Option(
         None, help="Optional hostname for the target (feeds vhost/TLS-aware modules)."
@@ -99,7 +86,7 @@ def scan(
         help="nmap battery: quick | default | full | exam (default: your configured preference).",
     ),
     udp_full: bool = typer.Option(
-        False, "--udp-full", help="Also run the slow full 65535-port UDP sweep (in addition to top-100)."
+        False, "--udp-full", help="Also run the slow full UDP sweep (65535 ports; adds to top-100)."
     ),
     resume: bool = typer.Option(
         False,
@@ -115,19 +102,31 @@ def scan(
 ) -> None:
     """Run staged nmap recon against a target and save findings to a profile.
 
-    Discovers open ports, then runs a versioned 'nmap -sV -sC' over exactly the ports it found,
-    parsing everything into <workspace>/<profile>/. Safe to re-run; open the profile in the GUI
-    ('nabu') to keep enumerating each service.
+    Discovers open ports, then runs a versioned `nmap -sV -sC` over exactly the ports it found,
+    parsing everything into `<workspace>/<profile>/`. Safe to re-run; open the profile in the GUI
+    (`nabu`) to keep enumerating each service.
 
-    Scan batteries (--scan-profile), fastest to most thorough -- all pure nmap, OSCP exam-legal:
+    **Scan batteries** (`--scan-profile`), fastest to most thorough — all pure nmap, exam-legal:
 
+    ```
     quick    Top-1000 TCP only (-T4). Fast triage; no full sweep, no UDP.
-    default  Top-1000 + full 65535-port TCP (-p- -T4) + UDP top-100, then -sV -sC on open ports.
+    default  Top-1000 + full 65535 TCP (-p- -T4) + UDP top-100, then -sV -sC on open ports.
     full     Same thorough sweep as default.
     exam     Full sweep rate-boosted (-p- --min-rate 1000 -T4) to finish fast under exam time.
+    ```
 
-    A profile (-p/--profile) is a named folder under the workspace. Re-running scan on an existing
-    profile REUSES it (history preserved); choose a new name to start a fresh scan.
+    A profile (`-p/--profile`) is a named folder under the workspace. Re-running scan on an existing
+    profile **reuses** it (history preserved); choose a new name to start a fresh scan.
+
+    **Examples:**
+
+    ```
+    nabu-cli scan 10.10.10.5 -p box                        # default battery -> profile 'box'
+    nabu-cli scan 10.10.10.5 -p box --scan-profile quick   # fast top-1000 triage only
+    nabu-cli scan 10.10.10.5 -p box --scan-profile exam    # full sweep, rate-boosted
+    nabu-cli scan target.htb -p box --hostname target.htb --udp-full   # + full UDP sweep
+    nabu-cli scan 10.10.10.5 -p box --resume               # continue; skip finished commands
+    ```
     """
     root = workspace if workspace is not None else config.workspace_root()
     profile_choice = (
@@ -260,12 +259,15 @@ def doctor(
     """Check each wrapped tool; print install hints, optionally apt-install the missing ones."""
     report = doctor_mod.scan()
     required = report.required
-    req_missing = [tool for tool in required if not tool.present]
-    spray_missing = [tool for tool in report.spray if not tool.present]
-    exploit_missing = [tool for tool in report.exploit if not tool.present]
-    typer.echo(
-        f"[doctor] {len(required) - len(req_missing)}/{len(required)} wrapped tools found on PATH"
-    )
+    # why: group-aware missing — don't report a tool as missing when a present alternative already
+    # covers it. Otherwise impacket-scripts looks "missing" because its scripts install as
+    # impacket-GetADUsers (no .py), not the .py variant we also allow-list.
+    eff_missing = doctor_mod.effective_missing(report)
+    req_missing = [tool for tool in eff_missing if not tool.optional]
+    spray_missing = [tool for tool in eff_missing if tool.category == "spray"]
+    exploit_missing = [tool for tool in eff_missing if tool.category == "exploit"]
+    present_ct = sum(1 for tool in required if tool.present)
+    typer.echo(f"[doctor] {present_ct}/{len(required)} required tools found on PATH")
     if req_missing:
         typer.echo(f"[doctor] {len(req_missing)} missing (install the ones you need):")
         for tool in req_missing:
@@ -1135,6 +1137,42 @@ def searchsploit_cmd(
         badge = f"[{hit.type or '?'}/{hit.platform or '?'}]"
         typer.echo(f"{star}EDB-{hit.edb_id:7} {badge:20} {hit.title}")
         typer.echo(f"     {hit.url}")
+
+
+@app.command("hosts")
+def hosts_cmd(
+    ip: str = typer.Argument(..., help="IP to map (usually the target IP)."),
+    names: list[str] = typer.Argument(
+        ..., help="One or more hostnames/vhosts, e.g. research.bedside.htb admin.bedside.htb"
+    ),
+    hosts_file: Path = typer.Option(
+        Path("/etc/hosts"), "--file", help="hosts file to edit (default /etc/hosts)."
+    ),
+) -> None:
+    """Add a discovered vhost/hostname to /etc/hosts so it resolves (idempotent).
+
+    Needs root to write /etc/hosts — if it can't, it prints the exact sudo command to run instead.
+
+    Example:
+
+    ```
+    nabu-cli hosts 10.10.10.5 research.bedside.htb   # sudo nabu-cli hosts ... to write directly
+    ```
+    """
+    from oscprecon import hosts as hosts_mod
+
+    try:
+        result = hosts_mod.add_entry(ip, names, hosts_file)
+    except ValueError as exc:
+        typer.echo(f"[error] {exc}", err=True)
+        raise typer.Exit(2) from exc
+    except OSError:
+        cmd = hosts_mod.sudo_append_command(ip, names)
+        typer.echo(
+            f"[hosts] can't write {hosts_file} (need root). Run this instead:\n  {cmd}", err=True
+        )
+        raise typer.Exit(1) from None
+    typer.echo(f"[hosts] {result.message}")
 
 
 creds_app = typer.Typer(help="Manage the profile credential vault (creds.json, chmod 600).")

@@ -61,9 +61,23 @@ class DoctorReport:
 # crackmapexec when netexec covers it). Mirrors the CLI's "alternatives are fine to skip" note.
 _ALTERNATIVE_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
     ("netexec", frozenset({"netexec", "nxc", "crackmapexec"})),
-    ("impacket-GetADUsers.py", frozenset({"GetADUsers.py", "impacket-GetADUsers.py"})),
-    ("impacket-GetNPUsers.py", frozenset({"GetNPUsers.py", "impacket-GetNPUsers.py"})),
-    ("impacket-GetUserSPNs.py", frozenset({"GetUserSPNs.py", "impacket-GetUserSPNs.py"})),
+    # the same impacket tool ships under three names depending on how it was installed: the Kali
+    # `impacket-scripts` package -> `impacket-GetADUsers` (NO .py, the preferred/installed form),
+    # a pip install -> `GetADUsers.py`, older packaging -> `impacket-GetADUsers.py`. ANY of them
+    # satisfies the tool; the preferred (first) member is what we'd apt-install if the whole group
+    # is absent. Without the no-.py name here, doctor wrongly reported impacket-scripts as missing.
+    (
+        "impacket-GetADUsers",
+        frozenset({"impacket-GetADUsers", "GetADUsers.py", "impacket-GetADUsers.py"}),
+    ),
+    (
+        "impacket-GetNPUsers",
+        frozenset({"impacket-GetNPUsers", "GetNPUsers.py", "impacket-GetNPUsers.py"}),
+    ),
+    (
+        "impacket-GetUserSPNs",
+        frozenset({"impacket-GetUserSPNs", "GetUserSPNs.py", "impacket-GetUserSPNs.py"}),
+    ),
 )
 
 

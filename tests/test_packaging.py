@@ -131,12 +131,14 @@ def test_install_script_is_present_and_safe() -> None:
     assert text.startswith("#!/usr/bin/env bash")
     assert "set -euo pipefail" in text  # fail-safe
 
-    core = text.split("CORE_PKGS=(", 1)[1].split(")", 1)[0]
+    # the default install list is an array of package "specs" (some are per-release aliases like
+    # "netexec|crackmapexec"); spray tools live only in SPRAY_SPECS behind --with-spray.
+    core = text.split("CORE_SPECS=(", 1)[1].split(")", 1)[0]
     assert (
         "hydra" not in core and "medusa" not in core
     )  # spray tools are NOT in the default install
-    assert "hydra medusa" in text  # they exist only behind --with-spray
+    assert "SPRAY_SPECS=(hydra medusa)" in text  # they exist only behind --with-spray
     assert "--with-spray" in text
     for forbidden in ("metasploit", "msfvenom", "sqlmap", "nessus", "burpsuite"):
         assert forbidden not in text.lower()
-    assert "uv sync" in text and "oscprecon-cli doctor" in text  # sets up + checks readiness
+    assert "uv sync" in text and "nabu-cli doctor" in text  # sets up + checks readiness

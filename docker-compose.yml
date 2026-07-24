@@ -12,12 +12,11 @@ services:
     # host networking so a VPN tun + raw-socket nmap work (Linux hosts).
     network_mode: host
     cap_add:
-      - NET_RAW
-      - NET_ADMIN
-      - NET_BIND_SERVICE
+      - NET_RAW   # all nmap needs for SYN/UDP scans; nmap has cap_net_raw+ep in the image
     volumes:
-      # persistent workspace (scans / creds / notes / config) on the host
-      - ${NABU_DATA:-./.nabu-data}:/data
+      # persistent workspace (scans / creds / notes / config). SAME default as docker/nabu-docker.sh
+      # so both entry points share one workspace. :z is a no-op off SELinux, required on Fedora/RHEL.
+      - ${NABU_DATA:-${HOME}/.nabu}:/data:z
     stdin_open: true
     tty: true
     # default action for a bare `docker compose run nabu`; override by appending a command.

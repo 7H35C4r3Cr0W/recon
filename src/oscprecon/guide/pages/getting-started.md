@@ -20,6 +20,25 @@ auto-installs — the **Spray-mode** (§2a) and **Exploitation-tab** (§2b) tool
 impacket-secretsdump, responder, hashcat, …) with their install hints, so you can confirm your
 attack tools are present before exam day. Those span apt/pipx/gem, so you install the ones you use.
 
+## Run in Docker (any host — Kali, Parrot, Ubuntu, macOS, Windows)
+
+Prefer not to touch your host's packages? Run Nabu as a container — the whole Kali toolset is baked
+**into the image**, so your host's `apt` is never involved and it runs the same everywhere Docker
+does. **The host distro doesn't matter (Parrot works exactly like Kali)** because the tools live in
+the container, not on your host.
+
+```bash
+docker/nabu-docker.sh build                    # build once (~4GB: all tools + Nabu)
+docker/nabu-docker.sh doctor                   # headless: check the toolset
+docker/nabu-docker.sh scan 10.10.10.5 -p box   # a scan — persists to ~/.nabu on your host
+docker/nabu-docker.sh gui                       # the desktop GUI (forwards your X11 display)
+docker/nabu-docker.sh shell                     # a shell inside the container
+```
+
+Scans/creds/notes persist on your host at `~/.nabu` (override with `NABU_DATA=…`). `--network host`
+gives the container your VPN tun + raw-socket nmap on Linux. The GUI needs an X11 server (native on
+Linux/Parrot; XQuartz on macOS; WSLg on Windows).
+
 ## Launch
 
 ```bash
@@ -27,6 +46,7 @@ nabu                    # the GUI  (python -m oscprecon is equivalent)
 nabu-cli scan 10.10.10.5 --profile htb-active   # headless staged nmap
 nabu-cli enum smb -p htb-active                 # run a service's Tier-1 recon headlessly
 nabu-cli findings -p htb-active                 # browse what was found
+nabu-cli hosts 10.10.10.5 research.bedside.htb  # add a discovered vhost to /etc/hosts (needs root)
 nabu-cli list                                   # your workspace projects
 nabu-cli creds list -p htb-active               # the vault (secrets shown in full)
 nabu-cli docs           # this documentation, in the terminal
@@ -37,6 +57,11 @@ The **CLI is at feature parity with the GUI** for automatable work — `scan`, `
 `payload`, `gtfobins`, `pivot`, `export-*`/`import-project`, and the gated `spray`/`config`. Run
 `nabu-cli --help` for the full surface. (The settings-heavy web/SMB panels — wordlist-driven content
 discovery, tiered SMB — stay richest in the GUI.)
+
+**Every command self-documents.** `nabu-cli --help` shows the typical workflow; `nabu-cli scan --help`
+lays out the scan batteries (`quick` / `default` / `full` / `exam`), every flag, and copy-paste
+examples — so you never have to guess the syntax. The same holds for `enum`, `searchsploit`, `payload`,
+`creds`, and the rest.
 
 ## Your first scan (GUI)
 
