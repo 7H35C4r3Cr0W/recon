@@ -15,6 +15,7 @@
 #   NABU_DATA=$HOME/.nabu         host dir for the persistent workspace (scans/creds/config)
 #   NABU_USER="$(id -u):$(id -g)" run as this uid:gid so files are host-owned (default: root)
 #   WITH_WORDLISTS=0              build a slim image without seclists/exploitdb (~2GB smaller)
+#   WITH_ATTACK=0                 build without the Exploitation-tab tools (recon-only image)
 set -euo pipefail
 
 IMAGE="${NABU_IMAGE:-nabu:latest}"
@@ -67,9 +68,12 @@ ensure_image() {
 }
 
 build() {
+    # "$@" is forwarded so `nabu-docker.sh build --no-cache` (or --pull, --progress=plain, another
+    # --build-arg) reaches docker instead of being silently dropped.
     local args=(build -t "$IMAGE")
     [ -n "${WITH_WORDLISTS:-}" ] && args+=(--build-arg "WITH_WORDLISTS=${WITH_WORDLISTS}")
-    args+=("$REPO")
+    [ -n "${WITH_ATTACK:-}" ] && args+=(--build-arg "WITH_ATTACK=${WITH_ATTACK}")
+    args+=("$@" "$REPO")
     printf '\033[1;36m[nabu-docker] docker %s\033[0m\n' "${args[*]}" >&2
     docker "${args[@]}"
 }

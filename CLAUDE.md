@@ -4,7 +4,7 @@
 
 > **▶ CONTINUING PRIOR WORK / CONTEXT WAS RESET?** Read `HANDOFF.md` — it points you to the maintainer's local `HANDOFF.local.md` (kept off the public repo) with the full state — it has the current repo HEAD, the four gates, how the owner wants work done, the adversarial-review workflow, what's already been swept, and what to do next. This file (CLAUDE.md) is the full brief and the rules.
 
-Companion files in this repo elaborate specific slices — `ROADMAP.md` for phase-by-phase build order, `prompts/*.md` for paste-able sequenced work chunks, `boxes/TRACKER.md` for the study list — but everything critical is in this file.
+Companion files in this repo elaborate specific slices — `ROADMAP.md` for phase-by-phase build order, `boxes/TRACKER.md` for the study list — but everything critical is in this file.
 
 ---
 
@@ -93,6 +93,7 @@ Rules (non-negotiable):
 - **Execution ON by default** (`exploit_enabled` default `true`, owner 2026-07-16) — the user wants the tab usable, and stays in control because **nothing runs automatically**: every Run is user-initiated and confirmed. A user who wants the tab shown-only can uncheck it in Preferences. This is a distribution posture, not a per-command gate — the per-run confirmation is the real gate.
 - **Loot is the operator's own data — shown in full, not redacted.** Run streams into the output pane (or paste tool output), **Parse** extracts hashes/creds, **Add to vault** writes `creds.json`. The loot table shows the dumped secrets **in full** (the owner wants to see/use them — do NOT redact them). **As of 2026-07-22 this extends to the RECON side too: nothing is redacted anywhere** (command logs, audit, reports, graph, spray, SNMP findings, vault) — see § 6. The old "recon commands keep their existing redaction" note is superseded.
 - **`runs_on` distinguishes attacker vs victim.** `"attacker"` = runs FROM Kali against the target → **Run** (a single Popen-safe argv). `"victim"` = a command you paste into an already-obtained shell ON the target (SUID checks, `sudo -l`, GTFOBins, winPEAS, reverse shells, mimikatz) → **copy-only**, never executed here. An action is only `attacker` if its filled command is a single Popen-safe argv beginning with a real program (no shell pipes/redirects/subshells, no payload fragment, not a victim-only tool).
+- **Every action is LABELLED with the port(s) it targets** (owner request, 2026-07-24). `exploit/base.py::action_ports(action, spec)` resolves them most-specific-first: the action's own `ports=` declaration → a literal port written into the command (`nmap -p139,445`, a URL `:8080`) → the tool's default port (a curated `_TOOL_PORTS` map: evil-winrm→5985/5986, impacket-secretsdump→445, timeroast→NTP/123; `netexec <proto>` reads the protocol token) → the service's declared ports. Local/offline tools (`_LOCAL_TOOLS`: searchsploit, gpp-decrypt, hashcat, *2john…) resolve to *no target port*, and a victim-side command with no derivable port says so. Copy-only ≠ portless — evil-winrm is `runs_on="victim"` yet plainly speaks 5985, so ports are derived before the victim check. The GUI shows them inline in the action tree (`… [445]`), and under the command against what the scan found (`445 ✓ open · 139 · not found — default for …`); the CLI prints the same with `✓`. A port-parameterised action (`{port}`/`{url}`) aimed at a port outside its usual set raises a **non-blocking** warning — services legitimately move (http on 65000) and §2b keeps the human confirm as the only gate. The Port picker lists DISCOVERED ports annotated with the service nmap named there (`8080 — http-proxy`); its value is still the bare number.
 - **Tied to discovered services/ports.** Each `ServiceExploits` declares the `ports` that signal its presence; the picker surfaces the surfaces open on *this* box first (`●`-marked, mirrors Recon's service focus) and binds `{port}`/`{url}` to the actual discovered port. **Presence must be a *strong* signal:** a shared web port (80/443/8080/…) alone marks only the generic `web`/`webdav` present — a *specific* web app (Drupal, WordPress, …) is `●` only via a service-name/fingerprint match or a service-specific (non-web) port, never merely because port 80 is open (else a bare web server marks ~70 apps present). Portless post-ex catalogs (`linux`/`windows` privesc, `shells`) are never "present" and never warn. Selecting an action for a *network* service the scan did **not** find shows a loud, non-blocking warning ("⚠ … was NOT found on this target by the scan") — it never disables Run (the human confirm stays the guardrail per this section), it just tells the operator they're acting on a service discovery didn't see.
 - **Engine lives in `src/oscprecon/exploit/`** (`base.py` registry + `fill_template` + `runs_on`/`ports`, one module per service, `parsers.py`). Every action cites a `source=`. GUI is `gui/widgets/exploit_panel.py`; execution is `main_window._on_exploit_run` (confirm → `CommandWorker(exploit=True)` → stream → auto-parse). Headless: `nabu-cli exploit [service] [-p profile]` (display view, RUN vs COPY).
 - **DECISION-AID, NOT a CVE database (owner rule, 2026-07-21).** The catalog exists to make recon/enum/attack *decisions* — per service it keeps fingerprint/version detection, `searchsploit` lookup, enumeration, default/weak-cred checks, config/loot reads, and **generic offensive technique CLASSES** (web SQLi/SSRF/LFI/SSTI/upload/deserialization *primitives*, the full AD attack catalog, potato family, GTFOBins, file transfers, privesc enumeration, Log4Shell/Text4Shell/Shellshock, DB→RCE via legit features). It does **not** hoard box-specific, novel, single-named-CVE **weaponized PoC delivery** (build-the-gadget / upload-the-webshell / run-the-CVE-exploit / CVE-pinned reverse-shell) — crafting the per-box exploit is the pentester's job. On 2026-07-21 a vault-gap audit removed **230 such named-CVE PoC-delivery actions across 81 service modules** (e.g. Ghostcat, Drupalgeddon2, Struts S2-04x/05x OGNL/XStream RCE, gitlab-22205/2825, grafana-43798 traversal, xwiki/solr/confluence/sharepoint/nexus RCE chains) while keeping every service's recon core (no module emptied). When a box hits a specific CVE, the tool fingerprints it + points at the CVE via `searchsploit`/the reference pane; the operator writes the exploit.
@@ -153,10 +154,11 @@ Install on a fresh Kali:
 
 ```bash
 sudo apt update && sudo apt install -y \
-  nmap feroxbuster gobuster ffuf dirsearch nikto whatweb wpscan \
+  nmap feroxbuster gobuster ffuf dirsearch dirb nikto whatweb wpscan wfuzz \
   smbclient smbmap enum4linux-ng rpcclient impacket-scripts \
-  netexec ldap-utils snmp onesixtyone dnsrecon dnsutils \
-  ike-scan nbtscan ntpdate seclists exploitdb
+  netexec ldap-utils snmp snmpcheck onesixtyone dnsrecon dnsutils \
+  ike-scan nbtscan ntpdate seclists exploitdb \
+  finger subversion default-mysql-client postgresql-client netcat-traditional ssh-audit
 
 # Python via uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -180,7 +182,8 @@ oscp-recon/
 ├── .dockerignore
 ├── docker/
 │   ├── entrypoint.sh         ← in-container dispatch: gui / shell / nabu-cli <args>
-│   └── nabu-docker.sh        ← host launcher (network host, /data volume, X11 for the GUI)
+│   ├── nabu-docker.sh        ← host launcher (network host, /data volume, X11 for the GUI)
+│   └── test-docker.sh        ← end-to-end container verification (--static | --build | --net | --gui)
 ├── src/oscprecon/
 │   ├── __main__.py           ← `python -m oscprecon` launches the GUI
 │   ├── cli.py                ← Typer headless entry (`oscprecon-cli`)
@@ -241,14 +244,7 @@ oscp-recon/
 │   ├── boxes.json
 │   ├── _template.md          ← per-box notes template
 │   └── <platform>-<box>.md   ← user notes per box
-├── walkthroughs/             ← gitignored except README.md + _sample-*.md
-│   ├── README.md
-│   ├── _sample-htb-linux.md
-│   ├── _sample-htb-ad.md
-│   └── _sample-vl-chain.md
-├── prompts/                  ← sequenced paste-able prompts (mostly used with Windsurf; still valid here)
-│   ├── README.md
-│   └── 00–08-*.md
+├── walkthroughs/             ← LOCAL drop point for third-party writeups — gitignored, never published (§21)
 ├── tests/
 │   ├── fixtures/             ← committed sample tool outputs
 │   └── gui/                  ← pytest-qt smoke tests
@@ -383,6 +379,27 @@ Default workspace: `~/oscprecon/`. Each profile is a folder:
   }
 }
 ```
+
+### 6c. Operator-entered findings — BUILT (owner request, 2026-07-24)
+
+A parser only records what a tool printed. The working SQLi, the credential spotted in a PDF, the
+path that actually gave a foothold are the operator's own findings — so they can be entered by hand:
+**Edit → Add Finding** (`Ctrl+Shift+F`), the **＋ Add finding** button on the Findings view, or
+`nabu-cli add-finding`. Fields: one-line description, kind, a **severity the operator judges**
+(info / reference / access / exposure / relay-risk), **host + port** (both prefilled from discovery),
+**PoC / repro**, notes, reference URL.
+
+- Stored in the SAME `findings.json` as parsed findings, with `manual: true`, a stable `id` and
+  `added_at` — so they flow into the Findings view, the graph and `report.md` with no separate store.
+- **Never deduped** (two hand-written notes may legitimately match) and **editable / deletable** by
+  id (`update_manual_finding` / `delete_manual_finding`). Parsed tool output is neither: it is the
+  record of what the tools actually saw, and the manual edit/delete paths refuse to touch it.
+- `finding_severity.category_of(finding)` is the ONE place that decides a finding's category — an
+  explicit valid `severity` (the operator judged it) wins, everything else is classified
+  conservatively as before. Used by the Findings view, the reporter and the CLI.
+- `report.md` gains a **My findings** section rendering each with its PoC in a fenced block (a ``` in
+  the pasted PoC is neutralised so it can't escape the fence); they are excluded from the
+  per-service grouping so nothing is duplicated.
 
 ### 6a. Audit log — `<profile>/audit.jsonl` — BUILT
 
@@ -1363,7 +1380,6 @@ uv run ruff format --check
 
 - This file, in full. Don't skim §§ 2 (constraints), 11 (SMB tiers), 21 (walkthroughs).
 - `ROADMAP.md` for phase context if working across phases.
-- `prompts/*.md` if the user asks you to work on a specific prompt.
 
 ### Behavior
 
@@ -1418,7 +1434,7 @@ New session? Do these first:
 
 1. Read this file (`CLAUDE.md`) fully.
 2. Read `ROADMAP.md`.
-3. Skim `boxes/TRACKER.md` and `walkthroughs/_sample-*.md`.
+3. Skim `boxes/TRACKER.md` (and any local writeups you dropped in `walkthroughs/`).
 4. Confirm: "Which phase are we on?" — check what's in `src/oscprecon/` vs. the phase deliverables in § 23.
 5. Ask the user which phase / feature / module to work on. Don't guess.
 6. Before writing code: list the specific commands you will wrap and confirm they're on the Allowed list in § 2.

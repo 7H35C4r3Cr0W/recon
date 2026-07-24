@@ -53,6 +53,9 @@ ${B}WHAT IT DOES${R}  ${DIM}(about 3–8 min on a fresh host, mostly downloads)$
 ${B}OPTIONS${R}
   --with-spray   also install the opt-in Spray-mode tools (hydra, medusa).
                  Spray stays OFF by default in the app; this only installs them.
+  --with-attack  also install the Exploitation-tab tools (evil-winrm, certipy-ad,
+                 responder, john, hashcat). Recon never runs these; every Run in
+                 the Exploitation tab is user-initiated and confirmed.
   -y, --yes      accepted for compatibility — the installer is always
                  non-interactive and never stops to ask.
   -h, --help     show this help and exit.
@@ -75,6 +78,7 @@ ${B}GOOD TO KNOW${R}
 ${B}EXAMPLES${R}
   ./install.sh                 # standard install
   ./install.sh --with-spray    # also install hydra/medusa
+  ./install.sh --with-attack   # also install the Exploitation-tab tools
   ./install.sh --help          # this screen
 
 After it finishes:  ${B}nabu-cli doctor${R}   then   ${B}nabu${R}
@@ -83,9 +87,11 @@ EOF
 
 # ---- argument parsing --------------------------------------------------------------------------
 WITH_SPRAY=0
+WITH_ATTACK=0
 for arg in "$@"; do
     case "$arg" in
         --with-spray) WITH_SPRAY=1 ;;
+        --with-attack) WITH_ATTACK=1 ;;
         -y | --yes) : ;;  # accepted for back-compat; this bootstrap is always non-interactive
         -h | --help)
             usage
@@ -241,20 +247,27 @@ fi
 # (systemd-timesyncd), so auto-installing it would swap the host's time daemon; the ntp module's ntpq
 # is therefore left to a deliberate 'nabu-cli doctor --install' rather than force-swapped here.
 CORE_SPECS=(
-    nmap feroxbuster gobuster ffuf dirsearch nikto whatweb wpscan curl wget
+    nmap feroxbuster gobuster ffuf dirsearch dirb nikto whatweb wpscan curl wget wfuzz
     smbclient smbmap "enum4linux-ng|enum4linux" impacket-scripts
     "netexec|crackmapexec"
-    ldap-utils snmp onesixtyone dnsrecon
+    ldap-utils snmp snmpcheck onesixtyone dnsrecon
     "bind9-dnsutils|dnsutils"
     ike-scan nbtscan
     "ntpsec-ntpdate|ntpdate"
     seclists exploitdb redis-tools
+    # the service clients the modules + attack catalog drive — the same set `doctor` looks for and
+    # the container image installs, so a host install and the container agree. Small, and each one
+    # is still only installed when MISSING.
+    finger subversion "default-mysql-client|mariadb-client" postgresql-client
+    "netcat-traditional|netcat-openbsd" ssh-audit nfs-common rsync
 )
 SPRAY_SPECS=(hydra medusa)
+# Exploitation-tab (§2b) tools — opt-in like spray, since a recon-only user needs none of them.
+ATTACK_SPECS=(evil-winrm certipy-ad responder john hashcat)
 
 NEED_UV=0
 command -v uv >/dev/null 2>&1 || NEED_UV=1
-TOTAL_STEPS=$((5 + WITH_SPRAY + NEED_UV)) # apt-update, tools, [spray], [uv], sync, link, doctor
+TOTAL_STEPS=$((5 + WITH_SPRAY + WITH_ATTACK + NEED_UV)) # apt-update, tools, [spray], [attack], [uv], sync, link, doctor
 
 # ---- welcome + plan ----------------------------------------------------------------------------
 printf '\n%s%s   {o,o}   Nabu — Local Recon Workspace%s\n' "$CY" "$B" "$R"
@@ -265,6 +278,7 @@ printf '\n%sHere is the plan (%s steps, ~3–8 min — mostly downloads):%s\n' "
 printf '   1. update apt package lists\n'
 printf '   2. install any MISSING recon tools (already-present ones are left untouched)\n'
 [ "$WITH_SPRAY" -eq 1 ] && printf '   +  install spray tools (hydra, medusa)\n'
+[ "$WITH_ATTACK" -eq 1 ] && printf '   +  install Exploitation-tab tools (evil-winrm, certipy-ad, responder, john, hashcat)\n'
 [ "$NEED_UV" -eq 1 ] && printf '   +  install uv (Python package manager)\n'
 printf '   3. set up Nabu in its own virtualenv\n'
 printf '   4. put nabu / nabu-cli on your PATH\n'
@@ -305,6 +319,12 @@ if [ "$WITH_SPRAY" -eq 1 ]; then
     step "install opt-in Spray-mode tools (hydra/medusa)"
     say "you asked with --with-spray. Spray mode still ships OFF in the app (§2a)."
     install_missing "spray tools" "${SPRAY_SPECS[@]}"
+fi
+
+if [ "$WITH_ATTACK" -eq 1 ]; then
+    step "install opt-in Exploitation-tab tools"
+    say "these are only used by the Exploitation tab (§2b) — recon never runs them."
+    install_missing "exploitation tools" "${ATTACK_SPECS[@]}"
 fi
 
 if [ "$NEED_UV" -eq 1 ]; then

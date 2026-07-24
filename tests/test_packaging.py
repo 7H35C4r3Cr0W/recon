@@ -142,3 +142,43 @@ def test_install_script_is_present_and_safe() -> None:
     for forbidden in ("metasploit", "msfvenom", "sqlmap", "nessus", "burpsuite"):
         assert forbidden not in text.lower()
     assert "uv sync" in text and "nabu-cli doctor" in text  # sets up + checks readiness
+
+    # Exploitation-tab tools are opt-in too — a recon-only install must not pull them in
+    assert "ATTACK_SPECS=(" in text and "--with-attack" in text
+    for attack_tool in ("evil-winrm", "hashcat", "responder", "john", "certipy"):
+        assert attack_tool not in core, f"{attack_tool} must not be in the default install"
+
+
+def test_install_script_and_container_install_the_same_tools() -> None:
+    # drift guard: the container bakes in the toolset, install.sh installs it on a host. When the
+    # two disagree, `doctor` reports tools missing in one place and present in the other.
+    text = (REPO / "install.sh").read_text()
+    core = text.split("CORE_SPECS=(", 1)[1].split(")", 1)[0]
+    dockerfile = (REPO / "Dockerfile").read_text()
+    shared = [
+        "nmap",
+        "feroxbuster",
+        "gobuster",
+        "ffuf",
+        "dirsearch",
+        "dirb",
+        "nikto",
+        "whatweb",
+        "wpscan",
+        "wfuzz",
+        "smbclient",
+        "smbmap",
+        "ldap-utils",
+        "onesixtyone",
+        "dnsrecon",
+        "ike-scan",
+        "nbtscan",
+        "finger",
+        "subversion",
+        "postgresql-client",
+        "ssh-audit",
+        "rsync",
+    ]
+    for pkg in shared:
+        assert pkg in core, f"install.sh is missing {pkg}"
+        assert pkg in dockerfile, f"the Dockerfile is missing {pkg}"

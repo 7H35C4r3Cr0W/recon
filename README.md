@@ -8,7 +8,7 @@ tools you already use (nmap, feroxbuster/gobuster/ffuf, nikto/whatweb, smbclient
 structures what they find, links each service to HackTricks and Exploit-DB, draws a BloodHound-style
 attack-surface graph, and produces Obsidian-friendly reports. It runs **offline** and makes **no LLM
 calls at runtime**. Recon is **exam-legal by default**; a separate, **owner-authorized Exploitation
-tab** lets you build and Run **human-confirmed** attacks by hand — **183 services / 3,187 actions**
+tab** lets you build and Run **human-confirmed** attacks by hand — **183 services / 3,190 actions**
 (impacket, evil-winrm, netexec, public PoCs, port-80 web attacks) plus an **msfvenom payload
 builder** — nothing auto-runs, you confirm every command, and SQLmap/Metasploit-modules are never
 shipped as actions.
@@ -73,12 +73,15 @@ shipped as actions.
   render, a **credential vault** (shown in full, `0600`, click-away autosave), **audit trail**, and an
   **Obsidian-ready `report.md`** with a pivot-topology section.
 - **Exploitation tab** (owner-authorized, human-driven) — clearly separated from Recon. It surfaces the
-  services found on *this* box first and, across **183 services / 3,187 actions** mined from
+  services found on *this* box first and, across **183 services / 3,190 actions** mined from
   the vault (AD, web/port-80, SMB, databases, mail, app servers, CVE-technique targets, …), shows the
   exact attack command pre-filled from the profile + a chosen vault credential. **Nothing auto-runs**:
   you pick an action and press **Run ▸**, which confirms the target before executing **one** command
   (never a chain), then **Parse** extracts dumped hashes/creds into the vault. Attacker-side actions get
-  a Run button; victim-side privesc/reverse-shells are copy-only. The **Active Directory** service is
+  a Run button; victim-side privesc/reverse-shells are copy-only. **Every attack is labelled with the
+  port(s) it targets** — inline in the list (`… [445]`) and spelled out under the command against what
+  *this* box has open (`Ports: 445 ✓ open · 139 · not found — default for impacket-secretsdump`);
+  aiming one at an unusual port is flagged, never blocked, since services do move. The **Active Directory** service is
   exhaustively covered (143 actions: PowerView/LOTL/BloodHound enum, Kerberos incl. Rubeus, ADCS ESC,
   coercion, delegation/ACL abuse, DCSync/gMSA/DPAPI, DCOM/winrs lateral, noPac/PrintNightmare/Zerologon,
   SCCM). Two copy-only helpers: a **🔍 GTFOBins** lookup (search a SUID/sudo binary → the break-out)
@@ -106,7 +109,8 @@ cd ~/oscp-recon
 
 # 2. install everything — guided and non-interactive; only the tools you're missing are added,
 #    after a dry-run that refuses to remove/downgrade anything on your system
-#    (./install.sh --help explains every step; --with-spray also installs hydra/medusa, §2a)
+#    (./install.sh --help explains every step. --with-spray adds hydra/medusa (§2a);
+#     --with-attack adds the Exploitation-tab tools: evil-winrm, certipy-ad, responder, john, hashcat)
 ./install.sh
 
 # 3. use it (a new terminal, if the installer said ~/.local/bin wasn't on PATH yet)
@@ -156,6 +160,10 @@ docker/nabu-docker.sh shell                     # a shell inside the container
 - The **GUI** needs an X11 server: native on Linux/Parrot; **XQuartz** on macOS; **WSLg/VcXsrv** on
   Windows. Build a slim image without the ~2GB wordlists with `WITH_WORDLISTS=0 docker/nabu-docker.sh build`.
 - `docker compose run --rm nabu doctor` works too (see `docker-compose.yml`).
+- **Verify a build** with `docker/test-docker.sh` — an end-to-end suite covering the image's toolset,
+  raw-socket nmap, the Qt/GUI runtime, entrypoint dispatch, workspace persistence and non-root runs.
+  `--static` needs no Docker (CI-safe); `--build` rebuilds first, `--net` adds a live internet scan.
+  Build a **recon-only** image without the attack/spray tools with `--build-arg WITH_ATTACK=0`.
 
 On first launch Nabu creates its workspace at `~/oscprecon/` and opens to the Workspace dashboard.
 
@@ -255,6 +263,11 @@ with profile`, or `nabu-cli scan --scan-profile <name>`.
   follow-ups, a parser, and pattern-library "recon next steps".
 - **Findings & credentials** persist to `findings.json` / `creds.json` (mode `0600`); anonymous / null
   enum auto-records a credential entry that later modules consume.
+- **Your own findings** — parsers only see tool output, so record what *you* found: **Edit → Add
+  Finding** (`Ctrl+Shift+F`) or `nabu-cli add-finding` captures a description, kind, severity you
+  judge, the **host + port** (prefilled from discovery), a **PoC / repro** block, notes and a
+  reference. They sit alongside parsed findings (marked `✎`, filterable, searchable by PoC text,
+  editable/deletable) and get their own **My findings** section in `report.md`, PoC in a fenced block.
 - **Reports** — `report.md` (Obsidian-friendly frontmatter + callouts, prior versions archived) with a
   rendered report tab, an **Exploit-DB references** section (searchsploit EDB-IDs per service —
   lookup-only), and an **audit-trail appendix**. `File → Export to Obsidian Vault…` writes a linked

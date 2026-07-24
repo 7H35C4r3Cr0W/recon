@@ -235,7 +235,7 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 
 - **Status:** ✅ Complete.
 - **Files:** `pyproject.toml` (hatchling), `.github/workflows/ci.yml`, `tests/test_packaging.py`,
-  `share/applications/oscp-recon.desktop`, `py.typed`.
+  `py.typed`.
 - **Does:** wheel bundles all package resources (patterns, references YAML, templates, graph_html,
   manual_commands); three console scripts; GitHub Actions CI runs the gates; `oscprecon-cli doctor` reports
   missing host tools.

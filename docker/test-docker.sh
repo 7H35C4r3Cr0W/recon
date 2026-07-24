@@ -125,9 +125,15 @@ else
     ok "Dockerfile: no piped curl|sh at build time"
 fi
 
-# entrypoint dispatch table
-for word in 'gui | nabu' 'shell | bash | sh' 'cli | nabu-cli' 'help'; do
-    grep_file "entrypoint dispatches: $word" "$REPO/docker/entrypoint.sh" "$word"
+# entrypoint dispatch table. FIXED-string matching on the actual `case` labels: as an extended
+# regex, `gui | nabu` is the alternation "gui " OR " nabu", which matches almost any shell script —
+# those four checks passed vacuously until this was caught.
+for label in 'gui | nabu)' 'shell | bash | sh)' 'cli | nabu-cli)' '"" | help | -h | --help)'; do
+    if grep -Fq -- "$label" "$REPO/docker/entrypoint.sh"; then
+        ok "entrypoint dispatches: $label"
+    else
+        no "entrypoint dispatches: $label" "no such case label in docker/entrypoint.sh"
+    fi
 done
 grep_file "entrypoint: friendly no-DISPLAY guidance" "$REPO/docker/entrypoint.sh" 'needs a forwarded X11 display'
 
@@ -223,11 +229,17 @@ section "container — the wrapped toolset"
 CORE_TOOLS="nmap feroxbuster gobuster ffuf dirsearch nikto whatweb wpscan smbclient smbmap"
 CORE_TOOLS="$CORE_TOOLS enum4linux-ng netexec rpcclient ldapsearch snmpwalk onesixtyone dnsrecon"
 CORE_TOOLS="$CORE_TOOLS dig ike-scan nbtscan ntpq curl wget ssh rsync showmount redis-cli"
-MISSING_TOOLS="$(dsh "for t in $CORE_TOOLS; do command -v \"\$t\" >/dev/null 2>&1 || echo \"\$t\"; done" 2>/dev/null)"
-if [ -z "$MISSING_TOOLS" ]; then
+# why the PROBE_RAN sentinel: "no output means every tool is present" also holds when the probe
+# never ran at all (a broken entrypoint, a failed container start), which would turn this check
+# green on a completely dead image. Require positive proof that the loop executed.
+TOOL_PROBE="$(dsh "for t in $CORE_TOOLS; do command -v \"\$t\" >/dev/null 2>&1 || echo \"MISSING \$t\"; done; echo PROBE_RAN" 2>/dev/null)"
+MISSING_TOOLS="$(printf '%s\n' "$TOOL_PROBE" | sed -n 's/^MISSING //p' | tr '\n' ' ')"
+if ! printf '%s' "$TOOL_PROBE" | grep -q PROBE_RAN; then
+    no "core recon tools present in the image" "the probe itself did not run inside the container"
+elif [ -z "${MISSING_TOOLS// /}" ]; then
     ok "core recon tools present in the image"
 else
-    no "core recon tools present in the image" "missing: $(echo "$MISSING_TOOLS" | tr '\n' ' ')"
+    no "core recon tools present in the image" "missing: $MISSING_TOOLS"
 fi
 # Kali installs impacket WITHOUT the .py suffix — the detection bug that showed tools as missing
 check "impacket scripts present (no-.py Kali names)" bash -c \
@@ -261,11 +273,17 @@ check "PySide6 widgets import" bash -c \
     "docker run --rm '$IMAGE' shell -c 'python -c \"import PySide6.QtWidgets\"'"
 check "QtWebEngine import (reference pane / graph)" bash -c \
     "docker run --rm '$IMAGE' shell -c 'python -c \"import PySide6.QtWebEngineWidgets\"'"
-XCB_MISSING="$(dsh 'p=$(python -c "import PySide6,os;print(os.path.dirname(PySide6.__file__))")/Qt/plugins/platforms/libqxcb.so; ldd "$p" 2>/dev/null | grep "not found"' 2>/dev/null)"
-if [ -z "$XCB_MISSING" ]; then
-    ok "xcb platform plugin has no unresolved libraries"
+# same trap as above: an empty "not found" list is also what a probe that never located the plugin
+# produces. Print the ldd line count so a silent probe failure fails the check instead of passing it.
+XCB_PROBE="$(dsh 'p=$(python -c "import PySide6,os;print(os.path.dirname(PySide6.__file__))")/Qt/plugins/platforms/libqxcb.so; test -f "$p" || { echo NO_PLUGIN; exit 0; }; ldd "$p" 2>/dev/null | grep "not found"; echo "LDD_LINES=$(ldd "$p" 2>/dev/null | wc -l)"' 2>/dev/null)"
+XCB_LINES="$(printf '%s' "$XCB_PROBE" | sed -n 's/^LDD_LINES=//p')"
+if printf '%s' "$XCB_PROBE" | grep -q NO_PLUGIN || [ "${XCB_LINES:-0}" -lt 5 ]; then
+    no "xcb platform plugin has no unresolved libraries" "the ldd probe did not run (plugin missing?)"
+elif printf '%s' "$XCB_PROBE" | grep -q 'not found'; then
+    no "xcb platform plugin has no unresolved libraries" \
+        "$(printf '%s' "$XCB_PROBE" | grep 'not found' | tr '\n' ' ')"
 else
-    no "xcb platform plugin has no unresolved libraries" "$(echo "$XCB_MISSING" | tr '\n' ' ')"
+    ok "xcb platform plugin has no unresolved libraries ($XCB_LINES libs resolved)"
 fi
 # the app must actually BOOT: offscreen needs no X server, so a crash-on-start shows up as an early
 # exit while a healthy app stays alive until the timeout kills it (rc 124). why the trailing echo:
@@ -280,10 +298,20 @@ else
 fi
 
 section "container — workspace persistence on the host volume"
-check "scan writes a profile to the mounted volume" bash -c \
-    "docker run --rm --network host --cap-add=NET_RAW -v '$DATA:/data:z' '$IMAGE' \
-     scan 127.0.0.1 -p dockersmoke --scan-profile quick >/dev/null 2>&1; \
-     test -f '$DATA/oscprecon/dockersmoke/profile.json'"
+# a profile.json is written even when nmap finds nothing (or cannot run at all), so persistence
+# alone is a weak assertion — require that the scan actually DISCOVERED a service through it.
+drun scan 127.0.0.1 -p dockersmoke --scan-profile quick >/dev/null 2>&1 || true
+if [ -f "$DATA/oscprecon/dockersmoke/profile.json" ]; then
+    ok "scan writes a profile to the mounted volume"
+else
+    no "scan writes a profile to the mounted volume"
+fi
+if grep -q '"port"' "$DATA/oscprecon/dockersmoke/profile.json" 2>/dev/null; then
+    ok "the scan really enumerated services (not just an empty profile)"
+else
+    no "the scan really enumerated services (not just an empty profile)" \
+        "discovered_services is empty — nmap ran but found nothing, or could not run"
+fi
 check "a second container sees the persisted project" bash -c \
     "docker run --rm -v '$DATA:/data:z' '$IMAGE' list | grep -q dockersmoke"
 check "config lives under the single /data mount" bash -c "test -d '$DATA/.config/oscprecon'"
@@ -294,6 +322,8 @@ section "container — non-root run (host-owned files)"
 # a FRESH workspace: the default (root) runs above leave root-owned dirs, which a --user run
 # legitimately cannot write — that trap is checked separately below.
 UDATA="$(mktemp -d -t nabu-docker-user.XXXXXX)"
+cleanup_user() { [ "$KEEP" = 1 ] || rm -rf "$UDATA"; }
+trap 'cleanup; cleanup_user' EXIT  # both workspaces, however the run ends
 if docker run --rm --network host --cap-add=NET_RAW --user "$(id -u):$(id -g)" \
     -v "$UDATA:/data:z" "$IMAGE" scan 127.0.0.1 -p userowned --scan-profile quick >/dev/null 2>&1
 then
@@ -306,7 +336,7 @@ then
 else
     no "NABU_USER run completes a scan on a fresh workspace"
 fi
-rm -rf "$UDATA"
+[ "$KEEP" = 1 ] && printf '  non-root workspace kept at %s\n' "$UDATA"
 # the launcher must WARN before a --user run hits a root-owned workspace, instead of letting the
 # operator discover it as a permission error mid-scan.
 warn_out="$(NABU_DATA="$DATA" NABU_USER="$(id -u):$(id -g)" "$WRAPPER" help 2>&1 >/dev/null)"
