@@ -28,7 +28,7 @@ app = typer.Typer(
         "```\n"
         "nabu-cli doctor                      # check the wrapped tools are installed\n"
         "nabu-cli scan 10.10.10.5 -p box      # staged nmap recon into profile 'box'\n"
-        "nabu-cli enum smb 10.10.10.5 -p box  # deeper per-service recon (smb/http/ftp/...)\n"
+        "nabu-cli enum smb -p box            # deeper per-service recon (smb/http/ftp/...)\n"
         "nabu-cli findings -p box             # show what has been discovered so far\n"
         "nabu-cli searchsploit vsftpd 2.3.4   # offline Exploit-DB lookup\n"
         "nabu                                 # or open the desktop GUI for the full workspace\n"
@@ -371,9 +371,38 @@ def exploit_cmd(
     profile: str | None = typer.Option(
         None, "--profile", "-p", help="Profile to pre-fill {target}/{domain}/{cred} from."
     ),
+    target: str | None = typer.Option(
+        None,
+        "--target",
+        "-t",
+        help="Aim at a SPECIFIC host — fills {target}/{ip}/{dc}, overriding the profile target "
+        "(use it to attack one host of a /24 at a time).",
+    ),
+    port: str | None = typer.Option(
+        None,
+        "--port",
+        help="Port the commands fill into {port}/{url} (default: the discovered port).",
+    ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
-    """Show exploitation command templates (§2b). CLI is display-only — copy a command to run it."""
+    """Show exploitation command templates (§2b) — the ATTACK catalog. Display-only: copy to run.
+
+    Recon feeds attack: scan/enum a box, then `exploit <service>` prints pre-filled attack commands
+    bound to the profile's target, the discovered port, and your vault credentials. Aim at a
+    specific host/port with `--target`/`--port` — handy on a /24 (one host at a time). Actions
+    tagged `RUN` run from Kali; `COPY` are victim-side (paste into a shell you own).
+
+    **Examples:**
+
+    ```
+    nabu-cli exploit                          # list every service in the attack catalog
+    nabu-cli exploit smb -p box               # SMB attacks, pre-filled from profile 'box'
+    nabu-cli exploit ad -p box                # the full Active Directory attack catalog
+    nabu-cli exploit web -p box --port 8080   # web attacks aimed at port 8080
+    nabu-cli exploit mssql -p box -t 10.10.10.7  # aim at a SPECIFIC host (one IP of a /24)
+    nabu-cli exploit linux                    # victim-side privesc (copy-paste in your shell)
+    ```
+    """
     from oscprecon import exploit as exploit_mod
     from oscprecon import ligolo
 
@@ -469,6 +498,23 @@ def exploit_cmd(
                 f"⚠ {spec.label} was NOT found on this target by the scan — attacks belong to "
                 f"identified services; only run this if you confirmed it's really there.\n"
             )
+
+    # explicit host/port overrides so you can aim an attack at a SPECIFIC host/port (one IP of a
+    # /24), with or without a profile. These win over the profile/discovered defaults. [user req]
+    if target:
+        values["target"] = target
+        values["dc"] = target
+    port_val = port or values.get("port", "")
+    if port_val:
+        values["port"] = port_val
+    host_for_url = target or (prof.target.host if prof is not None else "")
+    if host_for_url:
+        if port_val and port_val not in ("80", "443"):
+            scheme = "https" if port_val in ("443", "8443") else "http"
+            values["url"] = f"{scheme}://{host_for_url}:{port_val}"
+        else:
+            values["url"] = f"http://{host_for_url}"
+
     typer.echo(f"# {spec.label} — {spec.note}\n")
     for category in spec.categories():
         typer.echo(f"── {category} ──")
@@ -493,7 +539,16 @@ def payload_cmd(
     badchars: str = typer.Option("", "--badchars", "-b", help=r"Bad chars, e.g. \x00\x0a."),
     out: str = typer.Option("", "--out", "-o", help="Output file (default: shell.<ext>)."),
 ) -> None:
-    """Build an msfvenom reverse-shell payload + its listener (display-only — copy and run it)."""
+    """Build an msfvenom reverse-shell payload + its listener (display-only — copy and run it).
+
+    **Examples:**
+
+    ```
+    nabu-cli payload                                        # list the payload ids
+    nabu-cli payload lin-x64-stageless -l 10.10.14.5 -P 443     # Linux shell, your tun0 IP + port
+    nabu-cli payload win-x64-stageless -l 10.10.14.5 -f exe -o shell.exe   # Windows .exe
+    ```
+    """
     from oscprecon.exploit import msfvenom
 
     if payload is None:
@@ -536,7 +591,16 @@ def gtfobins_cmd(
         "Omit to list every binary.",
     ),
 ) -> None:
-    """Offline GTFOBins lookup — SUID/sudo/capability abuse for a Unix binary (display-only)."""
+    """Offline GTFOBins lookup — SUID/sudo/capability abuse for a Unix binary (display-only).
+
+    **Examples:**
+
+    ```
+    nabu-cli gtfobins tar               # break-outs for tar (suid / sudo / capabilities)
+    nabu-cli gtfobins find              # the classic sudo/suid escape
+    nabu-cli gtfobins vim               # shell escapes from a restricted editor
+    ```
+    """
     from oscprecon.references import gtfobins as gtfo
 
     results = gtfo.search(binary or "")
@@ -568,7 +632,16 @@ def hashcat_cmd(
     ),
     mask: str = typer.Option("?a?a?a?a?a?a", "--mask", help="Mask (attack 3/6/7)."),
 ) -> None:
-    """Hashcat mode helper — find the -m for a hash and build the crack command (display-only)."""
+    """Hashcat mode helper — find the -m for a hash and build the crack command (display-only).
+
+    **Examples:**
+
+    ```
+    nabu-cli hashcat ntlm               # search modes matching 'ntlm'
+    nabu-cli hashcat 1000               # look up mode 1000 + build the crack command
+    nabu-cli hashcat krb5tgs -a 3       # a mask/brute attack (attack mode 3)
+    ```
+    """
     from oscprecon.references import hashcat as hc
 
     results = hc.search(query or "")
@@ -606,7 +679,16 @@ def pivot_cmd(
     port: int = typer.Option(11601, "--port", "-P", help="Proxy listen port."),
     iface: str = typer.Option("ligolo", "--iface", help="Tun interface name."),
 ) -> None:
-    """Show the ligolo-ng pivot workflow as copy-paste steps (display-only; same as the Pivot tab)."""  # noqa: E501
+    """Show the ligolo-ng pivot workflow as copy-paste steps (display-only; same as the Pivot tab).
+
+    **Examples:**
+
+    ```
+    nabu-cli pivot -l 10.10.14.5                    # Linux pivot, your tun0 IP
+    nabu-cli pivot --os windows -r 172.16.5.0/24    # Windows agent + an internal /24 to route
+    nabu-cli pivot -r 172.16.5.0/24,172.16.6.0/24   # multiple internal ranges
+    ```
+    """
     from oscprecon import ligolo
 
     # normalize up front: build_ligolo_steps() falls back to the Linux workflow for any unknown
@@ -883,7 +965,19 @@ def enum_cmd(
     port: int = typer.Option(0, "--port", help="Override the discovered port (0 = the default)."),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
-    """Run a service's Tier-1 recon headlessly (the same enumeration the GUI service panels run)."""
+    """Run a service's Tier-1 recon headlessly (the same enumeration the GUI service panels run).
+
+    Uses the profile's target and the discovered port for that service (override with `--port`).
+
+    **Examples:**
+
+    ```
+    nabu-cli enum                       # list the services you can enumerate
+    nabu-cli enum smb -p box            # SMB null-session / guest / shares recon
+    nabu-cli enum http -p box           # HTTP fingerprint + content-discovery leads
+    nabu-cli enum ldap -p box --port 3268   # override the discovered port
+    ```
+    """
     from datetime import UTC, datetime
 
     from oscprecon import findings as findings_mod
@@ -981,7 +1075,14 @@ def list_cmd(
     ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
-    """List workspace projects (name · IP · status · service/finding/cred counts)."""
+    """List workspace projects (name · IP · status · service/finding/cred counts).
+
+    **Example:**
+
+    ```
+    nabu-cli list                       # all your projects at a glance
+    ```
+    """
     from oscprecon.workspace import index, portability
 
     root = workspace if workspace is not None else config.workspace_root()
@@ -1012,7 +1113,14 @@ def findings_cmd(
     service: str | None = typer.Option(None, "--service", help="Only findings from this module."),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
-    """Print the structured findings a profile has collected (the Findings view, headless)."""
+    """Print the structured findings a profile has collected (the Findings view, headless).
+
+    **Example:**
+
+    ```
+    nabu-cli findings -p box            # everything discovered so far for profile 'box'
+    ```
+    """
     from oscprecon import finding_severity
     from oscprecon import findings as findings_mod
     from oscprecon.modules.http.parsers import interesting_path_reason
@@ -1118,7 +1226,16 @@ def searchsploit_cmd(
     product: str = typer.Argument(..., help="Product name, e.g. 'vsftpd' or 'apache'."),
     version: str = typer.Argument("", help="Optional version, e.g. '2.4.49'."),
 ) -> None:
-    """Version-aware Exploit-DB lookup (display-only — never downloads or runs a PoC, §14)."""
+    """Version-aware Exploit-DB lookup (display-only — never downloads or runs a PoC, §14).
+
+    **Examples:**
+
+    ```
+    nabu-cli searchsploit vsftpd 2.3.4      # product + version (version hits are starred)
+    nabu-cli searchsploit "apache 2.4.49"   # quote a product that has spaces
+    nabu-cli searchsploit tomcat            # product-wide when no version is given
+    ```
+    """
     import tempfile
 
     from oscprecon import references
@@ -1141,25 +1258,70 @@ def searchsploit_cmd(
 
 @app.command("hosts")
 def hosts_cmd(
-    ip: str = typer.Argument(..., help="IP to map (usually the target IP)."),
-    names: list[str] = typer.Argument(
-        ..., help="One or more hostnames/vhosts, e.g. research.bedside.htb admin.bedside.htb"
+    ip: str | None = typer.Argument(
+        None, help="IP to map. Omit and pass --profile to add ALL discovered hosts at once."
     ),
+    names: list[str] | None = typer.Argument(
+        None, help="Hostnames/vhosts to map to IP, e.g. research.bedside.htb admin.bedside.htb"
+    ),
+    profile: str | None = typer.Option(
+        None,
+        "--profile",
+        "-p",
+        help="Add EVERY hostname discovered in this profile (subdomains, vhosts, AD/DC names) to "
+        "/etc/hosts in one go — no more hand-editing.",
+    ),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
     hosts_file: Path = typer.Option(
         Path("/etc/hosts"), "--file", help="hosts file to edit (default /etc/hosts)."
     ),
 ) -> None:
-    """Add a discovered vhost/hostname to /etc/hosts so it resolves (idempotent).
+    """Add discovered vhosts/hostnames to /etc/hosts so they resolve (idempotent).
 
-    Needs root to write /etc/hosts — if it can't, it prints the exact sudo command to run instead.
+    Two ways: give an IP + hostname(s) explicitly, or `-p PROFILE` to auto-add EVERYTHING recon
+    discovered (target hostname, vhosts, AD/DC names, pivot hosts). Needs root to write /etc/hosts —
+    if it can't, it prints the exact sudo command instead.
 
-    Example:
+    **Examples:**
 
     ```
-    nabu-cli hosts 10.10.10.5 research.bedside.htb   # sudo nabu-cli hosts ... to write directly
+    nabu-cli hosts 10.10.10.5 research.bedside.htb          # add one mapping
+    nabu-cli hosts 10.10.10.5 dc01.corp.local corp.local    # several names -> one IP
+    sudo nabu-cli hosts 10.10.10.5 research.bedside.htb      # write /etc/hosts directly (root)
+    nabu-cli hosts -p box                                    # add ALL discovered hosts for 'box'
     ```
     """
     from oscprecon import hosts as hosts_mod
+
+    # bulk mode: collect every discovered (ip, hostname) from the profile and add them all.
+    if profile is not None and not ip:
+        prof = _load_profile(profile, workspace)
+        cands = hosts_mod.collect_profile_hosts(prof)
+        if not cands:
+            typer.echo("[hosts] no discovered hostnames yet — scan/enum the box first.")
+            raise typer.Exit(0)
+        typer.echo(f"[hosts] {len(cands)} discovered host(s) for '{profile}':")
+        for c in cands:
+            typer.echo(f"    {c.ip}\t{c.hostname}   ({c.source})")
+        entries = [(c.ip, c.hostname) for c in cands]
+        try:
+            results = hosts_mod.add_many(entries, hosts_file)
+        except OSError:
+            cmd = hosts_mod.sudo_append_many(entries)
+            typer.echo(
+                f"\n[hosts] can't write {hosts_file} (need root). Add them all with:\n  {cmd}",
+                err=True,
+            )
+            raise typer.Exit(1) from None
+        added = sum(1 for r in results if r.changed)
+        typer.echo(f"[hosts] {added} new mapping(s) written to {hosts_file} ({len(cands)} total).")
+        return
+
+    if not ip or not names:
+        typer.echo(
+            "[error] give an IP and hostname(s), or `-p PROFILE` to add discovered hosts.", err=True
+        )
+        raise typer.Exit(2)
 
     try:
         result = hosts_mod.add_entry(ip, names, hosts_file)

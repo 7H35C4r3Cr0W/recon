@@ -187,6 +187,7 @@ oscp-recon/
 │   ├── orchestrator.py       ← runs phases against a target
 │   ├── shell.py              ← subprocess helper — sole chokepoint for exec
 │   ├── profile.py            ← Profile model (load/save profile.json, manage folders)
+│   ├── hosts.py              ← /etc/hosts helper: add/collect discovered vhosts+DC names (idempotent)
 │   ├── wordlists.py          ← scans/indexes wordlist paths, filters passwords out
 │   ├── modules/              ← service modules (one file each)
 │   │   ├── base.py           ← Module ABC

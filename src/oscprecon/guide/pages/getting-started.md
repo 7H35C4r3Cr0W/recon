@@ -43,13 +43,29 @@ Linux/Parrot; XQuartz on macOS; WSLg on Windows).
 
 ```bash
 nabu                    # the GUI  (python -m oscprecon is equivalent)
-nabu-cli scan 10.10.10.5 --profile htb-active   # headless staged nmap
-nabu-cli enum smb -p htb-active                 # run a service's Tier-1 recon headlessly
-nabu-cli findings -p htb-active                 # browse what was found
-nabu-cli hosts 10.10.10.5 research.bedside.htb  # add a discovered vhost to /etc/hosts (needs root)
-nabu-cli list                                   # your workspace projects
-nabu-cli creds list -p htb-active               # the vault (secrets shown in full)
-nabu-cli docs           # this documentation, in the terminal
+
+# --- recon ---
+nabu-cli scan 10.10.10.5 -p htb-active                 # staged nmap (quick/default/full/exam)
+nabu-cli scan 10.10.10.5 -p htb-active --scan-profile exam   # full sweep, rate-boosted
+nabu-cli enum smb -p htb-active                        # a service's Tier-1 recon, headless
+nabu-cli findings -p htb-active                        # browse what was found
+nabu-cli searchsploit vsftpd 2.3.4                     # offline Exploit-DB lookup
+
+# --- tie discovered hosts to /etc/hosts (no more hand-editing) ---
+nabu-cli hosts 10.10.10.5 research.bedside.htb         # add one discovered vhost (needs root)
+nabu-cli hosts 10.10.10.5 dc01.corp.local corp.local  # several names -> one IP
+nabu-cli hosts -p htb-active                           # add EVERYTHING discovered, in one go
+
+# --- attack (display-only; copy a command to run it) ---
+nabu-cli exploit smb -p htb-active                     # SMB attacks, pre-filled from the profile
+nabu-cli exploit ad -p htb-active                      # the full Active Directory catalog
+nabu-cli exploit web -p htb-active --port 8080         # web attacks aimed at port 8080
+nabu-cli exploit mssql -p htb-active -t 10.10.10.7     # aim at a SPECIFIC host (one IP of a /24)
+
+# --- workspace / vault ---
+nabu-cli list                                          # your workspace projects
+nabu-cli creds list -p htb-active                      # the vault (secrets shown in full)
+nabu-cli docs                                          # this documentation, in the terminal
 ```
 
 The **CLI is at feature parity with the GUI** for automatable work — `scan`, `enum`, `findings`,

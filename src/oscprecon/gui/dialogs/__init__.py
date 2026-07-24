@@ -4,6 +4,7 @@ from oscprecon.gui.dialogs.cred_vault import CredentialVaultDialog
 from oscprecon.gui.dialogs.credential import AddCredentialDialog
 from oscprecon.gui.dialogs.doctor import DoctorDialog
 from oscprecon.gui.dialogs.help_viewer import HelpPopup
+from oscprecon.gui.dialogs.hosts_manager import HostsManagerDialog
 from oscprecon.gui.dialogs.log_viewer import LogViewerDialog
 from oscprecon.gui.dialogs.new_profile import NewProfileDialog
 from oscprecon.gui.dialogs.nmap_scan import NmapScanDialog
@@ -18,6 +19,7 @@ __all__ = [
     "CredentialVaultDialog",
     "DoctorDialog",
     "HelpPopup",
+    "HostsManagerDialog",
     "LogViewerDialog",
     "NewProfileDialog",
     "NmapScanDialog",

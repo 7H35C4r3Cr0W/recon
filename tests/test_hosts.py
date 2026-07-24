@@ -89,3 +89,48 @@ def test_cli_hosts_falls_back_to_sudo_when_unwritable(tmp_path: Path, monkeypatc
     res = CliRunner().invoke(app, ["hosts", "10.10.10.5", "x.htb", "--file", str(hf)])
     assert res.exit_code == 1
     assert "sudo tee -a /etc/hosts" in res.output
+
+
+def test_add_many_and_current_mappings(tmp_path: Path) -> None:
+    hf = tmp_path / "hosts"
+    hf.write_text("127.0.0.1\tlocalhost\n")
+    results = hosts.add_many([("10.10.10.5", "a.htb"), ("10.10.10.5", "b.htb")], hf)
+    assert all(r.changed for r in results)
+    mappings = hosts.current_mappings(hf)
+    assert mappings["10.10.10.5"] == {"a.htb", "b.htb"}
+
+
+def test_sudo_append_many_format() -> None:
+    cmd = hosts.sudo_append_many([("10.10.10.5", "a.htb"), ("10.10.10.6", "b.htb")])
+    assert cmd == "printf '10.10.10.5 a.htb\\n10.10.10.6 b.htb\\n' | sudo tee -a /etc/hosts"
+
+
+def test_collect_profile_hosts_gathers_discovered(tmp_path: Path) -> None:
+    from oscprecon import findings as findings_mod
+    from oscprecon.models import DiscoveredHost, Target
+    from oscprecon.profile import Profile
+
+    prof = Profile.create(tmp_path, "box", Target(ip="10.10.10.5", hostname="dc01.corp.local"))
+    prof.discovered_hosts = [DiscoveredHost(ip="10.10.10.7", hostname="web01.corp.local")]
+    findings_mod.add_findings(
+        prof.directory,
+        [{"module": "vhost", "service": "vhost", "vhost": "research.corp.local"}],
+    )
+    pairs = {(c.ip, c.hostname) for c in hosts.collect_profile_hosts(prof)}
+    assert ("10.10.10.5", "dc01.corp.local") in pairs  # the target
+    assert ("10.10.10.7", "web01.corp.local") in pairs  # a pivot-discovered host
+    assert ("10.10.10.5", "research.corp.local") in pairs  # a discovered vhost
+
+
+def test_cli_hosts_bulk_from_profile(tmp_path: Path) -> None:
+    from oscprecon.models import Target
+    from oscprecon.profile import Profile
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    Profile.create(ws, "box", Target(ip="10.10.10.5", hostname="dc01.corp.local"))
+    hf = tmp_path / "hosts"
+    hf.write_text("127.0.0.1\tlocalhost\n")
+    res = CliRunner().invoke(app, ["hosts", "-p", "box", "--workspace", str(ws), "--file", str(hf)])
+    assert res.exit_code == 0, res.output
+    assert "dc01.corp.local" in hf.read_text()  # discovered hostnames added in bulk

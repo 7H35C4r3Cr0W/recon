@@ -56,6 +56,7 @@ from oscprecon.gui.dialogs import (
     CredentialVaultDialog,
     DoctorDialog,
     HelpPopup,
+    HostsManagerDialog,
     LogViewerDialog,
     NewProfileDialog,
     NmapScanDialog,
@@ -285,6 +286,7 @@ class MainWindow(QMainWindow):
         self._exploit_panel = ExploitPanel(theme.normalize(settings.theme))
         self._exploit_panel.add_credentials.connect(self._on_exploit_loot)
         self._exploit_panel.run_requested.connect(self._on_exploit_run)
+        self._exploit_panel.add_host_requested.connect(self._on_add_host_from_panel)
         self._dashboard = WorkspaceDashboard()
         self._dashboard.open_requested.connect(lambda d: self._open_path(Path(str(d))))
         self._dashboard.create_requested.connect(self._on_new)
@@ -1452,35 +1454,33 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output("[hostname] cleared — recon targets the IP again.")
 
     def _on_add_hosts_entry(self) -> None:
-        # quick "add a discovered vhost to /etc/hosts" — recon on HTB/PG constantly turns up
-        # name-based vhosts (research.bedside.htb) that only resolve once mapped to the target IP.
-        # Writes directly when Nabu is root; else copies the exact sudo command to the clipboard.
+        # Edit -> Add Host to /etc/hosts: open the Hosts Manager — it auto-collects every discovered
+        # hostname (subdomains, vhosts, AD/DC names) with its IP so you check the ones you want and
+        # add them all in one action (no more hand-editing /etc/hosts), plus a manual-entry row.
         if self._profile is None:
             QMessageBox.information(self, "No project", "Open or create a project first.")
             return
-        ip = self._profile.target.ip
-        default = f"{ip} {self._profile.target.hostname or ''}".strip()
-        text, ok = QInputDialog.getText(
-            self,
-            "Add Host to /etc/hosts",
-            "Entry to add — an IP then one or more vhosts (space-separated):\n"
-            "e.g. 10.10.10.5 research.bedside.htb admin.bedside.htb",
-            text=default + " ",
-        )
-        if not ok:
+        HostsManagerDialog(self._profile, self).exec()
+
+    def _on_add_host_from_panel(self, ip: str, name: str) -> None:
+        # from the Exploitation tab's ＋hosts button — add the selected discovered host directly, or
+        # fall back to the prefilled prompt when there's no hostname to add.
+        name = name.strip()
+        if not name or name == ip:
+            self._on_add_hosts_entry()
             return
-        parts = text.split()
-        if len(parts) < 2:
-            QMessageBox.warning(self, "Add Host", "Enter an IP followed by at least one hostname.")
-            return
-        entry_ip, names = parts[0], parts[1:]
+        self._add_host_entry(ip, [name])
+
+    def _add_host_entry(self, ip: str, names: list[str]) -> None:
+        # shared /etc/hosts add: write directly when root, else copy the exact sudo command. Reports
+        # via a dialog + the output pane.
         try:
-            result = hosts.add_entry(entry_ip, names)
+            result = hosts.add_entry(ip, names)
         except ValueError as exc:
             QMessageBox.warning(self, "Add Host", str(exc))
             return
         except OSError:
-            cmd = hosts.sudo_append_command(entry_ip, names)
+            cmd = hosts.sudo_append_command(ip, names)
             clip = QGuiApplication.clipboard()
             if clip is not None:
                 clip.setText(cmd)
@@ -1493,7 +1493,7 @@ class MainWindow(QMainWindow):
             )
             self._tool_panel.append_output(f"[hosts] copied (needs root):  {cmd}")
             return
-        self._audit_action("add-hosts-entry", ip=entry_ip, names=" ".join(names))
+        self._audit_action("add-hosts-entry", ip=ip, names=" ".join(names))
         self._tool_panel.append_output(f"[hosts] {result.message}")
         QMessageBox.information(self, "Add Host", result.message)
 

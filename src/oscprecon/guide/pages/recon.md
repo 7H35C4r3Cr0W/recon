@@ -90,3 +90,29 @@ user's); extra SAN names become vhost leads. The scan is also mined for **`http-
 entries** (each disallowed path — an admin panel, a backup, the thing they didn't want indexed —
 becomes a `[robots]` lead) and for a **JSON API banner** (`uvicorn` / `application/json` → the same
 `[api]` "enumerate the schema, not files" nudge).
+
+## Tie discovered hosts to /etc/hosts (no hand-editing)
+
+Recon constantly turns up names that only resolve once mapped to an IP — a subdomain from vhost
+fuzzing (`research.bedside.htb`), a domain/DC name from AD enum (`dc01.corp.local`), an internal
+vhost printed in a page body or a TLS cert SAN. Instead of hand-editing `/etc/hosts` every time, Nabu
+collects them and adds them for you (it writes `/etc/hosts` directly when run as root, otherwise
+copies the exact `sudo` command).
+
+**GUI — Hosts Manager** (`Edit → Add Host to /etc/hosts…`): auto-lists every discovered
+`(ip, hostname)` for the box — target, pivot-discovered hosts, and vhost/redirect findings — with the
+already-mapped ones marked. Check the ones you want and press **Add checked → /etc/hosts**. There's a
+manual-entry row for anything recon didn't capture. The **Exploitation tab** also has a **＋hosts**
+button beside the Host dropdown that adds the selected hostname in one click.
+
+**CLI:**
+
+```
+nabu-cli hosts 10.10.10.5 research.bedside.htb          # add one mapping
+nabu-cli hosts 10.10.10.5 dc01.corp.local corp.local    # several names -> one IP
+sudo nabu-cli hosts 10.10.10.5 research.bedside.htb      # write /etc/hosts directly (root)
+nabu-cli hosts -p htb-active                             # add EVERYTHING discovered for the profile
+```
+
+The add is **idempotent** — re-running never duplicates a line, and a name already mapped to a
+different IP is flagged so you don't silently create a resolution conflict.

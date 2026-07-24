@@ -219,10 +219,15 @@ same engine, nothing GUI-only:
   /`export-vault`/`delete-project`, `nabu-cli health -p <profile> [--repair]`, `nabu-cli activity`.
 - **Credentials:** `nabu-cli creds add|list|rm -p <profile>` (the vault, chmod-600, secrets shown in full).
 - **References / helpers:** `nabu-cli doctor [--install]`, `nabu-cli searchsploit <product> [version]`,
-  `nabu-cli exploit [service]` (the Exploitation catalog, display-only), `nabu-cli payload` (msfvenom
+  `nabu-cli exploit [service] [-p profile] [-t host] [--port N]` (the Exploitation catalog,
+  display-only — `-t`/`--port` aim it at a specific host/port of a /24), `nabu-cli payload` (msfvenom
   builder), `nabu-cli gtfobins [binary]`, `nabu-cli pivot` (ligolo-ng, `--os linux|windows`),
-  `nabu-cli hosts <ip> <vhost…>` (add a discovered vhost to `/etc/hosts`; also **Edit → Add Host to
-  /etc/hosts** in the GUI), `nabu-cli docs`.
+  `nabu-cli docs`.
+- **Tie discovered hosts to `/etc/hosts`:** `nabu-cli hosts <ip> <vhost…>` adds one mapping;
+  `nabu-cli hosts -p <profile>` adds **every** discovered subdomain / vhost / AD-DC name at once. In
+  the GUI, **Edit → Add Host to /etc/hosts** opens the **Hosts Manager** (auto-collected checklist +
+  bulk add), and the Exploitation tab's Host dropdown has a **＋hosts** button. Idempotent; writes
+  directly as root, else copies the exact `sudo` command.
 - **Opt-in modes (§2a/§2b):** `nabu-cli config --spray/--exploit` toggles the gates; `nabu-cli spray
   <service> -p <profile>` runs an OSCP-legal spray from the vault (refused while Spray mode is off,
   the exam-legal default).

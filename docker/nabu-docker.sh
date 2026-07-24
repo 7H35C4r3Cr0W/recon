@@ -105,18 +105,29 @@ case "$cmd" in
         [ -n "${DISPLAY:-}" ] || c_die "no \$DISPLAY set — start an X11 server (Parrot/Kali have one) or use the CLI."
         local_flags=()
         while IFS= read -r -d '' f; do local_flags+=("$f"); done < <(common_flags)
-        # grant the container access to the host X server, then REVOKE it when the GUI exits — run
-        # docker in the FOREGROUND (not exec) so this trap fires. (No --ipc=host: MIT-SHM is off and
-        # QtWebEngine runs --disable-dev-shm-usage, so sharing the host IPC namespace buys nothing.)
+        # X11 authorization that works ACROSS distros — NOT just Kali, which happens to bundle xhost.
+        # (No --ipc=host: MIT-SHM is off and QtWebEngine uses --disable-dev-shm-usage, so sharing the
+        # host IPC namespace buys nothing.)
+        gui_flags=(-e DISPLAY="$DISPLAY" -e QT_X11_NO_MITSHM=1 -v /tmp/.X11-unix:/tmp/.X11-unix:rw)
+        # 1) mount the host's X cookie so the container authenticates via MIT-MAGIC-COOKIE — this
+        #    alone makes the GUI work WITHOUT xhost (the Parrot/Ubuntu/Arch minimal-desktop case).
+        xauth="${XAUTHORITY:-$HOME/.Xauthority}"
+        if [ -f "$xauth" ]; then
+            gui_flags+=(-e XAUTHORITY=/tmp/.nabu.xauth -v "$xauth:/tmp/.nabu.xauth:ro")
+        fi
+        # 2) also relax the host-based ACL via xhost when present (belt-and-braces), revoked on exit.
         if command -v xhost >/dev/null 2>&1; then
             xhost +local: >/dev/null 2>&1 || true
             trap 'xhost -local: >/dev/null 2>&1 || true' EXIT INT TERM
+        elif [ ! -f "$xauth" ]; then
+            printf '\033[1;33m[nabu-docker] no xhost and no X cookie (%s) found — your X server may deny\n  the GUI. Install x11-xserver-utils (Debian/Parrot/Ubuntu) or xorg-xhost (Arch), then retry.\033[0m\n' "$xauth" >&2
         fi
-        docker run "${local_flags[@]}" \
-            -e DISPLAY="$DISPLAY" \
-            -e QT_X11_NO_MITSHM=1 \
-            -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-            "$IMAGE" gui
+        # 3) on SELinux-ENFORCING hosts (Fedora/RHEL/Rocky/Alma) let the container reach the X socket.
+        #    No-op on Kali (getenforce -> Disabled) and Parrot (getenforce absent -> empty).
+        if [ "$(getenforce 2>/dev/null)" = "Enforcing" ] || [ "$(cat /sys/fs/selinux/enforce 2>/dev/null)" = "1" ]; then
+            gui_flags+=(--security-opt label=disable)
+        fi
+        docker run "${local_flags[@]}" "${gui_flags[@]}" "$IMAGE" gui
         ;;
     shell)
         ensure_image
