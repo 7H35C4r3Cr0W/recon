@@ -1,0 +1,40 @@
+# Keep the build context small and leak-proof. The Dockerfile COPYs only pyproject/uv.lock/src/docker,
+# but everything here is also excluded from the context sent to the daemon.
+.git
+.github
+.venv
+build/
+dist/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.tar
+*.tar.gz
+
+# private / maintainer-only — must NEVER be baked into a distributable image
+HANDOFF.local.md
+.claude/
+walkthroughs/
+prompts/
+share/
+sc_audit.log
+autosave.sh
+mirror.sh
+
+# not needed at runtime
+tests/
+docs/
+boxes/
+packaging/
+PROGRESS.md
+PROJECT_MAP.md
+ROADMAP.md
+
+# runtime data / local docker state
+.nabu/
+.nabu-data/

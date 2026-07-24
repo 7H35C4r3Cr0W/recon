@@ -14,7 +14,32 @@ from oscprecon.gui.main_window import MainWindow
 from oscprecon.gui.splash import NabuSplash, make_splash
 
 
+def _has_display() -> bool:
+    # why: on a headless box / over SSH / a distro missing Qt's xcb libs, QApplication() aborts at
+    # the C++ level ("could not load the Qt platform plugin xcb") with a coredump Python can't catch.
+    # Detect the no-display case first so we can exit with an actionable message instead. This is the
+    # "GUI works for some, not others" split: the CLI never needs a display; the GUI always does.
+    platform = os.environ.get("QT_QPA_PLATFORM", "")
+    if platform:  # an explicit platform (offscreen/minimal/vnc/wayland/…) — trust it, let Qt decide
+        return True
+    if sys.platform in ("win32", "darwin"):  # native window server is always present
+        return True
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
 def main() -> int:
+    if not _has_display():
+        sys.stderr.write(
+            f"{APP_NAME}: no graphical display found (DISPLAY / WAYLAND_DISPLAY are unset).\n"
+            "The GUI needs a desktop; on a headless box use the CLI instead:\n\n"
+            "  nabu-cli --help          # everything the GUI does, headless\n"
+            "  nabu-cli doctor          # check the wrapped tools\n"
+            "  nabu-cli scan IP -p NAME # run a scan\n\n"
+            "To use the GUI anyway:\n"
+            "  • over SSH:   ssh -X user@host   then run: nabu\n"
+            "  • in Docker:  docker/nabu-docker.sh gui   (forwards your X11 socket)\n"
+        )
+        return 3
     # why: capture crashes + Qt warnings to a log file early, before anything can fail (Help → View
     # Diagnostics Log surfaces it). Best-effort — never blocks startup.
     diagnostics.install("gui")

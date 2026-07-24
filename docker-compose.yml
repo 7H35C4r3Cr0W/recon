@@ -1,0 +1,24 @@
+# Convenience wrapper for the headless CLI. Run any nabu-cli command with:
+#   docker compose run --rm nabu doctor
+#   docker compose run --rm nabu scan 10.10.10.5 -p box
+# For the desktop GUI use the helper script instead (it wires X11): docker/nabu-docker.sh gui
+services:
+  nabu:
+    build:
+      context: .
+      args:
+        WITH_WORDLISTS: "1"
+    image: ${NABU_IMAGE:-nabu:latest}
+    # host networking so a VPN tun + raw-socket nmap work (Linux hosts).
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+      - NET_BIND_SERVICE
+    volumes:
+      # persistent workspace (scans / creds / notes / config) on the host
+      - ${NABU_DATA:-./.nabu-data}:/data
+    stdin_open: true
+    tty: true
+    # default action for a bare `docker compose run nabu`; override by appending a command.
+    command: ["doctor"]

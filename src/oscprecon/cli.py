@@ -20,11 +20,29 @@ if TYPE_CHECKING:  # annotation-only names (imported at call time in the functio
 
 app = typer.Typer(
     help=(
-        "Nabu — headless recon CLI (recon-only, OSCP exam-legal). "
-        f"Created by {branding.AUTHOR_NAME} · {branding.AUTHOR_EMAIL} · {branding.AUTHOR_GITHUB} "
-        f"· ☕ {branding.AUTHOR_COFFEE}"
+        "Nabu — headless recon CLI (recon-only, OSCP exam-legal).\n\n"
+        "Run `nabu-cli COMMAND --help` for a command's full syntax, flags, and examples "
+        "(e.g. `nabu-cli scan --help`). A **profile** (`-p NAME`) is a folder under your workspace "
+        "(`~/oscprecon`) that holds all output for one target.\n\n"
+        f"By {branding.AUTHOR_NAME} · {branding.AUTHOR_GITHUB} · ☕ {branding.AUTHOR_COFFEE}"
+    ),
+    epilog=(
+        "**Typical workflow:**\n\n"
+        "```\n"
+        "nabu-cli doctor                      # check the wrapped tools are installed\n"
+        "nabu-cli scan 10.10.10.5 -p box      # staged nmap recon into profile 'box'\n"
+        "nabu-cli enum smb 10.10.10.5 -p box  # deeper per-service recon (smb/http/ftp/...)\n"
+        "nabu-cli findings -p box             # show what has been discovered so far\n"
+        "nabu-cli searchsploit vsftpd 2.3.4   # offline Exploit-DB lookup\n"
+        "nabu                                 # or open the desktop GUI for the full workspace\n"
+        "```\n\n"
+        "**Docker** (any host — Kali/Parrot/Ubuntu/macOS/Windows):\n\n"
+        "```\n"
+        "docker/nabu-docker.sh doctor | scan 10.10.10.5 -p box | gui | shell\n"
+        "```"
     ),
     add_completion=False,
+    rich_markup_mode="markdown",
 )
 
 
@@ -52,19 +70,37 @@ def _root(
         sys.stderr.write("\n" + branding.cli_banner() + "\n")
 
 
-@app.command()
-def scan(
-    ip: str = typer.Argument(..., help="Target IP or hostname."),
-    profile: str = typer.Option(
-        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+@app.command(
+    epilog=(
+        "Examples:\n\n"
+        "  nabu-cli scan 10.10.10.5 -p box\n"
+        "      Staged nmap into profile 'box' using your default battery.\n"
+        "  nabu-cli scan 10.10.10.5 -p box --scan-profile quick\n"
+        "      Fast top-1000 triage only (no full sweep, no UDP).\n"
+        "  nabu-cli scan 10.10.10.5 -p box --scan-profile exam\n"
+        "      Full 65535-port sweep, rate-boosted to finish fast under exam time.\n"
+        "  nabu-cli scan target.htb -p box --hostname target.htb --udp-full\n"
+        "      Set a hostname (vhost-aware modules) and add the slow full UDP sweep.\n"
+        "  nabu-cli scan 10.10.10.5 -p box --resume\n"
+        "      Continue a profile, skipping commands that already finished."
     ),
-    hostname: str | None = typer.Option(None, help="Optional hostname for the target."),
+)
+def scan(
+    ip: str = typer.Argument(..., help="Target IP or hostname (e.g. 10.10.10.5 or target.htb)."),
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name = the folder under ~/oscprecon holding all output."
+    ),
+    hostname: str | None = typer.Option(
+        None, help="Optional hostname for the target (feeds vhost/TLS-aware modules)."
+    ),
     scan_profile: str | None = typer.Option(
         None,
         "--scan-profile",
-        help="nmap battery: quick | default | full | exam (default: the configured preference).",
+        help="nmap battery: quick | default | full | exam (default: your configured preference).",
     ),
-    udp_full: bool = typer.Option(False, "--udp-full", help="Also run the slow full UDP sweep."),
+    udp_full: bool = typer.Option(
+        False, "--udp-full", help="Also run the slow full 65535-port UDP sweep (in addition to top-100)."
+    ),
     resume: bool = typer.Option(
         False,
         "--resume",
@@ -77,7 +113,22 @@ def scan(
     ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
-    """Run the staged nmap recon against a target and save findings to a profile."""
+    """Run staged nmap recon against a target and save findings to a profile.
+
+    Discovers open ports, then runs a versioned 'nmap -sV -sC' over exactly the ports it found,
+    parsing everything into <workspace>/<profile>/. Safe to re-run; open the profile in the GUI
+    ('nabu') to keep enumerating each service.
+
+    Scan batteries (--scan-profile), fastest to most thorough -- all pure nmap, OSCP exam-legal:
+
+    quick    Top-1000 TCP only (-T4). Fast triage; no full sweep, no UDP.
+    default  Top-1000 + full 65535-port TCP (-p- -T4) + UDP top-100, then -sV -sC on open ports.
+    full     Same thorough sweep as default.
+    exam     Full sweep rate-boosted (-p- --min-rate 1000 -T4) to finish fast under exam time.
+
+    A profile (-p/--profile) is a named folder under the workspace. Re-running scan on an existing
+    profile REUSES it (history preserved); choose a new name to start a fresh scan.
+    """
     root = workspace if workspace is not None else config.workspace_root()
     profile_choice = (
         scan_profile if scan_profile is not None else config.load_settings().scan_profile
