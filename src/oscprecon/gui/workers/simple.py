@@ -98,13 +98,7 @@ class SimpleReconWorker(CancellableThread):
         findings.add_findings(
             self._profile.directory,
             [
-                {
-                    "module": f.service,
-                    "kind": f.fields.get("kind", ""),
-                    "value": f.fields.get("value", ""),
-                    "detail": f.detail,
-                    "discovered_at": now,
-                }
+                findings.from_parsed(f.service, f.fields, f.detail, now, port=self._port)
                 for f in found
             ],
         )

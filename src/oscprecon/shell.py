@@ -315,11 +315,22 @@ _MONGO_FORBIDDEN_RE = re.compile(
 
 def _db_primitive_violation(tool: str, argv: list[str]) -> str | None:
     raw = " ".join(argv[1:])
-    # strip SQL comments (block + line) BEFORE collapsing whitespace, so a comment can't hide/split
+
+    # Strip SQL comments (block + line) BEFORE collapsing whitespace, so a comment can't hide/split
     # a keyword; PostgreSQL treats a comment as whitespace, so this mirrors the server's own lexer.
     # Keep `raw` pristine — the NoSQL check below needs the un-stripped argv (its `--` are flags).
+    #
+    # A LINE comment is stripped per TOKEN, and never from a token that starts with `-`: a client's
+    # own long flag (`mysql --host=10.10.10.5 …`) is not SQL. Stripping it as a comment ate the rest
+    # of the (newline-free) command line, leaving nothing to inspect — so ANY `--flag` disabled this
+    # entire gate and the primitive that followed ran in recon mode. Block comments are still
+    # stripped everywhere — `/* */` can never be mistaken for a flag, and the server treats one as
+    # whitespace, so this keeps matching what the database itself would parse.
+    def _strip_line_comments(token: str) -> str:
+        return token if token.startswith("-") else re.sub(r"--[^\n]*", " ", token)
+
     sql = re.sub(r"/\*.*?\*/", " ", raw, flags=re.DOTALL)
-    sql = re.sub(r"--[^\n]*", " ", sql)
+    sql = " ".join(_strip_line_comments(token) for token in sql.split(" "))
     joined = re.sub(r"\s+", " ", sql).lower()
     for primitive in _DB_FORBIDDEN_SUBSTR:
         if primitive in joined:

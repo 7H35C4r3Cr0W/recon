@@ -166,6 +166,15 @@ def scan(
                 err=True,
             )
             raise typer.Exit(2)
+        # you usually learn the vhost AFTER the first scan, so `--hostname` on a re-run must be
+        # applied, not dropped — TLS/vhost-aware recon keys off target.hostname. [review]
+        if hostname and hostname != prof.target.hostname:
+            try:
+                prof.set_hostname(hostname)  # same path the GUI's Set Target Hostname uses
+            except ValueError as exc:
+                typer.echo(f"[error] invalid --hostname: {exc}", err=True)
+                raise typer.Exit(2) from exc
+            typer.echo(f"[profile] hostname set to {hostname}")
         if resume:
             typer.echo(f"[resume] {prof.directory} — {len(prof.command_history)} prior commands")
         else:
@@ -509,28 +518,44 @@ def exploit_cmd(
         values["port"] = port_val
     host_for_url = target or (prof.target.host if prof is not None else "")
     if host_for_url:
+        # scheme from the SERVICE, mirroring the GUI (exploit_panel._service_url): an nmap
+        # "ssl/http" / "https" name — or a TLS port — means https. Building http:// for an
+        # HTTPS-only host made every copied command hit the wrong scheme and fail. [review]
+        svc_name = ""
+        if prof is not None and port_val.isdigit():
+            svc_name = next(
+                (
+                    s.service.lower()
+                    for s in prof.discovered_services
+                    if s.port == int(port_val) and s.state == "open"
+                ),
+                "",
+            )
+        secure = "https" in svc_name or "ssl" in svc_name or port_val in ("443", "8443")
+        scheme = "https" if secure else "http"
         if port_val and port_val not in ("80", "443"):
-            scheme = "https" if port_val in ("443", "8443") else "http"
             values["url"] = f"{scheme}://{host_for_url}:{port_val}"
         else:
-            values["url"] = f"http://{host_for_url}"
+            values["url"] = f"{scheme}://{host_for_url}"
 
     typer.echo(f"# {spec.label} — {spec.note}\n")
     # which ports each attack goes to, marked ✓ when the scan found that port open on this box —
     # the same decision aid the GUI shows, so a 445 command is never quietly aimed elsewhere.
-    open_ports = (
-        {s.port for s in prof.discovered_services if s.state == "open"} if prof is not None else set()
+    open_ports: set[int] = (
+        {s.port for s in prof.discovered_services if s.state == "open"}
+        if prof is not None
+        else set()
     )
     for category in spec.categories():
         typer.echo(f"── {category} ──")
         for action in spec.by_category(category):
             tag = "RUN " if action.executable else "COPY"  # attacker (run) vs victim (copy)
-            ports, why = exploit_mod.action_ports(action, spec)
-            if ports:
-                marks = ",".join(f"{p}{'✓' if p in open_ports else ''}" for p in ports)
-                port_note = f"  ports: {marks} ({why})"
+            act_ports, port_why = exploit_mod.action_ports(action, spec)
+            if act_ports:
+                marks = ",".join(f"{p}{'✓' if p in open_ports else ''}" for p in act_ports)
+                port_note = f"  ports: {marks} ({port_why})"
             else:
-                port_note = f"  ports: {why}" if why else ""
+                port_note = f"  ports: {port_why}" if port_why else ""
             typer.echo(f"[{tag}] {action.title}  ({action.tool}){port_note}")
             typer.echo(f"    {exploit_mod.fill_template(action.template, values)}")
         typer.echo("")
@@ -874,6 +899,12 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
     ]
     if not ports:
         ports = [Port(number=default_port, proto=Proto.TCP, service=service)]
+    elif port:
+        # an explicit --port is an instruction, not a hint: aim at THAT port. Without this, a box
+        # with 80 discovered ignored `enum http --port 8080` entirely and re-enumerated 80 — the
+        # multi-port modules (http/vhost) build their commands from this list. [review]
+        chosen = next((p for p in ports if p.number == port), None)
+        ports = [chosen or Port(number=port, proto=Proto.TCP, service=service)]
     # the scalar port the single-port step modules (ssh/ftp/ldap/smtp/dns/smb) actually probe: an
     # explicit --port wins (bug #15: it was silently ignored once the service was discovered), else
     # the DISCOVERED port when the scan found the service on a non-standard port, else the default.
@@ -892,7 +923,21 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
             )
     raw: dict[str, str] = {}
     issues: list[str] = []
-    for command, key in _tier1_enum_steps(service, module, prof.target, probe_port, ports):
+    steps = _tier1_enum_steps(service, module, prof.target, probe_port, ports)
+    if not steps:
+        # §24 no silent failures: vhost fuzzing needs a domain, and with none the module builds no
+        # commands at all. Reporting "0 finding(s)" read as "nothing is there" when in fact nothing
+        # ran — say which input is missing, and exit non-zero. [review]
+        hint = (
+            "vhost enumeration needs a domain — set one with "
+            f"`nabu-cli scan {prof.target.ip} -p {profile} --hostname box.htb` "
+            "(or Edit → Set Target Hostname in the GUI), then re-run."
+            if service == "vhost"
+            else f"the {service} module produced no commands for this target."
+        )
+        typer.echo(f"[enum] {service}: nothing to run — {hint}", err=True)
+        raise typer.Exit(2)
+    for command, key in steps:
         out = prof.directory / command.output_file
         result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
         if result.missing_tool is not None:
@@ -941,16 +986,7 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
         now = datetime.now(UTC).isoformat()
         findings_mod.add_findings(
             prof.directory,
-            [
-                {
-                    "module": f.service,
-                    "kind": f.fields.get("kind", ""),
-                    "value": f.fields.get("value", ""),
-                    "detail": f.detail,
-                    "discovered_at": now,
-                }
-                for f in found
-            ],
+            [findings_mod.from_parsed(f.service, f.fields, f.detail, now) for f in found],
         )
     if issues:
         typer.echo(
@@ -1055,16 +1091,7 @@ def enum_cmd(
         now = datetime.now(UTC).isoformat()
         findings_mod.add_findings(
             prof.directory,
-            [
-                {
-                    "module": f.service,
-                    "kind": f.fields.get("kind", ""),
-                    "value": f.fields.get("value", ""),
-                    "detail": f.detail,
-                    "discovered_at": now,
-                }
-                for f in found
-            ],
+            [findings_mod.from_parsed(f.service, f.fields, f.detail, now) for f in found],
         )
     if issues:
         typer.echo(
@@ -1173,7 +1200,7 @@ def add_finding_cmd(
     profile: str = typer.Option(
         ..., "--profile", "-p", help="Profile name (folder under workspace)."
     ),
-    value: str = typer.Argument(..., help="What you found, in one line."),
+    value: str = typer.Argument("", help="What you found, in one line (not needed with --delete)."),
     kind: str = typer.Option("note", "--kind", "-k", help="vuln | credential | foothold | note …"),
     severity: str = typer.Option(
         "info",
@@ -1205,7 +1232,7 @@ def add_finding_cmd(
         --poc "curl 'http://10.10.10.5/search.php?q=1%27+OR+1=1--'"
     nabu-cli add-finding -p box "creds in backup.zip" -k credential --host 10.10.10.5
     nabu-cli findings -p box                       # list them (yours are marked ✎ with an id)
-    nabu-cli add-finding -p box x --delete 9f2c1a4b7d3e   # remove one of yours
+    nabu-cli add-finding -p box --delete 9f2c1a4b7d3e       # remove one of yours
     ```
     """
     from oscprecon import finding_severity
@@ -1217,6 +1244,13 @@ def add_finding_cmd(
             typer.echo(f"[finding] deleted {delete}")
             raise typer.Exit(0)
         typer.echo(f"[error] no finding of yours with id '{delete}'", err=True)
+        raise typer.Exit(2)
+    if not value.strip():
+        typer.echo(
+            "[error] describe the finding in one line, e.g. "
+            '`nabu-cli add-finding -p box "SQLi in /search.php"` (or use --delete ID).',
+            err=True,
+        )
         raise typer.Exit(2)
     if severity not in finding_severity.ALL_CATEGORIES:
         typer.echo(
@@ -1445,7 +1479,13 @@ def creds_list_cmd(
     ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
-    """List stored credentials (secrets masked, like the GUI vault)."""
+    """List stored credentials — shown in FULL, exactly like the GUI vault (CLAUDE.md §6).
+
+    Your own loot against your own authorized targets is the deliverable, so nothing is masked. Set
+    `redact_secrets` in Preferences if you ever need the masked form.
+    """
+    from oscprecon.creds import redact
+
     prof = _load_profile(profile, workspace)
     entries = prof.credentials()
     if not entries:
@@ -1453,8 +1493,9 @@ def creds_list_cmd(
         raise typer.Exit(0)
     for c in entries:
         who = f"{c.domain}\\{c.username}" if c.domain else c.username
-        masked = f"<{c.secret_type} len={len(c.secret)}>"
-        typer.echo(f"  {who:32} {masked:20} {c.source}")
+        # redact() honours the redact_secrets preference and is a no-op by default — so this stays
+        # the SAME text the GUI vault shows, instead of the CLI unilaterally hiding it.
+        typer.echo(f"  {who:32} {redact(c.secret):32} {c.secret_type:9} {c.source}")
 
 
 @creds_app.command("add")

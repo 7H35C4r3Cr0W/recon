@@ -342,3 +342,27 @@ def test_default_never_redacts_secrets() -> None:
     assert creds.redact("Ashare1972") == "Ashare1972"  # full cred value
     assert audit._redact({"secret": "9C8B1A"}) == {"secret": "9C8B1A"}  # audit shows full
     assert spray.make_redactor(["Password123"])("got Password123 win") == "got Password123 win"
+
+
+def test_db_primitive_gate_survives_long_flags() -> None:
+    # review finding (HIGH): the SQL line-comment strip treated a client's own `--long-flag` as the
+    # start of a comment. argv has no newlines, so it ate the WHOLE command and left nothing to
+    # inspect — any `--flag` disabled the file/OS-primitive gate in recon mode.
+    import shlex
+
+    from oscprecon.shell import policy_violation
+
+    blocked = [
+        "mysql --host=10.10.10.5 -u root -e \"SELECT load_file('/etc/passwd')\"",
+        "psql --host=10.10.10.5 -c \"COPY x FROM PROGRAM 'id'\"",
+        "mysql --user=root --host=10.10.10.5 -e \"SELECT ... INTO OUTFILE '/tmp/x'\"",
+    ]
+    for command in blocked:
+        assert policy_violation(shlex.split(command)) is not None, command
+    # …and legitimate recon with the same long flags still runs
+    allowed = [
+        "mysql --host=10.10.10.5 -u root -e 'SHOW DATABASES'",
+        "psql --host=10.10.10.5 -c 'SELECT version()'",
+    ]
+    for command in allowed:
+        assert policy_violation(shlex.split(command)) is None, command
