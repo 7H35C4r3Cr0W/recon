@@ -318,6 +318,35 @@ def test_wpscan() -> None:
     assert "admin" in notes
 
 
+def test_wpscan_parses_themes_and_version_status() -> None:
+    findings = parse_wpscan(_read("wpscan.json"), 80)
+    notes = " ".join(f.note for f in findings)
+    assert "WordPress 5.8 (insecure)" in notes  # a known-outdated core is flagged
+    assert "theme: twentytwentyone" in notes  # vt/tt themes surface alongside plugins
+    assert "plugin: contact-form-7" in notes
+    assert "editor" in notes  # both enumerated users
+    paths = {f.path for f in findings}
+    assert "/wp-content/themes/twentytwentyone/" in paths
+    assert "/wp-content/plugins/akismet/" in paths
+
+
+def test_wpscan_tolerates_merged_stderr_noise() -> None:
+    # shell.run captures with stderr=STDOUT, so wpscan's progress lines bracket the JSON. The parser
+    # must still recover the object — the regression was that a strict json.loads returned zero
+    # findings, so wpscan "ran" but nothing was ever recorded.
+    noisy = (
+        "[i] Updating the Database ...\n"
+        "[i] Update completed.\n"
+        '{"target_url": "http://x/", "version": {"number": "6.1", "status": "insecure"}, '
+        '"users": {"admin": {"id": 1}}}\n'
+        "[+] Finished: some stats {truncated\n"
+    )
+    findings = parse_wpscan(noisy, 80)
+    notes = " ".join(f.note for f in findings)
+    assert "WordPress 6.1" in notes
+    assert "admin" in notes
+
+
 def test_parse_tool_dispatch_and_garbage() -> None:
     assert parse_tool("unknown-tool", "x", 80) == []
     assert parse_ffuf("not json", 80) == []

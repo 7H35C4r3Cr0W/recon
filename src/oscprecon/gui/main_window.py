@@ -2403,10 +2403,14 @@ class MainWindow(QMainWindow):
                 )
                 self._tool_panel.refresh_discovered_urls()  # grow the URL table live
         if detect_wordpress(text) and profile is self._profile:
+            from oscprecon.modules.http import is_tls, wordpress_command
+
+            wp_cmd = wordpress_command(profile.target, port, is_tls("", port))
             self._tool_panel.append_output(
-                "[wordpress] detected — follow-up: "
-                "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url <target>"
+                "[wordpress] detected — enumeration follow-up (never brute), ready to Run:\n"
+                f"    {wp_cmd.shell_line}"
             )
+            self._tool_panel.prefill_command(wp_cmd.shell_line)
         # only the fingerprint (whatweb) output carries the Server-header context detect_api_server
         # needs — never scan a raw index.html body, where a JS `application/json` literal misfires
         if tool == "whatweb" and detect_api_server(text) and profile is self._profile:

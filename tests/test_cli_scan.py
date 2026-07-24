@@ -87,3 +87,51 @@ def test_enum_full_module_resolver_maps_names() -> None:
             if issubclass(o, Module) and o is not Module and o.__module__.startswith(mod.__name__)
         ]
         assert cls, f"no Module class for enum '{name}'"
+
+
+def test_enum_http_auto_runs_wpscan_on_wordpress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    # End-to-end: `enum http` fingerprints a web port, and when the output shows WordPress it must
+    # AUTO-RUN wpscan enumeration and fold its findings (version/plugins/users) into findings.json —
+    # not merely print a suggestion. shell.run is stubbed so no real tools/network are touched.
+    from pathlib import Path
+
+    from oscprecon import shell
+    from oscprecon.models import Target
+    from oscprecon.profile import Profile
+
+    Profile.create(tmp_path, "wp", Target(ip="10.10.10.5"))
+    wpscan_json = (Path(__file__).parent / "fixtures" / "http" / "wpscan.json").read_text()
+    ran: list[str] = []
+
+    def fake_run(shell_line: str, output_file: Path, **_: Any) -> Any:
+        ran.append(shell_line)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        if shell_line.startswith("wpscan"):
+            output_file.write_text(wpscan_json, encoding="utf-8")
+        elif shell_line.startswith("whatweb"):
+            output_file.write_text("http://10.10.10.5/ [200 OK] WordPress[5.8]", encoding="utf-8")
+        else:
+            output_file.write_text("", encoding="utf-8")
+        return shell.ShellResult(
+            shell_line=shell_line,
+            exit_code=0,
+            output_file=output_file,
+            started_at="t",
+            finished_at="t",
+            duration_s=0.0,
+        )
+
+    monkeypatch.setattr("oscprecon.shell.run", fake_run)
+    result = runner.invoke(app, ["enum", "http", "--profile", "wp", "--workspace", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "[wordpress] detected on port 80" in result.output
+    # wpscan was actually invoked (enumeration flags, never brute)
+    wp = next(c for c in ran if c.startswith("wpscan"))
+    assert "--enumerate vp,vt,tt,cb,dbe,u,m" in wp and "--passwords" not in wp
+    # and its results landed in findings.json
+    findings_text = (tmp_path / "wp" / "findings.json").read_text(encoding="utf-8")
+    assert "WordPress 5.8" in findings_text
+    assert "akismet" in findings_text  # a plugin
+    assert "admin" in findings_text  # an enumerated user

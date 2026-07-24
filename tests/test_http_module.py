@@ -9,6 +9,7 @@ from oscprecon.modules.http import (
     default_url,
     is_tls,
     wide_net_extensions,
+    wordpress_command,
 )
 
 REFERENCE_EXTS = [
@@ -148,6 +149,28 @@ def test_suggest_wordpress() -> None:
     assert out
     assert "wpscan --enumerate" in out[0]
     assert "--passwords" not in out[0]
+
+
+def test_wordpress_command_is_enumeration_only() -> None:
+    import shlex
+
+    from oscprecon.shell import policy_violation
+
+    cmd = wordpress_command(Target(ip="10.10.10.5"), 80, tls=False)
+    line = cmd.shell_line
+    assert line.startswith("wpscan --url http://10.10.10.5/")
+    assert "--enumerate vp,vt,tt,cb,dbe,u,m" in line
+    assert "--format json" in line  # parse_wpscan needs JSON (was human-readable, silently []'d)
+    assert "--passwords" not in line and "--usernames" not in line
+    assert cmd.output_file == "http/80/wpscan.json"
+    # the recon-only policy must ALLOW it (enumeration, not brute)
+    assert policy_violation(shlex.split(line)) is None
+
+
+def test_wordpress_command_tls_and_alt_port() -> None:
+    cmd = wordpress_command(Target(ip="10.10.10.5"), 8443, tls=True)
+    assert cmd.shell_line.startswith("wpscan --url https://10.10.10.5:8443/")
+    assert cmd.output_file == "http/8443/wpscan.json"
 
 
 def test_suggest_api_server_enumeration() -> None:

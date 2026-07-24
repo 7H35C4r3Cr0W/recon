@@ -677,23 +677,58 @@ def parse_whatweb(text: str, port: int) -> list[HttpFinding]:
     return findings if findings else _parse_whatweb_plain(text, port)
 
 
-def parse_wpscan(text: str, port: int) -> list[HttpFinding]:
+_WPSCAN_KEYS = ("version", "plugins", "themes", "users", "interesting_findings", "target_url")
+
+
+def _load_wpscan_json(text: str) -> dict[str, object] | None:
+    # wpscan --format json emits ONE JSON object, but shell.run captures with stderr=STDOUT, so
+    # wpscan's progress/warning lines can bracket the JSON and a strict json.loads returns nothing
+    # (the old bug: wpscan ran but zero findings were recorded). Try a clean parse first, then
+    # recover the embedded {...} — same tolerance the ffuf loader gained after the same collision.
+    stripped = text.strip()
     try:
-        data = json.loads(text)
+        obj = json.loads(stripped)
+        if isinstance(obj, dict):
+            return obj
     except json.JSONDecodeError:
-        return []
-    if not isinstance(data, dict):
+        pass
+    decoder = json.JSONDecoder()
+    fallback: dict[str, object] | None = None
+    i = stripped.find("{")
+    while i != -1:
+        try:
+            obj, _ = decoder.raw_decode(stripped[i:])
+        except json.JSONDecodeError:
+            obj = None
+        if isinstance(obj, dict):
+            if any(key in obj for key in _WPSCAN_KEYS):
+                return obj
+            if fallback is None:
+                fallback = obj
+        i = stripped.find("{", i + 1)
+    return fallback
+
+
+def parse_wpscan(text: str, port: int) -> list[HttpFinding]:
+    data = _load_wpscan_json(text)
+    if data is None:
         return []
     findings: list[HttpFinding] = []
     version = data.get("version")
     if isinstance(version, dict) and version.get("number"):
-        findings.append(HttpFinding(port, "/", 0, note=f"WordPress {version['number']}"))
-    plugins = data.get("plugins")
-    if isinstance(plugins, dict):
-        for name in plugins:
-            findings.append(
-                HttpFinding(port, f"/wp-content/plugins/{name}/", 0, note=f"plugin: {name}")
-            )
+        status = version.get("status")
+        tag = f"WordPress {version['number']}"
+        if isinstance(status, str) and status and status.lower() not in ("latest", "up to date"):
+            tag += f" ({status})"  # e.g. "insecure" — a known-outdated core is worth flagging
+        findings.append(HttpFinding(port, "/", 0, note=tag))
+    # vt,tt enumerate themes alongside vp plugins — surface both as artifact paths
+    for kind, label in (("plugins", "plugin"), ("themes", "theme")):
+        section = data.get(kind)
+        if isinstance(section, dict):
+            for name in section:
+                findings.append(
+                    HttpFinding(port, f"/wp-content/{kind}/{name}/", 0, note=f"{label}: {name}")
+                )
     users = data.get("users")
     if isinstance(users, dict) and users:
         findings.append(HttpFinding(port, "/", 0, note=f"users: {', '.join(users)}"))

@@ -760,6 +760,34 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
             # null-session AND guest steps are both "netexec-shares"/"smbclient-shares"), so a plain
             # raw[key]=text let the guest run (often LOGON_FAILURE) clobber the null findings.
             raw[key] = raw[key] + "\n" + text if key in raw else text
+    # WordPress follow-up (CLAUDE.md §9): when a web port's fingerprint shows WordPress, run wpscan
+    # enumeration (never brute) for that port and fold its JSON into the same parse pass, so users /
+    # plugins / themes / version land in findings.json instead of only being suggested as text.
+    if service == "http":
+        from oscprecon.modules.http import detect_wordpress, is_tls, wordpress_command
+
+        for web_port in ports:
+            port_texts = [v for k, v in raw.items() if k.endswith(f":{web_port.number}")]
+            if not detect_wordpress(*port_texts):
+                continue
+            wp_cmd = wordpress_command(
+                prof.target, web_port.number, is_tls(web_port.service, web_port.number)
+            )
+            typer.echo(
+                f"\n[wordpress] detected on port {web_port.number} — running wpscan enumeration "
+                f"(plugins/themes/users; never brute)…"
+            )
+            wp_out = prof.directory / wp_cmd.output_file
+            wp_result = shell.run(wp_cmd.shell_line, wp_out, cwd=prof.directory, on_line=typer.echo)
+            if wp_result.missing_tool is not None:
+                issues.append(f"{wp_result.missing_tool} not installed")
+            elif wp_result.blocked is not None:
+                issues.append("a step was blocked by the recon-only policy")
+            try:
+                wp_text = wp_out.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                wp_text = ""
+            raw[f"wpscan:{web_port.number}"] = wp_text
     found = run_parser(lambda: module.parse(raw), label=service, raw="\n".join(raw.values()))
     if found:
         now = datetime.now(UTC).isoformat()

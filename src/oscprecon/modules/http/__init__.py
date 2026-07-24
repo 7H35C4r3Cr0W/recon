@@ -50,6 +50,7 @@ __all__ = [
     "parse_tool",
     "vhost_from_redirect",
     "wide_net_extensions",
+    "wordpress_command",
 ]
 
 HTTP_SERVICE_NAMES = frozenset(
@@ -267,6 +268,24 @@ def build_command(settings: HttpScanSettings) -> str:
     if settings.tool == "dirsearch":
         return _build_dirsearch(settings)
     return _build_feroxbuster(settings)
+
+
+def wordpress_command(target: Target, port: int, tls: bool) -> Command:
+    # WordPress enumeration follow-up when detect_wordpress() fires (CLAUDE.md §9): vulnerable
+    # plugins/themes, timthumbs, config backups, db exports, users, media — enumeration ONLY, never
+    # --passwords/--usernames (shell.run blocks those in recon mode anyway). --format json goes to
+    # stdout (no -o), so shell.run captures it with no collision, and parse_wpscan tolerates the
+    # merged-stderr progress lines. Passive plugin detection keeps it quick.
+    web_host, _ = effective_web_host(target)
+    url = default_url(web_host, port, tls)
+    return Command(
+        "http",
+        f"wpscan --url {url} --enumerate vp,vt,tt,cb,dbe,u,m "
+        f"--plugins-detection passive --random-user-agent --no-banner --format json",
+        "WordPress enumeration (plugins/themes/users/backups — never brute).",
+        "1-5 min",
+        f"http/{port}/wpscan.json",
+    )
 
 
 class HttpModule(Module):
