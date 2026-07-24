@@ -173,6 +173,18 @@ def test_wordpress_command_tls_and_alt_port() -> None:
     assert cmd.output_file == "http/8443/wpscan.json"
 
 
+def test_suggest_wordpress_user_enum() -> None:
+    # the WordPress suggestion must also point at form-less user enumeration (REST + author-id) and
+    # the readme version check — the HACKING WORDPRESS enumeration sections — never a brute.
+    module = HttpModule()
+    out = module.suggest([Finding(service="http", title="200 /", detail="whatweb: WordPress")])
+    joined = " ".join(out)
+    assert "wp-json/wp/v2/users" in joined
+    assert "author=1" in joined
+    assert "readme.html" in joined
+    assert "--passwords" not in joined
+
+
 def test_suggest_api_server_enumeration() -> None:
     # Spooktrol: a uvicorn/FastAPI fingerprint should nudge toward enumerating the API schema
     # (/openapi.json, /docs) rather than only dir-busting for files.

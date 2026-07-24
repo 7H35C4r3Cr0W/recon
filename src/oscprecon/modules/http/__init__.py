@@ -382,6 +382,12 @@ class HttpModule(Module):
                 "WordPress detected — enumerate (never brute): "
                 "wpscan --enumerate vp,vt,tt,cb,dbe,u,m --url {url}"
             )
+            out.append(
+                "WordPress users — list valid logins without touching the form: "
+                "curl -s {url}wp-json/wp/v2/users (REST) and curl -sI '{url}?author=1' "
+                "(a 301 to /author/<name>/ reveals the login, 404 = no such id); "
+                "confirm the core version at {url}readme.html."
+            )
         # an ASGI/JSON API (uvicorn/FastAPI) is enumerated by its schema, not by dir-busting for
         # files — the auto-generated docs list every route and its expected parameters (§14 lookup).
         if detect_api_server(blob):
