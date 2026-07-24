@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import shlex
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 from oscprecon.models import Command, Finding, Port, Proto, ScanResults, Target
@@ -136,9 +137,15 @@ def default_url(host: str, port: int, tls: bool) -> str:
     return f"{scheme}://{host}:{port}/"
 
 
+@lru_cache(maxsize=256)
 def host_resolves(name: str) -> bool:
     # True if the name resolves via DNS or /etc/hosts. Used to avoid pointing http probes at a vhost
     # the operator hasn't added to /etc/hosts yet (which fails with "no address" and zeroes recon).
+    #
+    # CACHED: this is a BLOCKING getaddrinfo, and the GUI calls it on the UI thread every time a web
+    # port is selected — against a slow/unreachable resolver that froze the window on every click.
+    # One lookup per name per session instead. Call host_resolves.cache_clear() after editing
+    # /etc/hosts so a newly-added vhost is picked up.
     import socket
 
     try:

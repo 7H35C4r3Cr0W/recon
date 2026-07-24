@@ -200,7 +200,10 @@ install_missing() {
 
     # DRY RUN (no root needed): refuse to touch the system if apt would REMOVE or DOWNGRADE anything.
     local plan rmcount removed
-    if ! plan="$(apt-get install -s --no-install-recommends "${to_install[@]}" 2>&1)"; then
+    # LC_ALL=C is load-bearing: the checks below read apt's SUMMARY ("… to remove", "will be
+    # DOWNGRADED"), which apt translates. On a non-English system the guard matched nothing and
+    # silently allowed the removal it exists to prevent.
+    if ! plan="$(LC_ALL=C apt-get install -s --no-install-recommends "${to_install[@]}" 2>&1)"; then
         warn "apt could not compute a safe install plan for these tools — skipping to protect your"
         warn "system. Install them yourself when convenient: sudo apt install ${to_install[*]}"
         printf '%s\n' "$plan" | tail -4 | sed 's/^/    /'
@@ -250,7 +253,7 @@ CORE_SPECS=(
     nmap feroxbuster gobuster ffuf dirsearch dirb nikto whatweb wpscan curl wget wfuzz
     smbclient smbmap "enum4linux-ng|enum4linux" impacket-scripts
     "netexec|crackmapexec"
-    ldap-utils snmp snmpcheck onesixtyone dnsrecon
+    ldap-utils snmp snmpcheck onesixtyone dnsrecon dnsenum
     "bind9-dnsutils|dnsutils"
     ike-scan nbtscan
     "ntpsec-ntpdate|ntpdate"
@@ -306,7 +309,7 @@ $SUDO apt-get update ||
 # A rolling release with many pending upgrades is where "install one thing" turns into a partial
 # upgrade. We already sidestep that (only missing tools are installed, and any removal/downgrade is
 # refused below) — but flag it so the user can full-upgrade on their own schedule.
-held="$(apt-get -s upgrade 2>/dev/null | grep -cE '^Inst ' || true)"
+held="$(LC_ALL=C apt-get -s upgrade 2>/dev/null | grep -cE '^Inst ' || true)"
 if [ "${held:-0}" -gt 30 ]; then
     warn "your system has ${held} pending package upgrades — Nabu installs only what's missing and"
     warn "will not partial-upgrade you, but consider 'sudo apt full-upgrade' soon to stay consistent."

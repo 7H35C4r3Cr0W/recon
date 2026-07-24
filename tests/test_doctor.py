@@ -244,3 +244,16 @@ def test_install_plan_excludes_optional_spray_tools(monkeypatch: pytest.MonkeyPa
     # a recon-only user must never be auto-pushed hydra/medusa (Spray mode is opt-in / off default)
     assert "hydra" not in plan.packages and "medusa" not in plan.packages
     assert "hydra" not in {name for name, _ in plan.manual}
+
+
+def test_raw_socket_check_sees_caps_behind_kalis_nmap_wrapper() -> None:
+    # review finding: Kali ships /usr/bin/nmap as a WRAPPER SCRIPT and puts cap_net_raw on
+    # /usr/lib/nmap/nmap, so getcap on the PATH entry found nothing and doctor reported
+    # "not privileged" on a host where SYN scans demonstrably work.
+    from oscprecon.doctor import _nmap_real_binaries
+
+    candidates = _nmap_real_binaries("/usr/bin/nmap")
+    # the wrapper's real binary is reached either by parsing the script or via the known location
+    assert any(c.endswith("/nmap") for c in candidates)
+    if Path("/usr/lib/nmap/nmap").exists():
+        assert "/usr/lib/nmap/nmap" in candidates

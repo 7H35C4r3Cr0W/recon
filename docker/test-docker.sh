@@ -306,11 +306,16 @@ if [ -f "$DATA/oscprecon/dockersmoke/profile.json" ]; then
 else
     no "scan writes a profile to the mounted volume"
 fi
-if grep -q '"port"' "$DATA/oscprecon/dockersmoke/profile.json" 2>/dev/null; then
-    ok "the scan really enumerated services (not just an empty profile)"
+# Read it back THROUGH the container: the default run is root and profile.json is mode 0600, so a
+# host-side grep gets "Permission denied" and would report an empty scan that actually worked.
+# `list` prints SVC/FIND/CRED — a non-zero service count is the proof nmap really enumerated
+# something (findings stay 0 here: a bare scan discovers services, the service modules find things).
+SVC_COUNT="$(drun list 2>/dev/null | awk '$1 == "dockersmoke" {print $NF}' | cut -d/ -f1)"
+if [ "${SVC_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+    ok "the scan really enumerated services ($SVC_COUNT found, not just an empty profile)"
 else
     no "the scan really enumerated services (not just an empty profile)" \
-        "discovered_services is empty — nmap ran but found nothing, or could not run"
+        "0 services recorded — nmap ran but found nothing, or could not run"
 fi
 check "a second container sees the persisted project" bash -c \
     "docker run --rm -v '$DATA:/data:z' '$IMAGE' list | grep -q dockersmoke"

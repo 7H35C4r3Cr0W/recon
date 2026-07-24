@@ -212,19 +212,46 @@ def _free_gb(path: str) -> float:
         return -1.0
 
 
+def _nmap_real_binaries(nmap: str) -> list[str]:
+    # Kali ships /usr/bin/nmap as a small WRAPPER SCRIPT and puts the capabilities on the real
+    # binary (/usr/lib/nmap/nmap). getcap on the wrapper returns nothing, so checking only the
+    # PATH entry reported "not privileged" on a host where SYN scans demonstrably work. [review]
+    candidates = [nmap]
+    resolved = os.path.realpath(nmap)
+    if resolved != nmap:
+        candidates.append(resolved)
+    try:
+        with open(resolved, "rb") as handle:
+            head = handle.read(4096)
+    except OSError:
+        head = b""
+    if head.startswith(b"#!"):  # a wrapper: take the absolute /…/nmap path it execs
+        for token in re.findall(rb"(/[\w./+-]*/nmap)\b", head):
+            path = token.decode("utf-8", "replace")
+            if path not in candidates:
+                candidates.append(path)
+    for fallback in ("/usr/lib/nmap/nmap", "/usr/libexec/nmap/nmap"):
+        if fallback not in candidates:
+            candidates.append(fallback)
+    return [c for c in candidates if os.path.exists(c)]
+
+
 def _nmap_can_raw() -> bool:
     # SYN / UDP / OS scans need raw sockets: root, or nmap granted cap_net_raw via setcap
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         return True
     nmap, getcap = shutil.which("nmap"), shutil.which("getcap")
-    if nmap and getcap:
+    if not nmap or not getcap:
+        return False
+    for candidate in _nmap_real_binaries(nmap):
         try:
             out = subprocess.run(  # noqa: S603
-                [getcap, nmap], capture_output=True, text=True, timeout=2, check=False
+                [getcap, candidate], capture_output=True, text=True, timeout=2, check=False
             )
-            return "cap_net_raw" in (out.stdout or "")
         except (OSError, subprocess.SubprocessError):
-            return False
+            continue
+        if "cap_net_raw" in (out.stdout or ""):
+            return True
     return False
 
 

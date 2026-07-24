@@ -162,6 +162,15 @@ def _context(finding: dict[str, Any], target: str, domain: str) -> dict[str, str
     # finding field already in context.
     if kind and kind not in ("target", "domain") and kind not in finding:
         context[kind] = str(finding.get("value", ""))
+    # {scheme}: suggested web commands hardcoded http://, so every "Recon next steps" line was the
+    # wrong scheme on a TLS port — you'd copy it, get nothing, and doubt the finding. [review]
+    if "scheme" not in context:
+        blob = " ".join(
+            str(finding.get(key, "")) for key in ("service", "note", "detail", "value")
+        ).lower()
+        port = str(finding.get("port", ""))
+        secure = port in ("443", "8443", "9443") or "https" in blob or "ssl" in blob
+        context["scheme"] = "https" if secure else "http"
     return context
 
 

@@ -378,8 +378,10 @@ class ToolPanel(QWidget):
     def set_vhost_filter_size(self, size: int) -> None:
         self._vhost.set_filter_size(size)
 
-    def enumerate_http(self, vhost: str) -> None:
-        self._http.set_url(f"http://{vhost}/")
+    def enumerate_http(self, vhost: str, base_url: str = "") -> None:
+        # `base_url` carries the scheme + port of the web service the vhost was found on; without it
+        # this hardcoded http://…:80, which is the wrong port (and often closed) on an 8443 box.
+        self._http.set_url(base_url or f"http://{vhost}/")
         self._web_tabs.setCurrentWidget(self._http)
         self._stack.setCurrentWidget(self._web_tabs)
 

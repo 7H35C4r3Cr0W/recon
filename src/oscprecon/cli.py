@@ -986,7 +986,10 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
         now = datetime.now(UTC).isoformat()
         findings_mod.add_findings(
             prof.directory,
-            [findings_mod.from_parsed(f.service, f.fields, f.detail, now) for f in found],
+            [
+                findings_mod.from_parsed(f.service, f.fields, f.detail, now, port=probe_port)
+                for f in found
+            ],
         )
     if issues:
         typer.echo(
@@ -1091,7 +1094,10 @@ def enum_cmd(
         now = datetime.now(UTC).isoformat()
         findings_mod.add_findings(
             prof.directory,
-            [findings_mod.from_parsed(f.service, f.fields, f.detail, now) for f in found],
+            [
+                findings_mod.from_parsed(f.service, f.fields, f.detail, now, port=probe_port)
+                for f in found
+            ],
         )
     if issues:
         typer.echo(

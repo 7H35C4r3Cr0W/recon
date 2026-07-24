@@ -267,7 +267,7 @@ class HelpPopup(QFrame):
         except (ValueError, UnicodeEncodeError):
             return False
 
-    def _store_geometry(self) -> None:
+    def store_geometry(self) -> None:
         if self.isMinimized() or self.isFullScreen():
             return  # never persist a minimized/fullscreen frame — it reopens unusable
         with contextlib.suppress(OSError):
@@ -276,7 +276,7 @@ class HelpPopup(QFrame):
             )
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        self._store_geometry()
+        self.store_geometry()
         super().closeEvent(event)
 
     def open_centered(self, over: QWidget | None) -> None:

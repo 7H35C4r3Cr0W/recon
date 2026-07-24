@@ -6,19 +6,19 @@
     service: http
   suggest:
     - text: "Content discovery — directories with your raft wordlist + common extensions (add -k for https)"
-      command: "feroxbuster -u http://{target}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,asp,xml,html,js,sql,gz,zip"
+      command: "feroxbuster -u {scheme}://{target}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,asp,xml,html,js,sql,gz,zip"
     - text: "Alternative content discovery with gobuster"
-      command: "gobuster dir -u http://{target}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt -t 50 -x php,asp,xml,html,js,sql,gz,zip"
+      command: "gobuster dir -u {scheme}://{target}:{port}/ -w /usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt -t 50 -x php,asp,xml,html,js,sql,gz,zip"
     - text: "Fingerprint the web stack"
-      command: "whatweb http://{target}:{port}/"
+      command: "whatweb {scheme}://{target}:{port}/"
     - text: "nmap web NSE — title, headers, allowed methods, and http-enum's common-path sweep"
       command: "nmap --script http-enum,http-title,http-headers,http-methods -p {port} {target}"
     - text: "File-level discovery — the dir sweeps miss loose files (add -k for https)"
-      command: "ffuf -u http://{target}:{port}/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -mc 200,204,301,302,403"
+      command: "ffuf -u {scheme}://{target}:{port}/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -mc 200,204,301,302,403"
     - text: "Leaked-source / config-backup hunt (-k for https)"
-      command: "feroxbuster -u http://{target}:{port}/ -k -w /usr/share/seclists/Discovery/Web-Content/big.txt -x bak,backup,old,swp,orig,tar.gz,zip,sql,conf"
+      command: "feroxbuster -u {scheme}://{target}:{port}/ -k -w /usr/share/seclists/Discovery/Web-Content/big.txt -x bak,backup,old,swp,orig,tar.gz,zip,sql,conf"
     - text: "Baseline web-server scan (known files, methods, misconfigs)"
-      command: "nikto -h http://{target}:{port}/"
+      command: "nikto -h {scheme}://{target}:{port}/"
 # source: Obsidian: 0.01 Cheatsheets .../80 (Web services)/80 _ Web services.md; .../Directory Discovery/feroxbuster.md; .../1. Initial Recon/Ports and tools.md; .../1. Initial Recon/web scan.md
 
 - match:
@@ -27,13 +27,13 @@
     value: "(?i)wordpress"
   suggest:
     - text: "WordPress detected — enumerate vulnerable themes/plugins + users (enumeration only — no password brute)"
-      command: "wpscan --url http://{target}:{port}/ -e vt,tt,u,ap"
+      command: "wpscan --url {scheme}://{target}:{port}/ -e vt,tt,u,ap"
     - text: "Pull usernames from the WordPress REST API"
-      command: "curl -s http://{target}:{port}/wp-json/wp/v2/users"
+      command: "curl -s {scheme}://{target}:{port}/wp-json/wp/v2/users"
     - text: "Usernames via the core user sitemap (a path the REST API can miss)"
-      command: "curl -s http://{target}:{port}/wp-sitemap-users-1.xml"
+      command: "curl -s {scheme}://{target}:{port}/wp-sitemap-users-1.xml"
     - text: "Check whether the XML-RPC endpoint is exposed"
-      command: "curl -s http://{target}:{port}/xmlrpc.php"
+      command: "curl -s {scheme}://{target}:{port}/xmlrpc.php"
 # source: Obsidian: 0.01 Cheatsheets .../80 (Web services)/Wordpress.md
 
 - match:
@@ -42,9 +42,9 @@
     value: "(?i)tomcat"
   suggest:
     - text: "Apache Tomcat — confirm the version from the docs page"
-      command: "curl -s http://{target}:{port}/docs/"
+      command: "curl -s {scheme}://{target}:{port}/docs/"
     - text: "Look for the Tomcat manager / host-manager consoles (foothold if weak/default creds)"
-      command: "curl -sI http://{target}:{port}/manager/html"
+      command: "curl -sI {scheme}://{target}:{port}/manager/html"
 # source: Obsidian: CPTS/Attacking Common Applications/Tomcat - Discovery & Enumeration.md
 
 - match:
@@ -53,7 +53,7 @@
     value: "(?i)jenkins"
   suggest:
     - text: "Jenkins — grab the version from the login page footer and check whether auth is disabled"
-      command: "curl -s http://{target}:{port}/login"
+      command: "curl -s {scheme}://{target}:{port}/login"
 # source: Obsidian: CPTS/Attacking Common Applications/Jenkins - Discovery & Enumeration.md
 
 - match:
@@ -62,9 +62,9 @@
     value: "(?i)gitlab"
   suggest:
     - text: "GitLab — browse public projects for committed secrets / SSH keys"
-      command: "curl -s http://{target}:{port}/explore"
+      command: "curl -s {scheme}://{target}:{port}/explore"
     - text: "Check the GitLab sign-up page (registration surface + username enumeration)"
-      command: "curl -sI http://{target}:{port}/users/sign_up"
+      command: "curl -sI {scheme}://{target}:{port}/users/sign_up"
 # source: Obsidian: CPTS/Attacking Common Applications/Gitlab - Discovery & Enumeration.md
 
 - match:
@@ -73,7 +73,7 @@
     value: "(?i)drupal"
   suggest:
     - text: "Drupal — read the version from CHANGELOG.txt (or the 'Generator' meta tag on /)"
-      command: "curl -s http://{target}:{port}/CHANGELOG.txt"
+      command: "curl -s {scheme}://{target}:{port}/CHANGELOG.txt"
 # source: Obsidian: CPTS/Attacking Common Applications/Drupal - Discovery & Enumeration.md
 
 - match:
@@ -82,7 +82,7 @@
     value: "(?i)coldfusion"
   suggest:
     - text: "ColdFusion — the admin login at /CFIDE/administrator confirms it and leaks the version"
-      command: "curl -sI http://{target}:{port}/CFIDE/administrator/"
+      command: "curl -sI {scheme}://{target}:{port}/CFIDE/administrator/"
 # source: Obsidian: CPTS/Attacking Common Applications/ColdFusion - Discovery & Enumeration.md
 
 - match:
@@ -91,7 +91,7 @@
     value: "(?i)prtg|paessler"
   suggest:
     - text: "PRTG Network Monitor — confirm it and read the exact build from the login HTML"
-      command: "curl -s http://{target}:{port}/index.htm"
+      command: "curl -s {scheme}://{target}:{port}/index.htm"
 # source: Obsidian: CPTS/Attacking Common Applications/PRTG Network Monitor.md
 
 - match:
@@ -109,7 +109,7 @@
     value: "^401$"
   suggest:
     - text: "401 on {path} — read the auth scheme + realm first (Basic vs NTLM/Negotiate); the WWW-Authenticate realm often names the app, and NTLM leaks the internal AD domain/host"
-      command: "curl -sI http://{target}:{port}{path}"
+      command: "curl -sI {scheme}://{target}:{port}{path}"
 # source: Obsidian: 0.00 Methodology .../1. Initial Recon/web scan.md
 
 - match:
@@ -118,7 +118,7 @@
     value: "(?i)joomla"
   suggest:
     - text: "Joomla detected — read the exact version from the unauthenticated manifest (feeds a version lookup)"
-      command: "curl -s 'http://{target}:{port}/administrator/manifests/files/joomla.xml'"
+      command: "curl -s '{scheme}://{target}:{port}/administrator/manifests/files/joomla.xml'"
 # source: Obsidian: 0.00 Methodology .../Other Services/80 (Web services)/Joomla.md
 
 - match:
@@ -127,7 +127,7 @@
     value: "(?i)werkzeug|django[\\[/]"
   suggest:
     - text: "Python web framework detected (Werkzeug/Flask/Django) — a server-rendered Python app. Check the Werkzeug debug console; if DEBUG was left on it is an interactive Python shell"
-      command: "curl -sik http://{target}:{port}/console"
+      command: "curl -sik {scheme}://{target}:{port}/console"
     - text: "If the app sets a Flask 'session' cookie it is CLIENT-SIDE signed — decode its structure (read-only) to see which fields the server trusts"
       command: "flask-unsign --decode --cookie '<paste the session cookie>'"
 # source: walkthroughs/htb-spider.md (Werkzeug/Flask/Django app recon)
@@ -138,9 +138,9 @@
     value: "(?i)(contact|feedback|guest-?book|leave.?a.?message|submit.?message|comment|inquir|suggestion|support|ticket|review)"
   suggest:
     - text: "Form endpoint {path} — content an ADMIN or a headless-browser BOT may later read/render. Classic blind/stored-XSS + client-side-SSRF surface. Read the form's fields/method/action first (which inputs get stored and re-displayed)"
-      command: "curl -s http://{target}:{port}{path}"
+      command: "curl -s {scheme}://{target}:{port}{path}"
     - text: "Out-of-band callback test (run by hand): submit a benign canary that only phones home (an <img src=http://YOUR-KALI-IP/xss-canary> in a stored field) and watch a listener (php -S 0.0.0.0:80 / nc -lvnp 80). A hit whose User-Agent is a real Chrome/HeadlessChrome proves a bot renders your input — then escalate manually from the Exploitation tab (xss-blind-oob-beacon, xss-cookie-steal, xss-ssrf-internal-read)"
-      command: "curl -sI http://{target}:{port}{path}"
+      command: "curl -sI {scheme}://{target}:{port}{path}"
 # source: walkthroughs/htb-ropetwo.md (contact form rendered by an admin Chrome bot => blind XSS + client-side SSRF)
 
 - match:
@@ -149,7 +149,7 @@
     value: "(?i)roundcube|webmail"
   suggest:
     - text: "Webmail address-book / recipient-autocomplete endpoints are classic IDOR + user/email enumeration surfaces — with a valid session, walk the contact id and the recipient search to read other users' contacts/addresses (HTB DarkCorp's recipient IDOR)"
-      command: "curl -sk -b cookie.txt 'http://{target}:{port}/?_task=addressbook&_action=show&_cid=1'"
+      command: "curl -sk -b cookie.txt '{scheme}://{target}:{port}/?_task=addressbook&_action=show&_cid=1'"
     - text: "Read the exact Roundcube version (feeds a version/CVE lookup — e.g. known stored-XSS in the mail body)"
-      command: "curl -sk http://{target}:{port}/CHANGELOG.md"
+      command: "curl -sk {scheme}://{target}:{port}/CHANGELOG.md"
 # source: HackTricks Roundcube webmail (address-book / recipient IDOR); CPTS Web Attacks (IDOR)

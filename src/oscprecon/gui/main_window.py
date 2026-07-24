@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import re
 import socket
@@ -290,8 +291,8 @@ class MainWindow(QMainWindow):
         self._exploit_panel.run_requested.connect(self._on_exploit_run)
         self._exploit_panel.add_host_requested.connect(self._on_add_host_from_panel)
         self._dashboard = WorkspaceDashboard()
-        self._dashboard.open_requested.connect(lambda d: self._open_path(Path(str(d))))
-        self._dashboard.create_requested.connect(self._on_new)
+        self._dashboard.open_requested.connect(lambda d: self._open_from_dashboard(Path(str(d))))
+        self._dashboard.create_requested.connect(self._new_from_dashboard)
         self._dashboard.status_message.connect(self._tool_panel.append_output)
         # the tool panel is hidden behind the dashboard (stack index 0) — also surface dashboard
         # status (refresh count, delete refusals, tag/pin skips) in the always-visible status bar.
@@ -620,7 +621,8 @@ class MainWindow(QMainWindow):
         # one docs window, reused: it's a real window now (movable/resizable/minimizable), so a
         # second F1 must raise the existing one rather than stack copies on top of each other.
         if self._help_window is not None:
-            self._help_window.showNormal()  # un-minimize if it was parked in the taskbar
+            if self._help_window.isMinimized():
+                self._help_window.showNormal()  # un-park it, but never un-MAXIMIZE it [review]
             self._help_window.raise_()
             self._help_window.activateWindow()
             return
@@ -897,6 +899,7 @@ class MainWindow(QMainWindow):
                 self._close_active_profile()  # drop lock + in-memory profile before rmtree
             try:
                 portability.delete_project(directory, root)
+                config.forget_recent(directory)  # a deleted project must leave Recent Profiles too
                 deleted += 1
             except (portability.ProjectArchiveError, OSError) as exc:
                 self._tool_panel.append_output(
@@ -934,6 +937,10 @@ class MainWindow(QMainWindow):
             if isinstance(edb_worker, QThread) and edb_worker.isRunning():
                 edb_worker.wait()
         self._release_lock()
+        # drop the auditor too: it still pointed at the (about to be deleted) folder, so the next
+        # audited action — including the one closeEvent writes — RECREATED the directory and its
+        # audit.jsonl, resurrecting a project the operator had just deleted. [review]
+        self._auditor = None
         self._profile = None
         self._graph_view.clear_profile()  # no ghost of the deleted project in the graph/summary
         self._header.clear_profile()
@@ -1579,11 +1586,21 @@ class MainWindow(QMainWindow):
         out = vault_export.export_vault(self._profile, Path(chosen))
         self._audit_action("profile-exported", dest=str(out))
         self._tool_panel.append_output(f"[exported] {out}")
+        # tell the truth about what was written: §6 ships with redaction OFF, so the export carries
+        # the secrets in FULL. Claiming they were redacted invited the operator to hand the folder
+        # to someone else. [review]
+        from oscprecon import shell as shell_mod
+
+        secrets_note = (
+            "Credential secret values are REDACTED (redact_secrets is on)."
+            if shell_mod.REDACT_SECRETS
+            else "It contains your credentials IN FULL — treat the folder as sensitive."
+        )
         QMessageBox.information(
             self,
             "Vault exported",
             f"Snapshot written to:\n{out}\n\nThis is a point-in-time copy (re-export to refresh). "
-            "Credential secret values are redacted.",
+            f"{secrets_note}",
         )
 
     def _on_open_by_ip(self) -> None:
@@ -1967,6 +1984,27 @@ class MainWindow(QMainWindow):
         else:
             self._start_recon("quick")
 
+    def _busy_blocked(self, what: str) -> bool:
+        # the dashboard's own Open / ＋New bypass the File-menu gate (its buttons are always live),
+        # so re-check here: switching projects mid-scan releases the edit lock while a worker is
+        # still writing the old project. [review]
+        if self._tasks.active_count == 0:
+            return False
+        message = f"[busy] a scan is still running — Stop it before you {what}."
+        self._tool_panel.append_output(message)
+        self.statusBar().showMessage(message, 6000)
+        return True
+
+    def _open_from_dashboard(self, directory: Path) -> None:
+        if self._busy_blocked("open another project"):
+            return
+        self._open_path(directory)
+
+    def _new_from_dashboard(self) -> None:
+        if self._busy_blocked("create a new project"):
+            return
+        self._on_new()
+
     def _refresh_busy(self) -> None:
         # why: profile-lifecycle actions (New/Open/Save) replace the shared Profile, so they lock
         # while ANY task runs. Launching new recon is gated by the bound: the Run button (full nmap)
@@ -2114,6 +2152,11 @@ class MainWindow(QMainWindow):
         # shell.run kills the child group and each worker returns promptly, then wait to tear down.
         if self._profile is None or not self._profile.read_only:
             self._notes_pane.flush()  # no notes write in read-only mode
+        # persist the docs window's size/position when the APP is quit with it still open — Qt
+        # tears the child window down without a closeEvent of its own, so the geometry the operator
+        # chose was lost every time they quit that way. [review]
+        if self._help_window is not None:
+            self._help_window.store_geometry()
         self._audit_action("profile-closed")
         self._tasks.cancel_all()
         for edb_worker in list(self._edb_workers):
@@ -2434,6 +2477,15 @@ class MainWindow(QMainWindow):
     def _on_run_command(self, command: str) -> None:
         if self._profile is None:
             return
+        # a READ-ONLY project is open in another window that holds the edit lock. Run/Tier-1 are
+        # disabled there, but the Tier-2 manual follow-up list stayed live and wrote its output +
+        # manual/commands.txt into the locked project. Refuse, and say why. [review]
+        if self._profile.read_only:
+            self._tool_panel.append_output(
+                "[read-only] this project is open for editing in another window — "
+                "copy the command and run it in a terminal, or close the other window."
+            )
+            return
         if self._at_capacity():
             return
         manual_dir = self._profile.directory / "manual"
@@ -2458,6 +2510,14 @@ class MainWindow(QMainWindow):
             )
             return
         struct_path.parent.mkdir(parents=True, exist_ok=True)
+        # feroxbuster/dirsearch APPEND to `-o`, so a re-run (new wordlist, new status filter) parsed
+        # the previous run's hits back in and reported them as fresh — and a run that died early
+        # "found" everything the last one did. Keep one generation aside and start clean. [review]
+        if struct_path.exists() and struct_path.stat().st_size:
+            previous = struct_path.with_name(struct_path.name + ".prev")
+            with contextlib.suppress(OSError):
+                struct_path.replace(previous)
+                self._tool_panel.append_output(f"[rotated] previous output → {previous.name}")
         self._tool_panel.append_output(f"$ {command}")
         prof = self._profile
         worker = CommandWorker(command, struct_path.with_suffix(".log"), cwd=prof.directory)
@@ -2611,8 +2671,26 @@ class MainWindow(QMainWindow):
             self._tool_panel.append_output(f"[wildcard] baseline size {digits} -> -fs set")
 
     def _on_enumerate_as_http(self, vhost: str) -> None:
-        self._tool_panel.enumerate_http(vhost)
-        self._tool_panel.append_output(f"[http] enumerate vhost as http://{vhost}/")
+        # reuse the scheme/port of the web service this profile actually exposes — a vhost lives on
+        # the same listener it was discovered through, not always on plain :80. [review]
+        base = f"http://{vhost}/"
+        if self._profile is not None:
+            web = [
+                s
+                for s in self._profile.discovered_services
+                if s.state == "open" and ("http" in s.service.lower() or "ssl" in s.service.lower())
+            ]
+            preferred = next((s for s in web if s.port not in (80,)), None) or (
+                web[0] if web else None
+            )
+            if preferred is not None:
+                name = preferred.service.lower()
+                secure = "https" in name or "ssl" in name or preferred.port in (443, 8443)
+                scheme = "https" if secure else "http"
+                port = "" if preferred.port in (80, 443) else f":{preferred.port}"
+                base = f"{scheme}://{vhost}{port}/"
+        self._tool_panel.enumerate_http(vhost, base)
+        self._tool_panel.append_output(f"[http] enumerate vhost as {base}")
 
     def _on_treat_as_http(self, service: object) -> None:
         if not isinstance(service, DiscoveredService) or self._profile is None:

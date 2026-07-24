@@ -45,7 +45,7 @@ def test_help_window_remembers_its_geometry(qtbot: QtBot, tmp_path: object) -> N
     popup = HelpPopup("light")
     qtbot.addWidget(popup)
     popup.resize(640, 480)
-    popup._store_geometry()
+    popup.store_geometry()
     assert config.window_geometry("help")  # persisted for the next session
     reopened = HelpPopup("light")
     qtbot.addWidget(reopened)

@@ -34,8 +34,16 @@ echo "    cli bin:  $CLI_BIN"
 # --- PATH symlinks so `nabu` / `nabu-cli` work from any terminal --------------------------------
 for pair in "nabu:$GUI_BIN" "nabu-cli:$CLI_BIN"; do
   name="${pair%%:*}"; target="${pair#*:}"
-  ln -sfn "$target" "$BIN_DIR/$name"
-  echo "    linked:   $BIN_DIR/$name -> $target"
+  link="$BIN_DIR/$name"
+  # never point the link at itself: without a repo venv, `command -v nabu` resolves to THIS link,
+  # and `ln -sfn` would then create a self-referential (broken) symlink and delete the working one.
+  if [ "$(readlink -f "$target" 2>/dev/null || echo "$target")" = "$(readlink -f "$link" 2>/dev/null || echo "$link")" ] \
+     && [ -L "$link" ]; then
+    echo "    kept:     $link (already points at $(readlink "$link"))"
+    continue
+  fi
+  ln -sfn "$target" "$link"
+  echo "    linked:   $link -> $target"
 done
 
 # --- hicolor icons (Icon=nabu resolves via the icon theme) --------------------------------------

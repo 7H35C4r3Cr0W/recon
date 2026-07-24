@@ -91,7 +91,17 @@ def add_entry(ip: str, names: list[str], path: Path = HOSTS_PATH) -> HostsResult
         to_add = names
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _forget_resolver_cache()
     return HostsResult(True, tuple(to_add), f"Added '{ip} {' '.join(to_add)}' to {path}.{warn}")
+
+
+def _forget_resolver_cache() -> None:
+    # http.host_resolves memoizes a blocking getaddrinfo (it runs on the GUI thread). A name we
+    # just mapped MUST stop being remembered as unresolvable, or recon keeps falling back to the IP
+    # until restart. Local import: hosts.py is imported by the http module's callers.
+    from oscprecon.modules.http import host_resolves
+
+    host_resolves.cache_clear()
 
 
 @dataclass(frozen=True)
