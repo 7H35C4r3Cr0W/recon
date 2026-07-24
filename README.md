@@ -91,18 +91,38 @@ shipped as actions.
 
 ## Quickstart
 
+**The easy way (Kali/Debian).** One script installs the wrapped recon tools, `uv`, Nabu itself, and
+puts `nabu` / `nabu-cli` on your PATH. It's **non-interactive** (never stops to ask) and safe to
+re-run:
+
 ```bash
-# 1. clone + set up (Python 3.11+ and uv required)
-git clone https://github.com/7H35C4r3Cr0W/recon.git ~/oscp-recon && cd ~/oscp-recon
-uv sync                 # create the venv and install deps
-uv pip install -e .     # install the console scripts (nabu, nabu-cli + legacy aliases)
+# 1. clone
+git clone https://github.com/7H35C4r3Cr0W/recon.git ~/oscp-recon
+cd ~/oscp-recon
 
-# 2. check the host has the wrapped tools (prints install hints for any that are missing)
-nabu-cli doctor
+# 2. install everything (add --with-spray to also install hydra/medusa — opt-in, §2a)
+./install.sh
 
-# 3. launch
-nabu                    # the GUI  (python -m oscprecon is equivalent)
+# 3. use it (a new terminal, if the installer said ~/.local/bin wasn't on PATH yet)
+nabu-cli doctor         # check the host has the wrapped tools
+nabu                    # launch the GUI
 ```
+
+**Manual / other OS.** Install the wrapped tools yourself (see [Requirements](#requirements)), then
+set up the app with `uv`. The console scripts live inside the project's `.venv`, so either run them
+with `uv run`, or put them on your PATH with `packaging/install-desktop.sh`:
+
+```bash
+git clone https://github.com/7H35C4r3Cr0W/recon.git ~/oscp-recon && cd ~/oscp-recon
+uv sync                       # create the venv and install Nabu + deps
+
+uv run nabu-cli doctor        # check the wrapped tools
+uv run nabu                   # launch the GUI  (uv run python -m oscprecon is equivalent)
+```
+
+> **Heads-up:** after `uv sync`, a *bare* `nabu` / `nabu-cli` will say `command not found` — the
+> scripts are in `.venv/bin`, which isn't on your PATH. Use `uv run nabu …`, or run
+> `packaging/install-desktop.sh` (or `./install.sh`) once to add the `~/.local/bin` symlinks.
 
 On first launch Nabu creates its workspace at `~/oscprecon/` and opens to the Workspace dashboard.
 

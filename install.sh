@@ -9,13 +9,15 @@
 # tools (hydra/medusa) are installed only with --with-spray. Nothing here needs the internet at the
 # app's RUNTIME — this is one-time setup.
 set -euo pipefail
+# why: a bootstrap the user explicitly ran must never block on an interactive apt prompt — especially
+# one that would be invisible because we suppress apt's chatter below.
+export DEBIAN_FRONTEND=noninteractive
 
 WITH_SPRAY=0
-ASSUME_YES=0
 for arg in "$@"; do
     case "$arg" in
         --with-spray) WITH_SPRAY=1 ;;
-        -y | --yes) ASSUME_YES=1 ;;
+        -y | --yes) : ;;  # accepted for back-compat; this bootstrap is always non-interactive
         -h | --help)
             tail -n +2 "$0" | grep '^#' | sed 's/^# \{0,1\}//'
             exit 0
@@ -58,22 +60,26 @@ SPRAY_PKGS=(hydra medusa)
 say "apt update"
 $SUDO apt-get update
 
-say "install the recon tool set"
-APT_YES=""
-[ "$ASSUME_YES" -eq 1 ] && APT_YES="-y"
-# install core packages one-by-one so a single unavailable/renamed package can't abort the rest
+say "install the recon tool set (${#CORE_PKGS[@]} packages — this can take a few minutes on a fresh host)"
+# install core packages one-by-one so a single unavailable/renamed package can't abort the rest, and
+# print a per-package result so the run never looks frozen while apt works.
 FAILED=()
 for pkg in "${CORE_PKGS[@]}"; do
-    if ! $SUDO apt-get install $APT_YES --no-install-recommends "$pkg" >/dev/null 2>&1; then
+    printf '  • %-22s ' "$pkg"
+    if $SUDO apt-get install -y --no-install-recommends "$pkg" >/dev/null 2>&1; then
+        printf 'ok\n'
+    else
+        printf 'skip (unavailable/renamed on this release)\n'
         FAILED+=("$pkg")
     fi
 done
-[ "${#FAILED[@]}" -gt 0 ] && say "note: could not install: ${FAILED[*]} (renamed/removed on this release — install by hand if you need them)"
+[ "${#FAILED[@]}" -gt 0 ] && say "note: could not install: ${FAILED[*]} — install by hand if you need them"
 
 if [ "$WITH_SPRAY" -eq 1 ]; then
     say "install opt-in Spray-mode tools (hydra/medusa) — you asked with --with-spray"
     for pkg in "${SPRAY_PKGS[@]}"; do
-        $SUDO apt-get install $APT_YES "$pkg" >/dev/null 2>&1 || say "could not install $pkg"
+        printf '  • %-22s ' "$pkg"
+        if $SUDO apt-get install -y "$pkg" >/dev/null 2>&1; then printf 'ok\n'; else printf 'skip\n'; fi
     done
 fi
 
@@ -85,15 +91,39 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 command -v uv >/dev/null 2>&1 || die "uv is still not on PATH — add ~/.local/bin to PATH and re-run."
 
-say "sync the project (creates .venv, installs oscp-recon)"
+say "sync the project (creates .venv, installs Nabu)"
 (cd "$REPO" && uv sync)
+
+# ---- put nabu / nabu-cli on PATH ---------------------------------------------------------------
+# why: uv sync installs the console scripts into $REPO/.venv/bin, which is NOT on PATH — so a bare
+# `nabu` / `nabu-cli` would say "command not found". Symlink them into ~/.local/bin (on Kali's PATH).
+say "link nabu / nabu-cli onto your PATH (~/.local/bin)"
+BIN_DIR="$HOME/.local/bin"
+mkdir -p "$BIN_DIR"
+for name in nabu nabu-cli; do
+    if [ -x "$REPO/.venv/bin/$name" ]; then
+        ln -sfn "$REPO/.venv/bin/$name" "$BIN_DIR/$name"
+        printf '  • %-9s -> %s\n' "$name" "$BIN_DIR/$name"
+    fi
+done
+case ":$PATH:" in
+    *":$BIN_DIR:"*) ON_PATH=1 ;;
+    *) ON_PATH=0 ;;
+esac
 
 # ---- readiness check ---------------------------------------------------------------------------
 say "checking host readiness (doctor)"
-(cd "$REPO" && uv run oscprecon-cli doctor) || true  # report only; a missing tool is not fatal
+(cd "$REPO" && uv run nabu-cli doctor) || true  # report only; a missing tool is not fatal
 
-say "done. Next:
-  cd '$REPO'
-  uv run python -m oscprecon        # launch the GUI
-  uv run oscprecon-cli doctor       # re-check tools any time
+if [ "$ON_PATH" -eq 1 ]; then
+    say "done. Next:
+  nabu-cli doctor       # re-check the wrapped tools any time
+  nabu                  # launch the GUI
 Spray mode stays OFF by default; enable it in Preferences → Scan (§2a)."
+else
+    say "done — but ~/.local/bin is not on your PATH yet. Add it and reload your shell:
+  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc   # (or ~/.bashrc)
+  exec \$SHELL
+Then run:  nabu-cli doctor   and   nabu
+Or skip PATH entirely:  cd '$REPO' && uv run nabu"
+fi
