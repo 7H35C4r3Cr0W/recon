@@ -282,6 +282,7 @@ class MainWindow(QMainWindow):
         self._graph_view.service_open_requested.connect(self._on_graph_service_open)
         self._report_view = ReportView()
         self._findings_view = FindingsView()
+        self._findings_view.changed.connect(self._on_findings_changed)
         self._activity_view = ActivityView()
         self._exploit_panel = ExploitPanel(theme.normalize(settings.theme))
         self._exploit_panel.add_credentials.connect(self._on_exploit_loot)
@@ -540,6 +541,13 @@ class MainWindow(QMainWindow):
         add_cred_action = QAction("Add Credential...", self)
         add_cred_action.triggered.connect(self._on_add_credential)
         edit_menu.addAction(add_cred_action)
+        add_finding_action = QAction("Add Finding...", self)
+        add_finding_action.setShortcut("Ctrl+Shift+F")
+        add_finding_action.setStatusTip(
+            "Record something you found yourself — host, port, PoC and notes"
+        )
+        add_finding_action.triggered.connect(self._on_add_finding)
+        edit_menu.addAction(add_finding_action)
         vault_action = QAction("Credential Vault...", self)
         vault_action.triggered.connect(self._on_credential_vault)
         edit_menu.addAction(vault_action)
@@ -1675,6 +1683,25 @@ class MainWindow(QMainWindow):
             source=cred.source,
         )
         self._tool_panel.append_output(f"[cred] added {cred.username} (source: {cred.source})")
+
+    def _on_add_finding(self) -> None:
+        # Edit → Add Finding (Ctrl+Shift+F): jump to the Findings view and open the entry dialog, so
+        # the shortcut works from anywhere in the app. [user request]
+        if self._profile is None:
+            QMessageBox.information(self, "No profile", "Open or create a profile first.")
+            return
+        self._show_findings()
+        self._findings_view.add_finding()
+
+    def _on_findings_changed(self) -> None:
+        # a hand-written finding is real project data: it belongs in the report, the graph and the
+        # audit trail exactly like a parsed one.
+        self._audit_action("finding-edited")
+        if self._profile is None:
+            return
+        self._graph_view.set_profile(self._profile)
+        self._report_view.set_profile(self._profile)
+        self._refresh_suggestions()
 
     def _on_credential_vault(self) -> None:
         if self._profile is None:

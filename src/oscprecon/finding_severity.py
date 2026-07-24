@@ -82,3 +82,20 @@ def classify(kind: str, value: str = "", detail: str = "") -> str:
 
 def is_notable(category: str) -> bool:
     return category in NOTABLE_CATEGORIES
+
+
+ALL_CATEGORIES: tuple[str, ...] = (INFO, REFERENCE, ACCESS, EXPOSURE, RELAY_RISK)
+
+
+def category_of(finding: dict[str, object]) -> str:
+    # ONE place that decides a finding's category, for parsed and operator-entered findings alike.
+    # A hand-written finding may carry an explicit `severity` (the operator judged it — they saw
+    # the box); anything else is classified conservatively from its kind/value/detail.
+    severity = str(finding.get("severity", "")).strip().lower()
+    if severity in ALL_CATEGORIES:
+        return severity
+    return classify(
+        str(finding.get("kind", "")),
+        str(finding.get("value", "")),
+        str(finding.get("detail", "")),
+    )

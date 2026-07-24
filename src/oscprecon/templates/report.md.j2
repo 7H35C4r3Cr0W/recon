@@ -66,6 +66,37 @@ _Run nmap to populate this section._
 _No Exploit-DB matches recorded — select a versioned service to run searchsploit._
 {% endfor %}
 
+## My findings
+{% if manual_findings %}
+
+Findings you recorded by hand — what the tools couldn't see.
+{% for f in manual_findings %}
+
+### {{ f.title }}
+{% if f.tags %}{{ f.tags }}
+{% endif %}
+- **category:** {{ f.category }}{% if f.where %} · **where:** {{ f.where }}{% endif %}{% if f.kind %} · **kind:** {{ f.kind }}{% endif %}{% if f.added_at %} · _added {{ f.added_at }}_{% endif %}
+
+{% if f.detail %}
+{{ f.detail }}
+
+{% endif %}
+{% if f.poc %}
+**PoC / repro:**
+
+```
+{{ f.poc }}
+```
+{% endif %}
+{% if f.reference %}
+- reference: {{ f.reference }}
+{% endif %}
+{% endfor %}
+{% else %}
+
+_No hand-written findings yet — add one with Edit → Add Finding (Ctrl+Shift+F) or `nabu-cli add-finding`._
+{% endif %}
+
 ## Per-service findings
 {% for g in finding_groups %}
 

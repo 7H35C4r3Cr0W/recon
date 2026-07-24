@@ -7,7 +7,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from oscprecon import audit, references, shell
+from oscprecon import audit, finding_severity, references, shell
 from oscprecon import edb as edb_mod
 from oscprecon import findings as findings_mod
 from oscprecon.graph_data import build_elements
@@ -77,9 +77,44 @@ def _audit_summary(details: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
+def _manual_findings(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # the operator's own findings get their own report section, with the PoC preserved verbatim in a
+    # fenced block — that block is the thing you paste back in the exam report.
+    out: list[dict[str, Any]] = []
+    for finding in raw:
+        if not finding.get("manual"):
+            continue
+        where_parts = [
+            str(finding.get(key, "")) for key in ("host", "port") if str(finding.get(key, ""))
+        ]
+        tags = " ".join(
+            f"#{tag}"
+            for tag in (finding_severity.category_of(finding), str(finding.get("kind", "")).strip())
+            if tag and tag != "note"
+        )
+        out.append(
+            {
+                "title": _inline(finding.get("value", "")) or "(finding)",
+                "category": finding_severity.category_of(finding),
+                "kind": _inline(finding.get("kind", "")),
+                "where": ":".join(where_parts),
+                "detail": str(finding.get("detail", "")).strip(),
+                # a fenced block ends at the first ``` — neutralise any in the pasted PoC so the
+                # rest of the report can't be swallowed into (or escape) the code fence.
+                "poc": str(finding.get("poc", "")).replace("```", "'''").strip(),
+                "reference": _inline(finding.get("reference", "")),
+                "added_at": _inline(finding.get("added_at", "")),
+                "tags": tags,
+            }
+        )
+    return out
+
+
 def _group_findings(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
     groups: dict[str, list[str]] = {}
     for finding in raw:
+        if finding.get("manual"):
+            continue  # rendered in full (with PoC) by the "My findings" section — don't duplicate
         module = str(finding.get("module", "")).strip() or "other"
         groups.setdefault(module, []).append(_finding_line(finding))
     return [{"module": module, "lines": groups[module]} for module in sorted(groups)]
@@ -283,6 +318,7 @@ class Reporter:
             "status": profile.status,
             "services": services,
             "finding_groups": _group_findings(raw_findings),
+            "manual_findings": _manual_findings(raw_findings),
             "edb_groups": edb_groups,
             "audit_rows": audit_rows,
             "audit_total": len(all_audit),

@@ -29,10 +29,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 #    ONE transaction, --no-install-recommends, names verified on kali-rolling. PySide6 bundles Qt
 #    itself, so only the system libs Qt's xcb platform and Chromium dlopen are needed here.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      nmap feroxbuster gobuster ffuf dirsearch nikto whatweb wpscan curl wget \
-      smbclient smbmap enum4linux-ng impacket-scripts netexec \
-      ldap-utils snmp onesixtyone dnsrecon bind9-dnsutils ike-scan nbtscan \
-      ntpsec-ntpdate ntpsec redis-tools nfs-common rpcbind dnsenum openssh-client rsync \
+      nmap feroxbuster gobuster ffuf dirsearch dirb nikto whatweb wpscan curl wget wfuzz \
+      smbclient smbmap enum4linux-ng enum4linux impacket-scripts netexec \
+      ldap-utils snmp snmpcheck onesixtyone dnsrecon bind9-dnsutils ike-scan nbtscan \
+      ntpsec-ntpdate ntpsec redis-tools nfs-common rpcbind dnsenum openssh-client ssh-audit rsync \
+      finger subversion default-mysql-client postgresql-client netcat-traditional \
       ca-certificates git libcap2-bin procps iproute2 \
       python3 python3-venv \
       libgl1 libegl1 libglib2.0-0t64 libdbus-1-3 fontconfig fonts-dejavu-core \
@@ -46,9 +47,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 #    slim build and bind-mount host wordlists instead:  --build-arg WITH_WORDLISTS=0
 ARG WITH_WORDLISTS=1
 RUN if [ "$WITH_WORDLISTS" = "1" ]; then \
-        apt-get update && apt-get install -y --no-install-recommends seclists exploitdb \
+        apt-get update && apt-get install -y --no-install-recommends seclists exploitdb wordlists \
         && rm -rf /var/lib/apt/lists/* ; \
     else echo "WITH_WORDLISTS=0 — skipping seclists/exploitdb (mount host wordlists at runtime)"; fi
+
+# 2b) Exploitation-tab (§2b) + Spray-mode (§2a) tools. NOT used by default recon — the recon
+#     allow-list never runs them — but the attack catalog and `doctor` expect them, and a user who
+#     builds this image wants the box to be complete. Turn off for a recon-only image:
+#     --build-arg WITH_ATTACK=0
+ARG WITH_ATTACK=1
+RUN if [ "$WITH_ATTACK" = "1" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+          evil-winrm certipy-ad responder john hashcat hydra medusa \
+        && rm -rf /var/lib/apt/lists/* ; \
+    else echo "WITH_ATTACK=0 — skipping the exploitation/spray tool set (recon-only image)"; fi
 
 # 3) uv — copied from the official distroless image (no `curl | sh` piped to a root shell at build
 #    time; reproducible and signed via the image digest).

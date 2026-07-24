@@ -78,6 +78,18 @@ _ALTERNATIVE_GROUPS: tuple[tuple[str, frozenset[str]], ...] = (
         "impacket-GetUserSPNs",
         frozenset({"impacket-GetUserSPNs", "GetUserSPNs.py", "impacket-GetUserSPNs.py"}),
     ),
+    # same class of bug as impacket: Kali's `certipy-ad` package installs the binary as
+    # `certipy-ad`, while a pipx install of the same project gives `certipy`. Either satisfies the
+    # ADCS actions — without this, an image that HAS certipy-ad was told certipy was missing.
+    ("certipy-ad", frozenset({"certipy-ad", "certipy"})),
+    # netcat: Debian/Kali ship the binary as `nc` (netcat-traditional / netcat-openbsd) and nmap
+    # ships `ncat`. Any of them is a listener/connector for the shells catalog.
+    ("nc", frozenset({"nc", "ncat", "netcat"})),
+    # MySQL/MariaDB client: Kali's default-mysql-client provides `mariadb` (with `mysql` as a
+    # compatibility symlink on some releases) — either one drives the mysql actions.
+    ("mysql", frozenset({"mysql", "mariadb"})),
+    # the legacy mongo shell was replaced by mongosh; either can drive the mongodb actions.
+    ("mongosh", frozenset({"mongosh", "mongo"})),
 )
 
 
@@ -86,6 +98,15 @@ def _group_for(tool: str) -> tuple[str, frozenset[str]] | None:
         if tool in members:
             return preferred, members
     return None
+
+
+def _on_path(tool: str) -> bool:
+    # a tool is present when ANY name in its alternative group is on PATH — the alternative may not
+    # be scanned in its own right (Kali installs `certipy-ad`, we look for `certipy`), so checking
+    # only the canonical name reported an INSTALLED tool as missing.
+    group = _group_for(tool)
+    names = sorted(group[1]) if group is not None else [tool]
+    return any(shutil.which(name) is not None for name in names)
 
 
 def effective_missing(report: DoctorReport) -> list[ToolStatus]:
@@ -121,7 +142,7 @@ _EXPLOIT_TOOLS: tuple[tuple[str, str], ...] = (
     ("impacket-smbexec", "apt install impacket-scripts"),
     ("impacket-ntlmrelayx", "apt install impacket-scripts"),
     ("evil-winrm", "gem install evil-winrm   (or: apt install evil-winrm)"),
-    ("certipy", "pipx install certipy-ad"),
+    ("certipy", "apt install certipy-ad   (or: pipx install certipy-ad)"),
     ("responder", "apt install responder"),
     ("hashcat", "apt install hashcat"),
     ("john", "apt install john"),
@@ -135,16 +156,15 @@ def scan() -> DoctorReport:
     # Spray-mode tools (hydra/medusa) are scanned too but flagged optional — a recon-only user isn't
     # missing anything without them, but a Spray-mode (§2a) user needs to know if they're absent.
     required = tuple(
-        ToolStatus(name, shutil.which(name) is not None, shell.install_hint(name))
+        ToolStatus(name, _on_path(name), shell.install_hint(name))
         for name in sorted(shell.ALLOWED_TOOLS)
     )
     spray = tuple(
-        ToolStatus(name, shutil.which(name) is not None, shell.install_hint(name), True, "spray")
+        ToolStatus(name, _on_path(name), shell.install_hint(name), True, "spray")
         for name in sorted(shell.SPRAY_TOOLS)
     )
     exploit = tuple(
-        ToolStatus(name, shutil.which(name) is not None, hint, True, "exploit")
-        for name, hint in _EXPLOIT_TOOLS
+        ToolStatus(name, _on_path(name), hint, True, "exploit") for name, hint in _EXPLOIT_TOOLS
     )
     return DoctorReport(required + spray + exploit)
 

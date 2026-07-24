@@ -76,6 +76,27 @@ build() {
 
 mkdir -p "$DATA"
 
+# Ownership guard. The container runs as ROOT by default, so an existing workspace is root-owned;
+# switching to NABU_USER later means the container can no longer write it, and every command fails
+# with a confusing permission error deep inside a scan. Catch it up front with the one-line fix.
+check_data_ownership() {
+    [ -n "${NABU_USER:-}" ] || return 0
+    local want="${NABU_USER%%:*}"
+    local owner
+    owner="$(stat -c '%u' "$DATA" 2>/dev/null || echo "$want")"
+    if [ "$owner" != "$want" ]; then
+        printf '\033[1;33m[nabu-docker] %s is owned by uid %s but NABU_USER runs as uid %s —\n  the container will not be able to write it. Fix with:\n    sudo chown -R %s %s\033[0m\n' \
+            "$DATA" "$owner" "$want" "$NABU_USER" "$DATA" >&2
+        return 0
+    fi
+    # the top dir can be yours while a previous ROOT run left root-owned projects inside it
+    if find "$DATA" -maxdepth 2 ! -uid "$want" -print -quit 2>/dev/null | grep -q .; then
+        printf '\033[1;33m[nabu-docker] some files under %s are owned by another user (a previous\n  default/root run). NABU_USER runs as uid %s and cannot write them. Fix with:\n    sudo chown -R %s %s\033[0m\n' \
+            "$DATA" "$want" "$NABU_USER" "$DATA" >&2
+    fi
+}
+check_data_ownership
+
 # shared docker run flags: host net (VPN/raw scans), recon caps, persistent volume, optional --user
 common_flags() {
     printf '%s\0' --rm -i

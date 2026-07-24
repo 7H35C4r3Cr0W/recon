@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import typer
 
@@ -516,13 +516,26 @@ def exploit_cmd(
             values["url"] = f"http://{host_for_url}"
 
     typer.echo(f"# {spec.label} — {spec.note}\n")
+    # which ports each attack goes to, marked ✓ when the scan found that port open on this box —
+    # the same decision aid the GUI shows, so a 445 command is never quietly aimed elsewhere.
+    open_ports = (
+        {s.port for s in prof.discovered_services if s.state == "open"} if prof is not None else set()
+    )
     for category in spec.categories():
         typer.echo(f"── {category} ──")
         for action in spec.by_category(category):
             tag = "RUN " if action.executable else "COPY"  # attacker (run) vs victim (copy)
-            typer.echo(f"[{tag}] {action.title}  ({action.tool})")
+            ports, why = exploit_mod.action_ports(action, spec)
+            if ports:
+                marks = ",".join(f"{p}{'✓' if p in open_ports else ''}" for p in ports)
+                port_note = f"  ports: {marks} ({why})"
+            else:
+                port_note = f"  ports: {why}" if why else ""
+            typer.echo(f"[{tag}] {action.title}  ({action.tool}){port_note}")
             typer.echo(f"    {exploit_mod.fill_template(action.template, values)}")
         typer.echo("")
+    if open_ports:
+        typer.echo("✓ = the scan found that port open on this target.")
     raise typer.Exit(0)
 
 
@@ -1138,11 +1151,95 @@ def findings_cmd(
         detail = str(r.get("detail") or r.get("note") or "").replace("\n", " ").strip()
         # parity with the GUI FindingsView / DiscoveredUrlsPanel: show the severity category + a
         # notable mark, and flag a source/backup/VCS disclosure or upload dir (was CLI-silent).
-        category = finding_severity.classify(str(r.get("kind", "")), val, detail)
+        category = finding_severity.category_of(r)
         mark = "‼" if finding_severity.is_notable(category) else " "
         reason = interesting_path_reason(str(r.get("path", ""))) if r.get("path") else ""
         warn = f"   ⚠ {reason}" if reason else ""
+        # your own findings are marked ✎ and carry their id, so you can edit/delete them headlessly
+        if r.get("manual"):
+            where = ":".join(str(r.get(k, "")) for k in ("host", "port") if str(r.get(k, "")))
+            bits = f" ({where})" if where else ""
+            typer.echo(f"{mark} ✎[{category}][{mod}] {head} {val}{bits}  {detail}".rstrip())
+            if r.get("poc"):
+                for line in str(r["poc"]).splitlines():
+                    typer.echo(f"      | {line}")
+            typer.echo(f"      id: {r.get('id', '')}")
+            continue
         typer.echo(f"{mark} [{category}][{mod}] {head} {val}  {detail}{warn}".rstrip())
+
+
+@app.command("add-finding")
+def add_finding_cmd(
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    value: str = typer.Argument(..., help="What you found, in one line."),
+    kind: str = typer.Option("note", "--kind", "-k", help="vuln | credential | foothold | note …"),
+    severity: str = typer.Option(
+        "info",
+        "--severity",
+        "-s",
+        help="info | reference | access | exposure | relay-risk (how you judge it).",
+    ),
+    host: str | None = typer.Option(None, "--host", help="Host / source IP it was found on."),
+    port: int | None = typer.Option(None, "--port", help="Port it was found on."),
+    module: str = typer.Option("manual", "--module", "-m", help="Service it belongs under."),
+    detail: str = typer.Option("", "--note", "-n", help="Notes / context."),
+    poc: str = typer.Option("", "--poc", help="How to reproduce it (use $'…\\n…' for lines)."),
+    reference: str = typer.Option("", "--reference", help="A URL to read later."),
+    delete: str | None = typer.Option(
+        None, "--delete", help="Delete one of YOUR findings by id (see `findings`) instead."
+    ),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Record a finding YOU made — the thing no parser can see (GUI: Edit → Add Finding).
+
+    It lands in the same `findings.json` as parsed findings, so it shows up in the Findings view,
+    the graph and `report.md` (with its PoC in a fenced block) — marked as yours, and editable or
+    deletable later.
+
+    **Examples:**
+
+    ```
+    nabu-cli add-finding -p box "SQLi in /search.php?q=" -k vuln -s exposure --port 80 \\
+        --poc "curl 'http://10.10.10.5/search.php?q=1%27+OR+1=1--'"
+    nabu-cli add-finding -p box "creds in backup.zip" -k credential --host 10.10.10.5
+    nabu-cli findings -p box                       # list them (yours are marked ✎ with an id)
+    nabu-cli add-finding -p box x --delete 9f2c1a4b7d3e   # remove one of yours
+    ```
+    """
+    from oscprecon import finding_severity
+    from oscprecon import findings as findings_mod
+
+    directory = _profile_dir(profile, workspace)
+    if delete:
+        if findings_mod.delete_manual_finding(directory, delete):
+            typer.echo(f"[finding] deleted {delete}")
+            raise typer.Exit(0)
+        typer.echo(f"[error] no finding of yours with id '{delete}'", err=True)
+        raise typer.Exit(2)
+    if severity not in finding_severity.ALL_CATEGORIES:
+        typer.echo(
+            f"[error] unknown --severity '{severity}'; choose one of "
+            f"{', '.join(finding_severity.ALL_CATEGORIES)}.",
+            err=True,
+        )
+        raise typer.Exit(2)
+    entry: dict[str, Any] = {
+        "module": module,
+        "kind": kind,
+        "value": value,
+        "detail": detail,
+        "severity": severity,
+        "poc": poc,
+        "reference": reference,
+    }
+    if host:
+        entry["host"] = host
+    if port is not None:
+        entry["port"] = port
+    saved = findings_mod.add_manual_finding(directory, entry)
+    typer.echo(f"[finding] added {saved['id']} — {value}")
 
 
 @app.command("health")
