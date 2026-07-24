@@ -28,6 +28,13 @@ usage() {
     cat <<EOF
 Nabu (containerized) — recon-first, OSCP exam-legal. Runs on any host with Docker.
 
+QUICK START  (run these from the cloned repo directory)
+  1. docker/nabu-docker.sh build                   one-time: build the image (~4GB, a few min)
+  2. docker/nabu-docker.sh doctor                  verify the toolset is present
+  3. docker/nabu-docker.sh scan 10.10.10.5 -p box  run a scan (saved under ~/.nabu)
+  4. docker/nabu-docker.sh gui                      optional: open the desktop GUI
+  (steps 2-4 auto-build the image the first time if you skip step 1)
+
 USAGE
   docker/nabu-docker.sh <command> [args…]
 
