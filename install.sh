@@ -4,18 +4,25 @@
 #   curl -LsSf … | bash        # NO — always read a script before piping it to a shell
 #   git clone <repo> && cd oscp-recon && ./install.sh        (run ./install.sh --help for details)
 #
-# Idempotent and fail-safe: re-running is harmless, any step failing aborts loudly rather than
-# leaving a half-set-up host. It installs ONLY the §2-allow-listed recon tools; the opt-in Spray-mode
-# tools (hydra/medusa) are installed only with --with-spray. Nothing here needs the internet at the
-# app's RUNTIME — this is one-time setup.
+# SAFE ACROSS KALI VERSIONS. The Python side is fully venv-isolated (uv sync) and can never touch the
+# system. The only step that touches the host is the apt tool-install, and it is deliberately
+# conservative so it CANNOT break a rolling-release box:
+#   • installs ONLY the tools you are actually missing — already-present tools are never upgraded,
+#     so it never triggers a partial upgrade of a rolling release (the classic "broke apt + libraries").
+#   • resolves every package name against what actually exists on THIS release (package names drift
+#     across Kali versions: dnsutils→bind9-dnsutils, ntpdate→ntpsec-ntpdate, crackmapexec→netexec);
+#     a name that isn't available is skipped, never fatal.
+#   • DRY-RUNS the plan first and REFUSES to proceed if apt would remove or downgrade anything.
+#   • installs the remainder in ONE transaction with visible output, and heals dpkg on Ctrl-C — so an
+#     interrupted run never leaves apt/dpkg half-configured.
+# It installs ONLY the §2-allow-listed recon tools; the opt-in Spray-mode tools (hydra/medusa) are
+# installed only with --with-spray. Nothing here needs the internet at the app's RUNTIME.
 set -euo pipefail
-# why: a bootstrap the user explicitly ran must never block on an interactive apt prompt — especially
-# one that would be invisible because we suppress apt's chatter below.
+# why: a bootstrap the user explicitly ran must never block on an interactive apt prompt.
 export DEBIAN_FRONTEND=noninteractive
 
 # ---- colours (only on a real terminal; kept out of pipes/CI logs) -------------------------------
 if [ -t 1 ]; then
-    IS_TTY=1
     B=$'\033[1m'
     DIM=$'\033[2m'
     R=$'\033[0m'
@@ -24,7 +31,6 @@ if [ -t 1 ]; then
     YEL=$'\033[1;33m'
     RED=$'\033[1;31m'
 else
-    IS_TTY=0
     B='' DIM='' R='' CY='' GRN='' YEL='' RED=''
 fi
 
@@ -37,7 +43,8 @@ ${B}USAGE${R}
 
 ${B}WHAT IT DOES${R}  ${DIM}(about 3–8 min on a fresh host, mostly downloads)${R}
   1. apt update
-  2. install the wrapped recon tools (nmap, feroxbuster, smbclient, netexec, …)
+  2. install ONLY the recon tools you are missing (nmap, feroxbuster, netexec, …),
+     in one transaction, after a dry-run that aborts if apt would remove anything
   3. install uv (the Python package manager) if it is missing
   4. set up Nabu in an isolated virtualenv (uv sync)
   5. put 'nabu' and 'nabu-cli' on your PATH (~/.local/bin)
@@ -50,12 +57,19 @@ ${B}OPTIONS${R}
                  non-interactive and never stops to ask.
   -h, --help     show this help and exit.
 
+${B}WHY IT WON'T BREAK YOUR KALI${R}
+  • It only installs tools you don't already have — it never force-upgrades an
+    installed package, so it can't drag your rolling release into a partial upgrade.
+  • It dry-runs the plan first and REFUSES to continue if apt would remove or
+    downgrade anything (it tells you to run 'sudo apt full-upgrade' instead).
+  • Package names are resolved to what exists on your Kali version, so a renamed
+    package is skipped — never a hard failure.
+  • If you Ctrl-C mid-apt, it heals dpkg so your system is never left broken.
+  • The Python app lives in its own virtualenv; that step can't touch the system.
+
 ${B}GOOD TO KNOW${R}
   • Safe to re-run — every step is idempotent.
   • apt needs root, so you may be asked for your sudo password once near the start.
-  • A live progress bar shows each tool installing; big packages (seclists,
-    exploitdb) take a while — the spinner means it is working, not frozen.
-  • Nothing here runs at the app's runtime; this is one-time setup and stays offline.
   • On another OS, install the tools from CLAUDE.md §4 by hand, then run 'uv sync'.
 
 ${B}EXAMPLES${R}
@@ -86,7 +100,7 @@ done
 
 REPO="$(cd "$(dirname "$0")" && pwd)"
 
-# ---- messaging + progress helpers --------------------------------------------------------------
+# ---- messaging helpers -------------------------------------------------------------------------
 say() { printf '%s  %s%s\n' "$DIM" "$*" "$R"; }
 step() {
     STEP=$((STEP + 1))
@@ -100,72 +114,121 @@ die() {
 STEP=0
 TOTAL_STEPS=0
 
-_rep() { # _rep <n> <char> → the char repeated n times (multibyte-safe)
-    local n=$1 s=$2 o=''
-    while [ "$n" -gt 0 ]; do
-        o="$o$s"
-        n=$((n - 1))
-    done
-    printf '%s' "$o"
+# ---- dpkg safety net: if we are interrupted mid-apt, heal so the box is never left broken -------
+APT_ACTIVE=0
+heal_dpkg() {
+    [ "$APT_ACTIVE" -eq 1 ] || return 0
+    APT_ACTIVE=0
+    printf '\n%s[install] interrupted during apt — healing dpkg so your system is not left in a\n' "$YEL" >&2
+    printf '          broken state (dpkg --configure -a; apt-get -f install)…%s\n' "$R" >&2
+    $SUDO dpkg --configure -a >/dev/null 2>&1 || true
+    $SUDO apt-get -f install -y >/dev/null 2>&1 || true
 }
-_bar() { # _bar <done> <total> → "[████░░░░░░]  40%"
-    local cur=$1 total=$2 width=22 filled empty pct
-    [ "$total" -gt 0 ] || total=1
-    [ "$cur" -gt "$total" ] && cur=$total
-    filled=$((cur * width / total))
-    empty=$((width - filled))
-    pct=$((cur * 100 / total))
-    printf '[%s%s] %3d%%' "$(_rep "$filled" '█')" "$(_rep "$empty" '░')" "$pct"
+trap 'heal_dpkg; printf "\n%s[install] aborted.%s\n" "$YEL" "$R" >&2; exit 130' INT TERM
+# a friendly message (and a heal) instead of a bare abort if something unexpected fails
+trap 'heal_dpkg; printf "\n%s[install] something failed unexpectedly (line %s).%s\n%sIt is safe to re-run: ./install.sh%s\n" "$RED" "$LINENO" "$R" "$DIM" "$R" >&2' ERR
+
+# ---- apt helpers -------------------------------------------------------------------------------
+pkg_available() { # is <pkg> installable on THIS release?
+    local cand
+    cand="$(apt-cache policy "$1" 2>/dev/null | awk -F': ' '/Candidate:/{print $2}')"
+    [ -n "$cand" ] && [ "$cand" != "(none)" ]
 }
-apt_one() { # apt_one <pkg> <done-before> <total> → install one package, animating; returns apt's rc
-    local pkg=$1 done=$2 total=$3 rc
-    if [ "$IS_TTY" -eq 1 ]; then
-        local sp='|/-\' k=0 pid
-        printf '\r  %s  %-44s' "$(_bar "$done" "$total")" "installing $pkg ($((done + 1))/$total)"
-        $SUDO apt-get install -y --no-install-recommends "$pkg" >/dev/null 2>&1 &
-        pid=$!
-        while kill -0 "$pid" 2>/dev/null; do
-            printf '\r  %s  %-44s' "$(_bar "$done" "$total")" "installing $pkg ($((done + 1))/$total) ${sp:$((k % 4)):1}"
-            k=$((k + 1))
-            sleep 0.2
-        done
-        if wait "$pid"; then rc=0; else rc=$?; fi
-    else
-        printf '  [%2d/%2d] %-22s ... ' "$((done + 1))" "$total" "$pkg"
-        if $SUDO apt-get install -y --no-install-recommends "$pkg" >/dev/null 2>&1; then
-            rc=0
-            printf 'ok\n'
-        else
-            rc=1
-            printf 'skip\n'
+pkg_installed() { # is <pkg> already installed (at any version)?
+    dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'install ok installed'
+}
+# A "spec" is one tool as pipe-separated aliases, tried left→right (modern name first, older fallback
+# second) — e.g. "bind9-dnsutils|dnsutils". group_installed skips the whole group if ANY alias is
+# already present (so we never reinstall dig just because it moved packages); resolve_spec picks the
+# first alias that is installable on this release.
+group_installed() {
+    local spec=$1 a
+    IFS='|' read -ra _aliases <<<"$spec"
+    for a in "${_aliases[@]}"; do pkg_installed "$a" && return 0; done
+    return 1
+}
+resolve_spec() {
+    local spec=$1 a
+    IFS='|' read -ra _aliases <<<"$spec"
+    for a in "${_aliases[@]}"; do
+        if pkg_available "$a"; then
+            printf '%s' "$a"
+            return 0
         fi
-    fi
-    return "$rc"
-}
-apt_group() { # apt_group <label> <pkg...> → install a list with a live bar; appends misses to FAILED
-    local label=$1
-    shift
-    local pkgs=("$@") total=${#pkgs[@]} i=0 miss=0 pkg okc
-    for pkg in "${pkgs[@]}"; do
-        if apt_one "$pkg" "$i" "$total"; then
-            :
-        else
-            FAILED+=("$pkg")
-            miss=$((miss + 1))
-        fi
-        i=$((i + 1))
     done
-    okc=$((total - miss))
-    if [ "$IS_TTY" -eq 1 ]; then
-        printf '\r  %s  %s✔%s %-42s\n' "$(_bar "$total" "$total")" "$GRN" "$R" "$label ($okc/$total)"
-    else
-        printf '  ✔ %s (%d/%d)\n' "$label" "$okc" "$total"
-    fi
-    return 0 # why: never let this function's exit status abort the script under set -e
+    return 1
 }
 
-# a friendly message instead of a bare abort if something unexpected fails
-trap 'printf "\n%s[install] something failed unexpectedly (line %s).%s\n%sIt is safe to re-run: ./install.sh%s\n" "$RED" "$LINENO" "$R" "$DIM" "$R" >&2' ERR
+# install_missing <step-label> <spec...> — the whole safe path: resolve names, drop already-installed
+# tools, dry-run-and-refuse-removals, then install the remainder in ONE visible transaction.
+install_missing() {
+    local label=$1
+    shift
+    local specs=("$@") spec pkg
+    local to_install=() unresolved=()
+
+    for spec in "${specs[@]}"; do
+        if group_installed "$spec"; then
+            continue # already have it — never force an upgrade (that is what breaks rolling Kali)
+        fi
+        if pkg="$(resolve_spec "$spec")"; then
+            to_install+=("$pkg")
+        else
+            unresolved+=("${spec//|/ or }")
+        fi
+    done
+
+    if [ "${#unresolved[@]}" -gt 0 ]; then
+        warn "not available on this Kali release, skipping: ${unresolved[*]}"
+    fi
+
+    if [ "${#to_install[@]}" -eq 0 ]; then
+        say "all $label already present — nothing to install, no upgrades forced. ✔"
+        return 0
+    fi
+
+    say "missing: ${to_install[*]}"
+
+    # low-disk heads-up before the large data sets (seclists/exploitdb are ~1GB together)
+    local free_mb
+    free_mb="$(df -Pm "$REPO" 2>/dev/null | awk 'NR==2{print $4}')"
+    if [ -n "${free_mb:-}" ] && [ "$free_mb" -lt 2048 ] &&
+        printf '%s\n' "${to_install[@]}" | grep -qE '^(seclists|exploitdb)$'; then
+        warn "only ${free_mb}MB free and seclists/exploitdb are large — free some space if apt aborts."
+    fi
+
+    # DRY RUN (no root needed): refuse to touch the system if apt would REMOVE or DOWNGRADE anything.
+    local plan rmcount removed
+    if ! plan="$(apt-get install -s --no-install-recommends "${to_install[@]}" 2>&1)"; then
+        warn "apt could not compute a safe install plan for these tools — skipping to protect your"
+        warn "system. Install them yourself when convenient: sudo apt install ${to_install[*]}"
+        printf '%s\n' "$plan" | tail -4 | sed 's/^/    /'
+        return 0
+    fi
+    rmcount="$(printf '%s\n' "$plan" | grep -oE '[0-9]+ to remove' | grep -oE '[0-9]+' | head -1 || true)"
+    if [ "${rmcount:-0}" -gt 0 ] || printf '%s\n' "$plan" | grep -q 'will be DOWNGRADED'; then
+        removed="$(printf '%s\n' "$plan" | awk '/^Remv /{printf "%s ", $2}')"
+        warn "SKIPPING the tool install — apt wants to REMOVE/DOWNGRADE packages to do it:"
+        [ -n "$removed" ] && warn "  would remove: $removed"
+        warn "  That usually means your system needs a full upgrade first. Run:"
+        warn "      sudo apt update && sudo apt full-upgrade"
+        warn "  then re-run ./install.sh. Nabu's own setup below is unaffected and continues."
+        return 0
+    fi
+
+    # Safe plan (install + necessary deps only). Do it in ONE transaction, visibly, healing on Ctrl-C.
+    say "installing ${#to_install[@]} package(s) in one transaction (apt output follows)…"
+    APT_ACTIVE=1
+    if $SUDO apt-get install -y --no-install-recommends "${to_install[@]}"; then
+        APT_ACTIVE=0
+        printf '  %s✔%s %s installed (%d package(s)).\n' "$GRN" "$R" "$label" "${#to_install[@]}"
+    else
+        APT_ACTIVE=0
+        warn "apt did not install everything cleanly — Nabu still runs; 'nabu-cli doctor' lists any"
+        warn "remaining gaps and 'nabu-cli doctor --install' can retry them one at a time."
+    fi
+    return 0
+}
 
 # ---- prerequisites -----------------------------------------------------------------------------
 command -v apt-get >/dev/null 2>&1 ||
@@ -179,20 +242,24 @@ else
     die "not root and no sudo — re-run as root or install sudo first."
 fi
 
-# ---- system recon tools (§2 allow-list; CLAUDE.md §4) -------------------------------------------
-CORE_PKGS=(
+# ---- recon tool specs (§2 allow-list; CLAUDE.md §4) --------------------------------------------
+# One entry per tool. Aliases (a|b) are tried in order so the right package is picked on every Kali
+# release. Note: 'rpcclient' is intentionally NOT here — its binary ships inside 'smbclient'.
+CORE_SPECS=(
     nmap feroxbuster gobuster ffuf dirsearch nikto whatweb wpscan curl wget
-    smbclient smbmap enum4linux-ng rpcclient impacket-scripts netexec
-    ldap-utils snmp onesixtyone dnsrecon dnsutils ike-scan nbtscan
-    ntpsec-ntpdate seclists exploitdb redis-tools
+    smbclient smbmap enum4linux-ng impacket-scripts
+    "netexec|crackmapexec"
+    ldap-utils snmp onesixtyone dnsrecon
+    "bind9-dnsutils|dnsutils"
+    ike-scan nbtscan
+    "ntpsec-ntpdate|ntpdate"
+    seclists exploitdb redis-tools
 )
-SPRAY_PKGS=(hydra medusa)
+SPRAY_SPECS=(hydra medusa)
 
-# total phases up front so the [N/T] counter is honest (uv-install + spray are conditional)
 NEED_UV=0
 command -v uv >/dev/null 2>&1 || NEED_UV=1
 TOTAL_STEPS=$((5 + WITH_SPRAY + NEED_UV)) # apt-update, tools, [spray], [uv], sync, link, doctor
-FAILED=()
 
 # ---- welcome + plan ----------------------------------------------------------------------------
 printf '\n%s%s   {o,o}   Nabu — Local Recon Workspace%s\n' "$CY" "$B" "$R"
@@ -201,13 +268,13 @@ printf '%s   -"-"-%s\n' "$DIM" "$R"
 
 printf '\n%sHere is the plan (%s steps, ~3–8 min — mostly downloads):%s\n' "$B" "$TOTAL_STEPS" "$R"
 printf '   1. update apt package lists\n'
-printf '   2. install %s recon tools (nmap, feroxbuster, smbclient, netexec, …)\n' "${#CORE_PKGS[@]}"
+printf '   2. install any MISSING recon tools (already-present ones are left untouched)\n'
 [ "$WITH_SPRAY" -eq 1 ] && printf '   +  install spray tools (hydra, medusa)\n'
 [ "$NEED_UV" -eq 1 ] && printf '   +  install uv (Python package manager)\n'
 printf '   3. set up Nabu in its own virtualenv\n'
 printf '   4. put nabu / nabu-cli on your PATH\n'
 printf '   5. run a health check\n'
-printf '%s   safe to re-run · Ctrl-C to abort · run ./install.sh --help for details%s\n' "$DIM" "$R"
+printf '%s   safe to re-run · Ctrl-C to abort (dpkg is healed if it happens mid-apt)%s\n' "$DIM" "$R"
 
 if [ -n "$SUDO" ]; then
     printf '\n%s   ▸ apt needs root — you may be prompted for your %s password once.%s\n' "$YEL" "$(id -un)" "$R"
@@ -215,28 +282,28 @@ fi
 
 # ---- run ---------------------------------------------------------------------------------------
 step "apt update"
-$SUDO apt-get update
+$SUDO apt-get update ||
+    warn "apt update reported problems (stale/expired mirror?) — continuing with the cached indexes."
 
-step "install the recon tool set — ${#CORE_PKGS[@]} packages"
-say "the bar advances as each finishes; the spinner shows the current one downloading."
-apt_group "recon tools installed" "${CORE_PKGS[@]}"
-[ "${#FAILED[@]}" -gt 0 ] && warn "could not install: ${FAILED[*]} — renamed/removed on this release; install by hand if you need them"
+step "install any missing recon tools"
+install_missing "recon tools" "${CORE_SPECS[@]}"
 
 if [ "$WITH_SPRAY" -eq 1 ]; then
     step "install opt-in Spray-mode tools (hydra/medusa)"
     say "you asked with --with-spray. Spray mode still ships OFF in the app (§2a)."
-    apt_group "spray tools installed" "${SPRAY_PKGS[@]}"
+    install_missing "spray tools" "${SPRAY_SPECS[@]}"
 fi
 
 if [ "$NEED_UV" -eq 1 ]; then
     step "install uv (Python dependency manager)"
+    say "uv installs into ~/.local/bin (user space — it does not touch system packages)."
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
 fi
 command -v uv >/dev/null 2>&1 || die "uv is still not on PATH — add ~/.local/bin to PATH and re-run."
 
 step "set up Nabu (create the virtualenv, install dependencies)"
-say "resolving Python packages — this is quick, uv streams its progress below."
+say "resolving Python packages into an isolated venv — cannot affect system packages."
 (cd "$REPO" && uv sync)
 
 # why: uv sync installs the console scripts into $REPO/.venv/bin, which is NOT on PATH — so a bare
@@ -259,12 +326,9 @@ step "check the host is ready (doctor)"
 (cd "$REPO" && uv run nabu-cli doctor) || true # report only; a missing tool is not fatal
 
 # ---- done --------------------------------------------------------------------------------------
-trap - ERR
+trap - ERR INT TERM
 printf '\n%s   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄%s\n' "$GRN" "$R"
 printf '%s   ✔ Setup complete — Nabu is installed.%s  %s(%ss)%s\n' "$GRN$B" "$R" "$DIM" "$SECONDS" "$R"
-if [ "${#FAILED[@]}" -gt 0 ]; then
-    warn "${#FAILED[@]} tool(s) skipped: ${FAILED[*]} — Nabu still runs; 'nabu-cli doctor' shows install hints."
-fi
 if [ "$ON_PATH" -eq 1 ]; then
     printf '\n%s   Launch it:%s\n' "$B" "$R"
     printf '     %snabu%s              # the GUI\n' "$B" "$R"

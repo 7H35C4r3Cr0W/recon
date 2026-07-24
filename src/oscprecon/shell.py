@@ -514,7 +514,7 @@ _INSTALL_HINTS: dict[str, str] = {
     "rpcclient": "apt install smbclient",
     "ldapsearch": "apt install ldap-utils",
     "dnsrecon": "apt install dnsrecon",
-    "dig": "apt install dnsutils",
+    "dig": "apt install bind9-dnsutils",
     "dnsenum": "apt install dnsenum",
     "wfuzz": "apt install wfuzz",
     "ike-scan": "apt install ike-scan",
