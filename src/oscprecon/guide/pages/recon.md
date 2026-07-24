@@ -53,6 +53,20 @@ real weak postures (anonymous access, null session, SMB signing off) are flagged
 missing/blocked tool is called out with **`⚠ step did not run`**, so "no findings" is never confused
 with "the service isn't there".
 
+## Your own findings
+
+Parsers only see what a tool printed. The working SQLi, the credential in a PDF, the path that
+actually gave you a foothold — record those yourself: **Edit → Add Finding** (`Ctrl+Shift+F`), or the
+**＋ Add finding** button on the Findings view. You get a one-line description, a kind, a severity you
+judge (info / reference / access / exposure / relay-risk), the **host and port** it was on (both
+prefilled from what the scan discovered), a **PoC / repro** block, notes and a reference URL.
+
+They live in the same `findings.json` as parsed findings — so they flow into the graph and
+`report.md` (their own **My findings** section, PoC preserved in a fenced block, ready to paste into
+an exam report) — but are marked `✎`, filterable via **My findings**, searchable by their PoC text,
+and stay editable or deletable (double-click a row). Parsed tool output is never editable: it is the
+record of what the tools actually saw. Headless: `nabu-cli add-finding -p box "…" --poc "…"`.
+
 ## Recon next steps
 
 As findings land, the pattern library surfaces **Recon next steps** in the tool panel — sensible,

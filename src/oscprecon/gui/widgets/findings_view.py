@@ -47,7 +47,7 @@ _ROW_ROLE = Qt.ItemDataRole.UserRole
 
 
 class FindingsView(QWidget):
-    changed = Signal()  # a manual finding was added/edited/deleted — host refreshes report/graph
+    changed = Signal(str)  # 'finding-added' | 'finding-edited' | 'finding-deleted'
 
     def __init__(self, theme_name: str = "dark", parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -117,7 +117,9 @@ class FindingsView(QWidget):
         self._table.setSortingEnabled(True)
         self._table.verticalHeader().setVisible(False)
         self._table.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self._table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+        header = self._table.horizontalHeader()
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Value — the finding itself
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)  # Detail
         self._table.itemSelectionChanged.connect(self._on_selection_changed)
         self._table.itemDoubleClicked.connect(lambda _item: self._edit_selected())
         layout.addWidget(self._table, stretch=3)
@@ -178,9 +180,11 @@ class FindingsView(QWidget):
             return False
         if category == _NOTABLE_ONLY and not finding_severity.is_notable(str(row["category"])):
             return False
-        if category not in (_ALL_CATEGORIES, _NOTABLE_ONLY, _MINE_ONLY):
-            if row["category"] != category:
-                return False
+        if (
+            category not in (_ALL_CATEGORIES, _NOTABLE_ONLY, _MINE_ONLY)
+            and row["category"] != category
+        ):
+            return False
         if needle:
             hay = " ".join(
                 str(row[k]) for k in ("module", "kind", "value", "detail", "host", "port")
@@ -226,11 +230,20 @@ class FindingsView(QWidget):
                 cat_item.setToolTip("Your own finding — double-click to edit")
             cat_item.setData(_ROW_ROLE, row)
             self._table.setItem(r, 0, cat_item)
-            for column, key in ((1, "module"), (2, "kind"), (3, "host"), (5, "value"), (6, "detail")):
+            for column, key in (
+                (1, "module"),
+                (2, "kind"),
+                (3, "host"),
+                (5, "value"),
+                (6, "detail"),
+            ):
                 self._table.setItem(r, column, QTableWidgetItem(str(row[key])))
             port_item = QTableWidgetItem()
             # numeric sort: ports must order 22 < 80 < 8080, not as strings
-            port_item.setData(Qt.ItemDataRole.DisplayRole, int(row["port"]) if str(row["port"]).isdigit() else str(row["port"]))
+            port_item.setData(
+                Qt.ItemDataRole.DisplayRole,
+                int(row["port"]) if str(row["port"]).isdigit() else str(row["port"]),
+            )
             self._table.setItem(r, 4, port_item)
             shown += 1
             if finding_severity.is_notable(str(row["category"])):
@@ -238,7 +251,9 @@ class FindingsView(QWidget):
             if row["manual"]:
                 mine += 1
         self._table.resizeColumnsToContents()
-        self._table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
+        head = self._table.horizontalHeader()
+        head.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        head.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
         self._table.setSortingEnabled(True)
         self._table.setUpdatesEnabled(True)
         filtered = "" if shown == len(self._all) else f" (of {len(self._all)})"
@@ -318,7 +333,7 @@ class FindingsView(QWidget):
             return
         findings_mod.add_manual_finding(self._profile.directory, dialog.finding())
         self.reload()
-        self.changed.emit()
+        self.changed.emit("finding-added")
 
     def _edit_selected(self) -> None:
         row = self._selected_row()
@@ -332,7 +347,7 @@ class FindingsView(QWidget):
             self._profile.directory, str(raw.get("id", "")), dialog.finding()
         )
         self.reload()
-        self.changed.emit()
+        self.changed.emit("finding-edited")
 
     def _delete_selected(self) -> None:
         row = self._selected_row()
@@ -350,7 +365,7 @@ class FindingsView(QWidget):
             return
         findings_mod.delete_manual_finding(self._profile.directory, str(raw.get("id", "")))
         self.reload()
-        self.changed.emit()
+        self.changed.emit("finding-deleted")
 
 
 def _escape(text: str) -> str:

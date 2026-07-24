@@ -7,7 +7,7 @@ import tempfile
 import threading
 import uuid
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -108,6 +108,30 @@ def add_findings(profile_dir: Path, new: list[dict[str, Any]]) -> list[dict[str,
         return existing
 
 
+def from_parsed(
+    service: str, fields: dict[str, Any], detail: str, discovered_at: str, port: int = 0
+) -> dict[str, Any]:
+    # ONE shape for "a parser Finding -> a findings.json row", shared by the CLI (`enum`) and the
+    # GUI workers so the two never diverge.
+    #
+    # why the whole `fields` dict: modules do NOT all speak kind/value. http/vhost carry
+    # vhost/path/status/note/port, and a transform that kept only kind+value flattened three
+    # discovered vhosts into three IDENTICAL blank rows — which _key() then deduped down to one, so
+    # the names were lost outright. Carrying the parser's own fields keeps them distinct and makes
+    # them visible in the Findings view / report.
+    payload: dict[str, Any] = dict(fields)
+    payload["module"] = service  # the module owns this key — never let a field shadow it
+    payload.setdefault("kind", "")
+    payload.setdefault("value", "")
+    payload["detail"] = detail
+    payload["discovered_at"] = discovered_at
+    # the port this recon ran against, when the parser didn't record one: without it, the same
+    # service on two ports (VNC 5900 + 5901) produces identical rows and one is deduped away.
+    if port and not payload.get("port"):
+        payload["port"] = port
+    return payload
+
+
 # --- operator-entered findings ------------------------------------------------------------------
 # What a parser can't see: the thing YOU found (a working SQLi, a credential in a PDF, the box's
 # actual foothold). Stored in the same findings.json as parsed findings — so they flow into the
@@ -171,4 +195,4 @@ def delete_manual_finding(profile_dir: Path, finding_id: str) -> bool:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")

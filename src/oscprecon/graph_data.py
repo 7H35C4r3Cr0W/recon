@@ -118,13 +118,15 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
 
     for index, finding in enumerate(findings_mod.load_findings(profile.directory)):
         fid = f"finding-{index}"
-        kind = str(finding.get("kind", ""))
-        value = str(finding.get("value", ""))
         module = str(finding.get("module", ""))
         detail = str(finding.get("detail", ""))
         label = _finding_label(finding)
-        category = finding_severity.classify(kind, value, detail)
+        # category_of, not classify: an operator-entered finding carries the severity THEY judged
+        # (they saw the box), and the graph must colour it the same as the Findings view and report.
+        category = finding_severity.category_of(finding)
         extra: dict[str, Any] = {"module": module, "detail": detail, "category": category}
+        if finding.get("manual"):
+            extra["manual"] = True
         if finding_severity.is_notable(category):
             extra["notable"] = True  # anon access / exposure / relay-risk -> highlighted ring
         add_node(fid, "finding", label, extra)

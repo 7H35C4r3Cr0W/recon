@@ -75,7 +75,9 @@ class ManualFindingDialog(QDialog):
             self._severity.addItem(label, value)
         self._host = QComboBox()
         self._host.setEditable(True)
-        self._host.setToolTip("Where you found it — the target, a discovered host, or anything you type")
+        self._host.setToolTip(
+            "Where you found it — the target, a discovered host, or anything you type"
+        )
         self._port = QComboBox()
         self._port.setEditable(True)
         self._port.setToolTip("The port it was on (blank if it isn't port-specific)")
@@ -196,8 +198,9 @@ class ManualFindingDialog(QDialog):
             "poc": self._poc.toPlainText().strip(),
             "reference": self._reference.text().strip(),
         }
-        if port:
-            data["port"] = int(port) if port.isdigit() else port
+        # ALWAYS send the port key: update_manual_finding MERGES, so omitting it would quietly keep
+        # the previous port and make "this finding isn't port-specific after all" impossible to say.
+        data["port"] = (int(port) if port.isdigit() else port) if port else ""
         existing_id = str(self._finding.get("id", ""))
         if existing_id:
             data["id"] = existing_id

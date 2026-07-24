@@ -98,9 +98,11 @@ def _manual_findings(raw: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "category": finding_severity.category_of(finding),
                 "kind": _inline(finding.get("kind", "")),
                 "where": ":".join(where_parts),
-                "detail": str(finding.get("detail", "")).strip(),
-                # a fenced block ends at the first ``` — neutralise any in the pasted PoC so the
-                # rest of the report can't be swallowed into (or escape) the code fence.
+                # ``` is neutralised in BOTH free-text fields: in the PoC it would escape the fence
+                # the template wraps it in, and in the notes (rendered as plain markdown) an odd one
+                # OPENS a fence that swallows the rest of report.md. Pasting a truncated snippet is
+                # routine, so neither may break the document.
+                "detail": str(finding.get("detail", "")).replace("```", "'''").strip(),
                 "poc": str(finding.get("poc", "")).replace("```", "'''").strip(),
                 "reference": _inline(finding.get("reference", "")),
                 "added_at": _inline(finding.get("added_at", "")),

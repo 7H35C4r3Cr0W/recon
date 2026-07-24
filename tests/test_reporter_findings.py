@@ -242,3 +242,74 @@ def test_report_summary_and_frontmatter_resist_banner_injection(tmp_path: Path) 
     assert "injected" not in fm and "htb" in str(fm["platform"])
     # a ``` inside the nmap-script block can't close the fence early (zero-width-broken)
     assert "​" in md
+
+
+def test_manual_findings_get_their_own_report_section_with_poc(tmp_path: Path) -> None:
+    from oscprecon import findings as findings_mod
+    from oscprecon.models import Target
+    from oscprecon.profile import Profile
+    from oscprecon.reporter import Reporter
+
+    profile = Profile.create(tmp_path, "manual", Target(ip="10.10.10.5"))
+    findings_mod.add_manual_finding(
+        profile.directory,
+        {
+            "kind": "vuln",
+            "value": "SQLi in /search.php",
+            "severity": "exposure",
+            "host": "10.10.10.5",
+            "port": 80,
+            "poc": "curl 'http://10.10.10.5/search.php?q=1'",
+            "detail": "boolean-based blind",
+        },
+    )
+    Reporter(profile).write()
+    text = (profile.directory / "report.md").read_text(encoding="utf-8")
+    assert "## My findings" in text
+    assert "SQLi in /search.php" in text
+    assert "curl 'http://10.10.10.5/search.php?q=1'" in text  # the PoC block, verbatim
+    assert "10.10.10.5:80" in text
+    # and it is NOT duplicated into the per-service section
+    assert text.count("SQLi in /search.php") == 1
+
+
+def test_manual_poc_cannot_break_out_of_its_code_fence(tmp_path: Path) -> None:
+    from oscprecon import findings as findings_mod
+    from oscprecon.models import Target
+    from oscprecon.profile import Profile
+    from oscprecon.reporter import Reporter
+
+    profile = Profile.create(tmp_path, "fence", Target(ip="10.10.10.5"))
+    findings_mod.add_manual_finding(
+        profile.directory,
+        {"kind": "note", "value": "x", "poc": "line1\n```\n## injected heading"},
+    )
+    Reporter(profile).write()
+    text = (profile.directory / "report.md").read_text(encoding="utf-8")
+    assert "## injected heading" in text  # kept as literal text…
+    body = text[text.index("## My findings") : text.index("## Per-service findings")]
+    assert body.count("```") == 2  # …inside exactly one fenced block, which it can't escape
+
+
+def test_manual_notes_cannot_break_the_report_either(tmp_path: Path) -> None:
+    # review finding: ``` was neutralised in the PoC but NOT in the notes, which the template
+    # renders as plain markdown — an odd one opened a fence that ate the rest of report.md.
+    from oscprecon import findings as findings_mod
+    from oscprecon.models import Target
+    from oscprecon.profile import Profile
+    from oscprecon.reporter import Reporter
+
+    profile = Profile.create(tmp_path, "notes", Target(ip="10.10.10.5"))
+    findings_mod.add_manual_finding(
+        profile.directory,
+        {
+            "kind": "note",
+            "value": "x",
+            "detail": "pasted from my notes:\n```sql\nSELECT 1",
+        },
+    )
+    Reporter(profile).write()
+    text = (profile.directory / "report.md").read_text(encoding="utf-8")
+    assert "SELECT 1" in text  # the note is kept…
+    assert text.count("```") % 2 == 0  # …and every fence in the document is closed
+    assert "## Per-service findings" in text  # the rest of the report survived
