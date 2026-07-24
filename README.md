@@ -100,7 +100,8 @@ re-run:
 git clone https://github.com/7H35C4r3Cr0W/recon.git ~/oscp-recon
 cd ~/oscp-recon
 
-# 2. install everything (add --with-spray to also install hydra/medusa — opt-in, §2a)
+# 2. install everything — a guided, non-interactive run with a live progress bar
+#    (./install.sh --help explains every step; --with-spray also installs hydra/medusa, §2a)
 ./install.sh
 
 # 3. use it (a new terminal, if the installer said ~/.local/bin wasn't on PATH yet)
