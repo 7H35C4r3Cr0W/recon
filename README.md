@@ -92,15 +92,20 @@ shipped as actions.
 ## Quickstart
 
 **The easy way (Kali/Debian).** One script installs the wrapped recon tools, `uv`, Nabu itself, and
-puts `nabu` / `nabu-cli` on your PATH. It's **non-interactive** (never stops to ask) and safe to
-re-run:
+puts `nabu` / `nabu-cli` on your PATH. It's **non-interactive** (never stops to ask), safe to
+re-run, and **won't break your Kali**: it installs only the tools you're *missing* (never
+force-upgrades an installed one, so it can't trigger a rolling-release partial upgrade), resolves
+package names to what actually exists on your release, and **dry-runs the plan first — aborting the
+tool step if apt would remove or downgrade anything** (it tells you to `sudo apt full-upgrade`
+instead). Nabu's own setup is a self-contained virtualenv that can't touch your system.
 
 ```bash
 # 1. clone
 git clone https://github.com/7H35C4r3Cr0W/recon.git ~/oscp-recon
 cd ~/oscp-recon
 
-# 2. install everything — a guided, non-interactive run with a live progress bar
+# 2. install everything — guided and non-interactive; only the tools you're missing are added,
+#    after a dry-run that refuses to remove/downgrade anything on your system
 #    (./install.sh --help explains every step; --with-spray also installs hydra/medusa, §2a)
 ./install.sh
 

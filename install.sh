@@ -114,19 +114,14 @@ die() {
 STEP=0
 TOTAL_STEPS=0
 
-# ---- dpkg safety net: if we are interrupted mid-apt, heal so the box is never left broken -------
-APT_ACTIVE=0
-heal_dpkg() {
-    [ "$APT_ACTIVE" -eq 1 ] || return 0
-    APT_ACTIVE=0
-    printf '\n%s[install] interrupted during apt — healing dpkg so your system is not left in a\n' "$YEL" >&2
-    printf '          broken state (dpkg --configure -a; apt-get -f install)…%s\n' "$R" >&2
-    $SUDO dpkg --configure -a >/dev/null 2>&1 || true
-    $SUDO apt-get -f install -y >/dev/null 2>&1 || true
-}
-trap 'heal_dpkg; printf "\n%s[install] aborted.%s\n" "$YEL" "$R" >&2; exit 130' INT TERM
-# a friendly message (and a heal) instead of a bare abort if something unexpected fails
-trap 'heal_dpkg; printf "\n%s[install] something failed unexpectedly (line %s).%s\n%sIt is safe to re-run: ./install.sh%s\n" "$RED" "$LINENO" "$R" "$DIM" "$R" >&2' ERR
+# ---- interrupt / failure messaging -------------------------------------------------------------
+# We deliberately do NOT run sudo repair work at abort time — firing `dpkg --configure -a` the moment
+# you hit Ctrl-C would surprise you with a password prompt exactly when you want out. Instead: apt's
+# own DPkg::ConfigurePending finishes a partially-unpacked package on the next apt run, and this
+# script repairs any pre-existing half-configured dpkg at STARTUP (see below) — so a plain re-run
+# genuinely self-heals, which is the promise we make.
+trap 'printf "\n%s[install] aborted. If that interrupted an apt install, just re-run ./install.sh —\n          it repairs dpkg at startup and continues cleanly.%s\n" "$YEL" "$R" >&2; exit 130' INT TERM
+trap 'printf "\n%s[install] something failed unexpectedly (line %s).%s\n%sSafe to re-run: ./install.sh — it repairs dpkg and skips what is already done.%s\n" "$RED" "$LINENO" "$R" "$DIM" "$R" >&2' ERR
 
 # ---- apt helpers -------------------------------------------------------------------------------
 pkg_available() { # is <pkg> installable on THIS release?
@@ -142,13 +137,13 @@ pkg_installed() { # is <pkg> already installed (at any version)?
 # already present (so we never reinstall dig just because it moved packages); resolve_spec picks the
 # first alias that is installable on this release.
 group_installed() {
-    local spec=$1 a
+    local spec=$1 a _aliases
     IFS='|' read -ra _aliases <<<"$spec"
     for a in "${_aliases[@]}"; do pkg_installed "$a" && return 0; done
     return 1
 }
 resolve_spec() {
-    local spec=$1 a
+    local spec=$1 a _aliases
     IFS='|' read -ra _aliases <<<"$spec"
     for a in "${_aliases[@]}"; do
         if pkg_available "$a"; then
@@ -218,12 +213,9 @@ install_missing() {
 
     # Safe plan (install + necessary deps only). Do it in ONE transaction, visibly, healing on Ctrl-C.
     say "installing ${#to_install[@]} package(s) in one transaction (apt output follows)…"
-    APT_ACTIVE=1
     if $SUDO apt-get install -y --no-install-recommends "${to_install[@]}"; then
-        APT_ACTIVE=0
         printf '  %s✔%s %s installed (%d package(s)).\n' "$GRN" "$R" "$label" "${#to_install[@]}"
     else
-        APT_ACTIVE=0
         warn "apt did not install everything cleanly — Nabu still runs; 'nabu-cli doctor' lists any"
         warn "remaining gaps and 'nabu-cli doctor --install' can retry them one at a time."
     fi
@@ -244,10 +236,13 @@ fi
 
 # ---- recon tool specs (§2 allow-list; CLAUDE.md §4) --------------------------------------------
 # One entry per tool. Aliases (a|b) are tried in order so the right package is picked on every Kali
-# release. Note: 'rpcclient' is intentionally NOT here — its binary ships inside 'smbclient'.
+# release. Intentionally NOT here: 'rpcclient' (its binary ships inside 'smbclient', already listed),
+# and the 'ntpsec' package that provides 'ntpq' — ntpsec Conflicts with 'time-daemon'
+# (systemd-timesyncd), so auto-installing it would swap the host's time daemon; the ntp module's ntpq
+# is therefore left to a deliberate 'nabu-cli doctor --install' rather than force-swapped here.
 CORE_SPECS=(
     nmap feroxbuster gobuster ffuf dirsearch nikto whatweb wpscan curl wget
-    smbclient smbmap enum4linux-ng impacket-scripts
+    smbclient smbmap "enum4linux-ng|enum4linux" impacket-scripts
     "netexec|crackmapexec"
     ldap-utils snmp onesixtyone dnsrecon
     "bind9-dnsutils|dnsutils"
@@ -281,9 +276,27 @@ if [ -n "$SUDO" ]; then
 fi
 
 # ---- run ---------------------------------------------------------------------------------------
+# self-heal: repair any pre-existing half-configured dpkg (e.g. from a prior interrupted apt) BEFORE
+# we touch apt, so a re-run truly starts clean and the "safe to re-run" promise holds. `dpkg --audit`
+# is read-only; the repair only runs when it reports a problem (normally a no-op).
+if [ -n "$(dpkg --audit 2>/dev/null)" ]; then
+    warn "dpkg looks half-configured (a prior interrupted apt?) — repairing before we start…"
+    $SUDO dpkg --configure -a || true
+    $SUDO apt-get -f install -y || true
+fi
+
 step "apt update"
 $SUDO apt-get update ||
     warn "apt update reported problems (stale/expired mirror?) — continuing with the cached indexes."
+
+# A rolling release with many pending upgrades is where "install one thing" turns into a partial
+# upgrade. We already sidestep that (only missing tools are installed, and any removal/downgrade is
+# refused below) — but flag it so the user can full-upgrade on their own schedule.
+held="$(apt-get -s upgrade 2>/dev/null | grep -cE '^Inst ' || true)"
+if [ "${held:-0}" -gt 30 ]; then
+    warn "your system has ${held} pending package upgrades — Nabu installs only what's missing and"
+    warn "will not partial-upgrade you, but consider 'sudo apt full-upgrade' soon to stay consistent."
+fi
 
 step "install any missing recon tools"
 install_missing "recon tools" "${CORE_SPECS[@]}"
@@ -297,7 +310,9 @@ fi
 if [ "$NEED_UV" -eq 1 ]; then
     step "install uv (Python dependency manager)"
     say "uv installs into ~/.local/bin (user space — it does not touch system packages)."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    # why: we manage PATH ourselves (below) and print explicit rc-file instructions, so tell uv's
+    # installer NOT to silently rewrite every shell rc file (.bashrc/.zshrc/.zshenv/.profile/…).
+    curl -LsSf https://astral.sh/uv/install.sh | env INSTALLER_NO_MODIFY_PATH=1 UV_NO_MODIFY_PATH=1 sh
     export PATH="$HOME/.local/bin:$PATH"
 fi
 command -v uv >/dev/null 2>&1 || die "uv is still not on PATH — add ~/.local/bin to PATH and re-run."
@@ -313,6 +328,11 @@ BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
 for name in nabu nabu-cli; do
     if [ -x "$REPO/.venv/bin/$name" ]; then
+        # never clobber a real file of the same name — only ever (re)create our own symlink
+        if [ -e "$BIN_DIR/$name" ] && [ ! -L "$BIN_DIR/$name" ]; then
+            warn "$BIN_DIR/$name exists and is not a symlink — left untouched (use 'uv run $name', or remove that file and re-run)."
+            continue
+        fi
         ln -sfn "$REPO/.venv/bin/$name" "$BIN_DIR/$name"
         printf '  %s•%s %-9s -> %s\n' "$GRN" "$R" "$name" "$BIN_DIR/$name"
     fi
