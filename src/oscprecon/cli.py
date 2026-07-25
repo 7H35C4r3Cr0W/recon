@@ -552,7 +552,11 @@ def exploit_cmd(
             tag = "RUN " if action.executable else "COPY"  # attacker (run) vs victim (copy)
             act_ports, port_why = exploit_mod.action_ports(action, spec)
             if act_ports:
-                marks = ",".join(f"{p}{'✓' if p in open_ports else ''}" for p in act_ports)
+                ordered = sorted(act_ports, key=lambda p: (p not in open_ports, act_ports.index(p)))
+                shown = ordered[:4]
+                marks = ",".join(f"{p}{'✓' if p in open_ports else ''}" for p in shown)
+                if len(ordered) > len(shown):
+                    marks += f",+{len(ordered) - len(shown)}"
                 port_note = f"  ports: {marks} ({port_why})"
             else:
                 port_note = f"  ports: {port_why}" if port_why else ""
