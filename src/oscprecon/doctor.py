@@ -381,8 +381,21 @@ def _default_runner(argv: list[str]) -> int:
     return subprocess.run(argv, check=False).returncode  # noqa: S603
 
 
+def _apt_simulate(argv: list[str]) -> tuple[int, str]:
+    """Run `apt-get install -s …` and return (exit code, stdout). Seam so callers/tests can
+    substitute it — the real one shells out, which a unit test must not do."""
+    completed = subprocess.run(  # noqa: S603 - fixed verb, package from a parsed allow-list
+        argv,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive"},
+    )
+    return completed.returncode, completed.stdout
+
+
 def _would_remove_or_downgrade(
-    run: Callable[[list[str]], int],
+    simulate: Callable[[list[str]], tuple[int, str]],
     prefix: list[str],
     package: str,
     echo: Callable[[str], None],
@@ -393,21 +406,17 @@ def _would_remove_or_downgrade(
     reads the plan; LC_ALL=C so the markers are matched on a non-English host too.
     """
     try:
-        completed = subprocess.run(  # noqa: S603 - fixed verb, package from a parsed allow-list
-            [*prefix, "apt-get", "install", "-s", "--no-install-recommends", package],
-            capture_output=True,
-            text=True,
-            check=False,
-            env={**os.environ, "LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive"},
+        code, stdout = simulate(
+            [*prefix, "apt-get", "install", "-s", "--no-install-recommends", package]
         )
     except OSError:
         return False  # can't simulate (no apt) — the real call below will report the failure
-    if completed.returncode != 0:
+    if code != 0:
         echo(f"[doctor] {package}: apt could not compute a safe plan — skipped.")
         return True
     destructive = [
         line
-        for line in completed.stdout.splitlines()
+        for line in stdout.splitlines()
         if line.startswith("Remv ") or "DOWNGRADED" in line.upper()
     ]
     if destructive:
@@ -424,6 +433,7 @@ def install(
     assume_yes: bool = False,
     confirm: Callable[[str], bool] | None = None,
     runner: Callable[[list[str]], int] | None = None,
+    simulate: Callable[[list[str]], tuple[int, str]] | None = None,
     echo: Callable[[str], None] = print,
 ) -> int:
     if not plan.packages:
@@ -450,7 +460,7 @@ def install(
         # REMOVE or DOWNGRADE anything to install it. On a rolling Kali that is how a "just install
         # the missing tool" turns into a partial upgrade that breaks the system, and this path had
         # none of the protection the installer advertises. [review]
-        unsafe = _would_remove_or_downgrade(run, prefix, package, echo)
+        unsafe = _would_remove_or_downgrade(simulate or _apt_simulate, prefix, package, echo)
         if unsafe:
             skipped.append(package)
             continue

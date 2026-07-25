@@ -46,7 +46,8 @@ def test_vhost_run_requested(qtbot: QtBot, tmp_path: Path) -> None:
     command, output_rel, tool, domain = blocker.args
     assert tool == "ffuf"
     assert domain == "example.com"
-    assert output_rel == "vhost/ffuf.json"
+    # the wordlist is part of the path so two sweeps can run at once
+    assert output_rel.startswith("vhost/ffuf") and output_rel.endswith(".json")
     assert "Host: FUZZ.example.com" in command
 
 

@@ -342,7 +342,7 @@ def test_page_visit_buffered_during_scan(qtbot: QtBot, tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "buf", Target(ip="10.0.0.1"))
     window._set_profile(prof)
     worker = QThread()
-    window._tasks.add(worker, "nmap", exclusive=True)  # simulate a run in progress
+    window._tasks.add(worker, "nmap", lane="battery")  # simulate a run in progress
     window._on_page_visited("smb", "https://book.hacktricks.wiki/smb")
     assert prof.references_visited == []  # buffered, not recorded yet
     # each buffered visit is tagged with its originating profile dir (finding #7)

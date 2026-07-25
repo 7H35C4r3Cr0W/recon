@@ -40,6 +40,9 @@ def test_doctor_install_runs_curated_apt_command(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(doctor.shutil, "which", lambda tool: None)
     captured: list[list[str]] = []
     monkeypatch.setattr(doctor, "_default_runner", lambda argv: captured.append(argv) or 0)
+    # each package is dry-run first (it must never remove/downgrade anything); stub that so the
+    # test doesn't shell out to a real apt. See test_audit_review_fixes for the guard's own tests.
+    monkeypatch.setattr(doctor, "_apt_simulate", lambda argv: (0, "Inst pkg (1.0 Kali:now)\n"))
     result = CliRunner().invoke(app, ["doctor", "--install", "--yes"])
     assert result.exit_code == 0
     assert captured  # ran at least one package
