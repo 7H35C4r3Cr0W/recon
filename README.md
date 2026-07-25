@@ -182,7 +182,7 @@ docker/nabu-docker.sh shell                     # a shell inside the container
 - **Verify a build** with `docker/test-docker.sh` — an end-to-end suite covering the image's toolset,
   raw-socket nmap, the Qt/GUI runtime, entrypoint dispatch, workspace persistence and non-root runs.
   `--static` needs no Docker (CI-safe); `--build` rebuilds first, `--net` adds a live internet scan.
-  Build a **recon-only** image without the attack/spray tools with `--build-arg WITH_ATTACK=0`.
+  Build a **recon-only** image (no attack/spray tools) with `docker/nabu-docker.sh build --build-arg WITH_ATTACK=0`.
 
 On first launch Nabu creates its workspace at `~/oscprecon/` and opens to the Workspace dashboard.
 
@@ -244,8 +244,10 @@ PORT     STATE SERVICE       VERSION
 ```
 
 Reopen the same folder in the GUI (or `--resume` on the CLI, or `Scan → Resume Recon` in the GUI) and
-the whole state comes back. **The CLI is at feature parity with the GUI** for automatable work — the
-same engine, nothing GUI-only:
+the whole state comes back. **The CLI covers the automatable work** — the same engine, the same policy gates, the same files
+on disk. A few things stay GUI-only by nature (the Cytoscape graph, the reference pane, the
+workspace dashboard) and a few are still GUI-first (whole-`/24` network projects with the pivot
+topology, and the HTTP content-discovery builder — use `nabu-cli scan` + your own feroxbuster there):
 
 - **Recon:** `nabu-cli scan` (staged nmap), `nabu-cli enum <service> -p <profile>` (run a service's
   Tier-1 enumeration headlessly — SMB null-session, SNMP walk, FTP/SMTP/… — the same steps the GUI

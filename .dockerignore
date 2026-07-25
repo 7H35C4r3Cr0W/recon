@@ -16,6 +16,22 @@ htmlcov/
 *.tar
 *.tar.gz
 
+# secrets — mirrors the .gitignore block. The Dockerfile COPYs a narrow set today, but the build
+# CONTEXT is what gets shipped to the daemon (and any future COPY), so exclude them here too.
+*.pem
+*.key
+*.ppk
+id_rsa*
+id_ed25519*
+*.ovpn
+.env
+.env.*
+creds.json
+*_creds.json
+*.kdbx
+/oscprecon/
+boxes/TRACKER.md
+
 # private / maintainer-only — must NEVER be baked into a distributable image
 HANDOFF.local.md
 .claude/

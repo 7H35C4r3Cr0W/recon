@@ -34,6 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ldap-utils snmp snmpcheck onesixtyone dnsrecon bind9-dnsutils ike-scan nbtscan \
       ntpsec-ntpdate ntpsec redis-tools nfs-common rpcbind dnsenum openssh-client ssh-audit rsync \
       finger subversion default-mysql-client postgresql-client netcat-traditional \
+      exploitdb \
       ca-certificates git libcap2-bin procps iproute2 \
       python3 python3-venv \
       libgl1 libegl1 libglib2.0-0t64 libdbus-1-3 fontconfig fonts-dejavu-core \
@@ -43,11 +44,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libasound2t64 libcups2t64 libpango-1.0-0 libwayland-cursor0 \
     && rm -rf /var/lib/apt/lists/*
 
-# 2) Wordlists + Exploit-DB (heavy: ~2GB). On by default for a self-contained image; turn OFF for a
-#    slim build and bind-mount host wordlists instead:  --build-arg WITH_WORDLISTS=0
+# 2) Wordlists (heavy: ~2GB). On by default for a self-contained image; turn OFF for a slim build
+#    and bind-mount host wordlists instead:  --build-arg WITH_WORDLISTS=0.
+#    NB: exploitdb is installed with the TOOLS above, not here — searchsploit is a wrapped tool
+#    (shell.ALLOWED_TOOLS, `nabu-cli searchsploit`, the reference pane), so a "no wordlists" build
+#    must not silently lose it.
 ARG WITH_WORDLISTS=1
 RUN if [ "$WITH_WORDLISTS" = "1" ]; then \
-        apt-get update && apt-get install -y --no-install-recommends seclists exploitdb wordlists \
+        apt-get update && apt-get install -y --no-install-recommends seclists wordlists \
         && rm -rf /var/lib/apt/lists/* ; \
     else echo "WITH_WORDLISTS=0 — skipping seclists/exploitdb (mount host wordlists at runtime)"; fi
 

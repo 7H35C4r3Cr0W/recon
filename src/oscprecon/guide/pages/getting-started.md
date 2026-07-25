@@ -4,8 +4,9 @@
 
 ```bash
 git clone https://github.com/7H35C4r3Cr0W/recon.git ~/oscp-recon && cd ~/oscp-recon
-uv sync                 # create the venv and install deps
-uv pip install -e .     # install the console scripts (nabu, nabu-cli)
+./install.sh            # tools + venv + puts nabu / nabu-cli on your PATH
+# (or, if you only want the Python side and already have the tools:)
+uv sync --no-dev        # create the venv and install deps
 ```
 
 Then check your host has the wrapped tools:
@@ -70,11 +71,14 @@ nabu-cli creds list -p htb-active                      # the vault (secrets show
 nabu-cli docs                                          # this documentation, in the terminal
 ```
 
-The **CLI is at feature parity with the GUI** for automatable work — `scan`, `enum`, `findings`,
-`creds` (add/list/rm), `list`, `health`, `activity`, `delete-project`, `searchsploit`, `exploit`,
-`payload`, `gtfobins`, `pivot`, `export-*`/`import-project`, and the gated `spray`/`config`. Run
-`nabu-cli --help` for the full surface. (The settings-heavy web/SMB panels — wordlist-driven content
-discovery, tiered SMB — stay richest in the GUI.)
+The **CLI covers the automatable work** — `scan`, `enum`, `vuln`, `findings`, `add-finding`,
+`creds` (add/list/rm), `list`, `health`, `activity`, `delete-project`, `searchsploit`, `exploit`
+(`--suggested`), `payload`, `gtfobins`, `hashcat`, `hosts`, `pivot`, `export-*`/`import-project`,
+and the gated `spray`/`config`. Run `nabu-cli --help` for the full surface.
+
+Some things stay GUI-first by nature: the graph, the reference pane and the workspace dashboard are
+visual; whole-`/24` network projects with the pivot topology, and the wordlist-driven HTTP content
+-discovery builder, are richest in the GUI.
 
 **Every command self-documents.** `nabu-cli --help` shows the typical workflow; `nabu-cli scan --help`
 lays out the scan batteries (`quick` / `default` / `full` / `exam`), every flag, and copy-paste

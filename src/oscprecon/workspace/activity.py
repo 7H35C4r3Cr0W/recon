@@ -49,9 +49,28 @@ def _describe(action: str, details: dict[str, object]) -> str:
     return f"{base} ({', '.join(extras)})" if extras else base
 
 
+def count_activity(profile_dir: Path, *, limit: int = 200) -> int:
+    """How many events the profile has in total, before `limit` truncates them.
+
+    Needed because load_activity returns the MALFORMED-line count, not the total — reading that as
+    a total made "N older event(s) not shown" print a number with no relation to what was hidden.
+    """
+    return len(load_all_activity(profile_dir))
+
+
+def load_all_activity(profile_dir: Path) -> list[ActivityEvent]:
+    events, _malformed = _parse_activity(profile_dir)
+    return events
+
+
 def load_activity(profile_dir: Path, *, limit: int = 200) -> tuple[list[ActivityEvent], int]:
-    """Human-readable events for one profile, newest first, plus a malformed-line count. A single
-    corrupt audit line is skipped (counted), never hides the rest of the history."""
+    """Human-readable events for one profile, newest first, plus a MALFORMED-LINE count (not a
+    total — see count_activity). A single corrupt audit line is skipped, never hides the rest."""
+    events, malformed = _parse_activity(profile_dir)
+    return events[:limit], malformed
+
+
+def _parse_activity(profile_dir: Path) -> tuple[list[ActivityEvent], int]:
     path = audit_path(profile_dir)
     events: list[ActivityEvent] = []
     malformed = 0
@@ -87,7 +106,7 @@ def load_activity(profile_dir: Path, *, limit: int = 200) -> tuple[list[Activity
             )
         )
     events.sort(key=lambda e: e.timestamp, reverse=True)
-    return events[:limit], malformed
+    return events, malformed
 
 
 def load_workspace_activity(

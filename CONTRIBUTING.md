@@ -37,7 +37,10 @@ uv run pytest --cov --cov-report=html     # browsable report under htmlcov/
   credential brute in the default mode, or any runtime LLM call. Credential spraying and manual
   exploitation stay **opt-in and off by default**.
 - **All subprocess calls go through `shell.run()`** — never `subprocess` directly outside `shell.py`.
-- **Never log or report secret values** (recon side redacts; see `CLAUDE.md` §6).
+- **Secrets are shown in full** — the owner decision in `CLAUDE.md` §6: the loot IS the
+  deliverable, and this is the operator's own tool against their own authorized targets. The
+  masking helpers exist but ship OFF. Do not re-introduce redaction as a default. Do keep
+  `creds.json` at mode 0600 and out of anything that leaves the project folder unasked.
 - **Type hints everywhere; no narrating comments.** Only `# why:` comments for non-obvious decisions.
 - **Tests:** parsers are tested against committed fixtures; GUI widgets get `pytest-qt` smoke tests.
 - **Keep docs in sync.** A change also updates the README, the bundled guide

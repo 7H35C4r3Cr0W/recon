@@ -1280,7 +1280,8 @@ Six phases. Phase "done" = tool used on ≥ 3 boxes from `TRACKER.md` without ma
 - `pyproject.toml`, `uv sync`, `mypy --strict`, `ruff` configured
 - `shell.py`, `profile.py`, `orchestrator.py`, `reporter.py`
 - `modules/base.py` (ABC), `modules/nmap.py` (TCP top-1000 → full → versioned, UDP top-100)
-- `cli.py` — Typer entry (`nabu-cli`), at **feature parity with the GUI** for automatable work:
+- `cli.py` — Typer entry (`nabu-cli`), covering the **automatable** work (the graph, reference pane,
+  dashboard and the /24 pivot topology stay GUI-first):
   `scan` (+ `--resume`), `enum <service>` (headless Tier-1 service recon), `vuln [service]`
   (per-service NSE vuln checks, `--all`/`--mode`), `creds` (add/list/rm),
   `list`/`findings`/`health`/`activity`/`delete-project`, `searchsploit`, `exploit`, `payload`,

@@ -16,7 +16,9 @@ Sections, in order:
 6. Your notes, and **Graph annotations** (notes you dropped on graph nodes).
 7. The full command log — every command, with timing and exit code. Nothing is hidden.
 
-Open it with **View → Report** (`Ctrl+R`), or **File → Export Report** to render it to HTML.
+Open it with **View → Report** (`Ctrl+R`) — the preview has **Regenerate** and **Open in
+editor**. To hand it to someone else, use **File → Export to Obsidian Vault…** (a linked
+folder of notes) or **File → Export Project…** (the whole project folder as a tar.gz).
 
 ## Export to an Obsidian vault
 

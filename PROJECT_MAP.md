@@ -123,6 +123,30 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 - **Tests:** `tests/gui/*` — smoke, per-panel, task lifecycle/manager, workers, bounded-parallel,
   dialogs, theme, dashboard, settings_dialog, report_view, graph_view, recon_next_steps, scan_presets.
 
+## 4a. Exploitation tab (§2b) — ✅
+
+- **Status:** ✅ Complete.
+- **Files:** `exploit/base.py` (registry, `ExploitAction`/`ServiceExploits`, `fill_template`,
+  `action_ports`), `exploit/relevance.py` (★ ranking), `exploit/parsers.py`, `exploit/<service>.py`
+  × 183, `exploit/msfvenom.py`; `gui/widgets/exploit_panel.py`, `gui/dialogs/msfvenom_builder.py`,
+  `gui/dialogs/gtfobins_search.py`, `gui/dialogs/hashcat_helper.py`; `cli.py` `exploit` / `payload`
+  / `gtfobins` / `hashcat`.
+- **Does:** a MANUAL attack console — 183 services / 3,190 actions, each pre-filled from the profile
+  plus a chosen vault credential, labelled with the port(s) it targets, and RANKED with ★ against
+  the evidence this box actually produced (open ports, confirmed vuln ids, findings, credentials).
+  Nothing auto-runs: every Run is user-selected and confirms the target first (§2b — the human is
+  the guardrail). Attacker-side actions get Run; victim-side ones are copy-only. Output parses into
+  loot → the vault.
+- **Complete:** catalog + registry, port labelling, presence marking, relevance ranking + Suggested
+  -only filter, msfvenom builder (copy-only), GTFOBins + hashcat helpers, CLI parity (`--suggested`).
+- **Remaining:** none; the catalog grows as boxes are reviewed (decision-aid rule — no box-specific
+  CVE PoC delivery, CLAUDE.md §2b).
+- **Depends on:** profiles/discovery (presence + port binding), findings (relevance), creds (fill).
+- **Risks:** drifting into an autopwn chain (guard: no chaining, per-run confirm, tests forbid
+  shipping SQLmap/Metasploit/mass-scanner actions).
+- **Tests:** `test_exploit`, `test_exploit_relevance`, `test_msfvenom`, `test_gtfobins`,
+  `test_hashcat_helper`, `tests/gui/test_exploit_panel.py`, `tests/gui/test_exploit_catalog.py`.
+
 ## 5. Workspace organization — ✅
 
 - **Status:** ✅ Complete (the 12-chunk upgrade, `e6ffb7e`…`7237b4f`).
@@ -161,12 +185,15 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 - **Status:** ✅ Complete.
 - **Files:** `findings.py` (+ `findings.json`), `creds.py` (+ `creds.json`, mode 0600), `audit.py`.
 - **Does:** parsers write structured findings; anonymous/null-session enum auto-writes a credential
-  entry (`source: <module>-anon-enum`) consumed by later modules; **secrets are redacted everywhere**
+  entry (`source: <module>-anon-enum`) consumed by later modules; **secrets are shown IN FULL** (owner decision, CLAUDE.md §6 — the loot is the deliverable; the
+  masking helpers ship off)
   (reports, audit log, search, graph) and never logged.
-- **Complete:** 0600 file mode, dedup, redaction, concurrency-safe writes.
+- **Complete:** 0600 file mode, dedup, concurrency-safe writes. Redaction exists but ships OFF
+  (`config.Settings.redact_secrets` / `shell.REDACT_SECRETS` default False) per CLAUDE.md §6.
 - **Remaining:** none.
 - **Depends on:** core execution, modules.
-- **Risks:** any new surface that renders a credential must go through `redact()` (§10 guarantees).
+- **Risks:** creds.json must stay 0600 and must never leave the project folder except through an
+  explicit export the user asked for (which warns that it includes creds).
 - **Tests:** `test_findings`, `test_findings_concurrency`, `test_creds`, `test_audit`,
   `tests/gui/test_audit_wiring`, `test_wordlist_notes_creds`.
 
@@ -263,7 +290,7 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 | Finding-aware HackTricks (offline Phases 1–3) | ✅ **Done** | §2/§27 gate ✅ | 21 vendored pages + loader + offline render + finding-aware jump + `clean_markdown` + 12-module/30-entry verified section map |
 | Owner-approved live HackTricks fetch/cache | ✅ **Done** | §14a policy ✅ | `references/live_hacktricks.py` — allow-listed HTTPS, bounded, sanitized, XDG cache; off-by-default; never transmits target/cred data. Security-reviewed: 0 confirmed defects |
 | Cred store + password spraying | ✅ **Done** | §2a | opt-in/off-by-default; creds durable in `<project>/creds.json`, isolated, only explicit edit/delete removes; confirmed-spray recorded add-only |
-| Preserve discovered port through spray | ✅ **Done** | spray dialog | `spray.discovered_port` maps by nmap service name → `build_spray_command` injects hydra `-s`/netexec `--port`; standard ports stay clean. Still policy-gated + secret-redacted |
+| Preserve discovered port through spray | ✅ **Done** | spray dialog | `spray.discovered_port` maps by nmap service name → `build_spray_command` injects hydra `-s`/netexec `--port`; standard ports stay clean. Still policy-gated; secrets are shown in full per §6 |
 | Timed mock-exam dry run | ⛔ | exam preset (✅) + live targets | The "timed" part needs authorized targets |
 | Interactive + cross-machine AppImage acceptance | 🕒 | AppImage build (✅) | build + headless construction verified on Kali; on-screen/cross-machine open — see `packaging/ACCEPTANCE.md` |
 
@@ -377,8 +404,8 @@ flowchart TD
 | PostgreSQL | ✅ | High (`test_postgresql_*`) | DB-primitive backstop coverage | None — hardened |
 | GUI architecture | ✅ | High (`tests/gui/*`) | Worker lifecycle regressions | None — refactor landed |
 | Profiles | ✅ | High (`test_config/organization`) | Future schema migrations | Keep schema backward-compatible |
-| Findings | ✅ | High (`test_findings*`) | New unredacted render surface | Route all through `redact()` |
-| Credentials | ✅ | High (`test_creds`, `test_audit`) | Secret leakage | None — 0600 + redaction |
+| Findings | ✅ | High (`test_findings*`) | A parsed value mis-framed as a weakness | `finding_severity` is the one classifier |
+| Credentials | ✅ | High (`test_creds`, `test_audit`) | Leaving the project folder | 0600 + export warns |
 | Graph | ✅ | Medium (`test_graph_data/_view`) | None material | None |
 | Reports | ✅ | High (`test_reporter_findings`, `test_edb`) | Report injection via tool output | None — EDB refs persist (lookup-only) |
 | Obsidian export | ✅ | High (`test_vault_export`) | None | None |

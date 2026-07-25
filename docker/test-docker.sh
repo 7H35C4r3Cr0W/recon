@@ -366,13 +366,21 @@ if [ "$DO_GUI" = 1 ]; then
     if [ -z "${DISPLAY:-}" ]; then
         skip "launcher gui" "no \$DISPLAY on this host"
     else
-        gui_log="$(NABU_DATA="$DATA" timeout 45 "$WRAPPER" gui 2>&1)"
-        rc=$?
-        if [ "$rc" -eq 124 ]; then
+        # `timeout` cannot stop `docker run -t` (the CLI does not proxy the signal), so the old
+        # form hung forever and left a container running. Name it, then force-remove it. [review]
+        gui_name="nabu-gui-smoke-$$"
+        gui_out="$(mktemp)"
+        NABU_DATA="$DATA" NABU_DOCKER_NAME="$gui_name" "$WRAPPER" gui >"$gui_out" 2>&1 </dev/null &
+        gui_pid=$!
+        sleep 20
+        if docker ps --filter "name=^${gui_name}$" --format '{{.Names}}' | grep -q "$gui_name"; then
             ok "launcher gui opens and stays up on \$DISPLAY"
         else
-            no "launcher gui opens and stays up on \$DISPLAY" "rc=$rc: $(printf '%s' "$gui_log" | tail -2 | tr '\n' ' ')"
+            no "launcher gui opens and stays up on \$DISPLAY" "$(tail -2 "$gui_out" | tr '\n' ' ')"
         fi
+        docker rm -f "$gui_name" >/dev/null 2>&1 || true
+        wait "$gui_pid" 2>/dev/null || true
+        rm -f "$gui_out"
     fi
 else
     skip "X11 GUI smoke" "opt-in: re-run with --gui"

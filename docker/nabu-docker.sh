@@ -110,7 +110,13 @@ common_flags() {
     printf '%s\0' --cap-add=NET_RAW
     # :z relabels for SELinux hosts (Fedora/RHEL) and is a no-op elsewhere (Kali/Parrot/Ubuntu/Arch).
     printf '%s\0' -v "$DATA:/data:z"
-    [ -n "${NABU_USER:-}" ] && printf '%s\0' --user "$NABU_USER"
+    # a NAME makes the container stoppable from outside (`docker rm -f`). `timeout` cannot stop a
+    # `docker run -t` — the CLI does not proxy the signal — so the GUI smoke test needs this.
+    [ -n "${NABU_DOCKER_NAME:-}" ] && printf '%s\0' --name "$NABU_DOCKER_NAME"
+    # why: default to the INVOKING user. Running as root left the whole /data tree — notes, scans,
+    # and a 0600 creds.json — owned by root on the host, so the operator could not read their own
+    # vault outside the container. Opt out with NABU_USER=root for a container that needs root.
+    printf '%s\0' --user "${NABU_USER:-$(id -u):$(id -g)}"
 }
 
 run_container() { # run_container <container-args…>
@@ -141,10 +147,14 @@ case "$cmd" in
             gui_flags+=(-e XAUTHORITY=/tmp/.nabu.xauth -v "$xauth:/tmp/.nabu.xauth:ro")
         fi
         # 2) also relax the host-based ACL via xhost when present (belt-and-braces), revoked on exit.
-        if command -v xhost >/dev/null 2>&1; then
+        # …but ONLY when the cookie is unavailable. `xhost +local:` opens the display to every
+        # local uid for as long as it is set; with the cookie mounted it buys nothing, and a
+        # crash before the revoke trap left the X server open. [review]
+        if [ ! -f "$xauth" ] && command -v xhost >/dev/null 2>&1; then
+            printf '\033[1;33m[nabu-docker] no X cookie at %s — falling back to "xhost +local:" for\n  this run (revoked on exit).\033[0m\n' "$xauth" >&2
             xhost +local: >/dev/null 2>&1 || true
             trap 'xhost -local: >/dev/null 2>&1 || true' EXIT INT TERM
-        elif [ ! -f "$xauth" ]; then
+        elif [ ! -f "$xauth" ] && ! command -v xhost >/dev/null 2>&1; then
             printf '\033[1;33m[nabu-docker] no xhost and no X cookie (%s) found — your X server may deny\n  the GUI. Install x11-xserver-utils (Debian/Parrot/Ubuntu) or xorg-xhost (Arch), then retry.\033[0m\n' "$xauth" >&2
         fi
         # 3) on SELinux-ENFORCING hosts (Fedora/RHEL/Rocky/Alma) let the container reach the X socket.

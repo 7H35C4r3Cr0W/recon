@@ -204,9 +204,14 @@ def export_vault_cmd(
     ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
-    """Export a profile to an Obsidian vault as linked markdown (creds redacted)."""
+    """Export a profile to an Obsidian vault as linked markdown.
+
+    Includes credential values IN FULL (CLAUDE.md §6) — treat the export as sensitive.
+    """
     out = vault_export.export_vault(_load_profile(profile, workspace), dest)
-    typer.echo(f"[exported] {out} (snapshot — creds.json values redacted)")
+    typer.echo(
+        f"[exported] {out} (snapshot — includes credential values IN FULL; treat it as sensitive)"
+    )
 
 
 @app.command("export-project")
@@ -443,9 +448,14 @@ def exploit_cmd(
         # mirror the GUI's ExploitPanel fill: a hash cred fills {hash} for pass-the-hash actions,
         # a password cred fills {password} — fill both when present so neither kind of template is
         # left with an unfilled brace. user/domain come from the password cred, else the hash cred.
+        # ONE credential fills the command, like the GUI's Credential dropdown. Taking the
+        # username from one entry and the hash from another produced a command that authenticated
+        # as nobody: `-hashes <svc_b's hash>` under `svc_a`'s name. [review]
         pw = next((c for c in creds if c.secret_type == "password"), None)
         hc = next((c for c in creds if c.secret_type == "hash"), None)
         primary = pw or hc
+        pw = primary if primary is not None and primary.secret_type == "password" else None
+        hc = primary if primary is not None and primary.secret_type == "hash" else None
         if primary is not None:
             values["user"] = primary.username
             if primary.domain:
@@ -546,7 +556,15 @@ def exploit_cmd(
             )
         secure = "https" in svc_name or "ssl" in svc_name or port_val in ("443", "8443")
         scheme = "https" if secure else "http"
-        if port_val and port_val not in ("80", "443"):
+        # only a WEB service gets :port in {url} — mirrors exploit_panel._service_url(). Appending
+        # an SMB/LDAP port to a URL produced http://host:445, which is not a thing. [review]
+        web_family = (
+            key in ("web", "webdav")
+            or "http" in svc_name
+            or "ssl" in svc_name
+            or bool(set(spec.ports) & exploit_mod.WEB_PORTS)
+        )
+        if web_family and port_val and port_val not in ("80", "443"):
             values["url"] = f"{scheme}://{host_for_url}:{port_val}"
         else:
             values["url"] = f"{scheme}://{host_for_url}"
@@ -559,6 +577,13 @@ def exploit_cmd(
         if prof is not None
         else set()
     )
+    if suggested and rank_ctx is None:
+        typer.echo(
+            "[error] --suggested ranks against a project's evidence — add -p PROFILE, or drop "
+            "--suggested for the full catalog.",
+            err=True,
+        )
+        raise typer.Exit(2)
     starred = exploit_mod.suggested_action_ids(spec, rank_ctx) if rank_ctx is not None else set()
     if suggested and not starred:
         typer.echo(
@@ -598,7 +623,9 @@ def exploit_cmd(
             typer.echo(f"    {exploit_mod.fill_template(action.template, values)}")
         typer.echo("")
     if open_ports:
-        typer.echo("✓ = the scan found that port open on this target.")
+        typer.echo(
+            f"✓ = the scan found that port open on {prof.target.ip if prof else 'this box'}."
+        )
     if starred and not suggested:
         typer.echo("★ = this box's evidence points at it (--suggested shows only these).")
     raise typer.Exit(0)
@@ -818,15 +845,36 @@ def _profile_dir(profile: str, workspace: Path | None) -> Path:
     return directory
 
 
-def _load_profile(profile: str, workspace: Path | None) -> Profile:
+def _load_profile(profile: str, workspace: Path | None, *, writes: bool = True) -> Profile:
     # a corrupt / foreign profile.json makes Profile.load raise ValueError; catch it and exit with
     # the clean `[error] … / exit 2` convention instead of dumping a traceback (bug #17).
     directory = _profile_dir(profile, workspace)
     try:
-        return Profile.load(directory)
+        loaded = Profile.load(directory)
     except (ValueError, OSError) as exc:
         typer.echo(f"[error] cannot read profile '{profile}': {exc}", err=True)
         raise typer.Exit(2) from exc
+    if writes:
+        _warn_if_locked(directory, profile)
+    return loaded
+
+
+def _warn_if_locked(directory: Path, profile: str) -> None:
+    # §6b: a GUI window holding the edit lock has this project's state in memory and will write it
+    # back. A CLI run against the same folder interleaves with that — the two disagree, and the
+    # window's next save wins. The GUI refuses this; the CLI said nothing at all. Warn loudly
+    # rather than refuse: a headless scan on a locked project is a legitimate thing to insist on.
+    from oscprecon.workspace import locks
+
+    info, _malformed = locks.read_lock(directory)
+    if info is None or locks.is_stale(info) or locks.is_ours(info):
+        return
+    typer.echo(
+        f"⚠ '{profile}' is open for editing in another Nabu window (pid {info.pid}). That window "
+        "holds this project in memory and will overwrite what this command writes — close it "
+        "first, or expect to lose one side's changes.",
+        err=True,
+    )
 
 
 # the richer recon modules (their own commands()/parse(), not simple-spec steps). enum runs the
@@ -1051,8 +1099,8 @@ def enum_cmd(
     service: str | None = typer.Argument(
         None, help="Service to enumerate (see the no-arg list). Omit to list runnable services."
     ),
-    profile: str = typer.Option(
-        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    profile: str | None = typer.Option(
+        None, "--profile", "-p", help="Profile name (folder under workspace)."
     ),
     port: int = typer.Option(0, "--port", help="Override the discovered port (0 = the default)."),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
@@ -1077,9 +1125,13 @@ def enum_cmd(
     from oscprecon.parsing import run_parser
 
     if service is None:
+        # the no-arg listing is documented as the first example — it must work WITHOUT a profile
         typer.echo("Runnable services (`nabu-cli enum <service> -p <profile>`):\n")
         typer.echo("  " + ", ".join(sorted(set(SIMPLE_SPECS) | set(_FULL_ENUM_MODULES))))
         raise typer.Exit(0)
+    if profile is None:
+        typer.echo(f"[error] enum needs a project: nabu-cli enum {service} -p <profile>", err=True)
+        raise typer.Exit(2)
     spec = SIMPLE_SPECS.get(service)
     if spec is None:
         # not a simple-spec service — try the richer full recon modules (http/ssh/ftp/dns/ldap/…)
@@ -1202,6 +1254,12 @@ def vuln_cmd(
             err=True,
         )
         raise typer.Exit(2)
+    if port and scan_all:
+        typer.echo(
+            "[error] --port checks ONE port; --all checks every service. Use one or the other.",
+            err=True,
+        )
+        raise typer.Exit(2)
     prof = _load_profile(profile, workspace)
     open_services = [s for s in prof.discovered_services if s.state == "open"]
     if not open_services:
@@ -1211,6 +1269,13 @@ def vuln_cmd(
     # one scan per service FAMILY — 139 and 445 are both SMB and share a single nmap pass
     plan = nse_vuln.plan_scans([(s.port, s.proto, s.service, s.product) for s in open_services])
 
+    if service is None and port:
+        # --port alone is a complete instruction: check that port. Don't fall through to the list.
+        matched = [t for t in plan if port in t.ports]
+        if not matched:
+            typer.echo(f"[error] port {port} is not open on this box.", err=True)
+            raise typer.Exit(2)
+        service = matched[0].profile.key
     if service is None and not scan_all:
         typer.echo("Discovered services and the vuln checks they map to:\n")
         for target in plan:
@@ -1390,7 +1455,7 @@ def add_finding_cmd(
         "info",
         "--severity",
         "-s",
-        help="info | reference | access | exposure | relay-risk (how you judge it).",
+        help="info | reference | access | exposure | relay-risk | vulnerable (how you judge it).",
     ),
     host: str | None = typer.Option(None, "--host", help="Host / source IP it was found on."),
     port: int | None = typer.Option(None, "--port", help="Port it was found on."),
@@ -1502,7 +1567,9 @@ def activity_cmd(
     """Print the profile's audit-trail timeline (audit.jsonl) — the Activity view, headless."""
     from oscprecon.workspace import activity as activity_mod
 
-    events, total = activity_mod.load_activity(_profile_dir(profile, workspace), limit=limit)
+    directory = _profile_dir(profile, workspace)
+    events, malformed = activity_mod.load_activity(directory, limit=limit)
+    total = activity_mod.count_activity(directory)
     if not events:
         typer.echo("[activity] no recorded activity.")
         raise typer.Exit(0)
@@ -1510,6 +1577,8 @@ def activity_cmd(
         typer.echo(f"  {event.timestamp}  {event.event_type:16} {event.description}")
     if total > len(events):
         typer.echo(f"  … {total - len(events)} older event(s) not shown (raise --limit).")
+    if malformed:
+        typer.echo(f"  ⚠ {malformed} unreadable audit line(s) skipped.")
 
 
 @app.command("delete-project")
@@ -1521,10 +1590,20 @@ def delete_project_cmd(
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     """Permanently delete a project folder (lock-safe). Destructive — asks first unless --yes."""
-    from oscprecon.workspace import portability
+    from oscprecon.workspace import locks, portability
 
     root = workspace if workspace is not None else config.workspace_root()
     directory = _profile_dir(profile, workspace)
+    # "lock-safe" has to mean it: a project open for edit in a running Nabu window must not be
+    # deleted out from under it (§6b). The GUI already refuses this; the CLI silently did not.
+    info, _malformed = locks.read_lock(directory)
+    if info is not None and not locks.is_stale(info) and not locks.is_ours(info):
+        typer.echo(
+            f"[error] '{profile}' is open in another Nabu window (pid {info.pid}) — close it "
+            "first, or the running window would keep writing into a deleted folder.",
+            err=True,
+        )
+        raise typer.Exit(2)
     if not yes and not typer.confirm(f"Permanently delete {directory}? This cannot be undone."):
         typer.echo("[delete] cancelled.")
         raise typer.Exit(0)

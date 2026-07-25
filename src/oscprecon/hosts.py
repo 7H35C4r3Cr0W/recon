@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from oscprecon.models import validate_host
 
 if TYPE_CHECKING:
     from oscprecon.profile import Profile
@@ -58,6 +61,19 @@ def add_entry(ip: str, names: list[str], path: Path = HOSTS_PATH) -> HostsResult
     ip, names = _norm(ip, names)
     if not ip or not names:
         raise ValueError("need an IP and at least one hostname")
+    # /etc/hosts is a system file: validate before writing. Without this any first token was
+    # appended verbatim and reported as a success, leaving a line that resolves nothing.
+    try:
+        ipaddress.ip_address(ip)
+    except ValueError as exc:
+        raise ValueError(
+            f"'{ip}' is not an IP address — usage: nabu-cli hosts <IP> <hostname>..."
+        ) from exc
+    for name in names:
+        try:
+            validate_host(name)
+        except ValueError as exc:
+            raise ValueError(f"'{name}' is not a valid hostname") from exc
 
     original = path.read_text(encoding="utf-8") if path.exists() else ""
     lines = original.splitlines()

@@ -10,8 +10,23 @@ mkdir -p "$HOME/oscprecon" "$HOME/.config/oscprecon" 2>/dev/null || true
 case "${1:-}" in
     gui | nabu)
         # the desktop GUI — requires -e DISPLAY + -v /tmp/.X11-unix:/tmp/.X11-unix from the host.
-        # Check BOTH: a bare DISPLAY with no mounted socket still aborts Qt with a cryptic xcb error.
-        if [ -z "${DISPLAY:-}" ] || [ ! -e /tmp/.X11-unix ]; then
+        # Check for a real SOCKET, not the directory: /tmp/.X11-unix already exists inside the
+        # image (an apt postinst creates it), so `[ ! -e /tmp/.X11-unix ]` was always false and the
+        # guard never fired — an unmounted display fell through to Qt and SIGSEGV'd (rc 139)
+        # instead of printing these instructions. [review]
+        x11_missing=0
+        case "${DISPLAY:-}" in
+            "") x11_missing=1 ;;
+            :* | unix:*)
+                # a unix display :N (optionally with a screen suffix) maps to /tmp/.X11-unix/XN
+                dnum="${DISPLAY#unix:}"
+                dnum="${dnum#:}"
+                dnum="${dnum%%.*}"
+                [ -S "/tmp/.X11-unix/X${dnum}" ] || x11_missing=1
+                ;;
+            *) : ;; # host:N / TCP display — nothing local to check, let Qt try
+        esac
+        if [ "$x11_missing" -eq 1 ]; then
             echo "[nabu] 'gui' needs a forwarded X11 display. Easiest: docker/nabu-docker.sh gui" >&2
             echo "       Manual: -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix  (+ 'xhost +local:' on host)." >&2
             echo "       No display? Recon works fully headless — just drop 'gui':" >&2

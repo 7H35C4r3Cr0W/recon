@@ -14,7 +14,7 @@ attack scripts allowed; autopwn / Metasploit-modules / SQLmap never shipped as a
 
 - `exploit/` engine — `base.py` (ExploitAction/ServiceExploits registry + `fill_template` + `runs_on`
   attacker/victim + `ports` tie-back), one module per service, `parsers.py` (secretsdump/kerberos → loot).
-  **182 services / ~2,244 attacker actions** mined from the vault across 13 gap-analysis batches.
+  **183 services / 3,190 attacker actions** mined from the vault across 13 gap-analysis batches.
 - `gui/widgets/exploit_panel.py` — the Exploitation tab: present-services-first picker → action tree →
   filled command → **Copy / Run ▸** (confirms the target before executing **one** command) → **Parse**
   → loot table → Add-to-vault. Execution is on by default but **nothing auto-runs** — every Run is
