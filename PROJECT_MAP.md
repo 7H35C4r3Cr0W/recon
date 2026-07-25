@@ -9,7 +9,7 @@ is the single "what is done / partial / next / blocked" view. The phase plan sta
 - **Version:** 0.0.1 · **Entry points:** `nabu`, `nabu-cli` (preferred) + `oscp-recon`, `oscprecon`,
   `oscprecon-cli` (legacy aliases).
 - **Verified:** `mypy --strict` clean (132 files) · `ruff check` + `ruff format --check` clean ·
-  **972 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
+  **2,045 tests** pass (incl. offscreen GUI) · `test_packaging` green (wheel ships resources, incl. the
   vendored HackTricks snapshot + the Nabu SVG identity; `packaging/` build infra excluded from the
   wheel), verified installed out-of-checkout (`nabu`/`nabu-cli` + legacy scripts + assets resolve).
   Live-fetch + credential-durability paths independently refute-reviewed; the Nabu UI pass was
@@ -256,9 +256,9 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 ## 11. Testing and quality — ✅
 
 - **Status:** ✅ Complete and enforced.
-- **Files:** `tests/` (92 test modules), `tests/fixtures/`, `tests/gui/`, `pyproject.toml` gate config.
+- **Files:** `tests/` (203 test modules), `tests/fixtures/`, `tests/gui/`, `pyproject.toml` gate config.
 - **Does:** parser tests against committed fixtures; pytest-qt offscreen GUI smoke; four gates green.
-- **Complete:** 972 tests pass; mypy strict clean; ruff clean; format clean.
+- **Complete:** 2,045 tests pass; mypy strict clean; ruff clean; format clean.
 - **Remaining:** none (grows with each feature).
 - **Depends on:** everything.
 - **Risks:** GUI tests must stay offscreen (`QT_QPA_PLATFORM=offscreen`) and never hit the network.

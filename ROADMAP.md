@@ -161,11 +161,10 @@ dialog:
 - **Locks + read-only** — advisory `<profile>/.lock` (§6b — resolves the deferred item below); live-lock
   never stolen, stale recovered, foreign-host conservative; read-only blocks every write, export still
   works.
-- **Activity timeline, saved views, safe bulk actions** — all filter-/read-only, secret-redacted.
-- **Preferences dialog** (§19) — `File → Preferences…` (`Ctrl+,`), 8 tabbed sections (Workspace /
-  Appearance / Tool paths / Scan / Reports / Privacy / Performance / Advanced) over a typed
-  `config.Settings` layer (validate + clamp + atomic, no secrets). Mandatory secret protections are
-  shown **locked-on** and cannot be disabled.
+- **Activity timeline, saved views, safe bulk actions** — all filter-/read-only.
+- **Preferences dialog** (§19) — `File → Preferences…` (`Ctrl+,`), 9 tabbed sections (Workspace /
+  Appearance / Tool paths / Scan / References / Reports / Privacy / Performance / Advanced) over a
+  typed `config.Settings` layer (validate + clamp + atomic writes).
 
 Verified: four gates + offscreen GUI green (972 tests); wheel ships and imports `workspace/` +
 `gui/workspace/` from a clean venv. **See [`PROJECT_MAP.md`](PROJECT_MAP.md) for the current

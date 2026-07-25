@@ -252,16 +252,14 @@ oscp-recon/
 │   │   │   ├── exploit_panel.py    ← Exploitation tab (§ 2b) — build/Run attacks + parse loot
 │   │   │   ├── wordlist_picker.py  ← reusable dropdown widget
 │   │   │   ├── notes_pane.py       ← live-edits <profile>/notes.md
-│   │   │   └── report_preview.py
+│   │   │   ├── report_view.py       ← rendered report.md (Regenerate / Open in editor)
 │   │   └── graph_html/       ← vendored Cytoscape.js + local HTML/JS/CSS
 │   └── config.py
-├── boxes/
-│   ├── README.md
-│   ├── TRACKER.md            ← Lain Kusanagi's OSCP-like list (267 boxes), HackSmarter excluded
-│   ├── boxes.csv
-│   ├── boxes.json
-│   ├── _template.md          ← per-box notes template
-│   └── <platform>-<box>.md   ← user notes per box
+├── boxes/                    ← LOCAL study notes — every file here is gitignored, never published
+│   ├── BOXES-COMPLETED.md    ← the running tally (with a TOTAL), updated after every box
+│   ├── BOX-REVIEW-SOP.md     ← how a box review is run
+│   ├── STARTING-POINT-LOG.md
+│   └── TRACKER.md            ← Lain Kusanagi's OSCP-like list (267 boxes) — maintainer's copy
 ├── walkthroughs/             ← LOCAL drop point for third-party writeups — gitignored, never published (§21)
 ├── tests/
 │   ├── fixtures/             ← committed sample tool outputs
