@@ -348,6 +348,7 @@ class ToolPanel(QWidget):
         self._vuln_button.clicked.connect(self._emit_vuln_scan)
         self._vuln_mode = QComboBox()
         self._vuln_mode.setMaximumWidth(230)
+        self._vuln_mode.setAccessibleName("Vuln scan mode")
         for mode in nse_vuln.MODES:
             self._vuln_mode.addItem(_VULN_MODE_LABELS[mode], mode)
         self._vuln_mode.currentIndexChanged.connect(lambda _i: self._sync_vuln_row(self._service))

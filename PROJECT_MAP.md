@@ -311,11 +311,15 @@ audit log §6a, concurrent-copy lock §6b) and the full Workspace Dashboard & Or
 
 ## 16. Blocked work — ⛔
 
-- **Live acceptance testing** — running the tool end-to-end on ≥3 authorized `boxes/TRACKER.md`
-  targets, live parser validation, and performance-under-load. **Blocked:** no authorized live target /
-  VPN in this environment. Every phase's §23 "exit criterion" (used on ≥3 real boxes) awaits this; to
-  date verification = fixtures + unit/GUI tests, **not** live boxes.
-- **Timed mock exam** — depends on the above.
+- **Timed mock exam** — 3 standalone boxes + an AD set, under exam conditions and clock (§23 Phase 6).
+  Not blocked by tooling; it needs a scheduled block of the maintainer's time.
+
+**No longer blocked — live acceptance testing is ongoing.** The tool is run end-to-end against
+authorized live targets over the lab VPN, and each review feeds parser/UX fixes back into the repo.
+51 boxes to date (`boxes/BOXES-COMPLETED.md`, local): 25 harder retired HTB field reviews, 25
+Starting Point incl. the Dante Pro Lab, and 1 OffSec PG Practice (Internal). Several parser bugs were
+found this way and only this way — the ffuf `-o` output collision, the http unresolvable-hostname
+fallback, and the SMB vuln-NSE gap that produced §8a.
 
 ## 17. Explicitly out-of-scope — ❌
 
