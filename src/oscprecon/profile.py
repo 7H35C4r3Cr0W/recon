@@ -4,6 +4,7 @@ import contextlib
 import json
 import os
 import tempfile
+import threading
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -29,6 +30,20 @@ from oscprecon.workspace.models import (
 # v2 adds discovered_hosts (the pivot topology). Loading a v1 profile is unchanged — the field
 # simply defaults to [] — so no migration is needed and old projects open exactly as before.
 SCHEMA_VERSION = 2
+
+
+# why: scans now run in PARALLEL (several nmap / content-discovery workers at once), so the
+# read-modify-write windows in save() / set_services() / add_command() are reachable from more than
+# one thread. _atomic_write_json already stops a torn FILE; this closes the lost-update window that
+# produces a valid file with a missing service or a duplicated command id.
+#
+# One module-level RLock rather than a per-Profile field: the critical sections are microseconds,
+# the GUI holds one active Profile, and a shared lock keeps a Profile a plain dataclass (no field to
+# accidentally persist, copy or compare). Reentrant because set_hostname() -> save().
+#
+# In-process only. A `nabu-cli scan` running against the same folder as the GUI is still a separate
+# process — that is what the `.lock` file (§6b) is for; this is not cross-process safety.
+_STATE_LOCK = threading.RLock()
 
 
 def _atomic_write_json(path: Path, payload: Any) -> None:
@@ -275,6 +290,10 @@ class Profile:
 
     def save(self) -> None:
         self._ensure_writable()
+        with _STATE_LOCK:
+            self._save_locked()
+
+    def _save_locked(self) -> None:
         payload: dict[str, Any] = {
             # always persist the CURRENT code schema — a v1 file that gains v2 content (hosts)
             # must not keep lying that it is still version 1.
@@ -298,14 +317,36 @@ class Profile:
 
     def set_services(self, services: list[DiscoveredService]) -> None:
         self._ensure_writable()  # never mutate in-memory state on a read-only profile [#43]
-        self.discovered_services = services
-        self.touch()
+        with _STATE_LOCK:
+            self.discovered_services = services
+            self.touch()
+
+    def merge_services(self, services: list[DiscoveredService]) -> None:
+        # union by (port, proto) instead of replace — with scans running in parallel, a narrow scan
+        # finishing after a broad one must ADD to discovery, never truncate it back to its own view.
+        # Same rule the custom-scan path has always used (nmap_scan.merge_services).
+        from oscprecon import nmap_scan  # local import: nmap_scan imports models, not profile
+
+        self._ensure_writable()
+        with _STATE_LOCK:
+            self.discovered_services = nmap_scan.merge_services(self.discovered_services, services)
+            self.touch()
+
+    def next_command_id(self) -> str:
+        # unique across re-scans AND across concurrent workers — read the length and mint under the
+        # same lock the append takes, so two workers can't both mint cmd-014.
+        with _STATE_LOCK:
+            return f"cmd-{len(self.command_history) + 1:03d}"
 
     def add_hosts(self, hosts: list[DiscoveredHost]) -> int:
         # Upsert pivoted hosts by ip: a re-scan of the same host updates its services / os / pivot
         # source in place rather than creating a duplicate node. The entry Target is never added
         # here (it stays the profile's primary target). Returns the number of NEW hosts added.
         self._ensure_writable()  # [#43]
+        with _STATE_LOCK:
+            return self._add_hosts_locked(hosts)
+
+    def _add_hosts_locked(self, hosts: list[DiscoveredHost]) -> int:
         by_ip = {h.ip: h for h in self.discovered_hosts}
         added = 0
         for host in hosts:
@@ -458,8 +499,9 @@ class Profile:
         self.save()
 
     def add_command(self, record: dict[str, Any]) -> None:
-        self.command_history.append(record)
-        self.touch()
+        with _STATE_LOCK:
+            self.command_history.append(record)
+            self.touch()
 
     def touch(self) -> None:
         self.status["last_active"] = _now_iso()

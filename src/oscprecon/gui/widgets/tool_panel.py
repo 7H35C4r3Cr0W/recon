@@ -5,6 +5,7 @@ import re
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from oscprecon import nse_vuln
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.widgets.banner import Banner
 from oscprecon.gui.widgets.discovered_urls_panel import DiscoveredUrlsPanel
@@ -37,6 +39,12 @@ from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef, expand_hint
 
 _COMMAND_ROLE = Qt.ItemDataRole.UserRole
+
+_VULN_MODE_LABELS = {
+    nse_vuln.MODE_ALL: "all vuln checks",
+    nse_vuln.MODE_TARGETED: "targeted family",
+    nse_vuln.MODE_SAFE: "safe checks only",
+}
 
 
 class _CurrentPageStack(QStackedWidget):
@@ -60,6 +68,7 @@ class _CurrentPageStack(QStackedWidget):
 # banner. Only actionable/outcome tags surface; info chatter (running/dry-run) stays in the log.
 _TAG_RE = re.compile(r"^\[([a-z][a-z-]*)\]")
 _TAG_KIND = {
+    "vuln": "error",  # a VULNERABLE verdict is the loudest thing recon can say
     "blocked": "error",
     "error": "error",
     "missing": "warning",
@@ -88,10 +97,13 @@ class ToolPanel(QWidget):
     dns_recon_requested = Signal(str, int)  # (domain, port)
     ldap_recon_requested = Signal(str, int)  # (basedn, port)
     simple_recon_requested = Signal(str, int)  # (module name, discovered service port)
+    vuln_scan_requested = Signal(str, int, str)  # (nmap service name, port, mode) — NSE vuln scan
 
     def __init__(self) -> None:
         super().__init__()
         self._target = ""
+        self._multi = False  # >1 task running -> prefix streamed lines with the run's tag
+        self._service: DiscoveredService | None = None
 
         self._header = QLabel(
             "No service selected — run Recon, then pick a service to build its commands."
@@ -177,6 +189,8 @@ class ToolPanel(QWidget):
             panel.manual_requested.connect(self.run_requested)
             self._simple[spec.module] = panel
 
+        self._vuln_row = self._build_vuln_row()
+
         self._stack = _CurrentPageStack()
         self._stack.addWidget(generic)  # 0: generic hints
         self._stack.addWidget(self._web_tabs)  # 1: http/vhost builders
@@ -213,6 +227,7 @@ class ToolPanel(QWidget):
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.addWidget(self._header)
+        body_layout.addWidget(self._vuln_row)
         body_layout.addWidget(self._stack, stretch=1)
         body_layout.addWidget(next_box)
 
@@ -258,6 +273,8 @@ class ToolPanel(QWidget):
         # host_ip != "" when the service belongs to a PIVOTED host — every panel then targets that
         # host instead of the entry box (else feroxbuster/smb/etc. would recon the wrong machine).
         self._hints.clear()
+        self._service = service
+        self._sync_vuln_row(service)
         if service is None:
             self._header.setText(
                 "No service selected — run Recon, then pick a service to build its commands."
@@ -312,10 +329,58 @@ class ToolPanel(QWidget):
             item.setData(_COMMAND_ROLE, expanded)
             self._hints.addItem(item)
 
+    def _build_vuln_row(self) -> QWidget:
+        # Present for EVERY service, above whichever builder is showing. The driving miss: a box
+        # whose only way in was an `smb-vuln-*` NSE check that the tool never offered, on a service
+        # panel that had five other buttons. Now every service has its vuln checks one click away.
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self._vuln_button = QPushButton("⚠  Vuln scripts (NSE)")
+        self._vuln_button.setAccessibleName("Run NSE vuln scripts against this service")
+        self._vuln_button.clicked.connect(self._emit_vuln_scan)
+        self._vuln_mode = QComboBox()
+        self._vuln_mode.setMaximumWidth(230)
+        for mode in nse_vuln.MODES:
+            self._vuln_mode.addItem(_VULN_MODE_LABELS[mode], mode)
+        self._vuln_mode.currentIndexChanged.connect(lambda _i: self._sync_vuln_row(self._service))
+        self._vuln_hint = QLabel("")
+        self._vuln_hint.setWordWrap(True)
+        layout.addWidget(self._vuln_button)
+        layout.addWidget(self._vuln_mode)
+        layout.addWidget(self._vuln_hint, stretch=1)
+        return row
+
+    def _sync_vuln_row(self, service: DiscoveredService | None) -> None:
+        if service is None:
+            self._vuln_row.setVisible(False)
+            return
+        self._vuln_row.setVisible(True)
+        profile = nse_vuln.profile_for(service.service, service.port, service.product)
+        mode = str(self._vuln_mode.currentData() or nse_vuln.MODE_ALL)
+        if mode == nse_vuln.MODE_TARGETED and not profile.family:
+            # no specific family for this service — say so instead of silently running the category
+            self._vuln_hint.setText(
+                f"{profile.label}: no service-specific script family — this runs the vuln category."
+            )
+        else:
+            self._vuln_hint.setText(f"{profile.label} · {nse_vuln.mode_label(mode, profile)}")
+        self._vuln_button.setToolTip(
+            f"{profile.why}\n\nRuns: "
+            f"{nse_vuln.build_command('<target>', [service.port], mode=mode, profile=profile)}"
+        )
+
+    def _emit_vuln_scan(self) -> None:
+        if self._service is None:
+            return
+        mode = str(self._vuln_mode.currentData() or nse_vuln.MODE_ALL)
+        self.vuln_scan_requested.emit(self._service.service, self._service.port, mode)
+
     def set_running(self, running: bool) -> None:
         # why: the http/vhost builders persist into the shared Profile on every control change;
         # disable them during a scan so a UI edit can't race the worker thread's profile.save().
         self._run_button.setEnabled(not running)
+        self._vuln_button.setEnabled(not running)
         self._http.setEnabled(not running)
         self._vhost.setEnabled(not running)
         self._smb.set_running(running)
@@ -385,8 +450,16 @@ class ToolPanel(QWidget):
         self._web_tabs.setCurrentWidget(self._http)
         self._stack.setCurrentWidget(self._web_tabs)
 
-    def append_output(self, text: str) -> None:
-        self._output.appendPlainText(text)
+    def set_multi(self, multi: bool) -> None:
+        # why: with several scans streaming into one pane, interleaved lines are unreadable unless
+        # each one says which run it came from. Only prefix while >1 task runs — a single scan's
+        # output stays exactly as it always was.
+        self._multi = multi
+
+    def append_output(self, text: str, tag: str = "") -> None:
+        self._output.appendPlainText(f"{tag} │ {text}" if (self._multi and tag) else text)
+        # the banner matches on the UNTAGGED text so [blocked]/[done]/[vuln] still surface when
+        # several scans are running.
         match = _TAG_RE.match(text.strip())
         if match is not None:
             kind = _TAG_KIND.get(match.group(1))

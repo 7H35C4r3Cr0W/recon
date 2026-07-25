@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QPushButton
 from pytestqt.qtbot import QtBot
 
 from oscprecon.gui.main_window import CancellableThread, MainWindow
-from oscprecon.gui.task_manager import TaskManager
+from oscprecon.gui.task_manager import BATTERY_LANE, NMAP_LANE, TOOL_LANE, TaskManager
 from oscprecon.gui.widgets.task_status_bar import TaskStatusBar
 from oscprecon.models import Target
 from oscprecon.profile import Profile
@@ -38,7 +38,7 @@ def test_cancel_button_stops_a_real_inflight_worker(qtbot: QtBot, tmp_path: Path
     assert len(buttons) == 1  # the ✕ for the running task
     buttons[0].click()  # cancel -> worker._cancel.set() -> run() returns -> finished -> _release
     qtbot.waitUntil(lambda: window._tasks.active_count == 0, timeout=5000)
-    assert window._run_button.isEnabled() is True  # drained, exclusive nmap available again
+    assert window._run_button.isEnabled() is True  # drained, the recon battery is available again
 
 
 def test_close_event_cancels_inflight_workers(qtbot: QtBot, tmp_path: Path) -> None:
@@ -84,16 +84,44 @@ def test_recon_handler_gated_at_capacity(qtbot: QtBot, tmp_path: Path) -> None:
     assert window._tasks.active_count == window._tasks.max_concurrency
 
 
-def test_nmap_exclusive_blocked_while_a_task_runs(qtbot: QtBot, tmp_path: Path) -> None:
+def test_recon_battery_runs_alongside_a_tool_task(qtbot: QtBot, tmp_path: Path) -> None:
+    # the point of the lane model: a content-discovery run must not block a full sweep, and vice
+    # versa. Only a SECOND battery is refused.
     window = MainWindow()
     qtbot.addWidget(window)
     window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.5")))
-    window._tasks.add(_DummyWorker(), "http:80")  # one parallel task running
+    window._tasks.add(_DummyWorker(), "http:80", lane=TOOL_LANE)
     window._refresh_busy()
-    assert window._run_button.isEnabled() is False  # full-recon (exclusive) must wait
+    assert window._run_button.isEnabled() is True
+    assert window._tasks.can_start(lane=BATTERY_LANE) is True
+    assert window._tasks.can_start(lane=NMAP_LANE) is True
 
-    window._on_run()  # nmap refused while another task runs
-    assert not any(task.exclusive for task in window._tasks.tasks())
+
+def test_second_recon_battery_is_refused(qtbot: QtBot, tmp_path: Path) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.5")))
+    window._tasks.add(_DummyWorker(), "nmap", lane=BATTERY_LANE)
+    window._refresh_busy()
+    assert window._tasks.can_start(lane=BATTERY_LANE) is False
+    # ...but an ad-hoc nmap and a service scan still can
+    assert window._tasks.can_start(lane=NMAP_LANE) is True
+    assert window._tasks.can_start(lane=TOOL_LANE) is True
+    # while the battery owns the button it reads as Stop, not Run
+    assert "Stop" in window._run_button.text()
+
+
+def test_several_nmap_scans_run_at_once_up_to_the_lane_cap(qtbot: QtBot, tmp_path: Path) -> None:
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.5")))
+    cap = window._tasks.lane_cap(NMAP_LANE)
+    for i in range(cap):
+        assert window._tasks.can_start(lane=NMAP_LANE) is True
+        window._tasks.add(_DummyWorker(), f"scan-{i}", lane=NMAP_LANE)
+    assert cap >= 2  # the whole feature: at least a full sweep + a vuln scan together
+    assert window._tasks.can_start(lane=NMAP_LANE) is False
+    assert window._tasks.can_start(lane=TOOL_LANE) is True  # other work is unaffected
 
 
 def test_release_drains_and_reenables(qtbot: QtBot, tmp_path: Path) -> None:
@@ -101,13 +129,14 @@ def test_release_drains_and_reenables(qtbot: QtBot, tmp_path: Path) -> None:
     qtbot.addWidget(window)
     window._set_profile(Profile.create(tmp_path, "b", Target(ip="10.10.10.5")))
     worker = _DummyWorker()
-    window._tasks.add(worker, "smb full")
+    window._tasks.add(worker, "nmap", lane=BATTERY_LANE)
     window._refresh_busy()
-    assert window._run_button.isEnabled() is False
+    assert window._tasks.can_start(lane=BATTERY_LANE) is False
 
     window._release(worker)
     assert window._tasks.active_count == 0
-    assert window._run_button.isEnabled() is True  # exclusive nmap available again
+    assert window._tasks.can_start(lane=BATTERY_LANE) is True
+    assert window._run_button.isEnabled() is True
 
 
 def test_post_run_refresh_preserves_notes_and_tree_selection(qtbot: QtBot, tmp_path: Path) -> None:

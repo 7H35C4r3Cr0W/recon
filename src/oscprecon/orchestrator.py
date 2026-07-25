@@ -49,9 +49,8 @@ class Orchestrator:
             output_file = entry.get("output_file")
             if output_file:
                 self._last_by_output[str(output_file)] = entry
-        # why: command ids must stay unique across re-scans of the same profile, whose
-        # command_history persists — so continue numbering, don't reset to 0.
-        self._counter = len(profile.command_history)
+        # command ids are minted by Profile.next_command_id() under the profile lock: they must stay
+        # unique across re-scans (command_history persists) AND across workers running in parallel.
 
     def _emit(self, text: str) -> None:
         if self.on_line is not None:
@@ -91,10 +90,9 @@ class Orchestrator:
             cancel=self.cancel,
             on_line=self._emit,
         )
-        self._counter += 1
         self.profile.add_command(
             {
-                "id": f"cmd-{self._counter:03d}",
+                "id": self.profile.next_command_id(),
                 "module": cmd.module,
                 "shell_line": cmd.shell_line,
                 "why": cmd.why,
@@ -191,7 +189,7 @@ class Orchestrator:
             if self._cancelled():
                 break
             raw[cmd.output_file] = self._run(cmd)
-        self.profile.set_services(self.nmap.discovered_services(raw))
+        self.profile.merge_services(self.nmap.discovered_services(raw))
         # fail-loud: nmap reported open ports but the parser extracted none -> format drift, not an
         # empty host. Silently ending up with 0 services would break everything downstream, quietly.
         if not self.profile.discovered_services and _nmap_saw_open_ports(raw):
@@ -207,8 +205,10 @@ class Orchestrator:
         # battery — only run the versioned scan when there is actually a TCP port to version.
         if open_tcp and not self._cancelled():
             for cmd in self.nmap.commands(target, open_tcp):
+                if self._cancelled():
+                    break
                 raw[cmd.output_file] = self._run(cmd)
-            self.profile.set_services(self.nmap.discovered_services(raw))
+            self.profile.merge_services(self.nmap.discovered_services(raw))
             self.profile.save()
 
         # why: the slow full UDP sweep (`full` profile / --udp-full opt-in) runs LAST — after the
@@ -221,7 +221,7 @@ class Orchestrator:
                     if self._cancelled():
                         break
                     raw[cmd.output_file] = self._run(cmd)
-                self.profile.set_services(self.nmap.discovered_services(raw))
+                self.profile.merge_services(self.nmap.discovered_services(raw))
                 self.profile.save()
 
         self._handle_hostname_leads(raw)

@@ -37,7 +37,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import alive, config, edb, findings, hosts, nmap_scan, references, vault_export
+from oscprecon import (
+    alive,
+    config,
+    edb,
+    findings,
+    hosts,
+    nmap_scan,
+    nse_vuln,
+    references,
+    run_paths,
+    vault_export,
+)
 from oscprecon.audit import Auditor
 from oscprecon.branding import (
     APP_NAME,
@@ -65,7 +76,7 @@ from oscprecon.gui.dialogs import (
     SettingsDialog,
 )
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
-from oscprecon.gui.task_manager import TaskManager
+from oscprecon.gui.task_manager import BATTERY_LANE, NMAP_LANE, TOOL_LANE, TaskManager
 from oscprecon.gui.theme import styles, tokens
 from oscprecon.gui.widgets.activity_view import ActivityView
 from oscprecon.gui.widgets.app_header import AppHeader
@@ -101,6 +112,8 @@ from oscprecon.gui.workers import (
     SmbReconWorker,
     SshReconResult,
     SshReconWorker,
+    VulnScanResult,
+    VulnScanWorker,
 )
 from oscprecon.gui.workspace import WorkspaceDashboard
 from oscprecon.manual_commands import expand, load_manual_commands
@@ -245,6 +258,7 @@ class MainWindow(QMainWindow):
         self._tool_panel.dns_recon_requested.connect(self._on_dns_recon)
         self._tool_panel.ldap_recon_requested.connect(self._on_ldap_recon)
         self._tool_panel.simple_recon_requested.connect(self._on_simple_recon)
+        self._tool_panel.vuln_scan_requested.connect(self._on_vuln_scan)
         self._tool_panel.vhost_validation_failed.connect(
             lambda msg: self._tool_panel.append_output(f"[blocked] {msg}")
         )
@@ -254,6 +268,7 @@ class MainWindow(QMainWindow):
         self._reference_pane.set_live_enabled(settings.hacktricks_live_enabled)
         self._edb_request_id = 0
         self._edb_workers: set[QThread] = set()
+        self._pending_vuln_scans: list[tuple[str, int]] = []  # "scan all services" queue
         self._edb_context: tuple[str, str, str] | None = None  # (service label, product, version)
         self._live_request_id = 0
         self._live_workers: set[QThread] = set()
@@ -495,6 +510,12 @@ class MainWindow(QMainWindow):
         )
         presets_dialog_action.triggered.connect(self._on_scan_presets_dialog)
         scan_menu.addAction(presets_dialog_action)
+        vuln_all_action = QAction("⚠  Vuln scripts on every discovered service", self)
+        vuln_all_action.setStatusTip(
+            "Run the NSE vuln checks (--script vuln) against every open port found on this box"
+        )
+        vuln_all_action.triggered.connect(self._on_scan_all_vulns)
+        scan_menu.addAction(vuln_all_action)
         ligolo_action = QAction("🔀 Pivot with Ligolo-ng...", self)
         ligolo_action.setStatusTip("Open the Pivot tab — guided ligolo-ng command-builder")
         ligolo_action.triggered.connect(lambda _checked=False: self._show_pivot())
@@ -879,7 +900,7 @@ class MainWindow(QMainWindow):
         for directory in paths:
             directory = directory.resolve()
             is_active = self._profile is not None and directory == self._profile.directory.resolve()
-            if is_active and not self._tasks.can_start(exclusive=True):
+            if is_active and self._tasks.active_count:
                 self._tool_panel.append_output(
                     f"[workspace] {directory.name}: a scan is running — stop it before deleting."
                 )
@@ -1094,7 +1115,7 @@ class MainWindow(QMainWindow):
         signals.line.connect(self._exploit_panel.append_run_output)
         signals.done.connect(lambda _code: self._exploit_panel.run_finished())
         signals.failed.connect(self._exploit_run_failed)
-        self._launch(worker, "exploit", exclusive=False)
+        self._launch(worker, "exploit", lane=TOOL_LANE)
 
     def _exploit_run_failed(self, message: str) -> None:
         self._exploit_panel.append_run_output(f"[error] {message}")
@@ -1392,7 +1413,7 @@ class MainWindow(QMainWindow):
         if self._profile.read_only:
             QMessageBox.information(self, "Read-only", "This project is open read-only.")
             return
-        if not self._tasks.can_start(exclusive=True):
+        if self._tasks.active_count:
             self._tool_panel.append_output(
                 "[busy] finish or Stop running scans before editing the project."
             )
@@ -1864,8 +1885,10 @@ class MainWindow(QMainWindow):
         if self._profile.read_only:
             QMessageBox.information(self, "Read-only", "This project is open read-only.")
             return
-        if not self._tasks.can_start(exclusive=True):
-            self._tool_panel.append_output("[busy] a scan is already running — wait or Stop it.")
+        if not self._tasks.can_start(lane=NMAP_LANE):
+            self._tool_panel.append_output(
+                f"[busy] {self._tasks.why_blocked(NMAP_LANE)} — wait, or Stop one in the task bar."
+            )
             return
         profile = self._profile
         dialog = NmapScanDialog(
@@ -1881,8 +1904,10 @@ class MainWindow(QMainWindow):
         stream_hosts = not is_entry  # entry -> discovered_services; else -> pivoted hosts
         out_dir = profile.directory / "nmap"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_name = "tcp-versioned.txt" if is_entry else f"scan-{_slug(target)}.txt"
-        output_file = out_dir / out_name
+        # why: a distinct file per distinct command. Both this path and the preset path used to
+        # hardcode tcp-versioned.txt for a single-host project — with scans now running in parallel
+        # that means two nmaps truncating each other's output, and each parsing the other's file.
+        output_file = run_paths.scan_output(out_dir, command, target)
         self._show_recon()
         self._tool_panel.append_output(f"[scan] {command}")
         if stream_hosts and nmap_scan.is_range(target):
@@ -1901,7 +1926,7 @@ class MainWindow(QMainWindow):
             worker,
             f"scan:{target}",
             lambda code: self._on_custom_scan_done(code, profile, is_entry, output_file),
-            exclusive=True,
+            lane=NMAP_LANE,
         )
         self._audit_action("custom-scan", target=target, command=command)
 
@@ -1967,14 +1992,17 @@ class MainWindow(QMainWindow):
         # true (and tells the user why) when no task slot is free. The tool-panel launch buttons are
         # normally disabled at capacity, but a queued/re-entrant signal can still reach these slots;
         # §24 forbids dropping the action silently. [#49]
-        if self._tasks.can_start():
+        if self._tasks.can_start(lane=TOOL_LANE):
             return False
-        self._tool_panel.append_output("[busy] at capacity — wait or Stop a task.")
+        self._tool_panel.append_output(
+            f"[busy] {self._tasks.why_blocked(TOOL_LANE)} — wait, or Stop one in the task bar."
+        )
         return True
 
     def _main_recon_running(self) -> bool:
-        # the main Run button owns the EXCLUSIVE recon task (full nmap) — true while one runs
-        return any(task.exclusive for task in self._tasks.tasks())
+        # the main Run button owns the BATTERY lane (full nmap) — true while one runs. Ad-hoc nmap
+        # scans and service recon are in other lanes and must not flip the button to Stop.
+        return self._tasks.lane_count(BATTERY_LANE) > 0
 
     def _on_run_button(self) -> None:
         # one button, two roles: Run when idle, Stop while the main recon is running
@@ -2038,26 +2066,31 @@ class MainWindow(QMainWindow):
             self._run_button.setStyleSheet(styles.accent_tool_button())
             self._run_button.setEnabled(
                 self._profile is not None
-                and self._tasks.can_start(exclusive=True)
+                and self._tasks.can_start(lane=BATTERY_LANE)
                 and not read_only
             )
         # why: keep the tree browseable (selecting a service is read-only) — only the launch
         # buttons in the tool panel are gated on capacity, via set_running. A read-only profile
         # disables every recon launch (a worker would write findings/creds -> ReadOnlyError).
         self._service_tree.setEnabled(self._profile is not None)
-        self._tool_panel.set_running(read_only or not self._tasks.can_start())
+        self._tool_panel.set_running(read_only or not self._tasks.can_start(lane=TOOL_LANE))
+        # tag streamed lines only when more than one task runs — a single scan's output stays
+        # byte-identical to what it has always been.
+        self._tool_panel.set_multi(self._tasks.active_count > 1)
         self._notes_pane.setEnabled(not read_only)  # no notes edits in read-only
         self._header.set_task_count(self._tasks.active_count)
 
-    def _launch(self, worker: QThread, label: str, *, exclusive: bool = False) -> None:
+    def _launch(self, worker: QThread, label: str, *, lane: str = TOOL_LANE) -> str:
         # admission primitive: register with the TaskManager, guarantee release on `finished`
         # (fires once, after run() returns — so a raising done/failed slot can't wedge the slot),
-        # audit the start, refresh the busy-gates, and start the thread.
-        self._tasks.add(worker, label, exclusive=exclusive)
+        # audit the start, refresh the busy-gates, and start the thread. Returns the run's unique
+        # tag, so the caller can attribute streamed output and claimed output paths to it.
+        task = self._tasks.add(worker, label, lane=lane)
         worker.finished.connect(lambda: self._release(worker))
-        self._audit_action("run", label=label, exclusive=exclusive)
+        self._audit_action("run", label=label, lane=lane)
         self._refresh_busy()
         worker.start()
+        return task.tag
 
     def _start(
         self,
@@ -2065,7 +2098,7 @@ class MainWindow(QMainWindow):
         label: str,
         on_done: Callable[[Any], None],  # done payload is int (nmap/command) or a Result object
         *,
-        exclusive: bool = False,
+        lane: str = TOOL_LANE,
         line_filter: Callable[[str], str] | None = None,
         on_failed: Callable[[str], None]
         | None = None,  # replaces the default failure slot if given
@@ -2077,24 +2110,37 @@ class MainWindow(QMainWindow):
         # line/done/failed on its own subclass, not on the CancellableThread base mypy sees here.
         # `line_filter` redacts secrets from streamed output (spray) before it reaches the UI/logs.
         signals: Any = worker
+        # the tag is resolved at EMIT time (the worker is registered by then) — no peeking, and
+        # it stays correct if the task list changes between wiring and the first line.
         if line_filter is None:
-            signals.line.connect(self._tool_panel.append_output)
+            signals.line.connect(
+                lambda line: self._tool_panel.append_output(line, self._tasks.tag_for(worker))
+            )
         else:
             redact = line_filter
-            signals.line.connect(lambda line: self._tool_panel.append_output(redact(line)))
+            signals.line.connect(
+                lambda line: self._tool_panel.append_output(
+                    redact(line), self._tasks.tag_for(worker)
+                )
+            )
         signals.done.connect(on_done)
         signals.failed.connect(on_failed if on_failed is not None else self._on_run_failed)
-        self._launch(worker, label, exclusive=exclusive)
+        self._launch(worker, label, lane=lane)
 
     def _release(self, worker: QThread) -> None:
         if not any(task.worker is worker for task in self._tasks.tasks()):
             return  # already released — never double-remove / double-audit / double-refresh
         worker.wait()  # finished has fired — returns immediately
-        label = next((task.label for task in self._tasks.tasks() if task.worker is worker), "")
+        task = self._tasks.task_for(worker)
+        label = task.label if task is not None else ""
+        if task is not None:
+            run_paths.release_tag(task.tag)  # free the output files this run held
         self._tasks.remove(worker)
         worker.deleteLater()
         self._audit_action("run-finished", label=label)
         self._post_run_refresh()
+        if self._pending_vuln_scans:
+            self._drain_vuln_queue()  # "scan all services" continues as each slot frees
 
     def _record_creds(self, profile: Profile, creds: list[Credential]) -> None:
         # creds always persist to the ORIGINATING profile; the echo line only shows when that
@@ -2213,16 +2259,17 @@ class MainWindow(QMainWindow):
         # discovered_services; a /24 project streams each live host into the topology.
         if self._profile is None or self._profile.read_only:
             return
-        if not self._tasks.can_start(exclusive=True):
-            self._tool_panel.append_output("[busy] a scan is already running — wait or Stop it.")
+        if not self._tasks.can_start(lane=NMAP_LANE):
+            self._tool_panel.append_output(
+                f"[busy] {self._tasks.why_blocked(NMAP_LANE)} — wait, or Stop one in the task bar."
+            )
             return
         profile = self._profile
         target = profile.target.ip
         is_entry = not profile.target.is_range
         out_dir = profile.directory / "nmap"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out_name = "tcp-versioned.txt" if is_entry else f"scan-{_slug(target)}.txt"
-        output_file = out_dir / out_name
+        output_file = run_paths.scan_output(out_dir, command, target)
         self._show_recon()
         self._tool_panel.append_output(f"[scan] {command}")
         worker = CustomScanWorker(
@@ -2234,7 +2281,7 @@ class MainWindow(QMainWindow):
             worker,
             f"preset:{target}",
             lambda code: self._on_custom_scan_done(code, profile, is_entry, output_file),
-            exclusive=True,
+            lane=NMAP_LANE,
         )
         self._audit_action("preset-scan", target=target, command=command)
 
@@ -2327,10 +2374,10 @@ class MainWindow(QMainWindow):
             )
             return
         self._show_recon()  # surface the streaming output pane before anything runs
-        if not self._tasks.can_start(exclusive=True):
+        if not self._tasks.can_start(lane=BATTERY_LANE):
             self._tool_panel.append_output(
-                "[busy] a scan is already running — wait for it to finish, or Stop it, "
-                "before starting a full recon."
+                f"[busy] {self._tasks.why_blocked(BATTERY_LANE)}. Per-service scans and nmap "
+                "presets can still run alongside it."
             )
             return
         settings = config.load_settings()
@@ -2356,7 +2403,7 @@ class MainWindow(QMainWindow):
             worker,
             "ping",
             lambda result: self._preflight_done(result, profile_name),
-            exclusive=True,
+            lane=BATTERY_LANE,
             on_failed=lambda msg: self._preflight_failed(msg, profile_name),
         )
 
@@ -2366,7 +2413,7 @@ class MainWindow(QMainWindow):
         self._proceed_after_preflight(profile_name)
 
     def _proceed_after_preflight(self, profile_name: str) -> None:
-        # defer to the next event-loop tick so the ping worker's exclusive slot (released on
+        # defer to the next event-loop tick so the ping worker's battery-lane slot (released on
         # `finished`, which fires AFTER this done/failed handler) is free before _launch_recon
         # re-checks capacity. The modal confirm path already drains it, so it launches directly.
         QTimer.singleShot(0, lambda: self._launch_recon(profile_name))
@@ -2419,8 +2466,8 @@ class MainWindow(QMainWindow):
         # `resume` reuses output from steps that already finished (exit 0), like CLI --resume.
         if self._profile is None or self._profile.read_only:
             return
-        if not self._tasks.can_start(exclusive=True):
-            self._tool_panel.append_output("[busy] a scan is already running — wait or Stop it.")
+        if not self._tasks.can_start(lane=BATTERY_LANE):
+            self._tool_panel.append_output(f"[busy] {self._tasks.why_blocked(BATTERY_LANE)}.")
             return
         if self._profile.target.is_range:
             self._launch_network_recon(profile_name)
@@ -2441,7 +2488,7 @@ class MainWindow(QMainWindow):
             scan_profile=profile_name,
             resume=resume,
         )
-        self._start(worker, "nmap", self._on_scan_done, exclusive=True)
+        self._start(worker, "nmap", self._on_scan_done, lane=BATTERY_LANE)
 
     def _launch_network_recon(self, profile_name: str) -> None:
         # whole-/24 project: one versioned nmap sweep across the range, each live host streamed into
@@ -2470,7 +2517,7 @@ class MainWindow(QMainWindow):
             worker,
             f"network:{cidr}",
             lambda code: self._on_custom_scan_done(code, profile, False, output_file),
-            exclusive=True,
+            lane=BATTERY_LANE,
         )
         self._audit_action("network-recon", target=cidr, command=command)
 
@@ -2789,6 +2836,80 @@ class MainWindow(QMainWindow):
         prof = self._profile
         worker = SimpleReconWorker(prof, module_name, port)
         self._start(worker, module_name, lambda r: self._on_simple_done(r, prof))
+
+    def _on_vuln_scan(self, service_name: str, port: int, mode: str = nse_vuln.MODE_ALL) -> None:
+        # per-service NSE vuln checks (§8). Runs in the nmap lane, so it can go WHILE a full sweep
+        # or a content-discovery run is in flight — noticing an MS17-010 should never cost you the
+        # rest of your recon.
+        if self._profile is None:
+            return
+        if self._profile.read_only:
+            self._tool_panel.append_output(
+                "[read-only] this project is open for editing elsewhere — vuln scan skipped."
+            )
+            return
+        if not self._tasks.can_start(lane=NMAP_LANE):
+            self._tool_panel.append_output(
+                f"[busy] {self._tasks.why_blocked(NMAP_LANE)} — wait, or Stop one in the task bar."
+            )
+            return
+        prof = self._profile
+        worker = VulnScanWorker(prof, service_name, port, mode)
+        label = f"vuln:{service_name}:{port}"
+        out_path = prof.directory / worker.output_rel()
+        owner = run_paths.claim(out_path, label)
+        if owner is not None:
+            self._tool_panel.append_output(
+                f"[busy] this vuln scan is already running ({owner}) — wait for it to finish."
+            )
+            return
+        self._show_recon()
+        self._start(worker, label, lambda r: self._on_vuln_done(r, prof), lane=NMAP_LANE)
+        self._audit_action("vuln-scan", service=service_name, port=port, mode=mode)
+
+    def _on_vuln_done(self, result: object, profile: Profile) -> None:
+        try:
+            if not isinstance(result, VulnScanResult) or profile is not self._profile:
+                return
+            for line in result.summary:
+                self._tool_panel.append_output(f"   {line}")
+            if result.hits:
+                self._tool_panel.append_output(
+                    f"[vuln] {result.hits} confirmed on {result.service} — recorded in Findings."
+                )
+            else:
+                self._tool_panel.append_output(f"[done] vuln scan complete — {result.service}")
+            self._findings_view.reload()
+        except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
+            self._tool_panel.append_output(f"[error] {exc}")
+
+    def _on_scan_all_vulns(self) -> None:
+        # "check every service on this box" in one action. Queued one per service through the normal
+        # lane gate rather than fired at once — an exam box should not field ten nmaps.
+        if self._profile is None:
+            QMessageBox.information(self, APP_NAME, "Open a project and run recon first.")
+            return
+        services = [s for s in self._profile.discovered_services if s.state == "open"]
+        if not services:
+            self._tool_panel.append_output(
+                "[vuln] no discovered services yet — run recon first, then scan them for vulns."
+            )
+            return
+        # one scan per service FAMILY (139+445 are one SMB pass), not one per port — otherwise the
+        # identical command runs twice and every verdict is recorded twice.
+        plan = nse_vuln.plan_scans([(s.port, s.proto, s.service, s.product) for s in services])
+        self._pending_vuln_scans = [(t.service_name, t.port) for t in plan]
+        self._show_recon()
+        self._tool_panel.append_output(
+            f"[vuln] queued NSE vuln checks for {len(plan)} service group(s) covering "
+            f"{len(services)} open port(s) — each starts as a slot frees up."
+        )
+        self._drain_vuln_queue()
+
+    def _drain_vuln_queue(self) -> None:
+        while self._pending_vuln_scans and self._tasks.can_start(lane=NMAP_LANE):
+            name, port = self._pending_vuln_scans.pop(0)
+            self._on_vuln_scan(name, port, nse_vuln.MODE_ALL)
 
     def _on_simple_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.

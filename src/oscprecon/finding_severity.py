@@ -12,16 +12,23 @@ from __future__ import annotations
 #   access     anonymous / guest auth or anonymous bind SUCCEEDED (misconfigured access)
 #   exposure   readable/writable data reachable without creds (null session, world-readable, …)
 #   relay-risk weak security posture (SMB signing disabled, open relay, weak algorithm)
+#   vulnerable a CHECK asserted it: an NSE vuln script returned State: VULNERABLE
+#
+# `vulnerable` outranks the rest, and is deliberately narrow. It is never inferred from a version
+# banner or an Exploit-DB hit (those stay `reference` — a pointer, not a verdict); it is set only
+# where a tool actually tested the host and said so. That distinction is the whole point: a missed
+# `smb-vuln-*` verdict is how a box gets lost for an evening.
 
 INFO = "info"
 REFERENCE = "reference"
 ACCESS = "access"
 EXPOSURE = "exposure"
 RELAY_RISK = "relay-risk"
+VULNERABLE = "vulnerable"
 
 # categories that deserve a "look here" highlight in the graph (the red ring). info + reference do
 # NOT — they must never masquerade as a confirmed weakness.
-NOTABLE_CATEGORIES = frozenset({ACCESS, EXPOSURE, RELAY_RISK})
+NOTABLE_CATEGORIES = frozenset({ACCESS, EXPOSURE, RELAY_RISK, VULNERABLE})
 
 # finding kinds that are purely informational, no matter their value (guards against an open port or
 # a version string ever being highlighted)
@@ -29,6 +36,9 @@ _INFO_KINDS = frozenset(
     {"port", "service", "product", "version", "os", "banner", "user", "share", "hostname", "vhost"}
 )
 _REFERENCE_KINDS = frozenset({"edb", "exploit", "searchsploit", "reference", "cve-ref"})
+# a tool-asserted verdict. `vuln-check` (a check that reached NO verdict) is deliberately NOT here —
+# an inconclusive result is information, never a confirmed weakness.
+_VULN_KINDS = frozenset({"vuln", "vulnerable", "nse-vuln"})
 _RELAY_KINDS = frozenset({"open-relay", "algo-weak", "signing"})
 _EXPOSURE_KINDS = frozenset({"world-readable", "writable"})
 _ACCESS_KINDS = frozenset({"auth", "bind", "access"})
@@ -49,6 +59,11 @@ def classify(kind: str, value: str = "", detail: str = "") -> str:
     # (upload / print-job / wide-link write vector — HTB Abducted's foothold) — escalate on write.
     if kind == "share":
         return EXPOSURE if "write" in text else INFO
+
+    # a tool-confirmed vulnerability outranks everything — but only when the CHECK said so, never
+    # from a version guess. A negated/inconclusive verdict falls through to the normal path.
+    if kind in _VULN_KINDS and "not vulnerable" not in text and "no verdict" not in text:
+        return VULNERABLE
 
     # explicit informational / reference kinds win first — never escalate these
     if kind in _INFO_KINDS:
@@ -84,7 +99,21 @@ def is_notable(category: str) -> bool:
     return category in NOTABLE_CATEGORIES
 
 
-ALL_CATEGORIES: tuple[str, ...] = (INFO, REFERENCE, ACCESS, EXPOSURE, RELAY_RISK)
+ALL_CATEGORIES: tuple[str, ...] = (INFO, REFERENCE, ACCESS, EXPOSURE, RELAY_RISK, VULNERABLE)
+
+# strongest first — the order the Findings view sorts by and the report groups by
+CATEGORY_RANK: dict[str, int] = {
+    VULNERABLE: 0,
+    RELAY_RISK: 1,
+    EXPOSURE: 2,
+    ACCESS: 3,
+    REFERENCE: 4,
+    INFO: 5,
+}
+
+
+def rank(category: str) -> int:
+    return CATEGORY_RANK.get(category, len(CATEGORY_RANK))
 
 
 def category_of(finding: dict[str, object]) -> str:

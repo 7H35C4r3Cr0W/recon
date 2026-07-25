@@ -1117,6 +1117,139 @@ def enum_cmd(
     Reporter(prof).write()
 
 
+@app.command("vuln")
+def vuln_cmd(
+    service: str | None = typer.Argument(
+        None, help="Service to check (omit to list what this box's discovered services map to)."
+    ),
+    profile: str = typer.Option(
+        ..., "--profile", "-p", help="Profile name (folder under workspace)."
+    ),
+    port: int = typer.Option(0, "--port", help="Override the discovered port (0 = the default)."),
+    mode: str = typer.Option(
+        "all", "--mode", help="all | targeted | safe — which NSE selector to run."
+    ),
+    scan_all: bool = typer.Option(
+        False, "--all", help="Check EVERY discovered service on this box, one after another."
+    ),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
+) -> None:
+    """Run the NSE vulnerability checks for a discovered service (GUI: the Vuln scripts button).
+
+    A default `-sC -sV` sweep does NOT run vuln-category scripts, so a box whose only way in is an
+    `smb-vuln-*` verdict looks clean. This runs them per service, prints every check's verdict —
+    including the ones that came back CLEAN, so "nothing found" is backed by evidence — and records
+    anything VULNERABLE (or inconclusive) into findings.json.
+
+    **Examples:**
+
+    ```
+    nabu-cli vuln -p box                    # what each discovered service maps to
+    nabu-cli vuln smb -p box                # the SMB checks on the discovered SMB port(s)
+    nabu-cli vuln -p box --all              # every discovered service, in turn
+    nabu-cli vuln http -p box --mode safe   # skip the DoS-category checks
+    ```
+    """
+    from datetime import UTC, datetime
+
+    from oscprecon import findings as findings_mod
+    from oscprecon import nse_vuln
+    from oscprecon.models import Proto
+    from oscprecon.parsing import run_parser
+
+    if mode not in nse_vuln.MODES:
+        typer.echo(
+            f"[error] --mode must be one of: {', '.join(nse_vuln.MODES)}",
+            err=True,
+        )
+        raise typer.Exit(2)
+    prof = _load_profile(profile, workspace)
+    open_services = [s for s in prof.discovered_services if s.state == "open"]
+    if not open_services:
+        typer.echo("[vuln] no discovered services — run `nabu-cli scan` first.")
+        raise typer.Exit(0)
+
+    # one scan per service FAMILY — 139 and 445 are both SMB and share a single nmap pass
+    plan = nse_vuln.plan_scans([(s.port, s.proto, s.service, s.product) for s in open_services])
+
+    if service is None and not scan_all:
+        typer.echo("Discovered services and the vuln checks they map to:\n")
+        for target in plan:
+            port_list = ",".join(str(p) for p in target.ports)
+            typer.echo(f"  {port_list:>12}/{target.proto.value}  → {target.profile.label}")
+            typer.echo(f"         {nse_vuln.mode_label(mode, target.profile)}")
+        typer.echo("\nRun one:  nabu-cli vuln <service> -p " + profile)
+        typer.echo("Run all:  nabu-cli vuln -p " + profile + " --all")
+        raise typer.Exit(0)
+
+    if scan_all:
+        targets = plan
+    else:
+        wanted = (service or "").lower()
+        targets = [
+            t
+            for t in plan
+            if wanted in (t.profile.key, t.service_name.lower()) or (port and port in t.ports)
+        ]
+        if not targets:
+            names = ", ".join(sorted({t.profile.key for t in plan}))
+            typer.echo(
+                f"[error] '{service}' is not an open service on this box. Found: {names}", err=True
+            )
+            raise typer.Exit(2)
+
+    total_hits = 0
+    for target in targets:
+        spec = target.profile
+        ports = list(target.ports)
+        proto = target.proto
+        svc_port = target.port
+        command = nse_vuln.build_command(
+            prof.target.ip, ports, mode=mode, profile=spec, proto=proto
+        )
+        out = prof.directory / "nmap" / nse_vuln.output_name(spec, ports, mode)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        typer.echo(f"\n[vuln] {target.label}")
+        if spec.dos_note and mode != nse_vuln.MODE_SAFE:
+            typer.echo(f"[warning] {spec.dos_note}")
+        typer.echo(f"$ {command}")
+        result = shell.run(command, out, cwd=prof.directory, on_line=typer.echo)
+        if result.missing_tool is not None:
+            typer.echo(f"⚠ {result.missing_tool} is not installed — nothing was checked.")
+            continue
+        if result.blocked is not None:
+            typer.echo(f"⚠ blocked by the recon-only policy: {result.blocked}")
+            continue
+        try:
+            text = out.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            text = ""
+
+        # bind this iteration's values explicitly — a bare closure over the loop variables would
+        # parse whatever the LAST iteration left behind.
+        def _parse(
+            t: str = text, sp: int = svc_port, pr: Proto = proto
+        ) -> list[nse_vuln.VulnResult]:
+            return nse_vuln.parse_vuln_output(t, default_port=sp, proto=pr)
+
+        results = run_parser(_parse, label=f"nse-vuln {spec.key}", raw=text)
+        for line in nse_vuln.summary_lines(results):
+            typer.echo(f"  {line}")
+        found = nse_vuln.to_findings(results, spec.key)
+        total_hits += sum(1 for r in results if r.vulnerable)
+        if found:
+            now = datetime.now(UTC).isoformat()
+            findings_mod.add_findings(
+                prof.directory,
+                [
+                    findings_mod.from_parsed(f.service, f.fields, f.detail, now, port=f.port or 0)
+                    for f in found
+                ],
+            )
+    Reporter(prof).write()
+    typer.echo(f"\n[vuln] {total_hits} confirmed vulnerability finding(s) recorded.")
+
+
 @app.command("list")
 def list_cmd(
     ip: str | None = typer.Option(None, "--ip", help="Only profiles whose target IP matches."),

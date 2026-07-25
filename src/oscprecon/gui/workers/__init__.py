@@ -22,6 +22,7 @@ from oscprecon.gui.workers.service_recon import (
     SshReconWorker,
 )
 from oscprecon.gui.workers.simple import SimpleReconResult, SimpleReconWorker
+from oscprecon.gui.workers.vuln import VulnScanResult, VulnScanWorker
 
 __all__ = [
     "CancellableThread",
@@ -39,6 +40,8 @@ __all__ = [
     "SearchsploitWorker",
     "SimpleReconResult",
     "SimpleReconWorker",
+    "VulnScanResult",
+    "VulnScanWorker",
     "SmbReconResult",
     "SmbReconWorker",
     "SshReconResult",

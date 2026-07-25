@@ -153,6 +153,93 @@ def _is_allowed(name: str) -> bool:
     return "brute" not in name or name in _ALLOWED_RECON_BRUTE
 
 
+# the credential-attack scripts the recon policy refuses. Read from the installed nmap when present
+# so the check reflects reality; the curated fallback keeps a dev/CI box (no nmap) deterministic.
+_FALLBACK_BRUTE: tuple[str, ...] = (
+    "afp-brute",
+    "ajp-brute",
+    "backorifice-brute",
+    "cassandra-brute",
+    "cics-user-brute",
+    "citrix-brute-xml",
+    "cvs-brute",
+    "cvs-brute-repository",
+    "deluge-rpc-brute",
+    "dpap-brute",
+    "drda-brute",
+    "ftp-brute",
+    "http-brute",
+    "http-form-brute",
+    "http-joomla-brute",
+    "http-proxy-brute",
+    "http-wordpress-brute",
+    "iax2-brute",
+    "imap-brute",
+    "impress-remote-brute",
+    "informix-brute",
+    "ipmi-brute",
+    "irc-brute",
+    "irc-sasl-brute",
+    "iscsi-brute",
+    "ldap-brute",
+    "membase-brute",
+    "metasploit-msgrpc-brute",
+    "metasploit-xmlrpc-brute",
+    "mikrotik-routeros-brute",
+    "mmouse-brute",
+    "mongodb-brute",
+    "ms-sql-brute",
+    "mysql-brute",
+    "nessus-brute",
+    "netbus-brute",
+    "nexpose-brute",
+    "nje-node-brute",
+    "nje-pass-brute",
+    "nping-brute",
+    "omp2-brute",
+    "openvas-otp-brute",
+    "oracle-brute",
+    "oracle-brute-stealth",
+    "pcanywhere-brute",
+    "pgsql-brute",
+    "pop3-brute",
+    "redis-brute",
+    "rexec-brute",
+    "rlogin-brute",
+    "rpcap-brute",
+    "rsync-brute",
+    "rtsp-url-brute",
+    "sip-brute",
+    "smb-brute",
+    "smtp-brute",
+    "snmp-brute",
+    "socks-brute",
+    "ssh-brute",
+    "svn-brute",
+    "telnet-brute",
+    "vmauthd-brute",
+    "vnc-brute",
+    "vtam-brute",
+    "xmpp-brute",
+)
+
+
+def brute_script_names(scripts_dir: Path | None = None) -> frozenset[str]:
+    """Every installed NSE script the recon policy treats as a credential attack.
+
+    Needed because a GLOB selector is judged by expansion, not by its own text: `--script 'smb-*'`
+    contains no "brute" substring but matches smb-brute. See shell.policy_violation.
+    """
+    directory = scripts_dir if scripts_dir is not None else _SCRIPTS_DIR
+    try:
+        names = {p.stem for p in directory.glob("*.nse")}
+    except OSError:
+        names = set()
+    if not names:
+        names = set(_FALLBACK_BRUTE)
+    return frozenset(n for n in names if not _is_allowed(n))
+
+
 def list_scripts(scripts_dir: Path | None = None) -> tuple[str, ...]:
     """Sorted NSE script names + category selectors, brute scripts filtered (§2).
 

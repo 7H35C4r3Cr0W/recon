@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from fnmatch import fnmatch
 from pathlib import Path
 
 logger = logging.getLogger("oscprecon.shell")
@@ -565,6 +566,32 @@ def _script_values(argv: list[str]) -> list[str]:
     return values
 
 
+# NSE selectors are richer than a comma list: nmap accepts boolean expressions over categories,
+# names, globs and directories — `--script "vuln and not *vulners*"`. Split on the grammar's
+# separators so every identifier inside an expression is judged, not just the whole string.
+_NSE_SEPARATORS = re.compile(r"[,\s()]+")
+_NSE_KEYWORDS = frozenset({"and", "or", "not"})
+
+
+def _script_selector_names(value: str) -> list[str]:
+    return [
+        token
+        for token in (t.strip().lower() for t in _NSE_SEPARATORS.split(value))
+        if token and token not in _NSE_KEYWORDS
+    ]
+
+
+def _brute_glob_match(pattern: str) -> str | None:
+    # the first credential-brute script this glob would run, or None. Imported lazily: nmap_nse
+    # reads the host's script directory, and shell.py is imported by everything.
+    from oscprecon import nmap_nse
+
+    for name in sorted(nmap_nse.brute_script_names()):
+        if fnmatch(name, pattern):
+            return name
+    return None
+
+
 def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = False) -> str | None:
     # `spray=True` ONLY in opt-in Spray mode (§2a); `exploit=True` ONLY for a command the user
     # SELECTED and CONFIRMED in the Exploitation tab (§2b).
@@ -598,14 +625,25 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
     # slip past a `tool == "netexec"` check, letting list-driven spray / brute run in recon mode.
     if base == "nmap" and not spray:
         for value in _script_values(argv):
-            for script in value.split(","):  # --script takes a comma list; judge each name
-                name = script.strip().lower()
+            # a selector may be a comma list, and each member may itself be an NSE boolean
+            # expression ("vuln and not *vulners*") — judge every identifier in it.
+            for name in _script_selector_names(value):
                 # `all` / `*` run EVERY script incl. the *-brute credential scripts, but carry no
                 # literal "brute" substring for the per-name check — block the glob-everything form
                 if name in ("all", "*"):
                     return "nmap --script all/* runs credential brute (off by default — Spray mode)"
                 if "brute" in name and name not in _NMAP_RECON_BRUTE:
                     return f"nmap --script {name} is credential brute (off by default — Spray mode)"
+                # a GLOB is judged by what it EXPANDS to, not by its own text: `--script 'smb-*'`
+                # contains no "brute" substring yet matches smb-brute. Expand against the installed
+                # script list and refuse if any credential-attack script falls inside it.
+                if any(ch in name for ch in "*?["):
+                    hit = _brute_glob_match(name)
+                    if hit is not None:
+                        return (
+                            f"nmap --script {name} matches {hit}, a credential brute script "
+                            "(off by default — enable Spray mode)"
+                        )
     if base == "searchsploit":
         for token in argv[1:]:
             if token in _SEARCHSPLOIT_FORBIDDEN:
