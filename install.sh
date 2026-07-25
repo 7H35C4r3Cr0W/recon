@@ -43,8 +43,9 @@ ${B}USAGE${R}
 
 ${B}WHAT IT DOES${R}  ${DIM}(about 3–8 min on a fresh host, mostly downloads)${R}
   1. apt update
-  2. install ONLY the recon tools you are missing (nmap, feroxbuster, netexec, …),
-     in one transaction, after a dry-run that aborts if apt would remove anything
+  2. install ONLY the recon tools you are missing (nmap, feroxbuster, netexec, …)
+     plus the Qt/X11 libraries the desktop GUI needs, in one transaction per group,
+     after a dry-run that aborts if apt would remove anything
   3. install uv (the Python package manager) if it is missing
   4. set up Nabu in an isolated virtualenv (uv sync)
   5. put 'nabu' and 'nabu-cli' on your PATH (~/.local/bin)
@@ -67,7 +68,8 @@ ${B}WHY IT WON'T BREAK YOUR KALI${R}
     downgrade anything (it tells you to run 'sudo apt full-upgrade' instead).
   • Package names are resolved to what exists on your Kali version, so a renamed
     package is skipped — never a hard failure.
-  • If you Ctrl-C mid-apt, it heals dpkg so your system is never left broken.
+  • If you Ctrl-C mid-apt, just re-run ./install.sh — it repairs dpkg at startup,
+    before doing anything else, so your system is never left broken.
   • The Python app lives in its own virtualenv; that step can't touch the system.
 
 ${B}GOOD TO KNOW${R}
@@ -235,6 +237,20 @@ install_missing() {
 command -v apt-get >/dev/null 2>&1 ||
     die "this bootstrap targets Debian/Kali (needs apt-get). On another OS, install the tools from CLAUDE.md §4 by hand, then run 'uv sync'."
 
+if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+    # why: run as YOURSELF. Under `sudo ./install.sh`, $HOME is /root, so uv lands in
+    # /root/.local/bin, the venv and its symlinks are root-owned, and the invoking user ends up with
+    # a Nabu they cannot run or update. The script calls sudo itself, only for the apt step.
+    die "don't run this with sudo — run it as your normal user (./install.sh).
+       It calls sudo itself, and only for the apt step. Running the whole script as root
+       creates a root-owned virtualenv in $(pwd)/.venv that '$SUDO_USER' cannot use."
+fi
+
+# capture the user's REAL PATH before we touch it: the uv step below prepends ~/.local/bin to this
+# process's PATH, and testing the mutated value would always say "already on PATH" and swallow the
+# instructions a fresh host actually needs. [review]
+ORIG_PATH="$PATH"
+
 if [ "$(id -u)" -eq 0 ]; then
     SUDO=""
 elif command -v sudo >/dev/null 2>&1; then
@@ -263,6 +279,22 @@ CORE_SPECS=(
     # is still only installed when MISSING.
     finger subversion "default-mysql-client|mariadb-client" postgresql-client
     "netcat-traditional|netcat-openbsd" ssh-audit nfs-common rsync
+    # rpcinfo (nfs/rpc module) and ssh (the ssh module + pivot helpers) — the container installs
+    # both; the host install did not, so a host user silently lost those two steps. [review]
+    rpcbind openssh-client
+)
+
+# The system libraries PySide6's Qt needs to open a window. PySide6 ships Qt itself, but its xcb
+# platform plugin and the bundled Chromium (QtWebEngine — the HackTricks pane and the graph)
+# dlopen these at runtime. Without them the GUI dies with "could not load the Qt platform plugin
+# xcb" while the CLI works fine — the same list the Dockerfile installs. Only-missing, like
+# everything else here. [review]
+GUI_SPECS=(
+    libgl1 libegl1 "libglib2.0-0t64|libglib2.0-0" libdbus-1-3 fontconfig fonts-dejavu-core
+    libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1
+    libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 libxcb-xkb1
+    libnss3 libnspr4 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxi6 libxfixes3 libxkbfile1
+    "libasound2t64|libasound2" "libcups2t64|libcups2" libpango-1.0-0 libwayland-cursor0
 )
 SPRAY_SPECS=(hydra medusa)
 # Exploitation-tab (§2b) tools — opt-in like spray, since a recon-only user needs none of them.
@@ -279,7 +311,8 @@ printf '%s   -"-"-%s\n' "$DIM" "$R"
 
 printf '\n%sHere is the plan (%s steps, ~3–8 min — mostly downloads):%s\n' "$B" "$TOTAL_STEPS" "$R"
 printf '   1. update apt package lists\n'
-printf '   2. install any MISSING recon tools (already-present ones are left untouched)\n'
+printf '   2. install any MISSING recon tools + the Qt libraries the GUI needs\n'
+printf '      (already-present packages are left untouched)\n'
 [ "$WITH_SPRAY" -eq 1 ] && printf '   +  install spray tools (hydra, medusa)\n'
 [ "$WITH_ATTACK" -eq 1 ] && printf '   +  install Exploitation-tab tools (evil-winrm, certipy-ad, responder, john, hashcat)\n'
 [ "$NEED_UV" -eq 1 ] && printf '   +  install uv (Python package manager)\n'
@@ -317,6 +350,9 @@ fi
 
 step "install any missing recon tools"
 install_missing "recon tools" "${CORE_SPECS[@]}"
+# the Qt/X11 runtime the GUI needs. Separate group so a headless/CLI-only user can see exactly what
+# it added, and so a missing lib name on an older release skips just that one.
+install_missing "GUI runtime libraries" "${GUI_SPECS[@]}"
 
 if [ "$WITH_SPRAY" -eq 1 ]; then
     step "install opt-in Spray-mode tools (hydra/medusa)"
@@ -342,7 +378,9 @@ command -v uv >/dev/null 2>&1 || die "uv is still not on PATH — add ~/.local/b
 
 step "set up Nabu (create the virtualenv, install dependencies)"
 say "resolving Python packages into an isolated venv — cannot affect system packages."
-(cd "$REPO" && uv sync)
+# --no-dev: an end user gets the app, not pytest/mypy/ruff. `uv sync` (with dev) is what the
+# Development section of the README documents for contributors.
+(cd "$REPO" && uv sync --no-dev)
 
 # why: uv sync installs the console scripts into $REPO/.venv/bin, which is NOT on PATH — so a bare
 # `nabu` / `nabu-cli` would say "command not found". Symlink them into ~/.local/bin (on Kali's PATH).
@@ -360,7 +398,7 @@ for name in nabu nabu-cli; do
         printf '  %s•%s %-9s -> %s\n' "$GRN" "$R" "$name" "$BIN_DIR/$name"
     fi
 done
-case ":$PATH:" in
+case ":$ORIG_PATH:" in
     *":$BIN_DIR:"*) ON_PATH=1 ;;
     *) ON_PATH=0 ;;
 esac

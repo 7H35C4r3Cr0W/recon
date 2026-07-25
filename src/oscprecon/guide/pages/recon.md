@@ -46,12 +46,65 @@ Each service has a module that runs the right enumeration, gated by a strict saf
 - **Tier 3 — Gated.** Iterating a list of credentials is **credential spraying** — off by default,
   behind opt-in Spray mode. See **Exploitation & spraying**.
 
+## Vuln scripts (NSE) — per service, one click
+
+A default `-sC -sV` sweep does **not** run nmap's vuln-category scripts. That is how a box gets lost
+for an evening: everything looks clean because the check that would have found the way in was never
+asked to run.
+
+So every service panel carries a **⚠ Vuln scripts (NSE)** button, and **Scan → Vuln scripts on every
+discovered service** queues them all (one run per service *family* — 139 and 445 are a single SMB
+pass). Headless: `nabu-cli vuln <service> -p <profile>`, or `--all`.
+
+Three modes:
+
+- **all vuln checks** (default) — `--script vuln`, scoped with `-p` to the ports this box has open.
+  nmap's own portrules decide what applies, so this is complete for *any* service without a
+  hand-maintained script list.
+- **targeted family** — the form you'd type yourself (`smb-vuln-*`, `http-vuln-*`, `ftp-vuln-*`).
+  Faster and narrower.
+- **safe checks only** — drops the DoS-category scripts. Several `smb-vuln-*` checks (ms06-025,
+  ms07-029, ms08-067, cve2009-3103) *crash* a vulnerable service by design; use this on anything
+  fragile, or on a box you can't revert.
+
+Two things make the result trustworthy:
+
+- **Every check states its verdict, including the negative ones** (`vulns.showall`). Without this,
+  nmap prints nothing for a check that came back clean — so a silent run is indistinguishable from
+  a check that never ran. You can see that MS08-067 *was* tested and came back NOT VULNERABLE.
+- **A check that reached no verdict is reported as inconclusive**, never as "not vulnerable". A
+  timeout or `NT_STATUS_ACCESS_DENIED` means *unknown* — it is recorded and shown as
+  `⚠ could not check`, so re-running it against that one port stays on your list.
+
+A `VULNERABLE` verdict is written into `findings.json` with its CVE/MS ids, at the **vulnerable**
+severity — the strongest category, and the only one that is never inferred from a banner. It flows
+into the Findings view, the graph, `report.md`, and the Exploitation tab's ★ suggestions.
+
+## Several scans at once
+
+Scans run in parallel. A full `-p-` sweep, a `--script vuln` scan on 445 and two feroxbuster runs
+with different wordlists can all be in flight together; the task bar lists each with its own Stop.
+
+Work is admitted in **lanes** so an exam box isn't hammered:
+
+| Lane | Cap | What runs there |
+|---|---|---|
+| battery | 1 | The full **Run Recon** staged sweep — it owns the profile's staged output files |
+| nmap | 3 | Ad-hoc scans: presets, *Scan a host / range*, per-service vuln scripts |
+| tool | pool | Service recon, content discovery, vhost — everything else |
+
+Output filenames follow the command and its settings, so two feroxbuster runs on the same port with
+different extensions no longer resolve to the same file. A running scan also holds a **claim** on its
+output file: launching a second run that would write the same file is refused by name rather than
+letting the two interleave. While more than one scan is streaming, each output line is prefixed with
+the run it came from.
+
 ## Conservative findings, visible failures
 
-An open port, a version string, or an Exploit-DB match is **never** called a vulnerability — only
-real weak postures (anonymous access, null session, SMB signing off) are flagged. And a
-missing/blocked tool is called out with **`⚠ step did not run`**, so "no findings" is never confused
-with "the service isn't there".
+An open port, a version string, or an Exploit-DB match is **never** called a vulnerability — only a
+real weak posture (anonymous access, null session, SMB signing off) or a **tool-confirmed
+`VULNERABLE` verdict** is flagged. And a missing/blocked tool is called out with **`⚠ step did not
+run`**, so "no findings" is never confused with "the service isn't there".
 
 ## Your own findings
 

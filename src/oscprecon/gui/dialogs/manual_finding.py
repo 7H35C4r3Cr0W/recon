@@ -31,6 +31,7 @@ _CATEGORY_HELP: tuple[tuple[str, str], ...] = (
     (finding_severity.ACCESS, "access — anonymous / guest / default login worked"),
     (finding_severity.EXPOSURE, "exposure — data reachable without credentials"),
     (finding_severity.RELAY_RISK, "relay-risk — weak posture (signing off, open relay)"),
+    (finding_severity.VULNERABLE, "vulnerable — a check confirmed it (you saw it work)"),
 )
 
 # common kinds, offered as suggestions — the field stays free text.

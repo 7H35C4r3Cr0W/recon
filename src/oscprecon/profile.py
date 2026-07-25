@@ -333,10 +333,13 @@ class Profile:
             self.touch()
 
     def next_command_id(self) -> str:
-        # unique across re-scans AND across concurrent workers — read the length and mint under the
-        # same lock the append takes, so two workers can't both mint cmd-014.
+        # the id the NEXT append would get. Only meaningful under _STATE_LOCK — callers that need a
+        # guaranteed-unique id must let add_command() assign it (it mints and appends atomically).
         with _STATE_LOCK:
-            return f"cmd-{len(self.command_history) + 1:03d}"
+            return self._peek_command_id()
+
+    def _peek_command_id(self) -> str:
+        return f"cmd-{len(self.command_history) + 1:03d}"
 
     def add_hosts(self, hosts: list[DiscoveredHost]) -> int:
         # Upsert pivoted hosts by ip: a re-scan of the same host updates its services / os / pivot
@@ -498,10 +501,16 @@ class Profile:
         self.target = replace(self.target, hostname=cleaned)  # Target is frozen — replace + resave
         self.save()
 
-    def add_command(self, record: dict[str, Any]) -> None:
+    def add_command(self, record: dict[str, Any]) -> str:
+        # mint AND append under ONE lock: with scans running in parallel, minting an id in the
+        # caller and appending afterwards leaves a window where two workers get the same cmd-014.
+        # A record that already carries an id keeps it (import / test fixtures).
         with _STATE_LOCK:
+            command_id = str(record.get("id") or "") or self._peek_command_id()
+            record["id"] = command_id
             self.command_history.append(record)
             self.touch()
+            return command_id
 
     def touch(self) -> None:
         self.status["last_active"] = _now_iso()

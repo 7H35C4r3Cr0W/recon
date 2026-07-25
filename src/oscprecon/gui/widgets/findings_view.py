@@ -39,6 +39,7 @@ _CATEGORY_FIELD = {
     finding_severity.ACCESS: "warning",
     finding_severity.EXPOSURE: "warning",
     finding_severity.RELAY_RISK: "error",
+    finding_severity.VULNERABLE: "error",  # a tool-confirmed verdict — the loudest thing here
 }
 _ALL_CATEGORIES = "All categories"
 _NOTABLE_ONLY = "Notable only"
@@ -71,6 +72,7 @@ class FindingsView(QWidget):
                 _ALL_CATEGORIES,
                 _NOTABLE_ONLY,
                 _MINE_ONLY,
+                finding_severity.VULNERABLE,
                 finding_severity.RELAY_RISK,
                 finding_severity.EXPOSURE,
                 finding_severity.ACCESS,

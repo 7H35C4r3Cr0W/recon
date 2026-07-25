@@ -366,3 +366,47 @@ def test_db_primitive_gate_survives_long_flags() -> None:
     ]
     for command in allowed:
         assert policy_violation(shlex.split(command)) is None, command
+
+
+# --- NSE selector gate: a script is judged by what it RUNS, not how it is spelled ---------------
+
+
+def test_single_dash_script_is_gated_too() -> None:
+    # nmap accepts `-script` as well as `--script`; matching only the long form let a credential
+    # brute through the §2 gate entirely.
+    assert (
+        shell.policy_violation(shlex.split("nmap -p 22 -script ssh-brute 10.10.10.5")) is not None
+    )
+    assert (
+        shell.policy_violation(shlex.split("nmap -p 22 -script=ssh-brute 10.10.10.5")) is not None
+    )
+
+
+def test_a_category_that_carries_brute_scripts_is_refused() -> None:
+    # `intrusive` selects 73 of the 74 brute scripts without naming one of them
+    for category in ("intrusive", "brute", "all", "external"):
+        violation = shell.policy_violation(
+            shlex.split(f"nmap -p 445 --script {category} 10.10.10.5")
+        )
+        assert violation is not None, category
+
+
+def test_a_directory_selector_is_refused() -> None:
+    assert (
+        shell.policy_violation(
+            shlex.split("nmap -p 445 --script /usr/share/nmap/scripts/ 10.10.10.5")
+        )
+        is not None
+    )
+
+
+def test_the_vuln_selectors_the_tool_ships_still_pass() -> None:
+    for selector in (
+        "vuln and not *vulners*",
+        "(vuln and safe) and not *vulners*",
+        "(smb-vuln-* or smb2-vuln-*) and not *vulners*",
+        "default,safe",
+        "http-vuln-*",
+    ):
+        argv = ["nmap", "-p", "445", "--script", selector, "10.10.10.5"]
+        assert shell.policy_violation(argv) is None, selector

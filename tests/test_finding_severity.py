@@ -68,3 +68,31 @@ def test_guest_writable_share_is_exposure_but_readable_is_info() -> None:
     assert writable == sev.EXPOSURE and sev.is_notable(writable)
     assert sev.classify("share", "IT", "READ") == sev.INFO
     assert sev.classify("share", "projects", "") == sev.INFO
+
+
+# --- tool-confirmed vulnerabilities (NSE vuln scripts) ---------------------------------------
+
+
+def test_a_confirmed_nse_verdict_is_the_vulnerable_category() -> None:
+    assert sev.classify("vuln", "smb-vuln-ms17-010", "State: VULNERABLE") == sev.VULNERABLE
+    assert sev.is_notable(sev.VULNERABLE)
+
+
+def test_a_negative_verdict_is_never_a_vulnerability() -> None:
+    assert sev.classify("vuln", "smb-vuln-ms08-067", "State: NOT VULNERABLE") != sev.VULNERABLE
+
+
+def test_an_inconclusive_check_is_information_not_a_weakness() -> None:
+    # "we could not establish this" must never be framed as a confirmed vulnerability
+    assert sev.classify("vuln-check", "smb-vuln-ms10-061", "no verdict reached") == sev.INFO
+
+
+def test_a_version_banner_is_still_never_called_a_vulnerability() -> None:
+    # the conservative rule that predates this category: only a CHECK can assert one
+    assert sev.classify("product", "vsftpd 2.3.4") == sev.INFO
+    assert sev.classify("edb", "EDB-17491") == sev.REFERENCE
+
+
+def test_vulnerable_outranks_every_other_category() -> None:
+    ranks = [sev.rank(c) for c in sev.ALL_CATEGORIES]
+    assert sev.rank(sev.VULNERABLE) == min(ranks)

@@ -94,10 +94,22 @@ Rules (non-negotiable):
 - **Loot is the operator's own data — shown in full, not redacted.** Run streams into the output pane (or paste tool output), **Parse** extracts hashes/creds, **Add to vault** writes `creds.json`. The loot table shows the dumped secrets **in full** (the owner wants to see/use them — do NOT redact them). **As of 2026-07-22 this extends to the RECON side too: nothing is redacted anywhere** (command logs, audit, reports, graph, spray, SNMP findings, vault) — see § 6. The old "recon commands keep their existing redaction" note is superseded.
 - **`runs_on` distinguishes attacker vs victim.** `"attacker"` = runs FROM Kali against the target → **Run** (a single Popen-safe argv). `"victim"` = a command you paste into an already-obtained shell ON the target (SUID checks, `sudo -l`, GTFOBins, winPEAS, reverse shells, mimikatz) → **copy-only**, never executed here. An action is only `attacker` if its filled command is a single Popen-safe argv beginning with a real program (no shell pipes/redirects/subshells, no payload fragment, not a victim-only tool).
 - **Every action is LABELLED with the port(s) it targets** (owner request, 2026-07-24). `exploit/base.py::action_ports(action, spec)` resolves them most-specific-first: the action's own `ports=` declaration → a literal port written into the command (`nmap -p139,445`, a URL `:8080`) → the tool's default port (a curated `_TOOL_PORTS` map: evil-winrm→5985/5986, impacket-secretsdump→445, timeroast→NTP/123; `netexec <proto>` reads the protocol token) → the service's declared ports. Local/offline tools (`_LOCAL_TOOLS`: searchsploit, gpp-decrypt, hashcat, *2john…) resolve to *no target port*, and a victim-side command with no derivable port says so. Copy-only ≠ portless — evil-winrm is `runs_on="victim"` yet plainly speaks 5985, so ports are derived before the victim check. The GUI shows them inline in the action tree (`… [445]`), and under the command against what the scan found (`445 ✓ open · 139 · not found — default for …`); the CLI prints the same with `✓`. A port-parameterised action (`{port}`/`{url}`) aimed at a port outside its usual set raises a **non-blocking** warning — services legitimately move (http on 65000) and §2b keeps the human confirm as the only gate. The Port picker lists DISCOVERED ports annotated with the service nmap named there (`8080 — http-proxy`); its value is still the bare number.
+- **RANKED, and the relevant actions STARRED (★) — but never hidden.** ~3,200 actions is unreadable
+  as a flat list, so `exploit/relevance.py` scores each action against evidence the project already
+  holds: a port it targets that this box has open, a CVE/MS id a **vuln check confirmed**, a notable
+  finding (`null session`, `signing disabled`), a vault credential that fills it, the detected OS
+  family; and it demotes actions gated on something the operator does not have yet (a hash, a shell,
+  a planted webshell). Suggested actions are marked ★, sorted first within their category, and the
+  tooltip states the reasons. A **Suggested only** toggle HIDES (never removes) the rest — §2b's
+  human-is-the-guardrail rule means a decision aid must never take a technique away. Presence is NOT
+  recomputed: `relevance.score_services()` GRADES the existing `services_present` +
+  `web_app_keys_from_fingerprints` result, so the ● dot, the "NOT found" warning and the ★ can never
+  contradict each other (a test asserts the sets are equal). `Target.os_guess` is never assigned
+  anywhere, so OS is derived from service names/products instead. Shared by the GUI and the CLI.
 - **Tied to discovered services/ports.** Each `ServiceExploits` declares the `ports` that signal its presence; the picker surfaces the surfaces open on *this* box first (`●`-marked, mirrors Recon's service focus) and binds `{port}`/`{url}` to the actual discovered port. **Presence must be a *strong* signal:** a shared web port (80/443/8080/…) alone marks only the generic `web`/`webdav` present — a *specific* web app (Drupal, WordPress, …) is `●` only via a service-name/fingerprint match or a service-specific (non-web) port, never merely because port 80 is open (else a bare web server marks ~70 apps present). Portless post-ex catalogs (`linux`/`windows` privesc, `shells`) are never "present" and never warn. Selecting an action for a *network* service the scan did **not** find shows a loud, non-blocking warning ("⚠ … was NOT found on this target by the scan") — it never disables Run (the human confirm stays the guardrail per this section), it just tells the operator they're acting on a service discovery didn't see.
 - **Engine lives in `src/oscprecon/exploit/`** (`base.py` registry + `fill_template` + `runs_on`/`ports`, one module per service, `parsers.py`). Every action cites a `source=`. GUI is `gui/widgets/exploit_panel.py`; execution is `main_window._on_exploit_run` (confirm → `CommandWorker(exploit=True)` → stream → auto-parse). Headless: `nabu-cli exploit [service] [-p profile]` (display view, RUN vs COPY).
 - **DECISION-AID, NOT a CVE database (owner rule, 2026-07-21).** The catalog exists to make recon/enum/attack *decisions* — per service it keeps fingerprint/version detection, `searchsploit` lookup, enumeration, default/weak-cred checks, config/loot reads, and **generic offensive technique CLASSES** (web SQLi/SSRF/LFI/SSTI/upload/deserialization *primitives*, the full AD attack catalog, potato family, GTFOBins, file transfers, privesc enumeration, Log4Shell/Text4Shell/Shellshock, DB→RCE via legit features). It does **not** hoard box-specific, novel, single-named-CVE **weaponized PoC delivery** (build-the-gadget / upload-the-webshell / run-the-CVE-exploit / CVE-pinned reverse-shell) — crafting the per-box exploit is the pentester's job. On 2026-07-21 a vault-gap audit removed **230 such named-CVE PoC-delivery actions across 81 service modules** (e.g. Ghostcat, Drupalgeddon2, Struts S2-04x/05x OGNL/XStream RCE, gitlab-22205/2825, grafana-43798 traversal, xwiki/solr/confluence/sharepoint/nexus RCE chains) while keeping every service's recon core (no module emptied). When a box hits a specific CVE, the tool fingerprints it + points at the CVE via `searchsploit`/the reference pane; the operator writes the exploit.
-- **Built out (2026-07-16, deep-mined 2026-07-19, CVE-PoC-trimmed 2026-07-21):** **183 services / ~3,187 actions** (verified from `base._REGISTRY`; top modules: ad 143 · web 124 · linux 73 · windows 40 · shells 39) mined from the maintainer's vault + standard tooling — `ad`, `web`, `smb`, `mssql`, `mysql`, `ftp`, `ssh`, `snmp`, `redis`, `rdp`, `nfs`, `linux`/`windows` (privesc, victim-side), `shells`, and the full long tail of app servers, CMSes, mail/DB/monitoring daemons, and appliances (recon/fingerprint/enum/default-cred surface for each; the box-specific CVE *delivery* actions were removed per the decision-aid rule above). The **`ad` service is exhaustively mined from the HTB AD Path vault** — 133 actions across 14 categories: enumeration (PowerView · built-in/LOTL · BloodHound · LDAP filters), Kerberos (impacket **+** Rubeus, overpass/pass-the-key, targeted-roast, S4U alt-service, cross-forest), delegation & ACL abuse, ADCS (ESC1/3/4/8/9/10/11, shadow creds, PassTheCert, golden cert), coercion (PetitPotam/PrinterBug/Coercer/DFSCoerce), credential dumping (secretsdump/DCSync/NTDS/gMSA/DPAPI/Golden-gMSA), lateral movement (psexec/wmiexec/smbexec/atexec/evil-winrm/DCOM/winrs/PSSession), NTLM relay, AD CVEs (noPac/PrintNightmare/Zerologon), SCCM, and DC-level persistence (Skeleton Key/DCShadow/DSRM). The **`web` service is deep-mined from the CPTS/CBBH/OSWE web curriculum (86 actions)** — manual SQLi, SSRF/IDOR, File Inclusion (LFI filter bypasses · RFI · php/data/expect wrappers), command-injection filter bypasses (${IFS}/quote-insertion/base64-smuggle), XXE (php://filter/SSRF/blind-OOB/expect), deserialization (ysoserial · PHPGGC · Phar polyglot · Python pickle · ysoserial.net), GraphQL/API (introspection · alias-batching · mass-assignment · verb-tampering), SSTI across engines (Jinja2 · Twig · Freemarker · Smarty · ERB/Mako), file-upload filter bypasses (ext tricks · exiftool/GIF polyglots · Content-Type spoof · .htaccess), and an XSS set. `linux` carries a **Loot cracking** category (unshadow/keepass2john/ssh2john/zip2john/office2john + hashcat modes) and `shells` a full **File Transfers** set (http.server/smbserver/bitsadmin/WebClient/base64-fileless/dev-tcp/exfil) — both from the CPTS Password-Attacks / File-Transfers modules. The full **potato family** (JuicyPotato/RoguePotato/JuicyPotatoNG/SweetPotato/GodPotato/PrintSpoofer) carries step-by-step directions. A **copy-only GTFOBins lookup** (`references/gtfobins.yaml`, ~62 binaries) is reachable from the Exploitation tab + `nabu-cli gtfobins`. Later batches were driven by a vault **gap-analysis** workflow (agents survey the vault for uncovered services, then mine templates); the vault is substantially exhausted at 183. Add a new service by dropping `exploit/<svc>.py` that `register()`s — `base._load_builtin()` imports it (keys must be valid Python module names — no hyphens). Keep the port/service tie-back + `source=` provenance. `runs_on` (attacker Run vs victim copy-only) is decided by Popen-safety — the `reclassify.py` pipeline demotes interactive sessions (bare ssh/DB logins, `nc` connects), shell chains/pipes, listeners, and unfillable-brace payloads to victim.
+- **Built out (2026-07-16, deep-mined 2026-07-19, CVE-PoC-trimmed 2026-07-21):** **183 services / 3,190 actions** (verified from `base._REGISTRY`; top modules: ad 143 · web 124 · linux 73 · windows 40 · shells 39) mined from the maintainer's vault + standard tooling — `ad`, `web`, `smb`, `mssql`, `mysql`, `ftp`, `ssh`, `snmp`, `redis`, `rdp`, `nfs`, `linux`/`windows` (privesc, victim-side), `shells`, and the full long tail of app servers, CMSes, mail/DB/monitoring daemons, and appliances (recon/fingerprint/enum/default-cred surface for each; the box-specific CVE *delivery* actions were removed per the decision-aid rule above). The **`ad` service is exhaustively mined from the HTB AD Path vault** — 143 actions across 14 categories: enumeration (PowerView · built-in/LOTL · BloodHound · LDAP filters), Kerberos (impacket **+** Rubeus, overpass/pass-the-key, targeted-roast, S4U alt-service, cross-forest), delegation & ACL abuse, ADCS (ESC1/3/4/8/9/10/11, shadow creds, PassTheCert, golden cert), coercion (PetitPotam/PrinterBug/Coercer/DFSCoerce), credential dumping (secretsdump/DCSync/NTDS/gMSA/DPAPI/Golden-gMSA), lateral movement (psexec/wmiexec/smbexec/atexec/evil-winrm/DCOM/winrs/PSSession), NTLM relay, AD CVEs (noPac/PrintNightmare/Zerologon), SCCM, and DC-level persistence (Skeleton Key/DCShadow/DSRM). The **`web` service is deep-mined from the CPTS/CBBH/OSWE web curriculum (86 actions)** — manual SQLi, SSRF/IDOR, File Inclusion (LFI filter bypasses · RFI · php/data/expect wrappers), command-injection filter bypasses (${IFS}/quote-insertion/base64-smuggle), XXE (php://filter/SSRF/blind-OOB/expect), deserialization (ysoserial · PHPGGC · Phar polyglot · Python pickle · ysoserial.net), GraphQL/API (introspection · alias-batching · mass-assignment · verb-tampering), SSTI across engines (Jinja2 · Twig · Freemarker · Smarty · ERB/Mako), file-upload filter bypasses (ext tricks · exiftool/GIF polyglots · Content-Type spoof · .htaccess), and an XSS set. `linux` carries a **Loot cracking** category (unshadow/keepass2john/ssh2john/zip2john/office2john + hashcat modes) and `shells` a full **File Transfers** set (http.server/smbserver/bitsadmin/WebClient/base64-fileless/dev-tcp/exfil) — both from the CPTS Password-Attacks / File-Transfers modules. The full **potato family** (JuicyPotato/RoguePotato/JuicyPotatoNG/SweetPotato/GodPotato/PrintSpoofer) carries step-by-step directions. A **copy-only GTFOBins lookup** (`references/gtfobins.yaml`, 66 binaries) is reachable from the Exploitation tab + `nabu-cli gtfobins`. Later batches were driven by a vault **gap-analysis** workflow (agents survey the vault for uncovered services, then mine templates); the vault is substantially exhausted at 183. Add a new service by dropping `exploit/<svc>.py` that `register()`s — `base._load_builtin()` imports it (keys must be valid Python module names — no hyphens). Keep the port/service tie-back + `source=` provenance. `runs_on` (attacker Run vs victim copy-only) is decided by Popen-safety — the `reclassify.py` pipeline demotes interactive sessions (bare ssh/DB logins, `nc` connects), shell chains/pipes, listeners, and unfillable-brace payloads to victim.
 
 ### 2c. msfvenom payload builder — owner-authorized, copy-only reverse-shell helper
 
@@ -153,12 +165,16 @@ Runtime dependencies on the host (Kali) — the tool doesn't install these, but 
 Install on a fresh Kali:
 
 ```bash
+# names drift per Kali release — ./install.sh resolves them (and refuses a destructive plan).
+# NOTE: `rpcclient` is NOT a package (it ships in smbclient); `dnsutils` and `ntpdate` no longer
+# have install candidates on current Kali — use bind9-dnsutils / ntpsec-ntpdate.
 sudo apt update && sudo apt install -y \
   nmap feroxbuster gobuster ffuf dirsearch dirb nikto whatweb wpscan wfuzz \
-  smbclient smbmap enum4linux-ng rpcclient impacket-scripts \
-  netexec ldap-utils snmp snmpcheck onesixtyone dnsrecon dnsutils \
-  ike-scan nbtscan ntpdate seclists exploitdb \
-  finger subversion default-mysql-client postgresql-client netcat-traditional ssh-audit
+  smbclient smbmap enum4linux-ng impacket-scripts \
+  netexec ldap-utils snmp snmpcheck onesixtyone dnsrecon dnsenum bind9-dnsutils \
+  ike-scan nbtscan ntpsec-ntpdate seclists exploitdb \
+  finger subversion default-mysql-client postgresql-client netcat-traditional ssh-audit \
+  nfs-common rpcbind rsync redis-tools openssh-client
 
 # Python via uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -186,6 +202,8 @@ oscp-recon/
 │   └── test-docker.sh        ← end-to-end container verification (--static | --build | --net | --gui)
 ├── src/oscprecon/
 │   ├── __main__.py           ← `python -m oscprecon` launches the GUI
+│   ├── nse_vuln.py           ← per-service NSE vuln scan: selectors, parser, findings (§8a)
+│   ├── run_paths.py          ← output-path derivation + live-file claims for PARALLEL runs (§19b)
 │   ├── cli.py                ← Typer headless entry (`oscprecon-cli`)
 │   ├── orchestrator.py       ← runs phases against a target
 │   ├── shell.py              ← subprocess helper — sole chokepoint for exec
@@ -380,6 +398,15 @@ Default workspace: `~/oscprecon/`. Each profile is a folder:
 }
 ```
 
+### 6d. Finding severity — the `vulnerable` category — BUILT (2026-07-25)
+
+`finding_severity` gained a sixth category, **`vulnerable`**, ranked above `relay-risk`. It is
+deliberately narrow and is the ONE thing that outranks the rest: it is set only where a tool
+actually TESTED the host and said so (an NSE vuln script returning `State: VULNERABLE`). It is never
+inferred from a version banner or an Exploit-DB hit — those stay `reference`, a pointer to read, not
+a verdict. `finding_severity.rank()` gives the strongest-first ordering used by the Findings view,
+the report and the CLI.
+
 ### 6c. Operator-entered findings — BUILT (owner request, 2026-07-24)
 
 A parser only records what a tool printed. The working SQLi, the credential spotted in a PDF, the
@@ -489,6 +516,42 @@ All commands appear in the report log with full args. **No hidden magic.**
 Parses stdout into `discovered_services` — each entry: `port`, `proto`, `service`, `product`, `version`, `nmap_scripts_output`.
 
 NSE is allowed. `--script vuln`, `--script smb-*`, `--script http-*` are opt-in in the GUI (they're slow / noisy).
+
+### 8a. Per-service NSE vuln scan — BUILT (owner request, 2026-07-25)
+
+A default `-sC -sV` sweep does **not** run vuln-category scripts, so a box whose only way in is an
+`smb-vuln-*` verdict reads as clean. Every discovered service therefore carries a **one-click vuln
+scan** — `⚠ Vuln scripts (NSE)` on the tool panel (present for EVERY service, above the per-service
+builder), *Scan → Vuln scripts on every discovered service*, and `nabu-cli vuln [service] [--all]`.
+
+- **Engine:** `src/oscprecon/nse_vuln.py` (pure data, no Qt) — `VulnProfile` per service family,
+  `profile_for()`, `plan_scans()` (one pass per family: 139+445 are ONE SMB scan), `build_command()`,
+  `parse_vuln_output()`, `to_findings()`. GUI worker: `gui/workers/vuln.py::VulnScanWorker`.
+- **Selector:** `--script "vuln and not *vulners*"` scoped with `-p <discovered ports>`. nmap's own
+  PORTRULES do the targeting, so the category is complete for EVERY service with no per-service
+  script list to rot. Modes: `all` (default) · `targeted` (the `smb-vuln-*` family form) · `safe`
+  (`vuln and safe` — drops the DoS-category checks that crash a vulnerable service by design).
+- **`vulners` is excluded from every selector, always.** vulners.nse queries vulners.com at scan
+  time with the target's product/version — §2 bans runtime internet AND transmitting target data.
+- **`--script-args vulns.showall` is ON by default.** Without it nmap prints nothing for a check that
+  came back negative, so a silent run is indistinguishable from a check that never ran. Every check
+  states its verdict; "nothing found" is backed by a count of what was tested.
+- **A check that reached NO verdict is `inconclusive`, never "not vulnerable"** (timeout,
+  `NT_STATUS_ACCESS_DENIED`). Recorded as an `info` finding and shown as `⚠ could not check`.
+- **No `<service>-*` globs, ever.** A glob is judged by what it EXPANDS to: `--script 'smb-*'`
+  carries no "brute" substring but matches `smb-brute`. `shell.policy_violation` now expands any
+  glob selector against the installed script list and refuses it if a credential-brute script falls
+  inside (`nmap_nse.brute_script_names()`); a test asserts no mode of any profile can reach one.
+- **Four NSE policy bypasses closed while building this** (all pre-existing, found by adversarial
+  review, all now blocked with tests): (1) nmap accepts the single-dash **`-script`** — the gate only
+  matched `--script`, so `nmap -script ssh-brute` ran unchecked; (2) **`--script intrusive`** selects
+  73 of the 74 brute scripts without ever naming one (they are tagged both), as does `all` and
+  `external` — `_BRUTE_CATEGORIES` now refuses any category that carries them; (3) a **directory
+  selector** (`--script /usr/share/nmap/scripts/`) runs everything in it; (4) `--script=` with the
+  single dash. The rule is now: a selector is judged by every identifier it contains, in any spelling
+  nmap accepts.
+- **Never added to the auto battery.** `Orchestrator.run_nmap` is unchanged — this is a per-service
+  button and a CLI verb. The `exam` profile stays vuln-NSE-free.
 
 ---
 
@@ -1033,6 +1096,37 @@ Rewritten every scan event. Prior version archived to `<profile>/report-archive/
  ?: help  q: quit  /: filter  enter: run  Ctrl+G: toggle graph  m: notes
 ```
 
+### 19b. Parallel scans — lanes — BUILT (owner request, 2026-07-25)
+
+Scans run CONCURRENTLY: a full `-p-` sweep, a `--script vuln` scan and two content-discovery runs
+with different wordlists/extensions can all be in flight. `gui/task_manager.py` admits work in
+**lanes** instead of a single exclusive flag:
+
+| Lane | Cap | What |
+|---|---|---|
+| `battery` | 1 | `Orchestrator.run_nmap` / network sweep — it owns the profile's staged output files and writes `report.md`; two at once on one box is meaningless |
+| `nmap` | 3 | ad-hoc nmap: presets, *Scan a host / range*, per-service vuln scripts |
+| `tool` | pool | service recon, content discovery, vhost — everything else |
+
+What had to be true first (all BUILT):
+
+- **`profile.py` mutation is locked.** A module-level `_STATE_LOCK` (RLock) wraps `save()` /
+  `set_services()` / `add_command()` / `add_hosts()`; `_atomic_write_json` already stopped a torn
+  file, this closes the lost-update window. **In-process only** — a `nabu-cli` run against the same
+  folder is still a separate process (that is what the `.lock` of §6b is for).
+- **`merge_services()` replaces `set_services()` in the orchestrator.** A narrow scan finishing after
+  a broad one must ADD to discovery, never truncate it to its own view.
+- **`add_command()` mints the id itself** under the same lock as the append — minting in the caller
+  left a window where two workers were handed the same `cmd-014`.
+- **`run_paths.py`** — output paths are derived per command (`scan_output`) and per settings
+  (`disambiguate`), so two runs can't resolve to one file; both nmap paths previously hardcoded
+  `nmap/tcp-versioned.txt`. A run also holds a **claim** on its output file: a second launch that
+  would write it is refused BY NAME (§24, no silent failures) instead of interleaving — this is what
+  stops the http `.prev` rotation renaming a file a live feroxbuster still holds, and the vhost
+  `unlink` deleting a running scan's `-o` target.
+- **Output is attributed per run.** `ToolPanel.append_output(text, tag)` prefixes each line with the
+  run's unique tag while >1 task is active; a single scan's output is byte-identical to before.
+
 ### Status footer — BUILT
 
 **Built (`main_window._update_status_footer`).** A small always-visible strip along the bottom of
@@ -1187,7 +1281,8 @@ Six phases. Phase "done" = tool used on ≥ 3 boxes from `TRACKER.md` without ma
 - `shell.py`, `profile.py`, `orchestrator.py`, `reporter.py`
 - `modules/base.py` (ABC), `modules/nmap.py` (TCP top-1000 → full → versioned, UDP top-100)
 - `cli.py` — Typer entry (`nabu-cli`), at **feature parity with the GUI** for automatable work:
-  `scan` (+ `--resume`), `enum <service>` (headless Tier-1 service recon), `creds` (add/list/rm),
+  `scan` (+ `--resume`), `enum <service>` (headless Tier-1 service recon), `vuln [service]`
+  (per-service NSE vuln checks, `--all`/`--mode`), `creds` (add/list/rm),
   `list`/`findings`/`health`/`activity`/`delete-project`, `searchsploit`, `exploit`, `payload`,
   `gtfobins`, `pivot`, `doctor`, `docs`, `export-*`/`import-project`, and the gated `spray` + `config`
 - `__main__.py` — GUI launch

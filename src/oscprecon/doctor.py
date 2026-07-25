@@ -381,6 +381,43 @@ def _default_runner(argv: list[str]) -> int:
     return subprocess.run(argv, check=False).returncode  # noqa: S603
 
 
+def _would_remove_or_downgrade(
+    run: Callable[[list[str]], int],
+    prefix: list[str],
+    package: str,
+    echo: Callable[[str], None],
+) -> bool:
+    """True when apt would REMOVE or DOWNGRADE something to install `package`.
+
+    Mirrors install.sh's dry-run refusal. Uses `apt-get -s` (no root needed, changes nothing) and
+    reads the plan; LC_ALL=C so the markers are matched on a non-English host too.
+    """
+    try:
+        completed = subprocess.run(  # noqa: S603 - fixed verb, package from a parsed allow-list
+            [*prefix, "apt-get", "install", "-s", "--no-install-recommends", package],
+            capture_output=True,
+            text=True,
+            check=False,
+            env={**os.environ, "LC_ALL": "C", "DEBIAN_FRONTEND": "noninteractive"},
+        )
+    except OSError:
+        return False  # can't simulate (no apt) — the real call below will report the failure
+    if completed.returncode != 0:
+        echo(f"[doctor] {package}: apt could not compute a safe plan — skipped.")
+        return True
+    destructive = [
+        line
+        for line in completed.stdout.splitlines()
+        if line.startswith("Remv ") or "DOWNGRADED" in line.upper()
+    ]
+    if destructive:
+        echo(f"[doctor] {package}: SKIPPED — apt wants to remove/downgrade packages to install it:")
+        for line in destructive[:6]:
+            echo(f"           {line.strip()}")
+        return True
+    return False
+
+
 def install(
     plan: InstallPlan,
     *,
@@ -407,7 +444,16 @@ def install(
     prefix = _sudo_prefix()
     installed: list[str] = []
     failed: list[str] = []
+    skipped: list[str] = []
     for package in plan.packages:
+        # why: the SAME guard install.sh applies — dry-run first and refuse the package if apt would
+        # REMOVE or DOWNGRADE anything to install it. On a rolling Kali that is how a "just install
+        # the missing tool" turns into a partial upgrade that breaks the system, and this path had
+        # none of the protection the installer advertises. [review]
+        unsafe = _would_remove_or_downgrade(run, prefix, package, echo)
+        if unsafe:
+            skipped.append(package)
+            continue
         try:
             code = run([*prefix, "apt-get", "install", "-y", package])
         except OSError as exc:
@@ -422,5 +468,8 @@ def install(
             failed.append(package)
             echo(f"[doctor] {package}: apt-get exited {code} — skipped, continuing")
     tail = f", {len(failed)} failed ({', '.join(failed)})" if failed else ""
+    if skipped:
+        tail += f", {len(skipped)} skipped to protect your system ({', '.join(skipped)})"
+        echo("[doctor] to install the skipped package(s), update first: sudo apt full-upgrade")
     echo(f"[doctor] done: {len(installed)} installed{tail}")
-    return 1 if failed else 0
+    return 1 if (failed or skipped) else 0

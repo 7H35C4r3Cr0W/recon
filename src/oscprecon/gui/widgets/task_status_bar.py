@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QWidget
 
 from oscprecon.gui.task_manager import TaskManager
@@ -8,6 +8,8 @@ from oscprecon.gui.theme import icons, tokens
 
 
 class TaskStatusBar(QWidget):
+    stop_all_requested = Signal()  # the host clears any queued work, then cancels — see _stop_all
+
     # why: a strip showing every running recon task, each with its OWN prominent Stop button, so any
     # in-flight scan (main recon or a per-panel/service scan) is visible and individually stoppable,
     # the operator never gets stuck watching a long scan they can't kill (§23 Phase 5).
@@ -98,7 +100,7 @@ class TaskStatusBar(QWidget):
             stop_all.setIcon(icons.get_icon("stop", "#ffffff", tokens.ICON_SM))
             stop_all.setToolTip("Stop every running scan")
             stop_all.setCursor(Qt.CursorShape.PointingHandCursor)
-            stop_all.clicked.connect(self._manager.cancel_all)
+            stop_all.clicked.connect(self.stop_all_requested)
             self._row.addWidget(stop_all)
         self._row.addStretch(1)
 

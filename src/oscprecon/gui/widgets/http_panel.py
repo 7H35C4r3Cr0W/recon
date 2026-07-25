@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon import manual_commands
+from oscprecon import manual_commands, run_paths
 from oscprecon.gui.theme import styles
 from oscprecon.gui.widgets.wordlist_picker import WordlistPicker
 from oscprecon.models import DiscoveredService
@@ -436,7 +436,9 @@ class HttpPanel(QWidget):
         tool = _TOOL_LABELS[self._tool.currentText()]
         if not self._output_is_custom:
             self._loading = True
-            self._output.setText(default_output(self._port, tool, self._wordlist))
+            self._output.setText(
+                default_output(self._port, tool, self._wordlist, self._output_variant())
+            )
             self._loading = False
 
         self._threads_label.setText(
@@ -447,6 +449,20 @@ class HttpPanel(QWidget):
         )
         self._preview.setPlainText(build_command(self._current_settings()))
         self._save_only()
+
+    def _output_variant(self) -> str:
+        # the settings that change WHAT a run finds but aren't in the filename. Two feroxbuster runs
+        # on :80 with big.txt — one for php,asp and one for bak,old — are different scans and need
+        # different output files, or the second overwrites the first mid-flight.
+        settings = self._current_settings()
+        if not settings.extensions and settings.status_codes == STATUS_PRESETS["All informative"]:
+            return ""  # the default shape keeps the historic, digest-free filename
+        parts = [
+            ",".join(sorted(settings.extensions)),
+            ",".join(str(c) for c in settings.status_codes),
+            str(settings.depth),
+        ]
+        return run_paths.digest("|".join(parts), 6)
 
     def _save_only(self) -> None:
         if self._profile is None or self._loading:

@@ -166,9 +166,18 @@ def effective_web_host(target: Target) -> tuple[str, bool]:
     return target.host, False
 
 
-def default_output(port: int, tool: str, wordlist: str) -> str:
+def default_output(port: int, tool: str, wordlist: str, variant: str = "") -> str:
+    """Where a content-discovery run writes.
+
+    `variant` is a short digest of the settings that are NOT in the filename (extensions, status
+    codes, threads, depth). Without it, two runs on the same port with the same wordlist and
+    different extensions resolve to the SAME file — which, now that they can run in parallel, means
+    one truncates the other and each parses the other's hits. Empty variant leaves the historic
+    name untouched, so a plain run keeps the path it has always had.
+    """
     stem = Path(wordlist).stem or "wordlist"
-    return f"http/{port}/{tool}-{stem}.txt"
+    suffix = f"-{variant}" if variant else ""
+    return f"http/{port}/{tool}-{stem}{suffix}.txt"
 
 
 @dataclass

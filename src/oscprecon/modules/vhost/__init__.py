@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shlex
 from dataclasses import dataclass
+from pathlib import Path
 
 from oscprecon.models import Command, Finding, Port, ScanResults, Target
 from oscprecon.modules.base import Module
@@ -48,7 +49,11 @@ class VhostScanSettings:
 
 
 def default_output(tool: str, wordlist: str) -> str:
-    return f"vhost/{tool}.json" if tool == "ffuf" else f"vhost/{tool}.txt"
+    # the wordlist is part of the path: two vhost sweeps with different lists are different scans,
+    # and now that they can run at the same time one must not overwrite (or be parsed as) the other.
+    stem = Path(wordlist).stem if wordlist else ""
+    suffix = f"-{stem}" if stem else ""
+    return f"vhost/{tool}{suffix}.json" if tool == "ffuf" else f"vhost/{tool}{suffix}.txt"
 
 
 def wildcard_probe_command(scheme: str, target: str, domain: str) -> str:

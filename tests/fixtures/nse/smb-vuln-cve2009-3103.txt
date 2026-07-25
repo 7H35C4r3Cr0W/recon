@@ -1,0 +1,33 @@
+# Nmap 7.94 scan initiated as: nmap -Pn -p139,445 -sV --script smb-vuln-* 10.10.10.100
+# The MS09-050 / CVE-2009-3103 miss this feature exists to prevent: a Windows Server 2008 SP1 box
+# that a default -sC -sV sweep reports as clean, because the vuln-category scripts never ran.
+Nmap scan report for 10.10.10.100
+Host is up (0.061s latency).
+
+PORT    STATE SERVICE      VERSION
+139/tcp open  netbios-ssn  Microsoft Windows netbios-ssn
+445/tcp open  microsoft-ds Microsoft Windows Server 2008 Standard 6001 Service Pack 1 microsoft-ds
+Service Info: Host: INTERNAL; OS: Windows; CPE: cpe:/o:microsoft:windows_server_2008::sp1
+
+Host script results:
+|_smb-vuln-ms10-054: false
+| smb-vuln-ms10-061:
+|_  Could not negotiate a connection:TIMEOUT
+| smb-vuln-cve2009-3103:
+|   VULNERABLE:
+|   SMBv2 exploit (CVE-2009-3103, Microsoft Security Advisory 975497)
+|     State: VULNERABLE
+|     IDs:  CVE:CVE-2009-3103
+|           Array index error in the SMBv2 protocol implementation in srv2.sys in Microsoft Windows Vista Gold, SP1, and SP2,
+|           Windows Server 2008 Gold and SP2, and Windows 7 RC allows remote attackers to execute arbitrary code or cause a
+|           denial of service (system crash) via an & (ampersand) character in a Process ID High header field in a NEGOTIATE
+|           PROTOCOL REQUEST packet, which triggers an attempted dereference of an out-of-bounds memory location,
+|           aka "SMBv2 Negotiation Vulnerability."
+|
+|     Disclosure date: 2009-09-08
+|     References:
+|       http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2009-3103
+|_      https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2009-3103
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done -- 1 IP address (1 host up) scanned

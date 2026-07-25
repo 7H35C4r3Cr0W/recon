@@ -34,7 +34,7 @@ from oscprecon.gui.widgets.simple_recon_panel import SimpleReconPanel
 from oscprecon.gui.widgets.smb_panel import SmbPanel
 from oscprecon.gui.widgets.ssh_panel import SshPanel
 from oscprecon.gui.widgets.vhost_panel import VhostPanel
-from oscprecon.models import DiscoveredService, Suggestion
+from oscprecon.models import DiscoveredService, Proto, Suggestion
 from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef, expand_hint
 
@@ -97,13 +97,18 @@ class ToolPanel(QWidget):
     dns_recon_requested = Signal(str, int)  # (domain, port)
     ldap_recon_requested = Signal(str, int)  # (basedn, port)
     simple_recon_requested = Signal(str, int)  # (module name, discovered service port)
-    vuln_scan_requested = Signal(str, int, str)  # (nmap service name, port, mode) — NSE vuln scan
+    # (service name, port, mode, proto, host_ip). proto matters: a UDP service scanned over TCP
+    # comes back "clean" and the operator believes it. host_ip aims it at a PIVOTED host, not the
+    # entry box — every other panel already receives it.
+    vuln_scan_requested = Signal(str, int, str, str, str)
 
     def __init__(self) -> None:
         super().__init__()
         self._target = ""
         self._multi = False  # >1 task running -> prefix streamed lines with the run's tag
         self._service: DiscoveredService | None = None
+        self._service_host_ip = ""  # set when the selected service belongs to a PIVOTED host
+        self._discovered: list[DiscoveredService] = []  # for the vuln row's family-port preview
 
         self._header = QLabel(
             "No service selected — run Recon, then pick a service to build its commands."
@@ -256,6 +261,7 @@ class ToolPanel(QWidget):
         self._target = target
 
     def set_profile(self, profile: Profile) -> None:
+        self._discovered = list(profile.discovered_services)
         self._http.set_profile(profile)
         self._urls.set_profile(profile)
         self._vhost.set_profile(profile)
@@ -274,6 +280,7 @@ class ToolPanel(QWidget):
         # host instead of the entry box (else feroxbuster/smb/etc. would recon the wrong machine).
         self._hints.clear()
         self._service = service
+        self._service_host_ip = host_ip
         self._sync_vuln_row(service)
         if service is None:
             self._header.setText(
@@ -351,6 +358,16 @@ class ToolPanel(QWidget):
         layout.addWidget(self._vuln_hint, stretch=1)
         return row
 
+    def _family_ports(self, service: DiscoveredService, spec: nse_vuln.VulnProfile) -> list[int]:
+        # what the worker will actually scan: every open port of this service family on this box.
+        # The tooltip has to show THAT command, not a single-port approximation of it.
+        open_ports = [
+            s.port
+            for s in self._discovered
+            if s.state == "open" and s.proto is service.proto and s.port in spec.ports
+        ]
+        return sorted(set(open_ports) | {service.port})
+
     def _sync_vuln_row(self, service: DiscoveredService | None) -> None:
         if service is None:
             self._vuln_row.setVisible(False)
@@ -358,6 +375,7 @@ class ToolPanel(QWidget):
         self._vuln_row.setVisible(True)
         profile = nse_vuln.profile_for(service.service, service.port, service.product)
         mode = str(self._vuln_mode.currentData() or nse_vuln.MODE_ALL)
+        udp = service.proto is not Proto.TCP
         if mode == nse_vuln.MODE_TARGETED and not profile.family:
             # no specific family for this service — say so instead of silently running the category
             self._vuln_hint.setText(
@@ -367,14 +385,27 @@ class ToolPanel(QWidget):
             self._vuln_hint.setText(f"{profile.label} · {nse_vuln.mode_label(mode, profile)}")
         self._vuln_button.setToolTip(
             f"{profile.why}\n\nRuns: "
-            f"{nse_vuln.build_command('<target>', [service.port], mode=mode, profile=profile)}"
+            + nse_vuln.build_command(
+                self._service_host_ip or "<target>",
+                self._family_ports(service, profile),
+                mode=mode,
+                profile=profile,
+                proto=service.proto,
+            )
+            + ("\n\n-sU needs root — run Nabu with sudo, or the scan finds nothing." if udp else "")
         )
 
     def _emit_vuln_scan(self) -> None:
         if self._service is None:
             return
         mode = str(self._vuln_mode.currentData() or nse_vuln.MODE_ALL)
-        self.vuln_scan_requested.emit(self._service.service, self._service.port, mode)
+        self.vuln_scan_requested.emit(
+            self._service.service,
+            self._service.port,
+            mode,
+            self._service.proto.value,
+            self._service_host_ip,
+        )
 
     def set_running(self, running: bool) -> None:
         # why: the http/vhost builders persist into the shared Profile on every control change;

@@ -392,6 +392,12 @@ def exploit_cmd(
         "--port",
         help="Port the commands fill into {port}/{url} (default: the discovered port).",
     ),
+    suggested: bool = typer.Option(
+        False,
+        "--suggested",
+        help="Only the actions this box's evidence points at (needs --profile). Same ★ ranking "
+        "as the GUI: open ports, confirmed vuln ids, findings, vault credentials.",
+    ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     """Show exploitation command templates (§2b) — the ATTACK catalog. Display-only: copy to run.
@@ -410,6 +416,7 @@ def exploit_cmd(
     nabu-cli exploit web -p box --port 8080   # web attacks aimed at port 8080
     nabu-cli exploit mssql -p box -t 10.10.10.7  # aim at a SPECIFIC host (one IP of a /24)
     nabu-cli exploit linux                    # victim-side privesc (copy-paste in your shell)
+    nabu-cli exploit smb -p box --suggested   # only what this box's evidence points at
     ```
     """
     from oscprecon import exploit as exploit_mod
@@ -475,6 +482,7 @@ def exploit_cmd(
     if spec is None:
         typer.echo(f"[error] unknown service '{service}'", err=True)
         raise typer.Exit(2)
+    rank_ctx: exploit_mod.RankContext | None = None  # no profile -> no evidence -> no ★
     if prof is not None:
         # bind {port} to the DISCOVERED port for this service (mirrors the GUI ExploitPanel), so
         # port-parameterised templates aren't left with a literal {port}; fall back to the catalog
@@ -492,15 +500,20 @@ def exploit_cmd(
             fp_texts.append(f"{s.product} {s.version}")
             if s.nmap_scripts_output:
                 fp_texts.append(s.nmap_scripts_output)
+        found_rows: list[dict[str, object]] = []
         try:
             for f in _findings.load_findings(prof.directory):
+                found_rows.append(dict(f))
                 note = str(f.get("note") or f.get("detail") or "")
                 if note:
                     fp_texts.append(note)
         except OSError:
             pass
-        present = set(exploit_mod.services_present(open_svcs)) | set(
-            exploit_mod.web_app_keys_from_fingerprints(fp_texts)
+        scores = exploit_mod.score_services(open_svcs, fp_texts)
+        present = {k for k, v in scores.items() if v > 0}
+        # the same ranking the GUI stars, from the same engine — GUI and CLI must never disagree
+        rank_ctx = exploit_mod.build_context(
+            open_svcs, fp_texts, found_rows, list(prof.credentials()), prof.command_history
         )
         if spec.ports and key not in present:  # portless catalogs (linux/windows/shells) never warn
             typer.echo(
@@ -546,10 +559,31 @@ def exploit_cmd(
         if prof is not None
         else set()
     )
-    for category in spec.categories():
+    starred = exploit_mod.suggested_action_ids(spec, rank_ctx) if rank_ctx is not None else set()
+    if suggested and not starred:
+        typer.echo(
+            "No suggestions for this service — nothing in the project points at it yet. "
+            "Run recon (and `nabu-cli vuln`) first, or drop --suggested for the full catalog.\n"
+        )
+        raise typer.Exit(0)
+    ranked = (
+        {s.action.id: s.score for s in exploit_mod.rank_actions(spec, rank_ctx)}
+        if rank_ctx is not None
+        else {}
+    )
+    categories = (
+        exploit_mod.category_order(spec, rank_ctx) if rank_ctx is not None else spec.categories()
+    )
+    for category in categories:
+        actions = sorted(spec.by_category(category), key=lambda a: -ranked.get(a.id, 0))
+        if suggested:
+            actions = [a for a in actions if a.id in starred]
+            if not actions:
+                continue
         typer.echo(f"── {category} ──")
-        for action in spec.by_category(category):
+        for action in actions:
             tag = "RUN " if action.executable else "COPY"  # attacker (run) vs victim (copy)
+            star = "★ " if action.id in starred else ""
             act_ports, port_why = exploit_mod.action_ports(action, spec)
             if act_ports:
                 ordered = sorted(act_ports, key=lambda p: (p not in open_ports, act_ports.index(p)))
@@ -560,11 +594,13 @@ def exploit_cmd(
                 port_note = f"  ports: {marks} ({port_why})"
             else:
                 port_note = f"  ports: {port_why}" if port_why else ""
-            typer.echo(f"[{tag}] {action.title}  ({action.tool}){port_note}")
+            typer.echo(f"[{tag}] {star}{action.title}  ({action.tool}){port_note}")
             typer.echo(f"    {exploit_mod.fill_template(action.template, values)}")
         typer.echo("")
     if open_ports:
         typer.echo("✓ = the scan found that port open on this target.")
+    if starred and not suggested:
+        typer.echo("★ = this box's evidence points at it (--suggested shows only these).")
     raise typer.Exit(0)
 
 
@@ -1125,7 +1161,9 @@ def vuln_cmd(
     profile: str = typer.Option(
         ..., "--profile", "-p", help="Profile name (folder under workspace)."
     ),
-    port: int = typer.Option(0, "--port", help="Override the discovered port (0 = the default)."),
+    port: int = typer.Option(
+        0, "--port", help="Check only this port (0 = every port of the chosen service family)."
+    ),
     mode: str = typer.Option(
         "all", "--mode", help="all | targeted | safe — which NSE selector to run."
     ),
@@ -1150,6 +1188,7 @@ def vuln_cmd(
     nabu-cli vuln http -p box --mode safe   # skip the DoS-category checks
     ```
     """
+    from dataclasses import replace
     from datetime import UTC, datetime
 
     from oscprecon import findings as findings_mod
@@ -1185,12 +1224,14 @@ def vuln_cmd(
     if scan_all:
         targets = plan
     else:
-        wanted = (service or "").lower()
-        targets = [
-            t
-            for t in plan
-            if wanted in (t.profile.key, t.service_name.lower()) or (port and port in t.ports)
-        ]
+        wanted = service or ""
+        targets = [t for t in plan if t.matches(wanted) or (port and port in t.ports)]
+        if port:
+            # --port means "only this one", not just "the group containing it" — otherwise the flag
+            # silently widened the scan to the whole family and the help line was a lie.
+            targets = [
+                replace(t, ports=(port,), port=port) for t in targets if port in t.ports
+            ] or [t for t in plan if port in t.ports]
         if not targets:
             names = ", ".join(sorted({t.profile.key for t in plan}))
             typer.echo(

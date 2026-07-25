@@ -283,7 +283,12 @@ class SettingsDialog(QDialog):
         self._concurrency = QSpinBox()
         self._concurrency.setRange(*CONCURRENCY_RANGE)
         form.addRow("Max concurrent recon workers:", self._concurrency)
-        note = QLabel("Caps how many tools run at once so an exam box isn't hammered.")
+        note = QLabel(
+            "Caps how many tools run at once so an exam box isn't hammered. Scans also run "
+            "in lanes: one full recon at a time, up to 3 ad-hoc nmap scans (presets, custom, "
+            "per-service vuln scripts), and the rest of the budget for service recon and "
+            "content discovery."
+        )
         note.setWordWrap(True)
         form.addRow("", note)
         return page

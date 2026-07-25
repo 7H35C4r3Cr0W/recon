@@ -22,6 +22,7 @@ class VulnScanResult:
     port: int
     summary: list[str] = field(default_factory=list)
     hits: int = 0
+    checked: int = 0  # how many checks actually reported — 0 means the scan did not really run
 
 
 class VulnScanWorker(CancellableThread):
@@ -43,6 +44,8 @@ class VulnScanWorker(CancellableThread):
         port: int,
         mode: str = nse_vuln.MODE_ALL,
         proto: Proto = Proto.TCP,
+        host: str = "",
+        ports: tuple[int, ...] = (),
     ) -> None:
         super().__init__()
         self._profile = profile
@@ -50,6 +53,12 @@ class VulnScanWorker(CancellableThread):
         self._port = port
         self._mode = mode
         self._proto = proto
+        # a service selected under a PIVOTED host must be scanned on THAT host, not the entry box —
+        # otherwise the verdict is about the wrong machine and is filed against the pivot anyway.
+        self._host = host
+        # an explicit port set from the planner. A service family with no DECLARED ports (msrpc and
+        # its dynamic range) cannot be rebuilt from the service key alone.
+        self._explicit_ports = tuple(ports)
 
     def run(self) -> None:
         try:
@@ -62,31 +71,57 @@ class VulnScanWorker(CancellableThread):
         self.done.emit(result)
 
     def output_rel(self) -> str:
+        # the host is part of the path: a pivoted host's scan must not overwrite the entry box's
+        # the SAME port list _drive() scans — deriving the name from a different set meant the
+        # claim guarded one path while the scan wrote another.
         spec = nse_vuln.profile_for(self._service_name, self._port)
-        ports = nse_vuln.ports_for(spec, self._scan_ports())
-        return f"nmap/{nse_vuln.output_name(spec, ports, self._mode)}"
+        name = nse_vuln.output_name(spec, self._scan_ports(), self._mode)
+        if self._host and self._host != self._profile.target.ip:
+            return f"nmap/{self._host.replace(':', '-')}-{name}"
+        return f"nmap/{name}"
 
-    def _scan_ports(self) -> list[int]:
-        # every open port of this service family on the box, so 139 AND 445 get checked in one pass
-        spec = nse_vuln.profile_for(self._service_name, self._port)
-        open_ports = [
-            s.port
+    def _services(self) -> list[tuple[int, str]]:
+        # the ports of the host being scanned: a pivoted host carries its own service list
+        if self._host and self._host != self._profile.target.ip:
+            for host in self._profile.discovered_hosts:
+                if host.ip == self._host:
+                    return [
+                        (s.port, s.service)
+                        for s in host.services
+                        if s.state == "open" and s.proto is self._proto
+                    ]
+            return [(self._port, self._service_name)]
+        return [
+            (s.port, s.service)
             for s in self._profile.discovered_services
             if s.state == "open" and s.proto is self._proto
         ]
-        family = sorted({p for p in open_ports if p in spec.ports} | {self._port})
-        return family
+
+    def _scan_ports(self) -> list[int]:
+        # every open port of this service family on the box, so 139 AND 445 get checked in one pass
+        if self._explicit_ports:
+            return sorted(set(self._explicit_ports))
+        spec = nse_vuln.profile_for(self._service_name, self._port)
+        open_ports = [port for port, _ in self._services()]
+        return sorted({p for p in open_ports if p in spec.ports} | {self._port})
 
     def _drive(self) -> VulnScanResult:
         prof = self._profile
         spec = nse_vuln.profile_for(self._service_name, self._port)
         ports = self._scan_ports()
+        host = self._host or prof.target.ip
         command = nse_vuln.build_command(
-            prof.target.ip, ports, mode=self._mode, profile=spec, proto=self._proto
+            host, ports, mode=self._mode, profile=spec, proto=self._proto
         )
         out = prof.directory / self.output_rel()
         out.parent.mkdir(parents=True, exist_ok=True)
-        self.line.emit(f"[vuln] {spec.label} on {','.join(str(p) for p in ports)} — {spec.why}")
+        where = f" on {host}" if self._host else ""
+        self.line.emit(
+            f"[scan] vuln checks — {spec.label} on {','.join(str(p) for p in ports)}{where}: "
+            f"{spec.why}"
+        )
+        if self._proto is not Proto.TCP:
+            self.line.emit("[warning] a UDP scan (-sU) needs root — without it nmap finds nothing.")
         if spec.dos_note and self._mode != nse_vuln.MODE_SAFE:
             self.line.emit(f"[warning] {spec.dos_note}")
         self.line.emit(f"$ {command}")
@@ -109,14 +144,26 @@ class VulnScanWorker(CancellableThread):
             text = out.read_text(encoding="utf-8", errors="replace")
         except OSError:
             text = ""
+        # attribute HOST scripts (smb-vuln-* carry no port line) to the LOWEST port of the set
+        # actually scanned, not to whichever node the operator happened to click — otherwise
+        # clicking 139 and then 445 files the same verdict twice under two different ports.
+        anchor = ports[0] if ports else self._port
         parsed = run_parser(
-            lambda: nse_vuln.parse_vuln_output(text, default_port=self._port, proto=self._proto),
+            lambda: nse_vuln.parse_vuln_output(text, default_port=anchor, proto=self._proto),
             label=f"nse-vuln {spec.key}",
+            on_line=self.line.emit,  # fail-loud: say so when substantial output parses to nothing
             raw=text,
         )
         results = parsed or []
         scan.summary = nse_vuln.summary_lines(results)
         scan.hits = sum(1 for r in results if r.vulnerable)
+        scan.checked = len(results)
+        if result.exit_code != 0 and not results:
+            # a killed / watchdog-timed-out nmap produces no verdicts. Saying "clean" here is the
+            # single worst thing this feature could do.
+            scan.summary.insert(
+                0, f"⚠ nmap exited {result.exit_code} — this scan did NOT complete. Re-run it."
+            )
         found = nse_vuln.to_findings(results, spec.key)
         if found:
             now = datetime.now(UTC).isoformat()

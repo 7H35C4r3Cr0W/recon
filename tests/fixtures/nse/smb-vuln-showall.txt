@@ -1,0 +1,92 @@
+# Nmap 7.99 scan initiated Sat Jul 25 16:40:00 2026 as: nmap -Pn -sV -p 139,445 --script "(smb-vuln-* or smb2-vuln-*) and not *vulners*" --script-args vulns.showall 10.10.10.100
+Nmap scan report for 10.10.10.100
+Host is up (0.059s latency).
+
+PORT    STATE SERVICE      VERSION
+139/tcp open  netbios-ssn  Microsoft Windows netbios-ssn
+| smb-vuln-webexec: 
+|   NOT VULNERABLE:
+|   Remote Code Execution vulnerability in WebExService
+|     State: NOT VULNERABLE
+|     IDs:  CVE:CVE-2018-15442
+|     References:
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2018-15442
+|       https://blog.skullsecurity.org/2018/technical-rundown-of-webexec
+|_      https://webexec.org
+445/tcp open  microsoft-ds Microsoft Windows Server 2008 R2 microsoft-ds (workgroup: WORKGROUP)
+| smb-vuln-webexec: 
+|   NOT VULNERABLE:
+|   Remote Code Execution vulnerability in WebExService
+|     State: NOT VULNERABLE
+|     IDs:  CVE:CVE-2018-15442
+|     References:
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2018-15442
+|       https://blog.skullsecurity.org/2018/technical-rundown-of-webexec
+|_      https://webexec.org
+Service Info: Host: INTERNAL; OS: Windows; CPE: cpe:/o:microsoft:windows, cpe:/o:microsoft:windows_server_2008:r2
+
+Host script results:
+| smb-vuln-ms17-010: 
+|   VULNERABLE:
+|   Remote Code Execution vulnerability in Microsoft SMBv1 servers (ms17-010)
+|     State: VULNERABLE
+|     IDs:  CVE:CVE-2017-0143
+|     Risk factor: HIGH
+|       A critical remote code execution vulnerability exists in Microsoft SMBv1
+|        servers (ms17-010).
+|           
+|     Disclosure date: 2017-03-14
+|     References:
+|       https://technet.microsoft.com/en-us/library/security/ms17-010.aspx
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-0143
+|_      https://blogs.technet.microsoft.com/msrc/2017/05/12/customer-guidance-for-wannacrypt-attacks/
+| smb-vuln-ms07-029: 
+|   NOT VULNERABLE:
+|   Windows DNS RPC Interface Could Allow Remote Code Execution (MS07-029)
+|     State: NOT VULNERABLE
+|     IDs:  CVE:CVE-2007-1748
+|     References:
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2007-1748
+|_      https://technet.microsoft.com/en-us/library/security/ms07-029.aspx
+| smb-vuln-ms08-067: 
+|   NOT VULNERABLE:
+|   Microsoft Windows system vulnerable to remote code execution (MS08-067)
+|     State: NOT VULNERABLE
+|     IDs:  CVE:CVE-2008-4250
+|     References:
+|       https://technet.microsoft.com/en-us/library/security/ms08-067.aspx
+|_      https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2008-4250
+| smb-vuln-ms06-025: 
+|   NOT VULNERABLE:
+|   RRAS Memory Corruption vulnerability (MS06-025)
+|     State: NOT VULNERABLE
+|     IDs:  CVE:CVE-2006-2370
+|     References:
+|       https://technet.microsoft.com/en-us/library/security/ms06-025.aspx
+|_      https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2006-2370
+| smb-vuln-regsvc-dos: 
+|   NOT VULNERABLE:
+|   Service regsvc in Microsoft Windows systems vulnerable to denial of service
+|_    State: NOT VULNERABLE
+|_smb-vuln-ms10-061: NT_STATUS_ACCESS_DENIED
+| smb-vuln-conficker: 
+|   NOT VULNERABLE:
+|   Microsoft Windows system infected by Conficker
+|     State: NOT VULNERABLE
+|     IDs:  CVE:2008-4250
+|     References:
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=2008-4250
+|       https://technet.microsoft.com/en-us/library/security/ms08-067.aspx
+|_      http://www.microsoft.com/security/portal/threat/encyclopedia/entry.aspx?Name=Win32%2fConficker
+|_smb-vuln-ms10-054: false
+| smb-vuln-cve2009-3103: 
+|   NOT VULNERABLE:
+|   SMBv2 exploit (CVE-2009-3103, Microsoft Security Advisory 975497)
+|     State: NOT VULNERABLE
+|     IDs:  CVE:CVE-2009-3103
+|     References:
+|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2009-3103
+|_      http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2009-3103
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sat Jul 25 16:40:12 2026 -- 1 IP address (1 host up) scanned in 12.16 seconds

@@ -557,13 +557,24 @@ def _now_iso() -> str:
 
 
 def _script_values(argv: list[str]) -> list[str]:
+    # nmap accepts BOTH `--script` and the single-dash `-script` (and either with `=`). Matching
+    # only the double-dash form left `nmap -script ssh-brute` sailing past the §2 gate entirely.
     values: list[str] = []
     for index, token in enumerate(argv):
-        if token == "--script" and index + 1 < len(argv):
+        head, sep, inline = token.partition("=")
+        if head.lstrip("-").lower() != "script" or not head.startswith("-"):
+            continue
+        if sep:
+            values.append(inline)
+        elif index + 1 < len(argv):
             values.append(argv[index + 1])
-        elif token.startswith("--script="):
-            values.append(token.split("=", 1)[1])
     return values
+
+
+# NSE category selectors that pull in the credential-brute scripts. `brute` is the obvious one;
+# `intrusive` carries 73 of the 74 (they are almost all tagged both), and `all` is everything.
+# Selecting any of these in recon mode would run credential attacks without ever naming one.
+_BRUTE_CATEGORIES: frozenset[str] = frozenset({"all", "brute", "intrusive", "external"})
 
 
 # NSE selectors are richer than a comma list: nmap accepts boolean expressions over categories,
@@ -628,10 +639,19 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
             # a selector may be a comma list, and each member may itself be an NSE boolean
             # expression ("vuln and not *vulners*") — judge every identifier in it.
             for name in _script_selector_names(value):
-                # `all` / `*` run EVERY script incl. the *-brute credential scripts, but carry no
-                # literal "brute" substring for the per-name check — block the glob-everything form
-                if name in ("all", "*"):
-                    return "nmap --script all/* runs credential brute (off by default — Spray mode)"
+                # a category / glob-everything selector runs the *-brute credential scripts without
+                # ever naming one: `all`, `*`, and `intrusive` (which carries 73 of the 74).
+                if name == "*" or name in _BRUTE_CATEGORIES:
+                    return (
+                        f"nmap --script {name} runs credential brute scripts "
+                        "(off by default — enable Spray mode)"
+                    )
+                # a DIRECTORY selector runs every script inside it — same effect, different spelling
+                if "/" in name or name.endswith(".nse") and "*" not in name and "/" in name:
+                    return (
+                        "nmap --script <path> runs every script in that directory "
+                        "(off by default — name the scripts you want)"
+                    )
                 if "brute" in name and name not in _NMAP_RECON_BRUTE:
                     return f"nmap --script {name} is credential brute (off by default — Spray mode)"
                 # a GLOB is judged by what it EXPANDS to, not by its own text: `--script 'smb-*'`

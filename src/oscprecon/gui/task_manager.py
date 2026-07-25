@@ -74,9 +74,15 @@ class TaskManager(QObject):
             return "a full recon is already running — Stop it, or use a per-service scan"
         return f"{self.lane_count(lane)}/{cap} {lane} slots are in use"
 
-    def add(self, worker: object, label: str, *, lane: str = TOOL_LANE) -> Task:
+    def reserve_tag(self, label: str) -> str:
+        # a run's unique tag, minted BEFORE the worker exists. Needed because output-file claims are
+        # taken before launch (the claim is what stops a rotation clobbering a live file), and a
+        # claim keyed on the plain label would let a second run on the same port claim its own file.
         self._seq += 1
-        task = Task(worker, label, lane, tag=f"{label} #{self._seq}")
+        return f"{label} #{self._seq}"
+
+    def add(self, worker: object, label: str, *, lane: str = TOOL_LANE, tag: str = "") -> Task:
+        task = Task(worker, label, lane, tag=tag or self.reserve_tag(label))
         self._tasks.append(task)
         self.changed.emit()
         return task

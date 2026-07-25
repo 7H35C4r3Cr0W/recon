@@ -35,9 +35,17 @@ shipped as actions.
 - **Target hostname / vhost** — set a name (e.g. `box.htb`) on New Project or via *Edit → Set Target
   Hostname*; host-based recon (HTTP dir-bust, whatweb, vhost) then targets the name, not the IP, and
   the app surfaces the exact `/etc/hosts` line (and warns when the name doesn't resolve yet).
+- **Per-service vuln scripts (NSE)** — a `⚠ Vuln scripts` button on **every** service, plus
+  *Scan → Vuln scripts on every discovered service* and `nabu-cli vuln`. A default `-sC -sV` sweep
+  does **not** run vuln-category scripts, so a box whose only way in is an `smb-vuln-*` verdict looks
+  clean; this runs them per service (`--script vuln`, portrule-scoped to the discovered ports, plus
+  a targeted `smb-vuln-*`-style family and a DoS-free "safe only" mode). Every check prints its
+  verdict — including the ones that came back **clean**, so "nothing found" is backed by evidence —
+  a `VULNERABLE` result is recorded as a finding with its CVE/MS ids, and a check that reached **no
+  verdict** (timeout, access denied) is reported as *inconclusive*, never as "not vulnerable".
 - **Conservative findings + visible failures** — an open port / version / Exploit-DB match is *never*
-  called a vulnerability; only real weak postures (anonymous access, null session, SMB signing off)
-  are flagged. A missing/blocked tool is called out (`⚠ step did not run`) so "no findings" is never
+  called a vulnerability; only a real weak posture (anonymous access, null session, SMB signing off)
+  or a tool-confirmed `VULNERABLE` verdict is flagged. A missing/blocked tool is called out (`⚠ step did not run`) so "no findings" is never
   mistaken for "the service isn't there".
 - **Reference pane** — vendored **offline** HackTricks + optional live copy, and a **version-aware
   `searchsploit`** Exploit-DB lookup (product + `major.minor`, product-wide fallback, version-matched
@@ -48,6 +56,12 @@ shipped as actions.
   Full-TCP / Version / UDP / Firewall-IDS-evasion / AD-Windows / Service / Host-discovery / OS-Vuln,
   filterable, each with a "what it's for" note). Each service panel is likewise granular (e.g. SMB:
   full recon, or just null-session / guest / shares).
+- **Scans run in parallel** — a full `-p-` sweep, a `--script vuln` scan and two feroxbuster runs
+  with different wordlists/extensions all go at once. Work is admitted in *lanes*: one recon battery
+  at a time (it owns the profile's staged output), up to 3 ad-hoc nmap scans, and the general pool
+  for service/content-discovery runs — so an exam box is never hammered by a dozen tools. Output
+  files are derived per command/settings so two runs can't overwrite each other, a run holds a claim
+  on its output file, and while several scans stream into one pane each line is tagged with its run.
 - **Stop any scan** — while recon runs, the **Run** button becomes a red **⏹ Stop**, and a status
   bar shows every in-flight scan with its own **⏹ Stop** (plus Stop-all) so a long scan is never
   something you're stuck watching. `Ctrl+.` stops everything.
@@ -75,7 +89,12 @@ shipped as actions.
 - **Exploitation tab** (owner-authorized, human-driven) — clearly separated from Recon. It surfaces the
   services found on *this* box first and, across **183 services / 3,190 actions** mined from
   the vault (AD, web/port-80, SMB, databases, mail, app servers, CVE-technique targets, …), shows the
-  exact attack command pre-filled from the profile + a chosen vault credential. **Nothing auto-runs**:
+  exact attack command pre-filled from the profile + a chosen vault credential. Rather than a flat
+  wall of commands it **ranks and stars (★) the actions the evidence points at** — an open port they
+  target, a CVE/MS id a vuln check actually confirmed, a finding like *null session works*, a vault
+  credential that fills them — and the tooltip says exactly why. A **Suggested only** toggle narrows
+  the tree to those; it **hides, never removes** (untick to get the whole catalog back), because a
+  decision aid must never quietly take a technique away from you. **Nothing auto-runs**:
   you pick an action and press **Run ▸**, which confirms the target before executing **one** command
   (never a chain), then **Parse** extracts dumped hashes/creds into the vault. Attacker-side actions get
   a Run button; victim-side privesc/reverse-shells are copy-only. **Every attack is labelled with the
@@ -178,12 +197,20 @@ On first launch Nabu creates its workspace at `~/oscprecon/` and opens to the Wo
   doctor` reports which are missing. Install the common set on Kali:
 
   ```bash
+  # Package names drift between Kali releases — ./install.sh resolves them for you and refuses
+  # any plan that would remove or downgrade something. This list is the manual equivalent:
   sudo apt update && sudo apt install -y \
-    nmap feroxbuster gobuster ffuf dirsearch nikto whatweb wpscan \
-    smbclient smbmap enum4linux-ng rpcclient impacket-scripts \
-    netexec ldap-utils snmp onesixtyone dnsrecon dnsutils \
-    ike-scan nbtscan ntpdate seclists exploitdb
+    nmap feroxbuster gobuster ffuf dirsearch dirb nikto whatweb wpscan wfuzz \
+    smbclient smbmap enum4linux-ng impacket-scripts netexec \
+    ldap-utils snmp snmpcheck onesixtyone dnsrecon dnsenum bind9-dnsutils \
+    ike-scan nbtscan ntpsec-ntpdate seclists exploitdb \
+    finger subversion default-mysql-client postgresql-client netcat-traditional \
+    ssh-audit nfs-common rpcbind rsync redis-tools openssh-client
   ```
+
+  `rpcclient` is not its own package — it ships inside `smbclient`. On current Kali `dnsutils` and
+  `ntpdate` are gone (use `bind9-dnsutils` and `ntpsec-ntpdate`), which is why the old one-liner
+  failed outright.
 
   Or let Nabu offer to install the missing allow-listed tools for you (asks before each `apt`):
   `nabu-cli doctor --install`.
@@ -222,9 +249,11 @@ same engine, nothing GUI-only:
 
 - **Recon:** `nabu-cli scan` (staged nmap), `nabu-cli enum <service> -p <profile>` (run a service's
   Tier-1 enumeration headlessly — SMB null-session, SNMP walk, FTP/SMTP/… — the same steps the GUI
-  panels run), `nabu-cli findings -p <profile>` (browse structured findings).
-- **Project management:** `nabu-cli list` (workspace dashboard), `open`/`import-project`/`export-project`
-  /`export-vault`/`delete-project`, `nabu-cli health -p <profile> [--repair]`, `nabu-cli activity`.
+  panels run), `nabu-cli vuln [service] -p <profile> [--all] [--mode safe]` (the NSE vulnerability
+  checks for a discovered service — every verdict printed, hits recorded as findings),
+  `nabu-cli findings -p <profile>` (browse structured findings).
+- **Project management:** `nabu-cli list` (workspace dashboard), `import-project` / `export-project`
+  / `export-vault` / `delete-project`, `nabu-cli health -p <profile> [--repair]`, `nabu-cli activity`.
 - **Credentials:** `nabu-cli creds add|list|rm -p <profile>` (the vault, chmod-600, secrets shown in full).
 - **References / helpers:** `nabu-cli doctor [--install]`, `nabu-cli searchsploit <product> [version]`,
   `nabu-cli exploit [service] [-p profile] [-t host] [--port N]` (the Exploitation catalog,

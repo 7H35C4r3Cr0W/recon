@@ -95,7 +95,9 @@ PROFILES: tuple[VulnProfile, ...] = (
         family=("http-vuln-*", "http-shellshock", "http-iis-webdav-vuln", "http-vmware-path-vuln"),
         why="Struts/ColdFusion/Drupalgeddon/IIS-WebDAV/Shellshock and the TLS checks "
         "(heartbleed, POODLE, CCS-injection) when the port is HTTPS.",
-        dos_note="http-slowloris-check is a DoS probe — 'safe checks only' skips it.",
+        dos_note="Some checks are intrusive against a fragile app (slowloris probes, repeated "
+        "auth). nmap tags http-slowloris-check 'safe', so 'safe checks only' does NOT drop it — "
+        "skip the port if the service must stay up.",
     ),
     VulnProfile(
         key="ftp",
@@ -130,28 +132,38 @@ PROFILES: tuple[VulnProfile, ...] = (
         key="mssql",
         label="MSSQL",
         ports=(1433,),
-        family=("ms-sql-*",),
+        family=("ms-sql-info", "ms-sql-ntlm-info", "ms-sql-empty-password", "ms-sql-dump-hashes"),
         why="Instance/version disclosure plus the vuln-category MSSQL checks.",
     ),
     VulnProfile(
         key="oracle",
         label="Oracle TNS",
         ports=(1521,),
-        family=("oracle-*",),
+        # oracle-sid-brute is recon-legal (§2 exception) but is offered by the NSE picker,
+        # not here — keeping every vuln selector free of the word "brute" is a checkable
+        # invariant, and a weaker one is not worth the convenience.
+        family=("oracle-tns-version",),
         why="TNS version + the vuln-category Oracle checks.",
     ),
     VulnProfile(
         key="mail-tls",
         label="IMAP / POP3",
         ports=(110, 143, 993, 995),
-        family=("ssl-*", "sslv2-drown"),
+        family=(
+            "ssl-heartbleed",
+            "ssl-poodle",
+            "ssl-ccs-injection",
+            "ssl-dh-params",
+            "sslv2-drown",
+            "rsa-vuln-roca",
+        ),
         why="The TLS weaknesses on a mail port — heartbleed, POODLE, DROWN, CCS-injection.",
     ),
     VulnProfile(
         key="rmi",
         label="Java RMI",
         ports=(1099, 1098),
-        family=("rmi-vuln-*", "rmi-dumpregistry"),
+        family=("rmi-vuln-classloader", "rmi-dumpregistry"),
         why="RMI classloader RCE — a registry that accepts remote class loading.",
     ),
     VulnProfile(
@@ -165,35 +177,35 @@ PROFILES: tuple[VulnProfile, ...] = (
         key="afp",
         label="AFP",
         ports=(548,),
-        family=("afp-path-vuln", "afp-*"),
+        family=("afp-path-vuln", "afp-showmount", "afp-serverinfo", "afp-ls"),
         why="AFP directory traversal (CVE-2010-0533).",
     ),
     VulnProfile(
         key="vnc",
         label="VNC",
         ports=(5900, 5901, 5902),
-        family=("realvnc-auth-bypass", "vnc-*"),
+        family=("realvnc-auth-bypass", "vnc-info", "vnc-title"),
         why="RealVNC auth bypass (CVE-2006-2369) and the VNC auth-type dump.",
     ),
     VulnProfile(
         key="nfs",
         label="NFS / RPC",
         ports=(111, 2049),
-        family=("nfs-*", "rpcinfo"),
+        family=("nfs-showmount", "nfs-ls", "nfs-statfs", "rpcinfo"),
         why="Exported shares and the RPC surface behind them.",
     ),
     VulnProfile(
         key="ldap",
         label="LDAP",
         ports=(389, 636, 3268, 3269),
-        family=("ldap-*",),
+        family=("ldap-rootdse", "ldap-search"),
         why="Root DSE + the vuln-category LDAP checks.",
     ),
     VulnProfile(
         key="ssh",
         label="SSH",
         ports=(22,),
-        family=("ssh-*", "sshv1"),
+        family=("sshv1", "ssh2-enum-algos", "ssh-auth-methods", "ssh-hostkey"),
         why="Protocol/algorithm weaknesses. There is no ssh-vuln-* family — the vuln category "
         "covers what exists.",
     ),
@@ -201,14 +213,21 @@ PROFILES: tuple[VulnProfile, ...] = (
         key="dns",
         label="DNS",
         ports=(53,),
-        family=("dns-*",),
+        family=("dns-recursion", "dns-cache-snoop", "dns-zone-transfer", "dns-nsid"),
         why="Recursion, cache-snooping and zone transfer — the DNS misconfigurations.",
     ),
     VulnProfile(
         key="snmp",
         label="SNMP",
         ports=(161,),
-        family=("snmp-*",),
+        family=(
+            "snmp-info",
+            "snmp-sysdescr",
+            "snmp-netstat",
+            "snmp-processes",
+            "snmp-win32-services",
+            "snmp-win32-users",
+        ),
         why="Community-string exposure and the SNMP information leaks.",
     ),
 )
@@ -278,6 +297,14 @@ class VulnTarget:
     proto: Proto
     service_name: str  # the nmap name of the representative port (what the GUI/CLI was asked for)
     port: int  # the representative port — what a finding is attributed to
+    # every nmap name in this group. A user types the name they SEE in the service tree —
+    # "microsoft-ds" for the SMB group whose first member happens to be 139/netbios-ssn — so the
+    # lookup has to accept any member's name, not just the representative's.
+    names: tuple[str, ...] = ()
+
+    def matches(self, wanted: str) -> bool:
+        low = wanted.strip().lower()
+        return bool(low) and (low == self.profile.key or low in {n.lower() for n in self.names})
 
     @property
     def label(self) -> str:
@@ -310,6 +337,7 @@ def plan_scans(services: list[tuple[int, Proto, str, str]]) -> list[VulnTarget]:
                 proto=proto,
                 service_name=first_name,
                 port=first_port,
+                names=tuple(dict.fromkeys(name for _, name in members if name)),
             )
         )
     return out
@@ -370,6 +398,11 @@ def output_name(profile: VulnProfile, ports: list[int], mode: str) -> str:
 # indented further, so the start-of-block match stays unambiguous.
 
 _BLOCK_RE = re.compile(r"^\|(?:_| )([a-z0-9][A-Za-z0-9._-]*):(.*)$")
+# -sV emits `| fingerprint-strings:` (and friends) in the same gutter as NSE output. They carry no
+# verdict, so they would each be recorded as an "inconclusive check" — pure noise in findings.json.
+_NOT_A_CHECK = frozenset(
+    {"fingerprint-strings", "service-info", "warning", "os", "network-distance"}
+)
 _PORT_RE = re.compile(r"^(\d{1,5})/(tcp|udp)\s+(\S+)\s*(\S*)")
 _STATE_RE = re.compile(r"^\s*State:\s*(.+?)\s*$")
 _IDS_RE = re.compile(r"(CVE-\d{4}-\d{3,7}|MS\d{2}-\d{3}|BID:\d+)", re.IGNORECASE)
@@ -384,11 +417,14 @@ LIKELY_VULNERABLE = "LIKELY VULNERABLE"
 _INCONCLUSIVE_MARKERS = (
     "ERROR",
     "TIMEOUT",
-    "COULD NOT",
+    "TIMED OUT",
+    "COULD NOT CONNECT",
     "NT_STATUS",
-    "FALSE POSITIVE",
-    "UNKNOWN",
+    "ACCESS DENIED",
     "NO RESPONSE",
+    "NO REPLY",
+    "CONNECTION REFUSED",
+    "UNABLE TO",
 )
 
 
@@ -409,12 +445,13 @@ class VulnResult:
 
     @property
     def inconclusive(self) -> bool:
-        # no verdict at all, or a verdict-shaped line that is really an error/refusal
+        # A check that FAILED to reach a verdict — not merely one that printed no verdict line.
+        # The distinction matters: plenty of scripts in the vuln category are informational
+        # (http-server-header) or state a negative in prose ("Couldn't find any stored XSS"), and
+        # calling those "could not check" buries the one that really did fail under noise.
         if self.vulnerable or self.state.upper().startswith("NOT VULNERABLE"):
             return False
-        if not self.state:
-            return True
-        upper = f"{self.state} {self.detail}".upper()
+        upper = f"{self.state} {self.title} {self.detail}".upper()
         return any(marker in upper for marker in _INCONCLUSIVE_MARKERS)
 
 
@@ -451,13 +488,21 @@ def _finish(
         ):
             title = line
     if not state:
-        # blocks that only carry the bare marker line ("|   VULNERABLE:") still state a verdict
-        upper = joined.upper()
-        if "NOT VULNERABLE" in upper:
+        # blocks that carry only the bare banner line ("|   VULNERABLE:") still state a verdict.
+        # Match it as a LINE, never as a substring: plenty of descriptions contain the sentence
+        # "... is vulnerable to ...", and promoting those to a confirmed verdict is exactly the
+        # false positive this feature must not produce.
+        banners = {
+            line.strip().rstrip(":").upper()
+            for line in body
+            if line.strip().rstrip(":").upper()
+            in ("VULNERABLE", "NOT VULNERABLE", "LIKELY VULNERABLE")
+        }
+        if "NOT VULNERABLE" in banners:
             state = "NOT VULNERABLE"
-        elif "LIKELY VULNERABLE" in upper:
+        elif LIKELY_VULNERABLE in banners:
             state = LIKELY_VULNERABLE
-        elif VULNERABLE in upper:
+        elif VULNERABLE in banners:
             state = VULNERABLE
         elif inline.strip().lower() in ("false", "no", "not vulnerable"):
             state = "NOT VULNERABLE"
@@ -516,11 +561,15 @@ def parse_vuln_output(
         block = _BLOCK_RE.match(line)
         if block is not None:
             flush()
+            if block.group(1).lower() in _NOT_A_CHECK:
+                continue  # -sV output, not a vuln check
             script = block.group(1)
             inline = block.group(2).strip()
             continue
         if line.startswith("|") and script:
-            body.append(line[1:])
+            # `|_` marks the LAST line of a block — strip both characters, or the underscore ends
+            # up inside the text ("_  Could not negotiate a connection:TIMEOUT").
+            body.append(line[2:] if line.startswith("|_") else line[1:])
             continue
         if not line.startswith("|"):
             flush()
@@ -593,7 +642,9 @@ def summary_lines(results: list[VulnResult]) -> list[str]:
         lines.append(
             f"⚠ could not check: {result.script} — {reason} (NOT the same as 'not vulnerable')"
         )
-    clean = len(results) - len(hits) - len(unknown)
+    # count only EXPLICIT negatives as clean — a script that printed something informational is
+    # neither a hit nor evidence of safety, and must not pad the number that backs "nothing found".
+    clean = sum(1 for r in results if r.state.upper().startswith("NOT VULNERABLE"))
     if not results:
         lines.append("No NSE script output — the scan found nothing to check on these ports.")
     elif not hits:

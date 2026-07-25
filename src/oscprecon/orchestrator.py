@@ -90,9 +90,10 @@ class Orchestrator:
             cancel=self.cancel,
             on_line=self._emit,
         )
+        # no id here: add_command mints it under the profile lock, so two workers running in
+        # parallel can never be handed the same cmd-NNN.
         self.profile.add_command(
             {
-                "id": self.profile.next_command_id(),
                 "module": cmd.module,
                 "shell_line": cmd.shell_line,
                 "why": cmd.why,
@@ -189,10 +190,16 @@ class Orchestrator:
             if self._cancelled():
                 break
             raw[cmd.output_file] = self._run(cmd)
-        self.profile.merge_services(self.nmap.discovered_services(raw))
+        # why: merge, not replace — a parallel ad-hoc scan's ports must not be truncated away by
+        # this pass. Note the trade-off: discovery is monotonic within a project, so a port that
+        # later CLOSES stays listed until the project is recreated. Same rule the custom-scan path
+        # has always used (nmap_scan.merge_services).
+        parsed = self.nmap.discovered_services(raw)
+        self.profile.merge_services(parsed)
         # fail-loud: nmap reported open ports but the parser extracted none -> format drift, not an
-        # empty host. Silently ending up with 0 services would break everything downstream, quietly.
-        if not self.profile.discovered_services and _nmap_saw_open_ports(raw):
+        # empty host. Read the PARSE, not the merged profile: after a merge the profile still holds
+        # the previous scan's services, which would silently hide the drift on every re-scan.
+        if not parsed and _nmap_saw_open_ports(raw):
             self._emit("⚠ [parse] nmap ran but 0 services parsed — check the scan output (drift?)")
         self.profile.save()
 

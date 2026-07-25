@@ -67,8 +67,10 @@ def test_commands_and_default_output() -> None:
     assert "Host: FUZZ.example.com" in cmds[0].shell_line
     assert cmds[0].output_file == "vhost/ffuf.json"
     assert module.commands(Target(ip="10.10.10.5"), []) == []  # no domain -> no auto command
-    assert default_output("ffuf", "/w.txt") == "vhost/ffuf.json"
-    assert default_output("dnsrecon", "/w.txt") == "vhost/dnsrecon.txt"
+    # the wordlist is part of the path so two sweeps with different lists can run at once
+    assert default_output("ffuf", "/w.txt") == "vhost/ffuf-w.json"
+    assert default_output("ffuf", "/other.txt") != default_output("ffuf", "/w.txt")
+    assert default_output("dnsrecon", "/w.txt") == "vhost/dnsrecon-w.txt"
 
 
 def test_parse_dispatch() -> None:

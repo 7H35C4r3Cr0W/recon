@@ -42,7 +42,10 @@ DEFAULT_THEME = "htb"
 #   exam    — speed-tuned tight/fast: top-1000 + rate-boosted -p- + UDP top-100, exam-legal
 SCAN_PROFILES = ("quick", "default", "full", "exam")
 DEFAULT_SCAN_PROFILE = "default"
-DEFAULT_MAX_CONCURRENCY = 4
+# 6, not 4: the common exam shape is a full -p- sweep + a --script vuln scan + two content
+# discovery runs with different wordlists. At 4 the battery plus two nmap scans left one slot
+# for everything else. Per-lane caps (gui/task_manager.py) still stop a box being hammered.
+DEFAULT_MAX_CONCURRENCY = 6
 CONCURRENCY_RANGE = (1, 16)
 FONT_SIZE_RANGE = (8, 24)  # 0 = "use the Qt default, don't override"
 # Live HackTricks fetch/cache (owner-approved, §14a) — OFF by default; the vendored offline snapshot
