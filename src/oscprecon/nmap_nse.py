@@ -10,11 +10,23 @@ from pathlib import Path
 # exception — it enumerates SIDs (identifiers), not passwords (mirrors shell._NMAP_RECON_BRUTE).
 
 _SCRIPTS_DIR = Path("/usr/share/nmap/scripts")
-_ALLOWED_RECON_BRUTE = frozenset({"oracle-sid-brute"})
+# "brute" in the NAME is not the same as a credential attack. These enumerate IDENTIFIERS:
+# oracle-sid-brute finds SIDs, dns-brute finds subdomains — and §10 lists DNS subdomain
+# brute-forcing (dnsrecon -t brt, gobuster dns) as allowed recon, so refusing nmap's equivalent
+# was inconsistent. A script that iterates PASSWORDS stays blocked.
+_ALLOWED_RECON_BRUTE = frozenset({"oracle-sid-brute", "dns-brute"})
 
 # Always offered alongside individual scripts — the common `--script <category>` selectors. The
-# 'brute' category is deliberately absent (it's the credential-attack category, blocked by §2).
-_CATEGORIES: tuple[str, ...] = ("default", "discovery", "safe", "version", "vuln")
+# 'brute' category is deliberately absent (it's the credential-attack category, blocked by §2), and
+# `vuln` is offered in its vulners-free form: the bare category selects vulners.nse, which queries
+# vulners.com with the target's product/version, so the policy refuses it. Offer what works.
+_CATEGORIES: tuple[str, ...] = (
+    "default",
+    "version",
+    "safe and not external",
+    "discovery and not (external or *brute*)",
+    "vuln and not *vulners*",
+)
 
 # Curated offline fallback — the NSE most useful for OSCP recon, one line per service group.
 _CURATED: tuple[str, ...] = (
@@ -253,4 +265,6 @@ def list_scripts(scripts_dir: Path | None = None) -> tuple[str, ...]:
         names = set()
     if not names:
         names = set(_CURATED)
-    return tuple(sorted(n for n in (names | set(_CATEGORIES)) if _is_allowed(n)))
+    # filter the SCRIPT NAMES only — the category selectors are curated expressions that may
+    # legitimately contain the word "brute" in a `not (… or *brute*)` exclusion.
+    return tuple(sorted({n for n in names if _is_allowed(n)} | set(_CATEGORIES)))

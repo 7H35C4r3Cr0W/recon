@@ -1339,7 +1339,12 @@ def vuln_cmd(
         0, "--port", help="Check only this port (0 = every port of the chosen service family)."
     ),
     mode: str = typer.Option(
-        "all", "--mode", help="all | targeted | safe — which NSE selector to run."
+        "vuln",
+        "--mode",
+        help="version | enum | vuln | auth | brute | dangerous — how far to escalate.",
+    ),
+    show: bool = typer.Option(
+        False, "--show", help="Print the scripts each profile would run, and exit (a dry preview)."
     ),
     scan_all: bool = typer.Option(
         False, "--all", help="Check EVERY discovered service on this box, one after another."
@@ -1366,13 +1371,18 @@ def vuln_cmd(
     from datetime import UTC, datetime
 
     from oscprecon import findings as findings_mod
-    from oscprecon import nse_vuln
+    from oscprecon import nse_profiles, nse_vuln
     from oscprecon.models import Proto
     from oscprecon.parsing import run_parser
 
-    if mode not in nse_vuln.MODES:
+    if mode not in nse_profiles.MODES:
+        typer.echo(f"[error] --mode must be one of: {', '.join(nse_profiles.MODES)}", err=True)
+        raise typer.Exit(2)
+    gate = nse_profiles.gate_for(mode)
+    if gate == "spray" and not config.load_settings().spray_enabled:
         typer.echo(
-            f"[error] --mode must be one of: {', '.join(nse_vuln.MODES)}",
+            "[error] the brute profile iterates credentials — that is opt-in Spray mode (§2a), "
+            "off by default. Enable it with `nabu-cli config --spray`.",
             err=True,
         )
         raise typer.Exit(2)
@@ -1403,7 +1413,13 @@ def vuln_cmd(
         for target in plan:
             port_list = ",".join(str(p) for p in target.ports)
             typer.echo(f"  {port_list:>12}/{target.proto.value}  → {target.profile.label}")
-            typer.echo(f"         {nse_vuln.mode_label(mode, target.profile)}")
+            _label, prefixes, _ports = nse_profiles.for_service(target.service_name, target.port)
+            mode_spec = nse_profiles.MODE_SPECS[mode]
+            scripts = nse_profiles.preview(prefixes, mode)
+            typer.echo(f"         {mode_spec.label}: {len(scripts)} script(s)")
+            if show and scripts:
+                for name in scripts:
+                    typer.echo(f"           {name}")
         typer.echo("\nRun one:  nabu-cli vuln <service> -p " + profile)
         typer.echo("Run all:  nabu-cli vuln -p " + profile + " --all")
         raise typer.Exit(0)
@@ -1426,19 +1442,34 @@ def vuln_cmd(
             )
             raise typer.Exit(2)
 
+    if show:
+        for target in targets:
+            _label, prefixes, _declared = nse_profiles.for_service(target.service_name, target.port)
+            scripts = nse_profiles.preview(prefixes, mode)
+            typer.echo(f"\n[{mode}] {target.label} — {len(scripts)} script(s):")
+            for name in scripts:
+                typer.echo(f"  {name}")
+            preview_cmd = nse_profiles.build_command(
+                prof.target.ip, target.ports, prefixes, mode, proto=target.proto
+            )
+            typer.echo(f"$ {preview_cmd}")
+        raise typer.Exit(0)
     total_hits = 0
     for target in targets:
         spec = target.profile
         ports = list(target.ports)
         proto = target.proto
         svc_port = target.port
-        command = nse_vuln.build_command(
-            prof.target.ip, ports, mode=mode, profile=spec, proto=proto
+        _label, prefixes, _declared = nse_profiles.for_service(target.service_name, target.port)
+        command = nse_profiles.build_command(
+            prof.target.ip, tuple(ports), prefixes, mode, proto=proto
         )
         out = prof.directory / "nmap" / nse_vuln.output_name(spec, ports, mode)
         out.parent.mkdir(parents=True, exist_ok=True)
         typer.echo(f"\n[vuln] {target.label}")
-        if spec.dos_note and mode != nse_vuln.MODE_SAFE:
+        if nse_profiles.gate_for(mode) == "dangerous" or (
+            spec.dos_note and mode == nse_profiles.MODE_VULN
+        ):
             typer.echo(f"[warning] {spec.dos_note}")
         typer.echo(f"$ {command}")
         # the GUI emits the same trio per service (run → vuln-scan → run-finished); keep it

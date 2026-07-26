@@ -12,7 +12,6 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from fnmatch import fnmatch
 from pathlib import Path
 
 logger = logging.getLogger("oscprecon.shell")
@@ -571,10 +570,39 @@ def _script_values(argv: list[str]) -> list[str]:
     return values
 
 
-# NSE category selectors that pull in the credential-brute scripts. `brute` is the obvious one;
-# `intrusive` carries 73 of the 74 (they are almost all tagged both), and `all` is everything.
-# Selecting any of these in recon mode would run credential attacks without ever naming one.
-_BRUTE_CATEGORIES: frozenset[str] = frozenset({"all", "brute", "intrusive", "external"})
+# Scripts that hand the TARGET's identity to a third party — §2 bans runtime internet beyond
+# probing the target itself, and forbids transmitting target data. nmap's own `external` category is
+# broader than this rule (it also covers smtp-open-relay, which mails THROUGH the target and is
+# legitimate recon per §12), so deny precisely the API lookups rather than the whole category.
+_THIRD_PARTY_LOOKUPS: frozenset[str] = frozenset(
+    {
+        "asn-query",
+        "dns-blacklist",
+        "dns-zeustracker",
+        "hostmap-bfk",
+        "hostmap-crtsh",
+        "hostmap-robtex",
+        "http-google-malware",
+        "http-icloud-findmyiphone",
+        "http-icloud-sendmsg",
+        "http-robtex-reverse-ip",
+        "http-robtex-shared-ns",
+        "http-virustotal",
+        "http-xssed",
+        "ip-geolocation-geoplugin",
+        "ip-geolocation-ipinfodb",
+        "ip-geolocation-map-bing",
+        "ip-geolocation-map-google",
+        "ip-geolocation-maxmind",
+        "shodan-api",
+        "targets-asn",
+        "tor-consensus-checker",
+        "traceroute-geolocation",
+        "vulners",
+        "whois-domain",
+        "whois-ip",
+    }
+)
 
 
 # NSE selectors are richer than a comma list: nmap accepts boolean expressions over categories,
@@ -592,14 +620,44 @@ def _script_selector_names(value: str) -> list[str]:
     ]
 
 
-def _brute_glob_match(pattern: str) -> str | None:
-    # the first credential-brute script this glob would run, or None. Imported lazily: nmap_nse
-    # reads the host's script directory, and shell.py is imported by everything.
-    from oscprecon import nmap_nse
+def _nmap_selection_violation(selector: str) -> str | None:
+    """Judge an `--script` value by what it SELECTS, not by how it is spelled.
 
-    for name in sorted(nmap_nse.brute_script_names()):
-        if fnmatch(name, pattern):
-            return name
+    This is what lets the tool offer `smb-* and vuln` — the form that catches vulnerability scripts
+    whose filename has no "vuln" in it — while still refusing bare `smb-*`, which selects smb-brute.
+    A lexical check could not tell those apart, so it refused both and the operator lost the checks.
+    """
+    from oscprecon import nmap_nse, nse_select
+
+    for name in _script_selector_names(selector):
+        # a DIRECTORY selector runs every .nse inside it; the evaluator refuses to model it rather
+        # than let it evaluate to "selects nothing" and slip through.
+        if "/" in name:
+            return (
+                "nmap --script <path> runs every script in that directory "
+                "(off by default — name the scripts you want)"
+            )
+    try:
+        chosen = set(nse_select.selected(selector))
+    except nse_select.SelectorError as exc:
+        return f"nmap --script {selector!r}: {exc}"
+    if not chosen:
+        return None  # selects nothing — nmap will say so; not our business to guess why
+    brute = sorted(chosen & nmap_nse.brute_script_names())
+    if brute:
+        shown = ", ".join(brute[:3]) + ("…" if len(brute) > 3 else "")
+        return (
+            f"nmap --script {selector!r} selects credential brute scripts ({shown}) "
+            "— off by default; enable Spray mode"
+        )
+    third_party = sorted(chosen & _THIRD_PARTY_LOOKUPS)
+    if third_party:
+        shown = ", ".join(third_party[:3]) + ("…" if len(third_party) > 3 else "")
+        return (
+            f"nmap --script {selector!r} selects scripts that send this target's details to a "
+            f"third-party service ({shown}) — §2 forbids that; exclude them, e.g. "
+            f'--script "{selector} and not ({" or ".join(third_party[:3])})"'
+        )
     return None
 
 
@@ -638,32 +696,9 @@ def policy_violation(argv: list[str], *, spray: bool = False, exploit: bool = Fa
         for value in _script_values(argv):
             # a selector may be a comma list, and each member may itself be an NSE boolean
             # expression ("vuln and not *vulners*") — judge every identifier in it.
-            for name in _script_selector_names(value):
-                # a category / glob-everything selector runs the *-brute credential scripts without
-                # ever naming one: `all`, `*`, and `intrusive` (which carries 73 of the 74).
-                if name == "*" or name in _BRUTE_CATEGORIES:
-                    return (
-                        f"nmap --script {name} runs credential brute scripts "
-                        "(off by default — enable Spray mode)"
-                    )
-                # a DIRECTORY selector runs every script inside it — same effect, different spelling
-                if "/" in name or name.endswith(".nse") and "*" not in name and "/" in name:
-                    return (
-                        "nmap --script <path> runs every script in that directory "
-                        "(off by default — name the scripts you want)"
-                    )
-                if "brute" in name and name not in _NMAP_RECON_BRUTE:
-                    return f"nmap --script {name} is credential brute (off by default — Spray mode)"
-                # a GLOB is judged by what it EXPANDS to, not by its own text: `--script 'smb-*'`
-                # contains no "brute" substring yet matches smb-brute. Expand against the installed
-                # script list and refuse if any credential-attack script falls inside it.
-                if any(ch in name for ch in "*?["):
-                    hit = _brute_glob_match(name)
-                    if hit is not None:
-                        return (
-                            f"nmap --script {name} matches {hit}, a credential brute script "
-                            "(off by default — enable Spray mode)"
-                        )
+            violation = _nmap_selection_violation(value)
+            if violation is not None:
+                return violation
     if base == "searchsploit":
         for token in argv[1:]:
             if token in _SEARCHSPLOIT_FORBIDDEN:

@@ -405,7 +405,9 @@ def test_the_vuln_selectors_the_tool_ships_still_pass() -> None:
         "vuln and not *vulners*",
         "(vuln and safe) and not *vulners*",
         "(smb-vuln-* or smb2-vuln-*) and not *vulners*",
-        "default,safe",
+        # `safe` alone pulls in whois-ip / asn-query / ip-geolocation-* — third-party lookups
+        # about the TARGET, which §2 forbids. The picker offers the external-free form.
+        "default,safe and not external",
         "http-vuln-*",
     ):
         argv = ["nmap", "-p", "445", "--script", selector, "10.10.10.5"]

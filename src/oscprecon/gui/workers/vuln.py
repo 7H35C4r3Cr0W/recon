@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from PySide6.QtCore import Signal
 
-from oscprecon import findings, nse_vuln, run_paths, shell
+from oscprecon import findings, nse_profiles, nse_vuln, run_paths, shell
 from oscprecon.gui.workers.base import CancellableThread
 from oscprecon.models import Proto
 from oscprecon.parsing import run_parser
@@ -42,7 +42,7 @@ class VulnScanWorker(CancellableThread):
         profile: Profile,
         service_name: str,
         port: int,
-        mode: str = nse_vuln.MODE_ALL,
+        mode: str = nse_profiles.MODE_VULN,
         proto: Proto = Proto.TCP,
         host: str = "",
         ports: tuple[int, ...] = (),
@@ -110,8 +110,11 @@ class VulnScanWorker(CancellableThread):
         spec = nse_vuln.profile_for(self._service_name, self._port)
         ports = self._scan_ports()
         host = self._host or prof.target.ip
-        command = nse_vuln.build_command(
-            host, ports, mode=self._mode, profile=spec, proto=self._proto
+        # the six escalating profiles are built from the service's script PREFIXES (nse_profiles);
+        # nse_vuln still supplies the label/DoS note and the output filename.
+        _label, prefixes, _declared = nse_profiles.for_service(self._service_name, self._port)
+        command = nse_profiles.build_command(
+            host, tuple(ports), prefixes, self._mode, proto=self._proto
         )
         out = prof.directory / self.output_rel()
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -122,7 +125,9 @@ class VulnScanWorker(CancellableThread):
         )
         if self._proto is not Proto.TCP:
             self.line.emit("[warning] a UDP scan (-sU) needs root — without it nmap finds nothing.")
-        if spec.dos_note and self._mode != nse_vuln.MODE_SAFE:
+        if nse_profiles.gate_for(self._mode) == "dangerous" or (
+            spec.dos_note and self._mode == nse_profiles.MODE_VULN
+        ):
             self.line.emit(f"[warning] {spec.dos_note}")
         self.line.emit(f"$ {command}")
         result = shell.run(

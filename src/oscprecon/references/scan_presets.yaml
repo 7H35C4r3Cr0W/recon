@@ -175,7 +175,7 @@
 - category: "OS & vulnerability"
   description: "Vuln NSE category sweep (opt-in, slow/noisy)"
   why: "§8 allows --script vuln — flags known service weaknesses, detection only (never exploits)."
-  command: "nmap -sV --script vuln {target}"
+  command: "nmap -sV --script 'vuln and not external' {target}"
 
 # =================================================================================================
 # ==  EXTENDED SET  ===============================================================================
@@ -225,7 +225,7 @@
 - category: "Version & scripts"
   description: "Discovery scripts"
   why: "The NSE 'discovery' category — extra info (rpcinfo, snmp, http-* enum) from open ports."
-  command: "nmap -sV --script discovery {target}"
+  command: "nmap -sV --script 'discovery and not (external or *brute*)' {target}"
 
 - category: "Version & scripts"
   description: "Fast version detect (--version-light)"
@@ -472,4 +472,4 @@
 - category: "Full TCP"
   description: "Deep — full TCP, versioned, default + vuln NSE (very slow)"
   why: "Everything on every port: versions, default scripts AND the vuln category. Thorough; leave it running."
-  command: "nmap -p- -sV -sC --script vuln -T4 {target}"
+  command: "nmap -p- -sV -sC --script 'vuln and not external' -T4 {target}"

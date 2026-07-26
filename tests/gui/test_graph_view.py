@@ -1,7 +1,11 @@
 import base64
+import inspect
 import json
 from pathlib import Path
 
+import pytest
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QMenu
 from pytestqt.qtbot import QtBot
 
 from oscprecon import findings as findings_mod
@@ -439,3 +443,154 @@ def test_fcose_layout_is_vendored_offline_and_wired() -> None:
     )
     app_js = (_GRAPH_HTML / "app.js").read_text()
     assert "cytoscapeFcose" in app_js and "fcose" in app_js  # registered + used as a layout
+
+
+def _menu_texts(menu: QMenu) -> list[str]:
+    return [a.text() for a in menu.actions() if not a.isSeparator()]
+
+
+def _menu_action(menu: QMenu, text: str) -> QAction:
+    return next(a for a in menu.actions() if a.text() == text)
+
+
+def test_bridge_node_context_menu_emits_id_data_and_position(qtbot: QtBot) -> None:
+    bridge = GraphBridge()
+    got: list[tuple[str, object, int, int]] = []
+    bridge.node_menu_requested.connect(lambda nid, data, x, y: got.append((nid, data, x, y)))
+    bridge.node_context_menu("service-445-tcp", '{"type": "service", "port": 445}', 120, 88)
+    assert got == [("service-445-tcp", {"type": "service", "port": 445}, 120, 88)]
+    bridge.node_context_menu("x", "not json", 0, 0)  # malformed -> empty dict, still emits
+    assert got[-1] == ("x", {}, 0, 0)
+
+
+def test_node_menu_service_vs_host_actions(qtbot: QtBot, tmp_path: Path) -> None:
+    view = GraphView()
+    qtbot.addWidget(view)
+    view.set_profile(_pivot_profile(tmp_path))
+
+    service = view.build_node_menu(
+        "service-80-tcp",
+        {
+            "type": "service",
+            "label": "80/tcp http",
+            "port": 80,
+            "proto": "tcp",
+            "owner": "target",
+            "status": "done",
+        },
+    )
+    texts = _menu_texts(service)
+    assert texts[0] == "80/tcp http"  # the node names its own menu
+    assert "Select in service tree →" in texts
+    assert "Copy as target:port" in texts
+    assert "Copy label" in texts and "Add note…" in texts and "Open project folder" in texts
+    for status in ("new", "investigating", "done", "dead-end"):
+        assert f"Mark as {status}" in texts
+    checked = [a.text() for a in service.actions() if a.isCheckable() and a.isChecked()]
+    assert checked == ["Mark as done"]  # only the node's current status is ticked
+    assert "Copy IP" not in texts  # a service node carries no ip of its own
+
+    host = view.build_node_menu(
+        "host-10.10.5.23",
+        {"type": "host", "label": "10.10.5.23\ndc01", "ip": "10.10.5.23", "note": "pivot box"},
+    )
+    host_texts = _menu_texts(host)
+    assert host_texts[0] == "10.10.5.23 · dc01"
+    assert "Copy IP" in host_texts
+    assert "Edit note…" in host_texts  # an existing note reads as an edit, not an add
+    # service-only entries are OMITTED on a host rather than shown dead
+    assert "Select in service tree →" not in host_texts
+    assert "Copy as target:port" not in host_texts
+
+
+def test_node_menu_actions_mark_jump_and_copy(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prof = _pivot_profile(tmp_path)
+    view = GraphView()
+    qtbot.addWidget(view)
+    view.set_profile(prof)
+    copied: list[str] = []
+    monkeypatch.setattr(GraphView, "_copy", staticmethod(copied.append))
+    opened: list[tuple[int, str]] = []
+    view.service_open_requested.connect(lambda p, pr: opened.append((p, pr)))
+
+    data = {
+        "type": "service",
+        "label": "80/tcp http",
+        "port": 80,
+        "proto": "tcp",
+        "owner": "target",
+    }
+    menu = view.build_node_menu("service-80-tcp", data)
+    _menu_action(menu, "Mark as investigating").trigger()
+    assert prof.load_graph()["node_overrides"]["service-80-tcp"]["status"] == "investigating"
+    _menu_action(menu, "Select in service tree →").trigger()
+    assert opened == [(80, "tcp")]
+    _menu_action(menu, "Copy as target:port").trigger()
+    assert copied == ["10.10.10.5:80"]
+
+    pivoted = view.build_node_menu(
+        "hostservice-10.10.5.23-445-tcp",
+        {
+            "type": "service",
+            "label": "445/tcp smb",
+            "port": 445,
+            "proto": "tcp",
+            "owner": "host-10.10.5.23",
+        },
+    )
+    _menu_action(pivoted, "Copy as target:port").trigger()
+    assert copied[-1] == "10.10.5.23:445"  # a pivoted service points at ITS host, not the entry
+
+
+def test_node_menu_status_click_toggles_off(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = _profile(tmp_path)
+    view = GraphView()
+    qtbot.addWidget(view)
+    view.set_profile(prof)
+    data = {"type": "service", "label": "445/tcp smb", "port": 445, "proto": "tcp"}
+    _menu_action(view.build_node_menu("service-445-tcp", data), "Mark as done").trigger()
+    assert prof.load_graph()["node_overrides"]["service-445-tcp"]["status"] == "done"
+    ticked = view.build_node_menu("service-445-tcp", {**data, "status": "done"})
+    _menu_action(ticked, "Mark as done").trigger()  # the ticked one again = clear
+    assert "status" not in prof.load_graph()["node_overrides"].get("service-445-tcp", {})
+
+
+def test_node_menu_read_only_hides_status_and_note(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = _profile(tmp_path)
+    prof.read_only = True
+    view = GraphView()
+    qtbot.addWidget(view)
+    view.set_profile(prof)
+    menu = view.build_node_menu(
+        "service-445-tcp",
+        {"type": "service", "label": "445/tcp smb", "port": 445, "proto": "tcp"},
+    )
+    texts = _menu_texts(menu)
+    assert not any(t.startswith("Mark as") for t in texts)
+    assert "Add note…" not in texts and "Edit note…" not in texts
+    assert any("Read-only" in t for t in texts)  # said out loud, not silently missing
+    assert "Copy label" in texts  # read-only still copies / navigates
+
+
+def test_summary_tree_right_click_requests_node_menu(qtbot: QtBot, tmp_path: Path) -> None:
+    tree = ReconSummaryTree()
+    qtbot.addWidget(tree)
+    tree.set_profile(_rich_profile(tmp_path))
+    got: list[tuple[str, object]] = []
+    tree.node_menu_requested.connect(lambda nid, data, _pos: got.append((nid, data)))
+    root = tree._tree.topLevelItem(0)
+    svc = next(root.child(i) for i in range(root.childCount()) if "445" in root.child(i).text(0))
+    tree._on_tree_menu(tree._tree.visualItemRect(svc).center())
+    assert got and got[0][0] == "service-445-tcp"
+    assert isinstance(got[0][1], dict) and got[0][1]["type"] == "service"
+
+
+def test_canvas_right_click_wired_and_chromium_menu_suppressed() -> None:
+    app_js = (_GRAPH_HTML / "app.js").read_text()
+    assert 'cy.on("cxttap", "node"' in app_js  # right-click handler written by hand (no plugin)
+    assert "bridge.node_context_menu(" in app_js  # menu is built in Qt, not JS
+    assert 'addEventListener("contextmenu"' in app_js and "preventDefault" in app_js
+    view_py = Path(inspect.getfile(GraphView)).read_text()
+    assert "setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)" in view_py

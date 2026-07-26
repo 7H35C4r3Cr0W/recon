@@ -18,6 +18,11 @@ A red ring marks a *notable* finding (anonymous access, writable share, weak sig
 
 - **Single-click** a node → its full detail (IP / OS / service+version / a /24's host count) in the
   side panel, plus a **status** (`new` / `investigating` / `done` / `dead-end`) and a **note**.
+- **Right-click** a node → every one of those actions in one menu: the four status marks (the current
+  one ticked — pick it again to clear it), *Add / Edit note…*, *Select in service tree →* (jumps back
+  to that port's tooling), *Copy label / IP / subnet / target:port*, and *Open project folder*. The
+  same menu is on the summary-tree rows. On a read-only project (open in another window) the status
+  and note entries are replaced by a read-only notice.
 - **Double-click** the entry, a `/24`, or a host to **drill down** — it opens centred on one node and
   expands `entry → /24 → host → service`, re-laying-out into a clean tree. Double-click the entry
   again to fold it all back to one node.

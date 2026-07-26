@@ -896,6 +896,26 @@
       if (bridge) bridge.node_clicked(id, JSON.stringify(evt.target.data()));
     });
 
+    // right-click a node -> hand the id, its data and the page position to Qt, which pops the NATIVE
+    // themed menu (status / note / copy / jump). The menu is deliberately NOT built here: Qt matches
+    // the app theme and reuses the very handlers the detail sidebar drives.
+    cy.on("cxttap", "node", function (evt) {
+      if (!bridge) return;
+      hideTip();
+      // move the selection ring with the menu, so the canvas agrees with the detail panel behind it
+      cy.elements(":selected").unselect();
+      evt.target.select();
+      var container = document.getElementById("cy");
+      var rect = container ? container.getBoundingClientRect() : { left: 0, top: 0 };
+      var rp = evt.renderedPosition || evt.target.renderedPosition();
+      bridge.node_context_menu(
+        evt.target.id(),
+        JSON.stringify(evt.target.data()),
+        Math.round(rect.left + rp.x),
+        Math.round(rect.top + rp.y),
+      );
+    });
+
     // double-click the entry / a /24 / a host to drill down (reveal or fold its children). Only in a
     // pivot graph — on a simple box there is nothing to drill, so a dbltap there just does nothing.
     cy.on("dbltap", 'node[type="target"], node[type="subnet"], node[type="host"]', function (evt) {
@@ -1011,6 +1031,12 @@
       refresh();
     });
   }
+
+  // belt-and-braces with the view's NoContextMenu policy (graph_view.py): the operator must never
+  // see Chromium's "Reload / View source" menu over the canvas.
+  document.addEventListener("contextmenu", function (e) {
+    e.preventDefault();
+  });
 
   if (window.qt && window.qt.webChannelTransport) boot(0);
   else window.addEventListener("load", function () { boot(0); });

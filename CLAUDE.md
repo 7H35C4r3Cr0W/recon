@@ -543,6 +543,21 @@ A default `-sC -sV` sweep does **not** run vuln-category scripts, so a box whose
 scan** — `⚠ Vuln scripts (NSE)` on the tool panel (present for EVERY service, above the per-service
 builder), *Scan → Vuln scripts on every discovered service*, and `nabu-cli vuln [service] [--all]`.
 
+- **Six scan PROFILES per service** (`nse_profiles.py`, from the maintainer's methodology notes):
+  version (`-sV --version-all`) · safe enumeration · vulnerability · authentication · credential
+  brute (opt-in Spray mode only, §2a) · intrusive/DoS/exploit (confirms first). Each is built from
+  the service's SCRIPT PREFIXES conjoined with a category expression — `smb-* and vuln` — which is
+  the only form that catches vulnerability scripts whose filename has no "vuln" in it
+  (smb-double-pulsar-backdoor) while selecting no credential attack. The service→prefix table is
+  `nse_matrix.py` (115 services, 103 prefixes, mined from nmap's script.db + the operator's matrix
+  + the vault). The GUI and `nabu-cli vuln --show` PREVIEW exactly which scripts a profile selects
+  before it runs.
+- **The §2 gate evaluates the SELECTION, not the spelling** (`nse_select.py`). It parses nmap's
+  selector grammar (categories, filenames, globs, `and`/`or`/`not`, parens, comma-union) over the
+  installed `script.db` and asks the real question — does this select a credential attack, or a
+  script that hands the target's details to a third party? A test asserts it agrees with
+  `nmap --script-help` exactly. This is what lets `smb-* and vuln` through while still refusing bare
+  `smb-*` (which selects smb-brute) and `vuln` (which selects vulners.nse → vulners.com).
 - **Roster:** 25 service families (derived from the 105 vuln-category scripts nmap ships), plus the
   portrule-driven `vuln` category for everything else — so every discovered service has a runnable
   check. Note `samba-vuln-*` is listed alongside `smb-vuln-*`: the prefixes differ, and Samba on
@@ -1007,7 +1022,13 @@ Alternate visual interface to the tree view. Toggle: `View → Graph` (Ctrl+G).
 
 - **Click node** → right pane detail
 - **Double-click service** → drill into artifacts as children
-- **Right-click** → context menu: Mark Investigated / Add Note / Open Folder / Copy Command / Hide
+- **Right-click** → **BUILT.** A native, themed Qt menu (built in `GraphView.build_node_menu`, never
+  in JS) carrying every action the node supports: the four status marks (current one ticked, click it
+  again to clear), Add/Edit note…, Select in service tree → (service nodes only — reuses
+  `service_open_requested`), Copy label / IP / subnet / target:port, Open project folder. The canvas
+  reports the right-click over the bridge (`node_context_menu` → `node_menu_requested`); Chromium's
+  own menu is suppressed (`NoContextMenu` + a `contextmenu` preventDefault). A read-only profile gets
+  a read-only notice instead of the status/note entries. The same menu is on the summary-tree rows
 - **Drag edge between two nodes** → creates `relates-to` user edge
 - **Status badges** (`new` / `investigating` / `done` / `dead-end`) affect color saturation
 - **Filter sidebar** — toggle node types, filter by status / tag / port / proto
@@ -1348,7 +1369,7 @@ Each ships with: fixture, parser test, ≥ 3 pattern library entries, HackTricks
 ### Phase 4 — Graph view (Bloodhound-style)
 
 - `graph_view.py` — QWebEngineView + vendored Cytoscape.js
-- `QWebChannel` bridge — `GraphBridge` methods for get_data / node_clicked / status_changed / add_user_edge / save_layout
+- `QWebChannel` bridge — `GraphBridge` methods for get_data / node_clicked / node_context_menu / status_changed / add_user_edge / save_layout
 - Node/edge types, layouts, interactions per § 16
 - `graph.json` persistence
 - `View → Graph` (Ctrl+G) toggles view

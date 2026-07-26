@@ -35,7 +35,11 @@ shipped as actions.
 - **Target hostname / vhost** — set a name (e.g. `box.htb`) on New Project or via *Edit → Set Target
   Hostname*; host-based recon (HTTP dir-bust, whatweb, vhost) then targets the name, not the IP, and
   the app surfaces the exact `/etc/hosts` line (and warns when the name doesn't resolve yet).
-- **Per-service vuln scripts (NSE)** — a `⚠ Vuln scripts` button on **every** service, plus
+- **Per-service NSE scan profiles** — a `⚠ NSE scripts` button on **every** service with six
+  escalating profiles (version → safe enumeration → vulnerability → authentication → credential
+  brute → intrusive/DoS), each built from that service's own script prefixes across a
+  **115-service matrix**. The tooltip and `nabu-cli vuln --show` list exactly which scripts a
+  profile will run *before* you run it. Plus
   *Scan → Vuln scripts on every discovered service* and `nabu-cli vuln`. A default `-sC -sV` sweep
   does **not** run vuln-category scripts, so a box whose only way in is an `smb-vuln-*` verdict looks
   clean; this runs them per service (`--script vuln`, portrule-scoped to the discovered ports, plus

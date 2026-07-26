@@ -16,14 +16,17 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QStackedWidget,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from oscprecon import nse_vuln
+from oscprecon import nse_profiles
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
+from oscprecon.gui.theme import tokens
 from oscprecon.gui.widgets.banner import Banner
 from oscprecon.gui.widgets.discovered_urls_panel import DiscoveredUrlsPanel
 from oscprecon.gui.widgets.dns_panel import DnsPanel
@@ -40,11 +43,9 @@ from oscprecon.references import ServiceRef, expand_hint
 
 _COMMAND_ROLE = Qt.ItemDataRole.UserRole
 
-_VULN_MODE_LABELS = {
-    nse_vuln.MODE_ALL: "all vuln checks",
-    nse_vuln.MODE_TARGETED: "targeted family",
-    nse_vuln.MODE_SAFE: "safe checks only",
-}
+# the six escalating scan profiles (nse_profiles) — version → safe enum → vuln → auth → brute →
+# intrusive. Built from the service's own script prefixes, so each one is service-specific.
+_MODE_ORDER: tuple[str, ...] = nse_profiles.MODES
 
 
 class _CurrentPageStack(QStackedWidget):
@@ -208,13 +209,25 @@ class ToolPanel(QWidget):
             self._stack.addWidget(panel)
 
         # "Recon next steps" — pattern-library suggestions from findings (§15). Pre-fill only.
+        # Collapsible: on a service with a lot of suggestions this box crowded out the builder, and
+        # a fixed 130px cap meant it could be neither read properly nor got out of the way.
         self._next_steps = QListWidget()
-        self._next_steps.setMaximumHeight(130)
+        self._next_steps.setMinimumHeight(60)
         self._next_steps.itemActivated.connect(self._on_next_step_activated)
-        next_box = QGroupBox(
-            "Recon next steps (patterns — double-click to pre-fill; never auto-run)"
-        )
-        QVBoxLayout(next_box).addWidget(self._next_steps)
+        self._next_box = QGroupBox("Recon next steps")
+        next_layout = QVBoxLayout(self._next_box)
+        next_layout.setContentsMargins(tokens.SPACE_SM, tokens.SPACE_SM, tokens.SPACE_SM, 0)
+        self._next_hint = QLabel("patterns — double-click to pre-fill; never auto-run")
+        self._next_hint.setObjectName("hintText")
+        next_layout.addWidget(self._next_hint)
+        next_layout.addWidget(self._next_steps)
+        self._next_toggle = QToolButton()
+        self._next_toggle.setText("▾")
+        self._next_toggle.setAutoRaise(True)
+        self._next_toggle.setToolTip("Collapse / expand the next-steps list")
+        self._next_toggle.setAccessibleName("Collapse next steps")
+        self._next_toggle.clicked.connect(self._toggle_next_steps)
+        self._next_box_collapsed = False
         self.set_suggestions([])
 
         self._banner = Banner()
@@ -222,29 +235,54 @@ class ToolPanel(QWidget):
         self._output.setReadOnly(True)
         self._output.setAccessibleName("Command output")
 
-        # why: on a short/narrow window the builder group boxes used to be crushed to an unusable
-        # sliver — the Run button scrolled out of reach. Put header + builder + next-steps in one
-        # vertical scroll region so each box keeps its natural size and the panel scrolls as a whole
-        # when the window shrinks; the live output + banner stay pinned below. `_CurrentPageStack`
-        # keeps the scrolled content the size of the VISIBLE builder, so there is no scrollbar at
-        # normal size. The scroll area's own minimum stays tiny, so the window still resizes freely.
+        # why: the three regions of this column — the builder, the suggestions, and the live
+        # output — compete for the same vertical space, and which one you need is entirely
+        # situational: a wide SMB builder while configuring, the output while a scan streams, the
+        # suggestions while deciding what is next. A fixed split served none of them, so they sit in
+        # a DRAGGABLE splitter; the builder still scrolls internally (so its Run button is never cut
+        # off on a short window) and the suggestions collapse to their title bar with one click.
         body = QWidget()
         body_layout = QVBoxLayout(body)
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.addWidget(self._header)
         body_layout.addWidget(self._vuln_row)
         body_layout.addWidget(self._stack, stretch=1)
-        body_layout.addWidget(next_box)
 
         body_scroll = QScrollArea()
         body_scroll.setWidgetResizable(True)
         body_scroll.setFrameShape(QFrame.Shape.NoFrame)
         body_scroll.setWidget(body)
 
+        next_header = QWidget()
+        next_row = QHBoxLayout(next_header)
+        next_row.setContentsMargins(0, 0, 0, 0)
+        next_row.addWidget(self._next_toggle)
+        next_row.addWidget(self._next_box, stretch=1)
+
+        self._split = QSplitter(Qt.Orientation.Vertical)
+        self._split.setChildrenCollapsible(True)
+        self._split.addWidget(body_scroll)
+        self._split.addWidget(next_header)
+        self._split.addWidget(self._output)
+        self._split.setStretchFactor(0, 3)
+        self._split.setStretchFactor(1, 1)
+        self._split.setStretchFactor(2, 3)
+        self._split.setSizes([420, 150, 300])
+
+        self._output.setMinimumHeight(80)
+
         layout = QVBoxLayout(self)
-        layout.addWidget(body_scroll, stretch=3)
+        layout.addWidget(self._split, stretch=1)
         layout.addWidget(self._banner)
-        layout.addWidget(self._output, stretch=1)
+
+    def _toggle_next_steps(self) -> None:
+        self._next_box_collapsed = not self._next_box_collapsed
+        self._next_steps.setVisible(not self._next_box_collapsed)
+        self._next_hint.setVisible(not self._next_box_collapsed)
+        self._next_toggle.setText("▸" if self._next_box_collapsed else "▾")
+        self._next_toggle.setToolTip(
+            "Expand the next-steps list" if self._next_box_collapsed else "Collapse it"
+        )
 
     def set_theme(self, theme_name: str) -> None:
         self._banner.restyle(theme_name)
@@ -343,14 +381,18 @@ class ToolPanel(QWidget):
         row = QWidget()
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
-        self._vuln_button = QPushButton("⚠  Vuln scripts (NSE)")
+        self._vuln_button = QPushButton("⚠  NSE scripts")
         self._vuln_button.setAccessibleName("Run NSE vuln scripts against this service")
         self._vuln_button.clicked.connect(self._emit_vuln_scan)
         self._vuln_mode = QComboBox()
-        self._vuln_mode.setMaximumWidth(230)
-        self._vuln_mode.setAccessibleName("Vuln scan mode")
-        for mode in nse_vuln.MODES:
-            self._vuln_mode.addItem(_VULN_MODE_LABELS[mode], mode)
+        self._vuln_mode.setMinimumWidth(210)
+        self._vuln_mode.setAccessibleName("NSE scan profile")
+        for mode in _MODE_ORDER:
+            spec = nse_profiles.MODE_SPECS[mode]
+            self._vuln_mode.addItem(spec.label, mode)
+        # default to the vulnerability profile: this control exists because a missed `smb-vuln-*`
+        # cost an operator a box. The cheaper profiles are one click away in the dropdown.
+        self._vuln_mode.setCurrentIndex(_MODE_ORDER.index(nse_profiles.MODE_VULN))
         self._vuln_mode.currentIndexChanged.connect(lambda _i: self._sync_vuln_row(self._service))
         self._vuln_hint = QLabel("")
         self._vuln_hint.setWordWrap(True)
@@ -359,47 +401,63 @@ class ToolPanel(QWidget):
         layout.addWidget(self._vuln_hint, stretch=1)
         return row
 
-    def _family_ports(self, service: DiscoveredService, spec: nse_vuln.VulnProfile) -> list[int]:
-        # what the worker will actually scan: every open port of this service family on this box.
-        # The tooltip has to show THAT command, not a single-port approximation of it.
-        open_ports = [
+    def _family_ports(self, service: DiscoveredService, prefixes: tuple[str, ...]) -> list[int]:
+        # what the scan will actually cover: every open port of this service family on this box, so
+        # 139 AND 445 go in one pass. The tooltip must show THAT command, not a one-port
+        # approximation of it.
+        same = [
             s.port
             for s in self._discovered
-            if s.state == "open" and s.proto is service.proto and s.port in spec.ports
+            if s.state == "open"
+            and s.proto is service.proto
+            and nse_profiles.for_service(s.service, s.port, s.product)[1] == prefixes
         ]
-        return sorted(set(open_ports) | {service.port})
+        return sorted(set(same) | {service.port})
 
     def _sync_vuln_row(self, service: DiscoveredService | None) -> None:
         if service is None:
             self._vuln_row.setVisible(False)
             return
         self._vuln_row.setVisible(True)
-        profile = nse_vuln.profile_for(service.service, service.port, service.product)
-        mode = str(self._vuln_mode.currentData() or nse_vuln.MODE_ALL)
+        label, prefixes, _declared = nse_profiles.for_service(
+            service.service, service.port, service.product
+        )
+        mode = str(self._vuln_mode.currentData() or nse_profiles.MODE_ENUM)
+        spec = nse_profiles.MODE_SPECS[mode]
         udp = service.proto is not Proto.TCP
-        if mode == nse_vuln.MODE_TARGETED and not profile.family:
-            # no specific family for this service — say so instead of silently running the category
-            self._vuln_hint.setText(
-                f"{profile.label}: no service-specific script family — this runs the vuln category."
-            )
+        # PREVIEW what will run, before it runs — the operator's own rule about wildcards. This is
+        # the same evaluation the policy gate uses, so the count is what nmap will actually select.
+        scripts = nse_profiles.preview(prefixes, mode)
+        if mode == nse_profiles.MODE_VERSION:
+            self._vuln_hint.setText(f"{label} · -sV --version-all (no scripts)")
+        elif scripts:
+            self._vuln_hint.setText(f"{label} · {len(scripts)} script(s) — {spec.label.lower()}")
         else:
-            self._vuln_hint.setText(f"{profile.label} · {nse_vuln.mode_label(mode, profile)}")
+            self._vuln_hint.setText(f"{label} · no scripts match this profile for this service")
+        gate = nse_profiles.gate_for(mode)
+        warn = ""
+        if gate == "spray":
+            warn = "\n\n⚠ Credential brute — runs only in opt-in Spray mode (§2a)."
+        elif gate == "dangerous":
+            warn = "\n\n⚠ Can crash the service or change state on it. Confirms before running."
+        preview = "\n  ".join(scripts[:14]) + ("\n  …" if len(scripts) > 14 else "")
         self._vuln_button.setToolTip(
-            f"{profile.why}\n\nRuns: "
-            + nse_vuln.build_command(
+            f"{spec.why}{warn}\n\nRuns: "
+            + nse_profiles.build_command(
                 self._service_host_ip or "<target>",
-                self._family_ports(service, profile),
-                mode=mode,
-                profile=profile,
+                tuple(self._family_ports(service, prefixes)),
+                prefixes,
+                mode,
                 proto=service.proto,
             )
             + ("\n\n-sU needs root — run Nabu with sudo, or the scan finds nothing." if udp else "")
+            + (f"\n\nSelects:\n  {preview}" if scripts else "")
         )
 
     def _emit_vuln_scan(self) -> None:
         if self._service is None:
             return
-        mode = str(self._vuln_mode.currentData() or nse_vuln.MODE_ALL)
+        mode = str(self._vuln_mode.currentData() or nse_profiles.MODE_ENUM)
         self.vuln_scan_requested.emit(
             self._service.service,
             self._service.port,

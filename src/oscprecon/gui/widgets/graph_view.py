@@ -6,12 +6,15 @@ import os
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot
+from PySide6.QtCore import QObject, QPoint, Qt, QUrl, Signal, Slot
+from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSplitter,
@@ -76,10 +79,19 @@ def graph_theme(pal: tokens.Palette) -> dict[str, str]:
     }
 
 
+def _node_data(data_json: str) -> dict[str, Any]:
+    try:
+        data = json.loads(data_json)
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 class GraphBridge(QObject):
     """QWebChannel bridge: serves graph data to the JS and persists edits back to graph.json."""
 
     node_selected = Signal(str, object)  # (node id, data dict)
+    node_menu_requested = Signal(str, object, int, int)  # (node id, data dict, page x, page y)
     export_requested = Signal(str, str)  # (format, data — png base64-uri or raw svg)
 
     def __init__(self) -> None:
@@ -100,11 +112,13 @@ class GraphBridge(QObject):
 
     @Slot(str, str)
     def node_clicked(self, node_id: str, data_json: str) -> None:
-        try:
-            data = json.loads(data_json)
-        except json.JSONDecodeError:
-            data = {}
-        self.node_selected.emit(node_id, data if isinstance(data, dict) else {})
+        self.node_selected.emit(node_id, _node_data(data_json))
+
+    @Slot(str, str, int, int)
+    def node_context_menu(self, node_id: str, data_json: str, x: int, y: int) -> None:
+        # the canvas only reports WHERE and WHICH — the menu itself is built in Qt (GraphView) so it
+        # is themed like the rest of the app and reuses the same handlers as the detail panel.
+        self.node_menu_requested.emit(node_id, _node_data(data_json), x, y)
 
     @Slot(str, str)
     def set_status(self, node_id: str, status: str) -> None:
@@ -338,6 +352,7 @@ class ReconSummaryTree(QWidget):
     """
 
     node_activated = Signal(str, object)  # (node id, data dict) — mirrors GraphBridge.node_selected
+    node_menu_requested = Signal(str, object, QPoint)  # (node id, data dict, global position)
 
     def __init__(self) -> None:
         super().__init__()
@@ -355,6 +370,10 @@ class ReconSummaryTree(QWidget):
         self._tree.setHeaderHidden(True)
         self._tree.setAccessibleName("Recon summary")
         self._tree.itemClicked.connect(self._on_item)
+        # the same right-click menu as the canvas, so every action stays reachable when the web view
+        # can't render (headless / no-GPU VM) — this tree IS the graph there.
+        self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._tree.customContextMenuRequested.connect(self._on_tree_menu)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -508,6 +527,15 @@ class ReconSummaryTree(QWidget):
         if isinstance(payload, tuple) and len(payload) == 2:
             self.node_activated.emit(payload[0], payload[1])
 
+    def _on_tree_menu(self, pos: QPoint) -> None:
+        item = self._tree.itemAt(pos)
+        viewport = self._tree.viewport()
+        if item is None or viewport is None:
+            return
+        payload = item.data(0, Qt.ItemDataRole.UserRole)
+        if isinstance(payload, tuple) and len(payload) == 2:
+            self.node_menu_requested.emit(payload[0], payload[1], viewport.mapToGlobal(pos))
+
 
 class GraphView(QWidget):
     service_open_requested = Signal(int, str)  # (port, proto) — jump to the three-pane tooling
@@ -517,6 +545,7 @@ class GraphView(QWidget):
         self._profile: Profile | None = None
         self._bridge = GraphBridge()
         self._bridge.node_selected.connect(self._on_node_selected)
+        self._bridge.node_menu_requested.connect(self._on_canvas_menu)
         self._web: QWebEngineView | None = None
         self._loaded = False  # the web page has finished its initial load at least once
         self._theme_json = json.dumps(graph_theme(tokens.active_palette()))
@@ -524,6 +553,9 @@ class GraphView(QWidget):
         if _webview_enabled():
             try:
                 self._web = QWebEngineView()
+                # kill Chromium's "Reload / View source" menu — right-click on the canvas belongs to
+                # the node menu below (app.js also preventDefaults it, for the non-node areas)
+                self._web.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
                 channel = QWebChannel(self._web)
                 channel.registerObject("bridge", self._bridge)
                 page = self._web.page()
@@ -540,6 +572,7 @@ class GraphView(QWidget):
         # native, always-available surface — lists the scan even when the canvas can't render
         self._summary = ReconSummaryTree()
         self._summary.node_activated.connect(self._on_node_selected)
+        self._summary.node_menu_requested.connect(self._on_summary_menu)
 
         self._detail = GraphDetail()
         self._detail.status_changed.connect(self._on_status_changed)
@@ -641,6 +674,124 @@ class GraphView(QWidget):
     def _on_note_saved(self, node_id: str, note: str) -> None:
         self._bridge.add_note(node_id, note)
         self.reload()
+
+    def _on_canvas_menu(self, node_id: str, data: object, x: int, y: int) -> None:
+        # x/y are page coordinates from the canvas; the web view's origin maps them to the screen
+        anchor: QWidget = self._web if self._web is not None else self
+        self._popup_node_menu(node_id, data, anchor.mapToGlobal(QPoint(x, y)))
+
+    def _on_summary_menu(self, node_id: str, data: object, position: QPoint) -> None:
+        self._popup_node_menu(node_id, data, position)
+
+    def _popup_node_menu(self, node_id: str, data: object, position: QPoint) -> None:
+        payload = data if isinstance(data, dict) else {}
+        self._on_node_selected(node_id, payload)  # right-click selects too, so the panel agrees
+        menu = self.build_node_menu(node_id, payload)
+        menu.exec(position)
+        menu.deleteLater()
+
+    def build_node_menu(self, node_id: str, data: dict[str, Any]) -> QMenu:
+        # the right-click twin of GraphDetail: every action the node supports, in one themed menu
+        menu = QMenu(self)
+        node_type = str(data.get("type", ""))
+        label = str(data.get("label", node_id)).replace("\n", " · ")
+        shown = label if len(label) <= 48 else label[:47] + "…"
+        title = menu.addAction(shown.replace("&", "&&"))  # never eat an & as a menu mnemonic
+        title.setEnabled(False)
+        menu.addSeparator()
+
+        port = data.get("port")
+        # a "hostservice-…" node belongs to a PIVOTED host, whose ports aren't in the entry target's
+        # service tree — offering the jump there would silently do nothing, so only entry services.
+        if node_type == "service" and node_id.startswith("service-") and isinstance(port, int):
+            proto = str(data.get("proto", "tcp"))
+            jump = menu.addAction("Select in service tree →")
+            jump.triggered.connect(
+                lambda _checked=False, p=port, pr=proto: self.service_open_requested.emit(p, pr)
+            )
+
+        if self._bridge._writable():
+            note = menu.addAction("Edit note…" if data.get("note") else "Add note…")
+            note.triggered.connect(lambda _checked=False: self._prompt_note(node_id, data))
+            menu.addSeparator()
+            current = str(data.get("status", ""))
+            for status in _STATUSES:
+                mark = menu.addAction(f"Mark as {status}")
+                mark.setCheckable(True)
+                mark.setChecked(status == current)  # clicking the checked one clears it (toggle)
+                mark.triggered.connect(
+                    lambda _checked=False, s=status: self._menu_set_status(node_id, data, s)
+                )
+        elif self._profile is not None:  # no profile at all = nothing to say "read-only" about
+            locked = menu.addAction("Read-only project — status / notes disabled")
+            locked.setEnabled(False)
+        menu.addSeparator()
+
+        copy_label = menu.addAction("Copy label")
+        copy_label.triggered.connect(lambda _checked=False: self._copy(label))
+        ip = str(data.get("ip", ""))
+        if ip:
+            copy_ip = menu.addAction("Copy IP")
+            copy_ip.triggered.connect(lambda _checked=False: self._copy(ip))
+        cidr = str(data.get("cidr", ""))
+        if cidr:
+            copy_cidr = menu.addAction("Copy subnet")
+            copy_cidr.triggered.connect(lambda _checked=False: self._copy(cidr))
+        endpoint = self._endpoint(data)
+        if endpoint:
+            copy_endpoint = menu.addAction("Copy as target:port")
+            copy_endpoint.triggered.connect(lambda _checked=False: self._copy(endpoint))
+
+        if self._profile is not None:
+            directory = self._profile.directory
+            menu.addSeparator()
+            open_dir = menu.addAction("Open project folder")
+            open_dir.triggered.connect(
+                lambda _checked=False: QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory)))
+            )
+        return menu
+
+    def _endpoint(self, data: dict[str, Any]) -> str:
+        port = data.get("port")
+        if not isinstance(port, int):
+            return ""
+        owner = str(data.get("owner", ""))
+        # a pivoted host's service is reached at THAT host's ip, not the entry target's
+        host = owner[5:] if owner.startswith("host-") else ""
+        if not host and self._profile is not None:
+            host = self._profile.target.ip
+        return f"{host}:{port}" if host else ""
+
+    @staticmethod
+    def _copy(text: str) -> None:
+        clipboard = QGuiApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(text)
+
+    def _menu_set_status(self, node_id: str, data: dict[str, Any], status: str) -> None:
+        new_status = "" if status == str(data.get("status", "")) else status
+        self._on_status_changed(node_id, new_status)
+        updated = dict(data)
+        if new_status:
+            updated["status"] = new_status
+        else:
+            updated.pop("status", None)
+        self._detail.show_node(node_id, updated)
+
+    def _prompt_note(self, node_id: str, data: dict[str, Any]) -> None:
+        label = str(data.get("label", node_id)).replace("\n", " · ")
+        text, ok = QInputDialog.getMultiLineText(
+            self, "Node note", f"Note for {label}", str(data.get("note", ""))
+        )
+        if not ok:
+            return
+        self._on_note_saved(node_id, text)
+        updated = dict(data)
+        if text.strip():
+            updated["note"] = text.strip()
+        else:
+            updated.pop("note", None)
+        self._detail.show_node(node_id, updated)
 
     def _on_export(self, image_format: str, data: str) -> None:
         is_svg = image_format == "svg"

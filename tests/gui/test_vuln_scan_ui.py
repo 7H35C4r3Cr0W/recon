@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pytestqt.qtbot import QtBot
 
-from oscprecon import nse_vuln
+from oscprecon import nse_profiles
 from oscprecon.gui.main_window import MainWindow
 from oscprecon.gui.task_manager import NMAP_LANE, TOOL_LANE, TaskManager
 from oscprecon.gui.widgets.tool_panel import ToolPanel
@@ -44,7 +44,7 @@ def test_vuln_button_emits_the_selected_service_and_port(qtbot: QtBot) -> None:
     panel.show_service(_service(445, "microsoft-ds"), None)
     with qtbot.waitSignal(panel.vuln_scan_requested, timeout=1000) as blocker:
         panel._vuln_button.click()
-    assert blocker.args == ["microsoft-ds", 445, nse_vuln.MODE_ALL, "tcp", ""]
+    assert blocker.args == ["microsoft-ds", 445, nse_profiles.MODE_VULN, "tcp", ""]
 
 
 def test_vuln_row_names_the_service_family_it_will_check(qtbot: QtBot) -> None:
@@ -81,7 +81,7 @@ def test_vuln_scan_uses_the_nmap_lane_so_it_runs_beside_other_work(
         "_start",
         lambda worker, label, on_done, **kw: launched.append((label, kw.get("lane", TOOL_LANE))),
     )
-    window._on_vuln_scan("microsoft-ds", 445, nse_vuln.MODE_ALL, "tcp")
+    window._on_vuln_scan("microsoft-ds", 445, nse_profiles.MODE_VULN, "tcp")
     assert launched == [("vuln:microsoft-ds:445", NMAP_LANE)]
 
 
