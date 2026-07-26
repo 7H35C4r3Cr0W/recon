@@ -138,11 +138,29 @@ def test_an_unknown_mode_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert "--mode must be one of" in result.output
 
 
-def test_safe_mode_drops_the_dos_checks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_enum_profile_excludes_the_dangerous_categories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # "safe enumeration" must be exactly that: no brute, no DoS, no exploit, no fuzzer.
     _box(tmp_path)
     commands = _stub_shell(monkeypatch, FIXTURE.read_text(encoding="utf-8"))
-    runner.invoke(app, ["vuln", "smb", "-p", "box", "--mode", "safe", "--workspace", str(tmp_path)])
-    assert "safe" in commands[0]
+    result = runner.invoke(
+        app, ["vuln", "smb", "-p", "box", "--mode", "enum", "--workspace", str(tmp_path)]
+    )
+    assert result.exit_code == 0
+    assert "not (brute or dos or exploit or intrusive or fuzzer)" in commands[0]
+
+
+def test_the_brute_profile_is_refused_while_spray_mode_is_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # §2a: iterating credentials is opt-in and OFF by default, whichever surface asks for it
+    _box(tmp_path)
+    result = runner.invoke(
+        app, ["vuln", "smb", "-p", "box", "--mode", "brute", "--workspace", str(tmp_path)]
+    )
+    assert result.exit_code == 2
+    assert "Spray mode" in result.output
 
 
 def test_a_box_with_no_services_says_to_scan_first(

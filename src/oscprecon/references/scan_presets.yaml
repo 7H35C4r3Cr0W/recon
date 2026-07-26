@@ -220,7 +220,7 @@
 - category: "Version & scripts"
   description: "Default + safe scripts"
   why: "Versions plus the 'default' AND 'safe' NSE categories — broader than -sC, still non-intrusive."
-  command: "nmap -sV --script \"default,safe\" {target}"
+  command: "nmap -sV --script 'default,safe and not external' {target}"
 
 - category: "Version & scripts"
   description: "Discovery scripts"
@@ -381,7 +381,7 @@
 - category: "OS & vulnerability"
   description: "Safe vuln scripts only (less noisy)"
   why: "Only the vuln scripts also tagged 'safe' — flags weaknesses without the intrusive checks."
-  command: "nmap -sV --script \"vuln and safe\" {target}"
+  command: "nmap -sV --script 'vuln and safe and not external' {target}"
 
 - category: "OS & vulnerability"
   description: "HTTP vuln scripts (web weaknesses)"

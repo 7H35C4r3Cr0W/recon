@@ -130,7 +130,7 @@ def test_vuln_records_the_same_vuln_scan_event_the_gui_does(
     actions = _actions(tmp_path / "box")
     assert actions == ["run", "vuln-scan", "run-finished"]
     details = _details(tmp_path / "box", "vuln-scan")
-    assert details["service"] == "smb" and details["mode"] == "all"
+    assert details["service"] == "smb" and details["mode"] == "vuln"
     assert details["host"] == "10.10.10.100" and details["port"] == 445
 
 
