@@ -1,0 +1,3 @@
+SMB         10.10.10.5      445    DC01             [+] active.htb\svc_account:Ticketmaster1968
+SMB         10.10.10.5      445    DC01             //10.10.10.5/Replication/active.htb/Policies/{31B2F340}/GPT.INI
+SMB         10.10.10.5      445    DC01             //10.10.10.5/Team Share/passwords.xlsx

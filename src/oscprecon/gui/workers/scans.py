@@ -28,6 +28,9 @@ class PingWorker(CancellableThread):
     def run(self) -> None:
         try:
             command = alive.build_alive_command(self._target)
+            # §24 / "no hidden magic": the pre-flight check is a real nmap command like any other —
+            # show it. It used to stream its output with nothing saying what had been run.
+            self.line.emit(f"$ {command}")
             shell.run(
                 command,
                 self._output_file,

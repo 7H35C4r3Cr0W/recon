@@ -13,6 +13,7 @@ from oscprecon import doctor as doctor_mod
 from oscprecon.models import Target
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.profile import Profile
+from oscprecon.recon_auth import ReconAuth
 from oscprecon.reporter import Reporter
 from oscprecon.workspace import portability
 
@@ -138,6 +139,12 @@ def scan(
         "--force",
         help="Re-run every command even when prior output exists (overrides --resume).",
     ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Print the exact nmap commands this battery would run, then exit. Scans nothing, "
+        "creates nothing.",
+    ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     """Run staged nmap recon against a target and save findings to a profile.
@@ -166,6 +173,7 @@ def scan(
     nabu-cli scan 10.10.10.5 -p box --scan-profile exam    # full sweep, rate-boosted
     nabu-cli scan target.htb -p box --hostname target.htb --udp-full   # + full UDP sweep
     nabu-cli scan 10.10.10.5 -p box --resume               # continue; skip finished commands
+    nabu-cli scan 10.10.10.5 -p box --dry-run              # show the exact nmap syntax, run nothing
     ```
     """
     root = workspace if workspace is not None else config.workspace_root()
@@ -184,6 +192,17 @@ def scan(
     except ValueError as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(2) from exc
+    if dry_run:
+        # "show me the syntax" must not require committing to a scan — or to creating a project.
+        from oscprecon.modules.nmap import NmapModule
+
+        planned = NmapModule(scan_profile=profile_choice, udp_full=udp_full).plan(target)
+        typer.echo(f"[dry-run] scan profile '{profile_choice}' — {len(planned)} nmap command(s):")
+        for index, cmd in enumerate(planned, start=1):
+            typer.echo(f"  {index}. {cmd.shell_line}")
+            typer.echo(f"     └ {cmd.why} [{cmd.expected_runtime_hint}] → {cmd.output_file}")
+        typer.echo("\n[dry-run] nothing ran and no project was created.")
+        raise typer.Exit(0)
     directory = Path(root) / profile
     # why: an EXISTING profile is always LOADED, never re-created — Profile.create overwrites
     # profile.json and erases command_history/tags/started_at (bug #2: re-running `scan` on a
@@ -1004,24 +1023,81 @@ def _tier1_enum_steps(
 # services whose Tier-1 recon is a conditional SEQUENCE, not a flat list of commands — they run the
 # shared engine in `service_enum`, which is also what the GUI panels drive.
 _ENGINE_SERVICES = frozenset({"smb", "ftp", "ssh", "dns", "ldap"})
+# of those, the ones an operator-supplied credential CHANGES. ssh recon is key/algorithm
+# enumeration and dns recon is protocol queries — neither has an authenticated pass, so `--as ssh`
+# must be refused rather than silently running the anonymous one under a credentialed-looking flag.
+_CRED_ENGINE_SERVICES = frozenset({"smb", "ftp", "ldap"})
 
 
-def _run_engine_enum(service: str, prof: Profile, port: int) -> None:
+def _credentialed_services() -> list[str]:
+    from oscprecon.gui.simple_recon import SIMPLE_SPECS
+
+    return sorted(
+        _CRED_ENGINE_SERVICES | {k for k, s in SIMPLE_SPECS.items() if s.auth_steps_fn is not None}
+    )
+
+
+def _resolve_auth(prof: Profile, as_user: str) -> ReconAuth | None:
+    """`--as <user>` / `--as <user@domain>` / `--as guest` -> the identity to enumerate as.
+
+    Resolves against the project's OWN vault only: this runs a credential the operator already
+    collected, never one typed at the prompt (which would land in shell history and in `ps`).
+    """
+    wanted = as_user.strip()
+    if not wanted:
+        return None
+    if wanted.lower() == "guest":
+        return ReconAuth.guest()
+    user, _, domain = wanted.partition("@")
+    matches = [
+        c
+        for c in prof.credentials()
+        if c.username.lower() == user.lower()
+        and c.secret
+        and (not domain or c.domain.lower() == domain.lower())
+    ]
+    if not matches:
+        known = sorted({c.username for c in prof.credentials() if c.secret})
+        available = ", ".join(known) if known else "none yet — add one with `nabu-cli creds add`"
+        typer.echo(
+            f"[error] no vault credential for '{wanted}'. Available: {available}",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if len(matches) > 1:
+        # never guess between two secrets for the same name — say what they are and how to choose
+        detail = "; ".join(
+            f"{c.username}@{c.domain or '(no domain)'} from {c.source or 'unknown source'}"
+            for c in matches
+        )
+        typer.echo(
+            f"[error] '{wanted}' matches {len(matches)} vault entries — {detail}. "
+            f"Disambiguate with --as {user}@<domain>, or drop the stale one "
+            f"with `nabu-cli creds rm`.",
+            err=True,
+        )
+        raise typer.Exit(2)
+    return ReconAuth.from_credential(matches[0])
+
+
+def _run_engine_enum(service: str, prof: Profile, port: int, auth: ReconAuth | None = None) -> None:
     from oscprecon import findings as findings_mod
     from oscprecon import service_enum
 
     target = prof.target
+    if auth is not None:
+        typer.echo(f"[enum] authenticating as {auth.label}")
     engine: service_enum.EnumEngine
     if service == "smb":
-        engine = service_enum.SmbEnum(prof, "full", typer.echo)
+        engine = service_enum.SmbEnum(prof, "full", typer.echo, None, auth)
     elif service == "ftp":
-        engine = service_enum.FtpEnum(prof, "full", port, typer.echo)
+        engine = service_enum.FtpEnum(prof, "full", port, typer.echo, None, auth)
     elif service == "ssh":
         engine = service_enum.SshEnum(prof, port, typer.echo)
     elif service == "dns":
         engine = service_enum.DnsEnum(prof, target.hostname or "", port, typer.echo)
     else:
-        engine = service_enum.LdapEnum(prof, "", port, typer.echo)
+        engine = service_enum.LdapEnum(prof, "", port, typer.echo, None, auth)
     result = engine.run()
     for line in result.summary:
         typer.echo(f"  {line}")
@@ -1033,7 +1109,9 @@ def _run_engine_enum(service: str, prof: Profile, port: int) -> None:
     typer.echo(f"\n[enum] {service}: {recorded} finding(s) recorded in this project")
 
 
-def _run_full_module_enum(service: str, profile: str, workspace: Path | None, port: int) -> None:
+def _run_full_module_enum(
+    service: str, profile: str, workspace: Path | None, port: int, as_user: str = ""
+) -> None:
     # run a full recon Module (native Tier-1 steps -> shell.run -> parse -> record findings),
     # mirroring the GUI's bespoke workers so http/ssh/ftp/dns/ldap/smb/smtp/vhost are enum-runnable.
     import importlib
@@ -1103,20 +1181,45 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
                 f"{prof.target.ip} instead. For a name-based vhost, add "
                 f"'{prof.target.ip} {prof.target.hostname}' to /etc/hosts and re-run."
             )
+    if service in _ENGINE_SERVICES and as_user and service not in _CRED_ENGINE_SERVICES:
+        typer.echo(
+            f"[error] --as is not supported for '{service}' — "
+            f"credentialed enumeration is wired for: {', '.join(_credentialed_services())}",
+            err=True,
+        )
+        raise typer.Exit(2)
     if service in _ENGINE_SERVICES:
         # smb/ftp/ssh/dns/ldap run the SHARED engine — the same conditional sequence the GUI panel
         # drives (SMB null -> guest -> follow-ups -> share walk -> peek; FTP's bounded BFS + peek).
         # The CLI used to run only each module's FIRST phase and stop, so `enum smb` and the SMB
         # panel's "Run full SMB recon" did visibly different amounts of work. [parity]
+        auth = _resolve_auth(prof, as_user)
         engine_label = f"{service}:{probe_port}"
         _audit_profile(
-            prof, "run", label=engine_label, lane=_TOOL_LANE, module=service, port=probe_port
+            prof,
+            "run",
+            label=engine_label,
+            lane=_TOOL_LANE,
+            module=service,
+            port=probe_port,
+            # §6a: the identity is part of what happened, the SECRET never is
+            **({"as_user": auth.username} if auth is not None else {}),
         )
         try:
-            _run_engine_enum(service, prof, probe_port)
+            _run_engine_enum(service, prof, probe_port, auth)
         finally:
             _audit_profile(prof, "run-finished", label=engine_label)
         return
+    if as_user:
+        # §24 no silent failures: --as only means something where an authenticated pass exists, and
+        # silently running an anonymous pass under a credentialed-looking command is exactly the
+        # confusion this feature exists to remove.
+        typer.echo(
+            f"[error] --as is not supported for '{service}' — "
+            f"credentialed enumeration is wired for: {', '.join(_credentialed_services())}",
+            err=True,
+        )
+        raise typer.Exit(2)
     raw: dict[str, str] = {}
     issues: list[str] = []
     steps = _tier1_enum_steps(service, module, prof.target, probe_port, ports)
@@ -1216,11 +1319,22 @@ def enum_cmd(
         None, "--profile", "-p", help="Profile name (folder under workspace)."
     ),
     port: int = typer.Option(0, "--port", help="Override the discovered port (0 = the default)."),
+    as_user: str = typer.Option(
+        "",
+        "--as",
+        help="Enumerate as a VAULT credential instead of anonymously "
+        "(smb/ftp/ldap/winrm/mssql/rdp/mysql/postgresql). "
+        "Give a username, 'user@domain', or 'guest'.",
+    ),
     workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     """Run a service's Tier-1 recon headlessly (the same enumeration the GUI service panels run).
 
     Uses the profile's target and the discovered port for that service (override with `--port`).
+
+    Anonymous by default. Once you have found a credential, `--as <user>` re-runs the SAME
+    enumeration authenticated — it draws the secret from the project vault (never the command line),
+    and writes into its own `<service>/as-<user>/` output folder so the two passes stay separate.
 
     **Examples:**
 
@@ -1229,6 +1343,8 @@ def enum_cmd(
     nabu-cli enum smb -p box            # SMB null-session / guest / shares recon
     nabu-cli enum http -p box           # HTTP fingerprint + content-discovery leads
     nabu-cli enum ldap -p box --port 3268   # override the discovered port
+    nabu-cli enum smb -p box --as svc_account       # authenticated SMB enumeration
+    nabu-cli enum ldap -p box --as j.doe@corp.htb   # bind as a domain user
     ```
     """
     from datetime import UTC, datetime
@@ -1249,11 +1365,18 @@ def enum_cmd(
     if spec is None:
         # not a simple-spec service — try the richer full recon modules (http/ssh/ftp/dns/ldap/…)
         if service in _FULL_ENUM_MODULES:
-            _run_full_module_enum(service, profile, workspace, port)
+            _run_full_module_enum(service, profile, workspace, port, as_user)
             raise typer.Exit(0)
         runnable = ", ".join(sorted(set(SIMPLE_SPECS) | set(_FULL_ENUM_MODULES)))
         typer.echo(
             f"[error] '{service}' is not a runnable enum service. Choose one of: {runnable}",
+            err=True,
+        )
+        raise typer.Exit(2)
+    if as_user and spec.auth_steps_fn is None:
+        typer.echo(
+            f"[error] --as is not supported for '{service}' — "
+            f"credentialed enumeration is wired for: {', '.join(_credentialed_services())}",
             err=True,
         )
         raise typer.Exit(2)
@@ -1281,13 +1404,30 @@ def enum_cmd(
         )
     raw: dict[str, str] = {}
     issues: list[str] = []
+    # resolve --as BEFORE the audited run opens: an unknown username must not leave a "run" entry
+    # in the audit trail for work that never happened.
+    auth = _resolve_auth(prof, as_user)
     # probe_port stays 0 when the scan never found this service (the tool then uses its own
     # default), and "mssql:0" would read as a port — label it by service alone in that case.
     label = f"{spec.module}:{probe_port}" if probe_port else spec.module
     with _audited_run(
-        prof, label, lane=_TOOL_LANE, module=spec.module, port=probe_port
+        prof,
+        label,
+        lane=_TOOL_LANE,
+        module=spec.module,
+        port=probe_port,
+        **({"as_user": auth.username} if auth is not None else {}),
     ) as run_details:
-        for command, tool in spec.steps_fn(prof.target, probe_port):
+        steps = list(spec.steps_fn(prof.target, probe_port))
+        # `not auth.anonymous` matters: `--as guest` against mysql/winrm/… would build
+        # `-u guest -p ''`, which is a GUESS at a well-known account — §11 Tier 2, never automatic.
+        # Only a credential the operator actually holds gets an authenticated pass here.
+        if auth is not None and not auth.anonymous and spec.auth_steps_fn is not None:
+            # the authenticated pass ADDS to the fingerprint here — these services have no anonymous
+            # phase for it to duplicate, and the banner is still worth having.
+            typer.echo(f"[{spec.module}] authenticating as {auth.label}")
+            steps += spec.auth_steps_fn(prof.target, probe_port, auth)
+        for command, tool in steps:
             out = prof.directory / command.output_file
             result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
             if result.missing_tool is not None:

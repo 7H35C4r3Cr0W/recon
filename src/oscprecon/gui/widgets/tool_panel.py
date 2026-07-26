@@ -92,12 +92,12 @@ class ToolPanel(QWidget):
     wildcard_detect_requested = Signal(str, str)
     enumerate_as_http_requested = Signal(str)
     vhost_validation_failed = Signal(str)
-    smb_recon_requested = Signal(str)  # mode: full | null | guest | shares
-    ftp_recon_requested = Signal(str, int)  # (mode: full | anon, port)
+    smb_recon_requested = Signal(str, object)  # (mode, ReconAuth | None)
+    ftp_recon_requested = Signal(str, int, object)  # (mode, port, ReconAuth | None)
     ssh_recon_requested = Signal(int)  # port
     dns_recon_requested = Signal(str, int)  # (domain, port)
-    ldap_recon_requested = Signal(str, int)  # (basedn, port)
-    simple_recon_requested = Signal(str, int)  # (module name, discovered service port)
+    ldap_recon_requested = Signal(str, int, object)  # (basedn, port, ReconAuth | None)
+    simple_recon_requested = Signal(str, int, object)  # (module, port, ReconAuth | None)
     # (service name, port, mode, proto, host_ip). proto matters: a UDP service scanned over TCP
     # comes back "clean" and the operator believes it. host_ip aims it at a PIVOTED host, not the
     # entry box — every other panel already receives it.
@@ -310,6 +310,15 @@ class ToolPanel(QWidget):
         self._ldap.set_profile(profile)
         for panel in self._simple.values():
             panel.set_profile(profile)
+
+    def refresh_credentials(self) -> None:
+        # a credential found mid-session must reach the "Run as" pickers immediately — that is the
+        # whole point of the feature (http enum yields a password -> re-run SMB/LDAP/FTP as them).
+        self._smb.refresh_credentials()
+        self._ftp.refresh_credentials()
+        self._ldap.refresh_credentials()
+        for panel in self._simple.values():
+            panel.refresh_credentials()
 
     def show_service(
         self, service: DiscoveredService | None, ref: ServiceRef | None, host_ip: str = ""

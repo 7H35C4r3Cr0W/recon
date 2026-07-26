@@ -1,0 +1,4 @@
+SMB         10.10.10.5      445    DC01             [+] active.htb\svc_account:Ticketmaster1968
+SMB         10.10.10.5      445    DC01             [+] Enumerated loggedon users
+SMB         10.10.10.5      445    DC01             active.htb\Administrator             logon_server: DC01
+SMB         10.10.10.5      445    DC01             active.htb\svc_tgs                   logon_server: DC01

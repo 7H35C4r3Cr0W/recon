@@ -4,6 +4,7 @@ from PySide6.QtCore import Signal
 
 from oscprecon.gui.workers.base import CancellableThread
 from oscprecon.profile import Profile
+from oscprecon.recon_auth import ReconAuth
 from oscprecon.service_enum import (
     CANCELLED_NOTE,
     DnsEnum,
@@ -61,24 +62,30 @@ class _ReconWorker(CancellableThread):
 
 
 class SmbReconWorker(_ReconWorker):
-    def __init__(self, profile: Profile, mode: str) -> None:
+    def __init__(self, profile: Profile, mode: str, auth: ReconAuth | None = None) -> None:
         super().__init__()
         self._profile = profile
         self._mode = mode
+        self._auth = auth
 
     def _build(self) -> SmbEnum:
-        return SmbEnum(self._profile, self._mode, self.line.emit, self._cancel)
+        return SmbEnum(self._profile, self._mode, self.line.emit, self._cancel, self._auth)
 
 
 class FtpReconWorker(_ReconWorker):
-    def __init__(self, profile: Profile, mode: str, port: int) -> None:
+    def __init__(
+        self, profile: Profile, mode: str, port: int, auth: ReconAuth | None = None
+    ) -> None:
         super().__init__()
         self._profile = profile
         self._mode = mode
         self._port = port
+        self._auth = auth
 
     def _build(self) -> FtpEnum:
-        return FtpEnum(self._profile, self._mode, self._port, self.line.emit, self._cancel)
+        return FtpEnum(
+            self._profile, self._mode, self._port, self.line.emit, self._cancel, self._auth
+        )
 
 
 class SshReconWorker(_ReconWorker):
@@ -103,11 +110,16 @@ class DnsReconWorker(_ReconWorker):
 
 
 class LdapReconWorker(_ReconWorker):
-    def __init__(self, profile: Profile, basedn: str, port: int) -> None:
+    def __init__(
+        self, profile: Profile, basedn: str, port: int, auth: ReconAuth | None = None
+    ) -> None:
         super().__init__()
         self._profile = profile
         self._basedn = basedn
         self._port = port
+        self._auth = auth
 
     def _build(self) -> LdapEnum:
-        return LdapEnum(self._profile, self._basedn, self._port, self.line.emit, self._cancel)
+        return LdapEnum(
+            self._profile, self._basedn, self._port, self.line.emit, self._cancel, self._auth
+        )

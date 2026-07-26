@@ -446,12 +446,96 @@ def _dedup_findings(findings: list[SmbFinding]) -> list[SmbFinding]:
     return unique
 
 
+# smbmap's per-share table: "\tSHARENAME     READ, WRITE\tRemark". Wanted because smbmap and
+# netexec disagree often enough to matter — smbmap walks each share to prove the permission, netexec
+# reports what the server claims, and on a real box one of them is right and the other is not.
+_SMBMAP_ROW = re.compile(
+    r"^\s*(?P<share>\S(?:.*?\S)?)(?:\t|\s{2,})\s*"
+    r"(?P<perm>NO ACCESS|READ ONLY|READ, WRITE|WRITE ONLY)\b",
+    re.IGNORECASE,
+)
+_SMBMAP_PERMS = {
+    "no access": "",
+    "read only": "READ",
+    "write only": "WRITE",
+    "read, write": "READ,WRITE",
+}
+
+
+def parse_smbmap(text: str) -> list[SmbFinding]:
+    findings: list[SmbFinding] = []
+    for line in text.splitlines():
+        match = _SMBMAP_ROW.match(line)
+        if match is None:
+            continue
+        share = match.group("share").strip()
+        if not share or share.lower() in ("disk", "share", "-----", "permissions"):
+            continue
+        findings.append(SmbFinding("share", share, _SMBMAP_PERMS[match.group("perm").lower()]))
+    return findings
+
+
+def _nxc_table_rows(text: str, kind: str, skip_prefixes: tuple[str, ...] = ()) -> list[SmbFinding]:
+    # netexec prints --groups / --local-groups / --loggedon-users as prefixed fixed-width tables;
+    # the first column is the name and everything after it is context worth keeping in the detail.
+    findings: list[SmbFinding] = []
+    for line in text.splitlines():
+        rest = _nxc_rest(line)
+        if rest is None:
+            continue
+        rest = rest.strip()
+        if not rest or rest.startswith("[") or rest.startswith(skip_prefixes):
+            continue
+        cols = re.split(r"\s{2,}", rest)
+        name = cols[0].strip()
+        if not name or name.startswith("-"):
+            continue
+        if "\\" in name:  # DOMAIN\name — keep the bare name, the domain is already known
+            name = name.rsplit("\\", 1)[1]
+        findings.append(SmbFinding(kind, name, " ".join(c.strip() for c in cols[1:]).strip()))
+    return findings
+
+
+def parse_netexec_groups(text: str) -> list[SmbFinding]:
+    return _nxc_table_rows(text, "group", ("-Group Name-", "Group Name"))
+
+
+def parse_netexec_local_groups(text: str) -> list[SmbFinding]:
+    return _nxc_table_rows(text, "group", ("-Group Name-", "Group Name"))
+
+
+def parse_netexec_loggedon(text: str) -> list[SmbFinding]:
+    return _nxc_table_rows(text, "session", ("-Users-", "Users"))
+
+
+_SPIDER_FILE = re.compile(r"^//\S+/(?P<path>\S.*?)\s*$")
+
+
+def parse_netexec_spider(text: str) -> list[SmbFinding]:
+    # --spider-plus streams "//host/Share/path/file" lines plus a JSON summary; the paths are the
+    # useful part — a file index across every readable share, with nothing downloaded.
+    findings: list[SmbFinding] = []
+    for line in text.splitlines():
+        rest = _nxc_rest(line)
+        candidate = (rest if rest is not None else line).strip()
+        match = _SPIDER_FILE.match(candidate)
+        if match is None:
+            continue
+        findings.append(SmbFinding("file", match.group("path"), "via spider"))
+    return findings
+
+
 _PARSERS = {
     "enum4linux": parse_enum4linux,
     "netexec-shares": parse_netexec_shares,
     "netexec-users": parse_netexec_users,
     "netexec-ridbrute": parse_netexec_ridbrute,
     "netexec-passpol": parse_netexec_passpol,
+    "netexec-groups": parse_netexec_groups,
+    "netexec-localgroups": parse_netexec_local_groups,
+    "netexec-loggedon": parse_netexec_loggedon,
+    "netexec-spider": parse_netexec_spider,
+    "smbmap": parse_smbmap,
     "smbclient-shares": parse_smbclient_shares,
     "rpcclient-users": parse_rpcclient_users,
 }

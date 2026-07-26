@@ -21,6 +21,7 @@ from oscprecon.modules.smb.parsers import (
     strip_smbclient_noise,
     writable_shares,
 )
+from oscprecon.recon_auth import ReconAuth
 
 __all__ = [
     "PEEK_MAX_FILES",
@@ -30,6 +31,7 @@ __all__ = [
     "SmbModule",
     "SmbStep",
     "anon_credential",
+    "credentialed_credential",
     "backslash_unc",
     "escaped_unc",
     "forward_unc",
@@ -100,8 +102,15 @@ def anon_credential(target: Target, method: str) -> Credential:
     )
 
 
-def _method_user(method: str) -> str:
-    return "guest" if method == "guest" else ""
+def credentialed_credential(target: Target, auth: ReconAuth) -> Credential:
+    return Credential(
+        username=auth.username,
+        secret=auth.secret,
+        secret_type=auth.secret_type,
+        domain=auth.domain or target.hostname or "",
+        source="smb-authenticated-enum",
+        notes="SMB authenticated session succeeded",
+    )
 
 
 class SmbModule(Module):
@@ -200,78 +209,167 @@ class SmbModule(Module):
             ),
         ]
 
-    def followup_steps(self, target: Target, method: str) -> list[SmbStep]:
+    def credentialed_steps(self, target: Target, auth: ReconAuth) -> list[SmbStep]:
+        # The same share/permission enumeration as null_session_steps/guest_steps, but as a
+        # credential the operator already holds. Not a guess and not a tier change (§11 is about
+        # GUESSING) — this is the authenticated enumeration you run the moment http/ftp/a share
+        # hands you a password, and it returns far more than any anonymous pass.
         host = target.ip
-        user = _method_user(method)
+        base = f"smb/{auth.output_slug}"
         return [
             SmbStep(
                 Command(
                     "smb",
-                    f"netexec smb {host} -u '{user}' -p '' --users",
+                    f"netexec smb {host} {auth.netexec_args()} --shares",
+                    f"Shares + permissions as {auth.label}.",
+                    "< 30s",
+                    f"{base}/netexec-shares.txt",
+                ),
+                "netexec-shares",
+            ),
+            SmbStep(
+                Command(
+                    "smb",
+                    f"smbclient -L //{host}/ {auth.smbclient_auth()}",
+                    f"List shares as {auth.label}.",
+                    "< 30s",
+                    f"{base}/smbclient-L.txt",
+                ),
+                "smbclient-shares",
+            ),
+            SmbStep(
+                Command(
+                    "smb",
+                    f"smbmap -H {host} {auth.smbmap_args()}",
+                    "Share permissions with read/write flags per share.",
+                    "< 1 min",
+                    f"{base}/smbmap.txt",
+                ),
+                "smbmap",
+            ),
+        ]
+
+    def followup_steps(self, target: Target, auth: ReconAuth) -> list[SmbStep]:
+        host = target.ip
+        nxc = auth.netexec_args()
+        base = "smb" if auth.anonymous else f"smb/{auth.output_slug}"
+        steps = [
+            SmbStep(
+                Command(
+                    "smb",
+                    f"netexec smb {host} {nxc} --users",
                     "Enumerate domain users.",
                     "< 30s",
-                    "smb/users.txt",
+                    f"{base}/users.txt",
                 ),
                 "netexec-users",
             ),
             SmbStep(
                 Command(
                     "smb",
-                    f"netexec smb {host} -u '{user}' -p '' --pass-pol",
+                    f"netexec smb {host} {nxc} --pass-pol",
                     "Password policy.",
                     "< 30s",
-                    "smb/pass-pol.txt",
+                    f"{base}/pass-pol.txt",
                 ),
                 "netexec-passpol",
             ),
             SmbStep(
                 Command(
                     "smb",
-                    f"netexec smb {host} -u '{user}' -p '' --rid-brute 10000",
+                    f"netexec smb {host} {nxc} --rid-brute 10000",
                     "RID cycling (recon, not a credential brute).",
                     "1-5 min",
-                    "smb/rid-brute.txt",
+                    f"{base}/rid-brute.txt",
                 ),
                 "netexec-ridbrute",
             ),
             SmbStep(
                 Command(
                     "smb",
-                    f"rpcclient -U '' -N {host} -c 'enumdomusers'",
-                    "RPC null-session user enumeration.",
+                    f"rpcclient {auth.rpcclient_auth()} {host} -c 'enumdomusers'",
+                    f"RPC user enumeration as {auth.label}.",
                     "< 30s",
-                    "smb/rpcclient-enumdomusers.txt",
+                    f"{base}/rpcclient-enumdomusers.txt",
                 ),
                 "rpcclient-users",
             ),
         ]
+        if auth.anonymous:
+            return steps
+        # a real credential unlocks enumeration an anonymous session never reaches
+        return steps + [
+            SmbStep(
+                Command(
+                    "smb",
+                    f"netexec smb {host} {nxc} --groups",
+                    "Domain groups (needs a credential).",
+                    "< 30s",
+                    f"{base}/groups.txt",
+                ),
+                "netexec-groups",
+            ),
+            SmbStep(
+                Command(
+                    "smb",
+                    f"netexec smb {host} {nxc} --loggedon-users",
+                    "Sessions currently logged on — who else to target.",
+                    "< 30s",
+                    f"{base}/loggedon-users.txt",
+                ),
+                "netexec-loggedon",
+            ),
+            SmbStep(
+                Command(
+                    "smb",
+                    f"netexec smb {host} {nxc} --local-groups",
+                    "Local groups — is this account a local admin anywhere?",
+                    "< 30s",
+                    f"{base}/local-groups.txt",
+                ),
+                "netexec-localgroups",
+            ),
+            SmbStep(
+                Command(
+                    "smb",
+                    f"netexec smb {host} {nxc} --spider-plus",
+                    "Spider every readable share's file index (metadata only, no download).",
+                    "1-5 min",
+                    f"{base}/spider-plus.txt",
+                ),
+                "netexec-spider",
+            ),
+        ]
 
-    def share_steps(self, target: Target, share: str, method: str) -> list[SmbStep]:
+    def share_steps(self, target: Target, share: str, auth: ReconAuth) -> list[SmbStep]:
         host = target.ip
-        auth = "-U 'guest%'" if method == "guest" else "-N"
+        smb_auth = auth.smbclient_auth()
         safe = share.replace("$", "").replace("/", "-") or "share"
         # hash the raw name so 'C' and 'C$' (or 'Users'/'Users$') don't collide to the same
         # file and overwrite each other's listing.
         digest = hashlib.sha1(share.encode(), usedforsecurity=False).hexdigest()[:8]
         # quote the UNC so a legal multi-word share name ("Team Share") stays one argv token
         unc = shlex.quote(f"//{host}/{share}")
+        # a credentialed walk of the same share must not overwrite the anonymous snapshot of it —
+        # the two listings differ, and which one you are looking at has to be unambiguous.
+        base = "smb/shares" if auth.anonymous else f"smb/{auth.output_slug}/shares"
         return [
             SmbStep(
                 Command(
                     "smb",
-                    f"smbclient {unc} {auth} -c 'ls'",
+                    f"smbclient {unc} {smb_auth} -c 'ls'",
                     f"Root listing of share {share}.",
                     "< 30s",
-                    f"smb/shares/{safe}-{digest}-ls.txt",
+                    f"{base}/{safe}-{digest}-ls.txt",
                 ),
             )
         ]
 
-    def share_peek_step(self, target: Target, share: str, name: str, method: str) -> SmbStep:
+    def share_peek_step(self, target: Target, share: str, name: str, auth: ReconAuth) -> SmbStep:
         # stream a small, already-listed text file to stdout (§12: bounded triage read). smbclient
         # uses backslash paths inside a share; the status line it prints is stripped from the peek.
         host = target.ip
-        auth = "-U 'guest%'" if method == "guest" else "-N"
+        smb_auth = auth.smbclient_auth()
         unc = shlex.quote(f"//{host}/{share}")
         # '/' is smbclient's in-share path separator (kept as '\'); escape an embedded double-quote
         # for smbclient's OWN parser (shlex.quote below only guards the shell) so a name like
@@ -280,13 +378,14 @@ class SmbModule(Module):
         inner = f'get "{smb_path}" -'
         digest = hashlib.sha1(f"{share}/{name}".encode(), usedforsecurity=False).hexdigest()[:8]
         slug = re.sub(r"[^A-Za-z0-9._-]", "-", f"{share}-{name}").strip("-")[:40] or "file"
+        base = "smb/peek" if auth.anonymous else f"smb/{auth.output_slug}/peek"
         return SmbStep(
             Command(
                 "smb",
-                f"smbclient {unc} {auth} -c {shlex.quote(inner)}",
+                f"smbclient {unc} {smb_auth} -c {shlex.quote(inner)}",
                 f"Peek: preview the head of {share}/{name} (small text file).",
                 "< 15s",
-                f"smb/peek/{slug}-{digest}.txt",
+                f"{base}/{slug}-{digest}.txt",
             ),
         )
 

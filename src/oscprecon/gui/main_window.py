@@ -131,6 +131,7 @@ from oscprecon.modules.vhost import parse_vhost_tool
 from oscprecon.parsing import run_parser
 from oscprecon.patterns.engine import suggest_for
 from oscprecon.profile import Profile
+from oscprecon.recon_auth import ReconAuth
 from oscprecon.references.live_hacktricks import LiveResult
 from oscprecon.workspace import locks, portability
 
@@ -184,6 +185,11 @@ def _contained_path(base: Path, rel: str) -> Path | None:
     if not candidate.is_relative_to(base.resolve()):
         return None
     return candidate
+
+
+def _named_identity(auth: ReconAuth | None) -> ReconAuth | None:
+    """The identity worth NAMING in a label — null/guest are the default posture, not a name."""
+    return auth if auth is not None and not auth.anonymous else None
 
 
 class MainWindow(QMainWindow):
@@ -498,6 +504,12 @@ class MainWindow(QMainWindow):
         run_action = QAction("Run Full Recon", self)
         run_action.triggered.connect(self._on_run)
         scan_menu.addAction(run_action)
+        plan_action = QAction("Show scan plan (dry run — runs nothing)", self)
+        plan_action.setStatusTip(
+            "Print the exact nmap commands 'Run Full Recon' would run, without running them"
+        )
+        plan_action.triggered.connect(self._on_show_scan_plan)
+        scan_menu.addAction(plan_action)
         resume_action = QAction("Resume Recon (skip completed steps)", self)
         resume_action.setStatusTip(
             "Re-run recon, reusing output from steps that already finished (like CLI --resume)"
@@ -1058,6 +1070,7 @@ class MainWindow(QMainWindow):
         for cred in creds:
             self._profile.add_credential(cred)
         self._audit_action("exploit-loot-added", count=str(len(creds)))
+        self._tool_panel.refresh_credentials()
         self._tool_panel.append_output(f"[exploit] added {len(creds)} credential(s) to the vault.")
 
     def _on_exploit_run(self, command: str, output_rel: str, parses: str) -> None:
@@ -1742,6 +1755,7 @@ class MainWindow(QMainWindow):
             secret_type=cred.secret_type,
             source=cred.source,
         )
+        self._tool_panel.refresh_credentials()
         self._tool_panel.append_output(f"[cred] added {cred.username} (source: {cred.source})")
 
     def _on_add_finding(self) -> None:
@@ -2176,6 +2190,8 @@ class MainWindow(QMainWindow):
             profile.add_credential(cred)
             if profile is self._profile:
                 self._tool_panel.append_output(f"[cred] {cred.username} (source: {cred.source})")
+        if creds and profile is self._profile:
+            self._tool_panel.refresh_credentials()
 
     def _post_run_refresh(self) -> None:
         # why: this fires on EVERY worker completion (up to 4 in parallel). Refresh only what a
@@ -2825,15 +2841,42 @@ class MainWindow(QMainWindow):
         if profile is self._profile:
             self._tool_panel.append_output(f"[http] port {service.port} now treated as HTTP")
 
-    def _on_smb_recon(self, mode: str) -> None:
+    def _on_show_scan_plan(self) -> None:
+        # "Run full recon" is not allowed to be a black box: the same plan the run prints, on demand
+        # and without scanning anything. Mirrors `nabu-cli scan --dry-run`.
+        if self._profile is None:
+            self._tool_panel.append_output("[plan] open or create a project first.")
+            self._show_recon()
+            return
+        settings = config.load_settings()
+        planned = NmapModule(scan_profile=settings.scan_profile).plan(self._profile.target)
+        self._show_recon()
+        self._tool_panel.append_output(
+            f"[dry-run] scan profile '{settings.scan_profile}' — "
+            f"{len(planned)} nmap command(s) that 'Run Full Recon' would run:"
+        )
+        for index, cmd in enumerate(planned, start=1):
+            self._tool_panel.append_output(f"  {index}. {cmd.shell_line}")
+            self._tool_panel.append_output(
+                f"     └ {cmd.why} [{cmd.expected_runtime_hint}] → {cmd.output_file}"
+            )
+        self._tool_panel.append_output("[dry-run] nothing ran.")
+        self._audit_action("scan-plan-shown", scan_profile=settings.scan_profile)
+
+    def _on_smb_recon(self, mode: str, auth: object = None) -> None:
         if self._profile is None:
             return
         if self._at_capacity():
             return
-        self._tool_panel.append_output(f"[smb] {mode} recon starting…")
+        who = auth if isinstance(auth, ReconAuth) else None
+        # only a real credential earns a label/tag suffix — "smb guest guest" reads as a bug
+        named = _named_identity(who)
+        as_who = "" if named is None else f" as {named.label}"
+        self._tool_panel.append_output(f"[smb] {mode} recon{as_who} starting…")
         prof = self._profile
-        worker = SmbReconWorker(prof, mode)
-        self._start(worker, f"smb {mode}", lambda r: self._on_smb_done(r, prof))
+        worker = SmbReconWorker(prof, mode, who)
+        tag = f"smb {mode}" if named is None else f"smb {mode} {named.output_slug}"
+        self._start(worker, tag, lambda r: self._on_smb_done(r, prof))
 
     def _on_smb_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.
@@ -2846,15 +2889,19 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
 
-    def _on_ftp_recon(self, mode: str, port: int) -> None:
+    def _on_ftp_recon(self, mode: str, port: int, auth: object = None) -> None:
         if self._profile is None:
             return
         if self._at_capacity():
             return
-        self._tool_panel.append_output(f"[ftp] {mode} recon on port {port} starting…")
+        who = auth if isinstance(auth, ReconAuth) else None
+        named = _named_identity(who)
+        as_who = "" if named is None else f" as {named.label}"
+        self._tool_panel.append_output(f"[ftp] {mode} recon on port {port}{as_who} starting…")
         prof = self._profile
-        worker = FtpReconWorker(prof, mode, port)
-        self._start(worker, f"ftp:{port}", lambda r: self._on_ftp_done(r, prof))
+        worker = FtpReconWorker(prof, mode, port, who)
+        tag = f"ftp:{port}" if named is None else f"ftp:{port} {named.output_slug}"
+        self._start(worker, tag, lambda r: self._on_ftp_done(r, prof))
 
     def _on_ftp_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.
@@ -2886,15 +2933,18 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
 
-    def _on_simple_recon(self, module_name: str, port: int = 0) -> None:
+    def _on_simple_recon(self, module_name: str, port: int = 0, auth: object = None) -> None:
         if self._profile is None or module_name not in SIMPLE_SPECS:
             return
         if self._at_capacity():
             return
-        self._tool_panel.append_output(f"[{module_name}] recon starting…")
+        who = _named_identity(auth if isinstance(auth, ReconAuth) else None)
+        as_who = "" if who is None else f" as {who.label}"
+        self._tool_panel.append_output(f"[{module_name}] recon{as_who} starting…")
         prof = self._profile
-        worker = SimpleReconWorker(prof, module_name, port)
-        self._start(worker, module_name, lambda r: self._on_simple_done(r, prof))
+        worker = SimpleReconWorker(prof, module_name, port, who)
+        tag = module_name if who is None else f"{module_name} {who.output_slug}"
+        self._start(worker, tag, lambda r: self._on_simple_done(r, prof))
 
     def _on_vuln_scan(
         self,
@@ -3061,16 +3111,20 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # boundary: never wedge the worker slot on a UI-thread write error
             self._tool_panel.append_output(f"[error] {exc}")
 
-    def _on_ldap_recon(self, basedn: str, port: int) -> None:
+    def _on_ldap_recon(self, basedn: str, port: int, auth: object = None) -> None:
         if self._profile is None:
             return
         if self._at_capacity():
             return
+        who = auth if isinstance(auth, ReconAuth) else None
+        named = _named_identity(who)
         scope = f"base {basedn}" if basedn else "auto-discover base DN"
-        self._tool_panel.append_output(f"[ldap] recon on port {port} — {scope} starting…")
+        as_who = "" if named is None else f" as {named.label}"
+        self._tool_panel.append_output(f"[ldap] recon on port {port} — {scope}{as_who} starting…")
         prof = self._profile
-        worker = LdapReconWorker(prof, basedn, port)
-        self._start(worker, f"ldap:{port}", lambda r: self._on_ldap_done(r, prof))
+        worker = LdapReconWorker(prof, basedn, port, who)
+        tag = f"ldap:{port}" if named is None else f"ldap:{port} {named.output_slug}"
+        self._start(worker, tag, lambda r: self._on_ldap_done(r, prof))
 
     def _on_ldap_done(self, result: object, profile: Profile) -> None:
         # why: a UI-thread write error must not escape — cleanup runs on the finished signal.

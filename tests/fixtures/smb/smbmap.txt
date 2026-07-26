@@ -1,0 +1,8 @@
+[+] IP: 10.10.10.5:445	Name: active.htb                                        
+        Disk                                                    Permissions     Comment
+	----                                                  	-----------	-------
+	ADMIN$                                            	NO ACCESS	Remote Admin
+	C$                                                	NO ACCESS	Default share
+	IPC$                                              	READ ONLY	Remote IPC
+	Replication                                       	READ ONLY	
+	Team Share                                        	READ, WRITE	Departmental files

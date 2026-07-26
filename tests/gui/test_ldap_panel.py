@@ -29,7 +29,7 @@ def test_recon_button_emits_basedn_and_port(qtbot: QtBot, tmp_path: Path) -> Non
     panel.set_profile(_profile(tmp_path))  # seeds base DN from hostname
     panel.configure(DiscoveredService(389, Proto.TCP, "ldap"))
     captured: list[tuple[str, int]] = []
-    panel.recon_requested.connect(lambda basedn, port: captured.append((basedn, port)))
+    panel.recon_requested.connect(lambda basedn, port, _a: captured.append((basedn, port)))
     panel._recon.click()
     assert captured == [("DC=example,DC=htb", 389)]  # derived from example.htb
 
@@ -41,7 +41,7 @@ def test_invalid_basedn_blocks_recon(qtbot: QtBot, tmp_path: Path) -> None:
     panel._basedn.setText('DC=x" evil')
     recon: list[tuple[str, int]] = []
     failures: list[str] = []
-    panel.recon_requested.connect(lambda b, p: recon.append((b, p)))
+    panel.recon_requested.connect(lambda b, p, _a: recon.append((b, p)))
     panel.validation_failed.connect(failures.append)
     panel._recon.click()
     assert recon == []
@@ -91,7 +91,7 @@ def test_tool_panel_forwards_ldap_signals(qtbot: QtBot, tmp_path: Path) -> None:
     panel.show_service(DiscoveredService(389, Proto.TCP, "ldap"), _ldap_ref())
     recon: list[tuple[str, int]] = []
     manual: list[str] = []
-    panel.ldap_recon_requested.connect(lambda b, p: recon.append((b, p)))
+    panel.ldap_recon_requested.connect(lambda b, p, _a: recon.append((b, p)))
     panel.run_requested.connect(manual.append)
     panel._ldap._recon.click()
     panel._ldap._on_manual_activated(panel._ldap._manual.item(0))

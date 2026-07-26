@@ -37,6 +37,11 @@ Standard OSCP-permitted enumeration, wrapped for convenience:
 A single attempt against a well-known account is recon-adjacent. **Iterating a list is spraying** —
 OSCP-legal against your authorized target, but gated behind Spray mode and never on by default.
 
+The tiers are about **guessing**. Using a credential you *already hold* is none of them — that is
+authenticated enumeration, the first thing you do after a foothold, and the **Run as** picker on the
+service panels (or `nabu-cli enum <svc> --as <user>`) exists for it. The secret comes from the project
+vault, one credential at a time; anonymous stays the default.
+
 ## Offline & private
 
 No network at runtime except probing the target itself, rendering the reference pane, and the

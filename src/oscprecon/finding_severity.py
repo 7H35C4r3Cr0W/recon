@@ -33,7 +33,22 @@ NOTABLE_CATEGORIES = frozenset({ACCESS, EXPOSURE, RELAY_RISK, VULNERABLE})
 # finding kinds that are purely informational, no matter their value (guards against an open port or
 # a version string ever being highlighted)
 _INFO_KINDS = frozenset(
-    {"port", "service", "product", "version", "os", "banner", "user", "share", "hostname", "vhost"}
+    {
+        "port",
+        "service",
+        "product",
+        "version",
+        "os",
+        "banner",
+        "user",
+        # a group/session name is a roster entry, never a verdict — and Windows ships built-ins
+        # called "ANONYMOUS LOGON" / "Guests" that the text fallback would otherwise escalate.
+        "group",
+        "session",
+        "share",
+        "hostname",
+        "vhost",
+    }
 )
 _REFERENCE_KINDS = frozenset({"edb", "exploit", "searchsploit", "reference", "cve-ref"})
 # a tool-asserted verdict. `vuln-check` (a check that reached NO verdict) is deliberately NOT here —

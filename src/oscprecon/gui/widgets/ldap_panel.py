@@ -19,16 +19,18 @@ from PySide6.QtWidgets import (
 
 from oscprecon import manual_commands
 from oscprecon.gui.theme import styles
+from oscprecon.gui.widgets.auth_picker import AuthPicker
 from oscprecon.models import DiscoveredService
 from oscprecon.modules import ldap as ldap_mod
 from oscprecon.profile import Profile
+from oscprecon.recon_auth import ReconAuth, prefill_identity
 
 _MANUAL_YAML = Path(ldap_mod.__file__).parent / "manual_commands.yaml"
 _COMMAND_ROLE = Qt.ItemDataRole.UserRole
 
 
 class LdapPanel(QWidget):
-    recon_requested = Signal(str, int)  # (basedn, port)
+    recon_requested = Signal(str, int, object)  # (basedn, port, ReconAuth | None)
     manual_requested = Signal(str)  # command
     validation_failed = Signal(str)
 
@@ -44,12 +46,16 @@ class LdapPanel(QWidget):
         form = QFormLayout()
         form.addRow("Base DN:", self._basedn)
 
+        self._auth = AuthPicker()
+        self._auth.changed.connect(self._on_identity_changed)
+
         self._recon = QPushButton("Run full LDAP recon (root DSE + anonymous users)")
         self._recon.setStyleSheet(styles.accent_button())  # flagship Tier-1 action
         self._recon.clicked.connect(self._on_recon)
-        button_box = QGroupBox("Tier 1 — anonymous LDAP recon (read-only, bounded)")
+        button_box = QGroupBox("Tier 1 — LDAP recon (read-only, bounded)")
         box_layout = QVBoxLayout(button_box)
         box_layout.addLayout(form)
+        box_layout.addWidget(self._auth)
         box_layout.addWidget(self._recon)
 
         self._manual = QListWidget()
@@ -80,6 +86,7 @@ class LdapPanel(QWidget):
 
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
+        self._auth.set_credentials(list(profile.credentials()))
         # why: seed the base DN from the hostname only when empty, so a scan-end refresh can't
         # clobber a value the user typed.
         if not self._basedn.text().strip():
@@ -87,10 +94,31 @@ class LdapPanel(QWidget):
             if derived:
                 self._basedn.setText(derived)
         self._reload_manual()
+        self._relabel_buttons()
+
+    def refresh_credentials(self) -> None:
+        if self._profile is not None:
+            self._auth.set_credentials(list(self._profile.credentials()))
+
+    def selected_auth(self) -> ReconAuth | None:
+        return self._auth.current_auth()
+
+    def _on_identity_changed(self) -> None:
+        self._relabel_buttons()
+        self._reload_manual()  # the Tier-2 follow-ups fill from the SAME identity
+
+    def _relabel_buttons(self) -> None:
+        auth = self._auth.current_auth()
+        self._recon.setText(
+            "Run full LDAP recon (root DSE + anonymous users)"
+            if auth is None
+            else f"Run full LDAP recon as {auth.username}"
+        )
 
     def configure(self, service: DiscoveredService, host_ip: str = "") -> None:
         self._host_ip = host_ip
         self._port = service.port
+        self.refresh_credentials()
         self._reload_manual()
 
     def set_running(self, running: bool) -> None:
@@ -106,7 +134,7 @@ class LdapPanel(QWidget):
         if raw and ldap_mod.sanitize_basedn(raw) is None:
             self.validation_failed.emit(f"invalid base DN: {raw!r}")
             return
-        self.recon_requested.emit(raw, self._port)
+        self.recon_requested.emit(raw, self._port, self._auth.current_auth())
 
     def _reload_manual(self) -> None:
         self._manual.clear()
@@ -116,12 +144,13 @@ class LdapPanel(QWidget):
         # why: {basedn} is interpolated into a runnable ldapsearch command, so sanitize it (drop it
         # if it isn't DN-syntax) before it reaches the command line — never trust the raw field.
         basedn = ldap_mod.sanitize_basedn(self._basedn.text()) or ""
-        # pre-fill {user}/{password}/{domain} from the first collected password credential so the
-        # netexec-ldap module follow-ups come ready to run (still reviewed before running).
-        cred = next((c for c in self._profile.credentials() if c.secret_type == "password"), None)
-        user = cred.username if cred is not None else ""
-        password = cred.secret if cred is not None else ""
-        domain = (cred.domain if cred is not None and cred.domain else "") or target.hostname or ""
+        # pre-fill {user}/{password}/{domain} from the PICKED identity (else the first collected
+        # password credential) so the netexec-ldap follow-ups come ready to run as the same account
+        # the Tier-1 button above them uses (still reviewed before running).
+        creds = list(self._profile.credentials())
+        user, password, domain = prefill_identity(
+            self._auth.current_auth(), creds, target.hostname or ""
+        )
         for entry in manual_commands.load_manual_commands(_MANUAL_YAML):
             command = manual_commands.expand(
                 entry.command,

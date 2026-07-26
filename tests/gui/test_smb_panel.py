@@ -23,7 +23,7 @@ def test_recon_buttons_emit_modes(qtbot: QtBot) -> None:
     panel = SmbPanel()
     qtbot.addWidget(panel)
     captured: list[str] = []
-    panel.recon_requested.connect(captured.append)
+    panel.recon_requested.connect(lambda mode, _a: captured.append(mode))
     panel._full.click()
     panel._null.click()
     panel._guest.click()
@@ -96,7 +96,7 @@ def test_tool_panel_forwards_smb_signals(qtbot: QtBot, tmp_path: Path) -> None:
     panel.set_profile(prof)
     modes: list[str] = []
     manual: list[str] = []
-    panel.smb_recon_requested.connect(modes.append)
+    panel.smb_recon_requested.connect(lambda mode, _a: modes.append(mode))
     panel.run_requested.connect(manual.append)  # Tier-2 follow-ups reuse the ad-hoc path
     panel._smb._full.click()
     panel._smb._on_manual_activated(panel._smb._manual.item(0))

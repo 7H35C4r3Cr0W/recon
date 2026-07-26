@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,6 +53,9 @@ from oscprecon.modules import (
     zookeeper,
 )
 from oscprecon.modules.base import Module
+from oscprecon.recon_auth import ReconAuth
+
+AuthStepsFn = Callable[[Target, int, ReconAuth], list[tuple[Command, str]]]
 
 # The read-only, single-shape modules (recon_steps -> parse -> suggest) share one GUI panel + worker
 # instead of a bespoke widget each. Each spec supplies the concrete step-builder (its shape differs:
@@ -251,6 +255,90 @@ class SimpleReconSpec:
     manual_yaml: Path
     factory: Callable[[], Module]  # for parse() + suggest() (uniform on the base Module)
     steps_fn: Callable[[Target, int], list[tuple[Command, str]]]
+    # optional AUTHENTICATED pass: what this service can tell you once you hold a credential.
+    # Unset means the service has nothing extra to offer authenticated (or no read-only way to ask),
+    # and the panel then shows no "Run as" picker at all rather than a control that does nothing.
+    auth_steps_fn: AuthStepsFn | None = None
+
+
+def _nxc_login(proto: str, default_port: int, why: str) -> AuthStepsFn:
+    # netexec's own protocol handlers already answer the question a credential makes askable:
+    # "does this account actually work here, and what am I?" — one login, no iteration (§11 Tier 3
+    # is about ITERATING; this is a single credential the operator already holds).
+    def build(target: Target, port: int, auth: ReconAuth) -> list[tuple[Command, str]]:
+        host = target.ip
+        used = port or default_port
+        return [
+            (
+                Command(
+                    proto,
+                    f"netexec {proto} {host} --port {used} {auth.netexec_args()}",
+                    why,
+                    "< 30s",
+                    f"{proto}/{auth.output_slug}/netexec-login.txt",
+                ),
+                f"{proto}-login",
+            )
+        ]
+
+    return build
+
+
+def _mysql_auth_steps(target: Target, port: int, auth: ReconAuth) -> list[tuple[Command, str]]:
+    # read-only catalogue queries only — list what exists, change nothing
+    host = target.ip
+    used = port or 3306
+    base = f"mysql -h {host} -P {used} -u {shlex.quote(auth.username)} -p{shlex.quote(auth.secret)}"
+    return [
+        (
+            Command(
+                "mysql",
+                f"{base} --connect-timeout=10 -e 'SHOW DATABASES;'",
+                f"Database list as {auth.label} (read-only).",
+                "< 30s",
+                f"mysql/{auth.output_slug}/databases.txt",
+            ),
+            "mysql-databases",
+        ),
+        (
+            Command(
+                "mysql",
+                f"{base} --connect-timeout=10 -e 'SELECT user,host FROM mysql.user; SHOW GRANTS;'",
+                "Accounts and this account's grants — what the credential can reach.",
+                "< 30s",
+                f"mysql/{auth.output_slug}/grants.txt",
+            ),
+            "mysql-grants",
+        ),
+    ]
+
+
+def _postgresql_auth_steps(target: Target, port: int, auth: ReconAuth) -> list[tuple[Command, str]]:
+    host = target.ip
+    used = port or 5432
+    base = f"psql {shlex.quote(auth.psql_uri(host, used))} -w"
+    return [
+        (
+            Command(
+                "postgresql",
+                f"{base} -l",
+                f"Database list as {auth.label} (read-only).",
+                "< 30s",
+                f"postgresql/{auth.output_slug}/databases.txt",
+            ),
+            "psql-databases",
+        ),
+        (
+            Command(
+                "postgresql",
+                f"{base} -c '\\du'",
+                "Roles and their attributes — superuser reachable from here?",
+                "< 30s",
+                f"postgresql/{auth.output_slug}/roles.txt",
+            ),
+            "psql-roles",
+        ),
+    ]
 
 
 def _manual(pkg: object) -> Path:
@@ -346,37 +434,44 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
     "mssql": SimpleReconSpec(
         "mssql",
         "Run full MSSQL recon (banner · instance · NTLM info)",
-        "MSSQL recon — unauth ms-sql-info/ntlm-info banner (read-only); sa checks are Tier-2.",
+        "MSSQL recon — unauth ms-sql-info/ntlm-info banner (read-only); sa checks are Tier-2. "
+        "With a vault credential, 'Run as' verifies the login and reports what it is.",
         _manual(mssql),
         mssql.MssqlModule,
         _mssql_steps,
+        _nxc_login("mssql", 1433, "Verify the credential against MSSQL and report the account."),
     ),
     "mysql": SimpleReconSpec(
         "mysql",
         "Run full MySQL recon (banner · version · auth-plugin)",
-        "MySQL recon — unauth mysql-info banner (read-only); root default-cred is Tier-2.",
+        "MySQL recon — unauth mysql-info banner (read-only); root default-cred is Tier-2. "
+        "With a vault credential, 'Run as' lists the databases, accounts and grants it can see.",
         _manual(mysql),
         mysql.MysqlModule,
         _mysql_steps,
+        _mysql_auth_steps,
     ),
     "postgresql": SimpleReconSpec(
         "postgresql",
         "Run full PostgreSQL recon (nmap -sV version banner)",
         "PostgreSQL recon — Tier-1 is credential-free nmap -sV version detection only; no login is "
-        "attempted. Default-cred (postgres:'' / postgres:postgres) and authed read-only enum are "
-        "Tier-2 manual follow-ups.",
+        "attempted. Default-cred (postgres:'' / postgres:postgres) stays a Tier-2 follow-up; with "
+        "a vault credential, 'Run as' lists the databases and roles it can see.",
         _manual(postgresql),
         postgresql.PostgresqlModule,
         _postgresql_steps,
+        _postgresql_auth_steps,
     ),
     "rdp": SimpleReconSpec(
         "rdp",
         "Run full RDP recon (NTLM info · NLA · encryption)",
         "RDP recon — unauth rdp-ntlm-info (AD domain/host/OS build) + rdp-enum-encryption (NLA "
-        "state); read-only, no login. Credential testing is Spray-mode only.",
+        "state); read-only, no login. GUESSING credentials is Spray-mode only; a credential you "
+        "already hold can be verified here with 'Run as'.",
         _manual(rdp),
         rdp.RdpModule,
         _rdp_steps,
+        _nxc_login("rdp", 3389, "Does this credential actually get an RDP session?"),
     ),
     "vnc": SimpleReconSpec(
         "vnc",
@@ -499,10 +594,12 @@ SIMPLE_SPECS: dict[str, SimpleReconSpec] = {
         "winrm",
         "Run full WinRM recon (banner · endpoint)",
         "WinRM recon — netexec banner (host/domain/OS) + a GET /wsman endpoint check; read-only, "
-        "no login. WinRM is a shell target once creds exist (Spray mode, off by default).",
+        "no login. WinRM is a shell target once creds exist — 'Run as' verifies a vault credential "
+        "here and (Pwn3d!) means you have a shell.",
         _manual(winrm),
         winrm.WinrmModule,
         _winrm_steps,
+        _nxc_login("winrm", 5985, "Does this credential get a WinRM shell? (Pwn3d! means yes.)"),
     ),
     "rsync": SimpleReconSpec(
         "rsync",

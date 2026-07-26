@@ -210,6 +210,7 @@ oscp-recon/
 │   ├── orchestrator.py       ← runs phases against a target
 │   ├── shell.py              ← subprocess helper — sole chokepoint for exec
 │   ├── profile.py            ← Profile model (load/save profile.json, manage folders)
+│   ├── recon_auth.py         ← ReconAuth: run recon anonymously OR as a vault credential (§ 11a)
 │   ├── hosts.py              ← /etc/hosts helper: add/collect discovered vhosts+DC names (idempotent)
 │   ├── wordlists.py          ← scans/indexes wordlist paths, filters passwords out
 │   ├── modules/              ← service modules (one file each)
@@ -522,6 +523,16 @@ Every `Command` records:
 
 All commands appear in the report log with full args. **No hidden magic.**
 
+**The PLAN is printed before the battery runs** (`NmapModule.plan()` → `Orchestrator._emit_plan`,
+owner request 2026-07-26). "Run Full Recon" used to be a black box: you learned each command only as
+it started, minutes apart, and the pre-flight ping streamed nmap output with nothing saying what had
+been run. Now every run opens with the whole ordered battery — each `shell_line` plus the `why` and
+`expected_runtime_hint` above — and the ping echoes its own `$ nmap -sn …`. The plan is readable
+WITHOUT scanning via `nabu-cli scan <ip> -p <name> --dry-run` (creates nothing) and
+*Scan → Show scan plan (dry run)* in the GUI. The versioned scan's `-p` list is unknown until
+discovery finishes, so it is shown as `nmap -sV -sC -p <discovered ports> <target>`; a test asserts
+the plan equals what the battery actually runs.
+
 ---
 
 ## 8. Nmap module
@@ -756,9 +767,51 @@ In `manual_commands.yaml`, pre-filled in the Manual Follow-ups tab:
 - `--continue-on-success` spraying
 - Hashcat / john on captured hashes
 
+### 11a. Credentialed recon — "Run as" (BUILT, owner request 2026-07-25)
+
+Recon is anonymous **by default**, and always starts there. But the moment a credential turns up —
+in an http config, on a share, in a PDF — the same enumeration is worth re-running **as that user**,
+and it returns far more. That was impossible: the vault existed, but only the Exploitation tab read
+it, so every service panel was stuck on "anon shit".
+
+**This is not a tier change.** §11's tiers are about *guessing*: Tier 1 anonymous, Tier 2 a single
+attempt against a well-known account with an empty/default password, Tier 3 iterating a list. Using
+a credential the operator **already holds** is none of those — it is authenticated enumeration, the
+first thing you do after a foothold. `shell.policy_violation` already allowed a single
+`-u user -p pass` while refusing a list file, so **no policy change was needed and none was made**.
+
+- **`recon_auth.ReconAuth`** is the one place that knows how each wrapped tool spells an identity
+  (`netexec_args` / `smbclient_auth` / `smbmap_args` / `rpcclient_auth` / `ldapsearch_args` /
+  `curl_userpass`), so a module never hand-builds credential syntax. Three constructors: `null()`,
+  `guest()`, `from_credential()`. NTLM hashes are supported (`-H` / `--pw-nt-hash`).
+- **Surfaces:** a **"Run as:"** dropdown (`gui/widgets/auth_picker.py`) on the SMB, FTP and LDAP
+  panels **and** on the WinRM / MSSQL / RDP / MySQL / PostgreSQL panels, listing anonymous first and
+  then every vault entry with a secret; the flagship button relabels to say who it will run as. A
+  service with no authenticated read-only pass to offer shows **no** picker (a control that changes
+  nothing is worse than no control). Headless: `nabu-cli enum <svc> -p <profile> --as <user[@domain]>`.
+- **What each service gains authenticated:** SMB → `--groups` / `--loggedon-users` /
+  `--local-groups` / `--spider-plus` / `smbmap`; LDAP → an authenticated bind (`-D`/`-w`) for the root
+  DSE + user search; FTP → the walk and peeks as that user; **WinRM / MSSQL / RDP** → netexec's login
+  verdict (`(Pwn3d!)` = administrative access, parsed by the shared `modules/nxc_auth.py`);
+  **MySQL** → `SHOW DATABASES` + accounts/grants; **PostgreSQL** → `psql -l` + `\du` roles. All
+  read-only — nothing writes, nothing is downloaded.
+- **The secret always comes from the project vault**, never from the command line — a password in
+  argv lands in shell history and in `ps`. `--as` names a vault entry; an unknown name lists what is
+  available and exits 2.
+- **A credential replaces the anonymous phases** rather than adding to them (asking whether guest
+  works is pointless once you hold a real account, and mixing two identities muddies the findings).
+  "Just check null session" / "Just check guest" stay anonymous whatever is picked.
+- **Each identity writes its own output folder** — `smb/as-<user>/`, `ldap/as-<user>/`,
+  `ftp/as-<user>/` — so one user's share list never overwrites another's. The anonymous paths
+  (`smb/null-session/`, `ldap/rootdse.txt`, `ftp/dirs/`) are byte-identical to before.
+- **A credential unlocks more steps:** authenticated SMB adds `--groups`, `--loggedon-users`,
+  `--local-groups`, `--spider-plus` and `smbmap` on top of the anonymous set.
+- **A rejected credential says so loudly** (§24) — in the stream and in the summary — and records
+  nothing.
+
 ### Credential auto-propagation
 
-On Tier 1 success (null session or guest), auto-write entry to `creds.json` with `source: smb-anon-enum`. LDAP / RPC / WinRM modules then consume this without re-prompting.
+On Tier 1 success (null session or guest), auto-write entry to `creds.json` with `source: smb-anon-enum`. A successful **authenticated** run records the working credential with `source: smb-authenticated-enum`. LDAP / RPC / WinRM modules then consume these without re-prompting.
 
 ### UNC syntax toggle
 
@@ -1213,7 +1266,7 @@ credentials, findings, and graph layout. The three File-menu actions above forma
 ### Other menus
 
 - **Edit** — Add Note / Add Credential / Add Manual Finding
-- **Scan** — Run Quick Recon / Run Full Recon / Custom Command / Stop All
+- **Scan** — Run Full Recon / Show scan plan (dry run) / Resume Recon / Scan a host or range / Nmap presets / Vuln scripts / Stop All
 - **View** — Service Tree / Graph (Ctrl+G) / Notes / Report Preview / Theme
 - **Help** — About / OSCP Constraints / Doctor / Documentation / Shortcuts / **View Diagnostics Log**
 

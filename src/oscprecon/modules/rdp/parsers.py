@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from oscprecon.modules.nxc_auth import parse_login_verdict
+
 
 @dataclass
 class RdpFinding:
@@ -96,7 +98,11 @@ def parse_rdp_info(text: str) -> list[RdpFinding]:
     return findings
 
 
-_PARSERS = {"rdp-info": parse_rdp_info}
+def parse_login(text: str) -> list[RdpFinding]:
+    return [RdpFinding(kind, value, detail) for kind, value, detail in parse_login_verdict(text)]
+
+
+_PARSERS = {"rdp-login": parse_login, "rdp-info": parse_rdp_info}
 
 
 def parse_rdp_tool(tool: str, text: str) -> list[RdpFinding]:

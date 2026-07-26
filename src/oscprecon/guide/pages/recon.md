@@ -112,6 +112,44 @@ accepted, whether signing is required, and the supported SMB dialects. That last
 `SMB 1.0: true` is flagged as *SMBv1 enabled — MS17-010 / EternalBlue precondition*, which tells you
 exactly which vuln check to run next.
 
+## The scan tells you what it is about to run
+
+Every recon run opens with its **plan**: the whole ordered nmap battery, each command's exact syntax,
+why it is there and roughly how long it takes. Then each command is echoed with `$` as it starts —
+including the pre-flight host-discovery ping, which used to stream nmap output with nothing saying
+what had been run.
+
+To read the syntax *without* scanning: **Scan → Show scan plan (dry run)**, or
+`nabu-cli scan <ip> -p <name> --dry-run` (which creates no project). The versioned scan's port list
+is only known after discovery, so it shows as `nmap -sV -sC -p <discovered ports> <target>`.
+
+## Anonymous first, then as whoever you found
+
+Recon starts anonymous — null session, guest, anonymous FTP, anonymous LDAP bind. That is the right
+first move, and it stays the default. But once a credential turns up (an http config, a share, a
+PDF), the **Run as:** dropdown on the SMB, FTP and LDAP panels re-runs the *same* enumeration as that
+user, and it returns far more: authenticated SMB adds domain groups, logged-on sessions, local-group
+membership, an `smbmap` permission walk and a metadata-only `--spider-plus` file index.
+
+The same picker is on the WinRM, MSSQL, RDP, MySQL and PostgreSQL panels. There it *adds* an
+authenticated pass to the fingerprint rather than replacing it: WinRM/MSSQL/RDP report netexec's login
+verdict — **`(Pwn3d!)` means administrative access**, which on WinRM is a shell — and MySQL/PostgreSQL
+list the databases, accounts and roles the credential can actually see. A service with nothing to
+offer authenticated shows no picker at all.
+
+The dropdown lists every credential in the project vault, so a password found during http enum is
+one click from the SMB recon that uses it — no retyping, no copy-paste. The flagship button relabels
+(*Run full SMB recon as svc_account*) so an authenticated pass never looks like the anonymous one.
+Headless: `nabu-cli enum smb -p box --as svc_account` (or `--as user@domain`); the secret is read
+from the vault, never taken on the command line where it would land in shell history and in `ps`.
+
+Each identity writes its own output folder (`smb/as-svc_account/`, `ldap/as-j.doe/`), so one user's
+share list never overwrites another's, and a rejected credential is called out rather than quietly
+producing an empty result.
+
+This is *not* a credential attack — it is one credential you already hold, which is what you would
+type by hand. Iterating a list is still Spray mode (off by default).
+
 ## Conservative findings, visible failures
 
 An open port, a version string, or an Exploit-DB match is **never** called a vulnerability — only a

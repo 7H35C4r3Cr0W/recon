@@ -4,7 +4,7 @@ import threading
 from collections.abc import Callable
 
 from oscprecon import shell
-from oscprecon.models import Command, Port, Proto
+from oscprecon.models import Command, Port, Proto, Target
 from oscprecon.modules.http import HTTP_SERVICE_NAMES
 from oscprecon.modules.http.parsers import detect_api_server
 from oscprecon.modules.nmap import (
@@ -73,6 +73,20 @@ class Orchestrator:
             return out_path.is_file() and out_path.stat().st_size > 0
         except OSError:
             return False
+
+    def _emit_plan(self, target: Target) -> None:
+        # why: "Run full recon" used to be a black box — you learned each command only as it
+        # started, minutes apart, and never saw the shape of the battery. Print the whole plan
+        # first, with the reason and the runtime hint each Command already carries (§7), so the
+        # syntax is on screen before anything runs. Both front-ends get this (shared orchestrator).
+        planned = self.nmap.plan(target)
+        if not planned:
+            return
+        profile = self.nmap.scan_profile
+        self._emit(f"[plan] scan profile '{profile}' — {len(planned)} nmap command(s), in order:")
+        for index, cmd in enumerate(planned, start=1):
+            self._emit(f"  {index}. {cmd.shell_line}")
+            self._emit(f"     └ {cmd.why} [{cmd.expected_runtime_hint}]")
 
     def _run(self, cmd: Command) -> str:
         out_path = self.profile.directory / cmd.output_file
@@ -185,6 +199,7 @@ class Orchestrator:
     def run_nmap(self) -> None:
         target = self.profile.target
         raw: dict[str, str] = {}
+        self._emit_plan(target)
 
         for cmd in self.nmap.commands(target, []):
             if self._cancelled():

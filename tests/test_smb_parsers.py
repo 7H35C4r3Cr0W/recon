@@ -268,8 +268,9 @@ def test_is_share_peekable_gates_on_small_text() -> None:
 def test_smb_share_peek_step_streams_to_stdout() -> None:
     from oscprecon.models import Target
     from oscprecon.modules.smb import SmbModule
+    from oscprecon.recon_auth import ReconAuth
 
-    step = SmbModule().share_peek_step(Target(ip="10.0.0.1"), "IT", "web.config", "null")
+    step = SmbModule().share_peek_step(Target(ip="10.0.0.1"), "IT", "web.config", ReconAuth.null())
     line = step.command.shell_line
     assert "smbclient" in line and "//10.0.0.1/IT" in line
     assert 'get "web.config" -' in line  # streams the file to stdout, backslash path form

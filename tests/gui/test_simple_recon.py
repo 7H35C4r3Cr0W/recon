@@ -172,10 +172,11 @@ def test_postgresql_panel_emits_configured_port(qtbot: QtBot) -> None:
     panel.configure(DiscoveredService(5433, Proto.TCP, "postgresql"))
     with qtbot.waitSignal(panel.recon_requested) as blocker:
         panel._recon.click()
-    assert blocker.args == [
+    assert blocker.args[:2] == [
         "postgresql",
         5433,
     ]  # module + the non-standard port, not a 5432 default
+    assert blocker.args[2] is None  # anonymous by default — the "Run as" picker is opt-in
 
 
 def test_kerberos_worker_parses_and_writes_findings(

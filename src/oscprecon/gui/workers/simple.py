@@ -8,10 +8,11 @@ from PySide6.QtCore import Signal
 from oscprecon import findings, shell
 from oscprecon.gui.simple_recon import SIMPLE_SPECS
 from oscprecon.gui.workers.base import CancellableThread
-from oscprecon.models import Finding
+from oscprecon.models import Command, Finding, Target
 from oscprecon.modules.base import Module
 from oscprecon.parsing import run_parser
 from oscprecon.profile import Profile
+from oscprecon.recon_auth import ReconAuth
 
 _STEP_TIMEOUT_S = 300.0  # per-step watchdog, matching the bespoke service workers (service_recon)
 
@@ -27,11 +28,18 @@ class SimpleReconWorker(CancellableThread):
     done = Signal(object)  # SimpleReconResult
     failed = Signal(str)
 
-    def __init__(self, profile: Profile, module_name: str, port: int = 0) -> None:
+    def __init__(
+        self,
+        profile: Profile,
+        module_name: str,
+        port: int = 0,
+        auth: ReconAuth | None = None,
+    ) -> None:
         super().__init__()
         self._profile = profile
         self._spec = SIMPLE_SPECS[module_name]
         self._port = port
+        self._auth = auth if auth is not None and not auth.anonymous else None
         self._issues: list[str] = []  # steps that couldn't run (missing tool / blocked)
 
     def run(self) -> None:
@@ -70,10 +78,21 @@ class SimpleReconWorker(CancellableThread):
         except OSError:
             return ""
 
+    def _steps(self, target: Target) -> list[tuple[Command, str]]:
+        # an authenticated pass ADDS to the unauthenticated one here (unlike SMB, where a credential
+        # replaces the anonymous phases): the banner/NSE fingerprint is still worth having, and
+        # these services have no anonymous phase for it to duplicate.
+        steps = list(self._spec.steps_fn(target, self._port))
+        if self._auth is not None and self._spec.auth_steps_fn is not None:
+            steps += self._spec.auth_steps_fn(target, self._port, self._auth)
+        return steps
+
     def _drive(self) -> SimpleReconResult:
         target = self._profile.target
         raw: dict[str, str] = {}
-        for command, tool in self._spec.steps_fn(target, self._port):
+        if self._auth is not None:
+            self.line.emit(f"[{self._spec.module}] authenticating as {self._auth.label}")
+        for command, tool in self._steps(target):
             if self._cancel.is_set():
                 break
             text = self._run_step(command.shell_line, command.output_file)

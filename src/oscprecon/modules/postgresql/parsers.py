@@ -62,7 +62,51 @@ def parse_postgresql_info(text: str) -> list[PostgresqlFinding]:
     return findings
 
 
-_PARSERS = {"postgresql-sv": parse_postgresql_info}
+# Authenticated catalogue output — `psql -l` and `\\du` print an aligned table whose rows start with
+# a leading space and use " | " separators. Read-only: names and role attributes, no row data.
+# why: [^|]+? — a `|` is non-whitespace, so a \S-anchored name greedily swallowed the column
+# separator itself and reported "webapp    |" as the role name.
+_PSQL_ROW = re.compile(r"^\s+(?P<name>[^|]+?)\s*\|(?P<rest>.*)$")
+
+
+def _psql_rows(text: str) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    for line in text.splitlines():
+        match = _PSQL_ROW.match(line.rstrip())
+        if match is None:
+            continue
+        name = match.group("name").strip()
+        if not name or name in ("Name", "Role name") or set(name) <= {"-", "+"}:
+            continue
+        rows.append((name, match.group("rest").strip()))
+    return rows
+
+
+def parse_psql_databases(text: str) -> list[PostgresqlFinding]:
+    if not text.strip() or text.lstrip().startswith(_SENTINEL):
+        return []
+    return [
+        PostgresqlFinding("database", name, "visible to this account")
+        for name, _rest in _psql_rows(text)
+        if name not in ("template0", "template1")
+    ]
+
+
+def parse_psql_roles(text: str) -> list[PostgresqlFinding]:
+    if not text.strip() or text.lstrip().startswith(_SENTINEL):
+        return []
+    findings: list[PostgresqlFinding] = []
+    for name, rest in _psql_rows(text):
+        detail = "SUPERUSER" if "superuser" in rest.lower() else rest.split("|")[0].strip()
+        findings.append(PostgresqlFinding("role", name, detail))
+    return findings
+
+
+_PARSERS = {
+    "postgresql-sv": parse_postgresql_info,
+    "psql-databases": parse_psql_databases,
+    "psql-roles": parse_psql_roles,
+}
 
 
 def parse_postgresql_tool(tool: str, text: str) -> list[PostgresqlFinding]:

@@ -17,16 +17,18 @@ from PySide6.QtWidgets import (
 
 from oscprecon import manual_commands
 from oscprecon.gui.theme import styles
+from oscprecon.gui.widgets.auth_picker import AuthPicker
 from oscprecon.models import DiscoveredService
 from oscprecon.modules import ftp as ftp_mod
 from oscprecon.profile import Profile
+from oscprecon.recon_auth import ReconAuth
 
 _MANUAL_YAML = Path(ftp_mod.__file__).parent / "manual_commands.yaml"
 _COMMAND_ROLE = Qt.ItemDataRole.UserRole
 
 
 class FtpPanel(QWidget):
-    recon_requested = Signal(str, int)  # (mode: full | anon, port)
+    recon_requested = Signal(str, int, object)  # (mode: full | anon, port, ReconAuth | None)
     manual_requested = Signal(str)  # command
 
     def __init__(self) -> None:
@@ -35,13 +37,17 @@ class FtpPanel(QWidget):
         self._host_ip = ""  # a pivoted host's IP; "" = the entry target
         self._port = 21
 
+        self._auth = AuthPicker()
+        self._auth.changed.connect(self._on_identity_changed)
+
         self._full = QPushButton("Run full FTP recon (bounded walk)")
         self._full.setStyleSheet(styles.accent_button())  # flagship Tier-1 action
-        self._full.clicked.connect(lambda: self.recon_requested.emit("full", self._port))
+        self._full.clicked.connect(lambda: self._emit_recon("full"))
         self._anon = QPushButton("Just list anonymous root")
-        self._anon.clicked.connect(lambda: self.recon_requested.emit("anon", self._port))
-        button_box = QGroupBox("Tier 1 — anonymous recon (read-only; never downloads)")
+        self._anon.clicked.connect(lambda: self._emit_recon("anon"))
+        button_box = QGroupBox("Tier 1 — read-only recon (never downloads)")
         button_layout = QVBoxLayout(button_box)
+        button_layout.addWidget(self._auth)
         for button in (self._full, self._anon):
             button_layout.addWidget(button)
 
@@ -71,11 +77,39 @@ class FtpPanel(QWidget):
 
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
+        self._auth.set_credentials(list(profile.credentials()))
         self._reload_manual()
+        self._relabel_buttons()
+
+    def refresh_credentials(self) -> None:
+        if self._profile is not None:
+            self._auth.set_credentials(list(self._profile.credentials()))
+
+    def selected_auth(self) -> ReconAuth | None:
+        return self._auth.current_auth()
+
+    def _emit_recon(self, mode: str) -> None:
+        self.recon_requested.emit(mode, self._port, self._auth.current_auth())
+
+    def _on_identity_changed(self) -> None:
+        self._relabel_buttons()
+        self._reload_manual()  # the Tier-2 follow-ups fill from the SAME identity
+
+    def _relabel_buttons(self) -> None:
+        auth = self._auth.current_auth()
+        self._full.setText(
+            "Run full FTP recon (bounded walk)"
+            if auth is None
+            else f"Run full FTP recon as {auth.username}"
+        )
+        self._anon.setText(
+            "Just list anonymous root" if auth is None else f"Just list root as {auth.username}"
+        )
 
     def configure(self, service: DiscoveredService, host_ip: str = "") -> None:
         self._port = service.port
         self._host_ip = host_ip
+        self.refresh_credentials()
         self._reload_manual()
 
     def set_running(self, running: bool) -> None:

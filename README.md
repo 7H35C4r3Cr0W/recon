@@ -258,9 +258,9 @@ both record the anonymous credential. Headless work also lands in the project's 
 (whole-`/24` network projects with the pivot topology, and the wordlist-driven HTTP content-discovery
 builder):
 
-- **Recon:** `nabu-cli scan` (staged nmap), `nabu-cli enum <service> -p <profile>` (run a service's
+- **Recon:** `nabu-cli scan` (staged nmap; `--dry-run` prints the exact battery without running it), `nabu-cli enum <service> -p <profile>` (run a service's
   Tier-1 enumeration headlessly — SMB null-session, SNMP walk, FTP/SMTP/… — the same steps the GUI
-  panels run), `nabu-cli vuln [service] -p <profile> [--all] [--mode safe]` (the NSE vulnerability
+  panels run; add `--as <user>` to re-run it authenticated with a vault credential), `nabu-cli vuln [service] -p <profile> [--all] [--mode safe]` (the NSE vulnerability
   checks for a discovered service — every verdict printed, hits recorded as findings),
   `nabu-cli findings -p <profile>` (browse structured findings).
 - **Project management:** `nabu-cli list` (workspace dashboard), `import-project` / `export-project`

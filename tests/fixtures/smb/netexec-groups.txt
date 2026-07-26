@@ -1,0 +1,6 @@
+SMB         10.10.10.5      445    DC01             [*] Windows Server 2016 Standard 14393 x64 (name:DC01) (domain:active.htb) (signing:True) (SMBv1:False)
+SMB         10.10.10.5      445    DC01             [+] active.htb\svc_account:Ticketmaster1968
+SMB         10.10.10.5      445    DC01             -Group Name-                            -membercount-
+SMB         10.10.10.5      445    DC01             Administrators                          3
+SMB         10.10.10.5      445    DC01             Domain Admins                           2
+SMB         10.10.10.5      445    DC01             Enterprise Read-only Domain Controllers  0

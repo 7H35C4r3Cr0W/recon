@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from oscprecon.modules.nxc_auth import parse_login_verdict
+
 
 @dataclass
 class MssqlFinding:
@@ -87,7 +89,11 @@ def parse_mssql_info(text: str) -> list[MssqlFinding]:
     return findings
 
 
-_PARSERS = {"mssql-info": parse_mssql_info}
+def parse_login(text: str) -> list[MssqlFinding]:
+    return [MssqlFinding(kind, value, detail) for kind, value, detail in parse_login_verdict(text)]
+
+
+_PARSERS = {"mssql-login": parse_login, "mssql-info": parse_mssql_info}
 
 
 def parse_mssql_tool(tool: str, text: str) -> list[MssqlFinding]:

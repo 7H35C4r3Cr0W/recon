@@ -8,6 +8,7 @@ from oscprecon.modules.smb import (
     to_backslash_command,
     to_escaped_command,
 )
+from oscprecon.recon_auth import ReconAuth
 
 
 def _target() -> Target:
@@ -43,7 +44,7 @@ def test_banner_null_guest_steps() -> None:
 
 
 def test_followup_steps_never_use_lists() -> None:
-    lines = [s.command.shell_line for s in SmbModule().followup_steps(_target(), "null")]
+    lines = [s.command.shell_line for s in SmbModule().followup_steps(_target(), ReconAuth.null())]
     assert "netexec smb 10.10.10.5 -u '' -p '' --users" in lines
     assert any("--rid-brute 10000" in c for c in lines)
     assert any("rpcclient -U '' -N 10.10.10.5" in c for c in lines)
@@ -55,9 +56,9 @@ def test_followup_steps_never_use_lists() -> None:
 def test_share_steps() -> None:
     module = SmbModule()
     target = _target()
-    null_share = module.share_steps(target, "Replication", "null")[0].command.shell_line
+    null_share = module.share_steps(target, "Replication", ReconAuth.null())[0].command.shell_line
     assert null_share == "smbclient //10.10.10.5/Replication -N -c 'ls'"
-    guest_share = module.share_steps(target, "Users", "guest")[0].command.shell_line
+    guest_share = module.share_steps(target, "Users", ReconAuth.guest())[0].command.shell_line
     assert "-U 'guest%'" in guest_share
 
 

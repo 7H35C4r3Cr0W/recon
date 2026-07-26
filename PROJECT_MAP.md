@@ -57,22 +57,26 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 - **Files:** `shell.py` (sole exec chokepoint + `policy_violation`), `orchestrator.py`
   (phase runner + `--resume`/`--force`), `models.py` (domain types + target validation),
   `profile.py` (state under a module `_STATE_LOCK` — scans run in parallel), `service_enum.py`
-  (the Tier-1 enumeration engine both the GUI panels and `nabu-cli enum` drive), `run_paths.py`
+  (the Tier-1 enumeration engine both the GUI panels and `nabu-cli enum` drive), `recon_auth.py`
+  (`ReconAuth` — the one place that knows how each wrapped tool spells an identity, so recon can run
+  anonymously OR as a vault credential — CLAUDE.md §11a), `run_paths.py`
   (per-command output paths + live-file claims), `nse_vuln.py` (per-service NSE vuln scan),
   `config.py`, `cli.py` (Typer: `scan`, `vuln`, `doctor`), `__main__.py`.
 - **Does:** every subprocess routes through `shell.run` → logs, times, writes raw output, enforces the
   allow/deny policy and DB-primitive backstop, kills the process group on timeout/cancel.
 - **Complete:** two-stage nmap flow, **scan profiles** (quick/default/full/exam govern the nmap
   battery), resume semantics, target validation, atomic writes, cancellation, **parallel scans**
-  (lane-based admission, locked profile mutation, collision-free output paths — CLAUDE.md §19b), and
-  the **per-service NSE vuln scan** (§8a).
+  (lane-based admission, locked profile mutation, collision-free output paths — CLAUDE.md §19b), the
+  **per-service NSE vuln scan** (§8a), and **credentialed recon** (§11a — a "Run as" picker on the
+  SMB/FTP/LDAP/WinRM/MSSQL/RDP/MySQL/PostgreSQL panels and `nabu-cli enum --as <user>`; anonymous
+  stays the default, the secret always comes from the project vault).
 - **Remaining:** none for the core.
 - **Depends on:** nothing (foundation).
 - **Risks:** the exec chokepoint is the single security-critical seam — any new module must pass
   through it and never call `subprocess` directly (CLAUDE.md §24).
 - **Tests:** `test_shell_policy`, `test_shell_cancel`, `test_target_validation`, `test_config`,
   `test_orchestrator_resume`, `test_nmap_commands`, `test_cli_doctor`, `test_nse_vuln`,
-  `test_run_paths`, `test_profile_concurrency`.
+  `test_run_paths`, `test_profile_concurrency`, `test_recon_auth`, `test_credentialed_enum`.
 
 ## 3. Recon modules — ✅ (core) · 🚧 (breadth)
 

@@ -20,6 +20,7 @@ from oscprecon.modules.ftp.parsers import (
 )
 from oscprecon.modules.peek import PEEK_MAX_BYTES, PEEK_MAX_FILES
 from oscprecon.modules.peek import is_peekable as _peek_is_peekable
+from oscprecon.recon_auth import ReconAuth
 
 __all__ = [
     "FTP_SERVICE_NAMES",
@@ -77,6 +78,12 @@ def ftp_dir_url(target: str, port: int, path: str) -> str:
     return ftp_base_url(target, port) + encoded
 
 
+def _curl_login(auth: ReconAuth) -> str:
+    # a trailing space only when there IS a credential, so anonymous commands stay byte-identical
+    flag = auth.curl_userpass()
+    return f"{flag} " if flag else ""
+
+
 def _dir_slug(path: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "-", path.strip("/")) or "root"
 
@@ -116,23 +123,32 @@ class FtpModule(Module):
             )
         ]
 
-    def anon_steps(self, target: Target, port: int = 21) -> list[FtpStep]:
+    def anon_steps(
+        self, target: Target, port: int = 21, auth: ReconAuth | None = None
+    ) -> list[FtpStep]:
         url = ftp_dir_url(target.ip, port, "/")
+        who = auth or ReconAuth.null()
+        base = "ftp" if who.anonymous else f"ftp/{who.output_slug}"
+        login = _curl_login(who)
         return [
             FtpStep(
                 Command(
                     "ftp",
-                    f"curl -s --connect-timeout 10 --max-time 60 {shlex.quote(url)}",
-                    "Anonymous root directory listing.",
+                    f"curl -s --connect-timeout 10 --max-time 60 {login}{shlex.quote(url)}",
+                    f"Root directory listing as {who.label if not who.anonymous else 'anonymous'}.",
                     "< 30s",
-                    "ftp/curl-root.txt",
+                    f"{base}/curl-root.txt",
                 ),
                 "curl-list",
             )
         ]
 
-    def list_step(self, target: Target, path: str, port: int = 21) -> FtpStep:
+    def list_step(
+        self, target: Target, path: str, port: int = 21, auth: ReconAuth | None = None
+    ) -> FtpStep:
         url = ftp_dir_url(target.ip, port, path)
+        who = auth or ReconAuth.null()
+        base = "ftp" if who.anonymous else f"ftp/{who.output_slug}"
         # why: the slug is lossy (many paths collapse to one), so append a hash of the full path —
         # otherwise two distinct dirs (e.g. '/' and '/root', '/a/b' and '/a-b') clobber each other's
         # on-disk listing snapshot.
@@ -140,28 +156,32 @@ class FtpModule(Module):
         return FtpStep(
             Command(
                 "ftp",
-                f"curl -s --connect-timeout 10 --max-time 60 {shlex.quote(url)}",
-                f"Anonymous listing of {path}.",
+                f"curl -s --connect-timeout 10 --max-time 60 {_curl_login(who)}{shlex.quote(url)}",
+                f"Listing of {path}.",
                 "< 30s",
-                f"ftp/dirs/{_dir_slug(path)}-{digest}.txt",
+                f"{base}/dirs/{_dir_slug(path)}-{digest}.txt",
             ),
             "curl-list",
         )
 
-    def peek_step(self, target: Target, path: str, port: int = 21) -> FtpStep:
+    def peek_step(
+        self, target: Target, path: str, port: int = 21, auth: ReconAuth | None = None
+    ) -> FtpStep:
         # fetch the HEAD of a small, already-listed text file (§12: bounded read). `-r 0-N` caps the
         # transfer by BYTES, not just --max-time (which bounds time only): a target under-reporting
         # a file's size in its listing can't force a multi-GB download / OOM on a fast link. [#23]
         url = ftp_file_url(target.ip, port, path)
         digest = hashlib.sha1(path.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
+        who = auth or ReconAuth.null()
+        base = "ftp" if who.anonymous else f"ftp/{who.output_slug}"
         return FtpStep(
             Command(
                 "ftp",
                 f"curl -s --connect-timeout 10 --max-time 15 -r 0-{PEEK_MAX_BYTES - 1} "
-                f"{shlex.quote(url)}",
+                f"{_curl_login(who)}{shlex.quote(url)}",
                 f"Peek: preview the head of {path} (small text file).",
                 "< 15s",
-                f"ftp/peek/{_dir_slug(path)}-{digest}.txt",
+                f"{base}/peek/{_dir_slug(path)}-{digest}.txt",
             ),
             "peek",
         )

@@ -12,6 +12,7 @@ from oscprecon.modules.ldap.parsers import (
     parse_ldapsearch_rootdse,
     parse_nmap_ldap,
 )
+from oscprecon.recon_auth import ReconAuth
 
 __all__ = [
     "LDAP_SERVICE_NAMES",
@@ -88,17 +89,23 @@ class LdapModule(Module):
             for s in scan_results.services
         )
 
-    def rootdse_steps(self, target: Target, port: int = 389) -> list[LdapStep]:
+    def rootdse_steps(
+        self, target: Target, port: int = 389, auth: ReconAuth | None = None
+    ) -> list[LdapStep]:
         host = target.ip
         uri = ldap_uri(host, port)
+        who = auth or ReconAuth.null()
+        bind = who.ldapsearch_args()
+        base = "ldap" if who.anonymous else f"ldap/{who.output_slug}"
+        label = "Anonymous" if who.anonymous else f"As {who.label}:"
         return [
             LdapStep(
                 Command(
                     "ldap",
-                    f'ldapsearch -x -H {uri} -s base -b "" "(objectClass=*)" +',
-                    "Anonymous root DSE — naming contexts, DC hostname, functional levels (recon).",
+                    f'ldapsearch {bind} -H {uri} -s base -b "" "(objectClass=*)" +',
+                    f"{label} root DSE — naming contexts, DC hostname, functional levels (recon).",
                     "< 30s",
-                    "ldap/rootdse.txt",
+                    f"{base}/rootdse.txt",
                 ),
                 "ldapsearch-rootdse",
             ),
@@ -114,19 +121,24 @@ class LdapModule(Module):
             ),
         ]
 
-    def user_search_step(self, target: Target, basedn: str, port: int = 389) -> LdapStep | None:
+    def user_search_step(
+        self, target: Target, basedn: str, port: int = 389, auth: ReconAuth | None = None
+    ) -> LdapStep | None:
         clean = sanitize_basedn(basedn)
         if clean is None:
             return None
         uri = ldap_uri(target.ip, port)
+        who = auth or ReconAuth.null()
+        base = "ldap" if who.anonymous else f"ldap/{who.output_slug}"
+        label = "anonymous" if who.anonymous else f"authenticated ({who.label})"
         return LdapStep(
             Command(
                 "ldap",
-                f'ldapsearch -x -H {uri} -b "{clean}" "(objectClass=person)" '
+                f'ldapsearch {who.ldapsearch_args()} -H {uri} -b "{clean}" "(objectClass=person)" '
                 f"sAMAccountName cn -z {_USER_SEARCH_LIMIT}",
-                "Bounded anonymous user enumeration under the discovered base DN (recon).",
+                f"Bounded {label} user enumeration under the discovered base DN (recon).",
                 "< 1 min",
-                "ldap/users.txt",
+                f"{base}/users.txt",
             ),
             "ldapsearch-users",
         )

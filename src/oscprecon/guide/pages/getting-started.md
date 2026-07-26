@@ -49,6 +49,7 @@ nabu                    # the GUI  (python -m oscprecon is equivalent)
 nabu-cli scan 10.10.10.5 -p htb-active                 # staged nmap (quick/default/full/exam)
 nabu-cli scan 10.10.10.5 -p htb-active --scan-profile exam   # full sweep, rate-boosted
 nabu-cli enum smb -p htb-active                        # a service's Tier-1 recon, headless
+nabu-cli enum smb -p htb-active --as svc_account       # ...again, as a credential you found
 nabu-cli vuln smb -p htb-active                        # NSE vuln checks for a discovered service
 nabu-cli vuln -p htb-active --all                      # ...every discovered service
 nabu-cli findings -p htb-active                        # browse what was found

@@ -36,6 +36,7 @@ from oscprecon.modules.smb import (
     SmbModule,
     SmbStep,
     anon_credential,
+    credentialed_credential,
     dedup_share_findings,
     is_share_peekable,
     netexec_auth_ok,
@@ -48,6 +49,7 @@ from oscprecon.modules.smb import (
 from oscprecon.modules.ssh import SshFinding, SshModule, parse_ssh_tool
 from oscprecon.parsing import run_parser
 from oscprecon.profile import Profile
+from oscprecon.recon_auth import ReconAuth
 
 # The Tier-1 service enumeration ENGINE — Qt-free, so the GUI worker and `nabu-cli enum` run the
 # SAME code. They used to be two implementations: the GUI drove the full conditional sequence
@@ -140,9 +142,11 @@ class SmbEnum(_Engine):
         mode: str,
         on_line: Callable[[str], None] | None = None,
         cancel: threading.Event | None = None,
+        auth: ReconAuth | None = None,
     ) -> None:
         super().__init__(profile, on_line, cancel)
         self._mode = mode
+        self._auth = auth
         self._module = SmbModule()
 
     def _run_phase(self, steps: list[SmbStep]) -> tuple[list[SmbFinding], bool]:
@@ -195,33 +199,60 @@ class SmbEnum(_Engine):
         banner, _ = self._run_phase(module.banner_steps(target))
         collected += banner
 
-        method: str | None = None
+        if self._auth is not None and not self._auth.anonymous:
+            return self._run_credentialed(target, self._auth, collected)
+
+        auth: ReconAuth | None = None
         if self._mode in ("full", "null", "shares"):
             null_found, null_ok = self._run_phase(module.null_session_steps(target))
             collected += null_found
             if null_ok:
-                method = "null"
+                auth = ReconAuth.null()
         if self._mode in ("full", "guest", "shares"):
             guest_found, guest_ok = self._run_phase(module.guest_steps(target))
             collected += guest_found
-            if guest_ok and method is None:
-                method = "guest"
+            if guest_ok and auth is None:
+                auth = ReconAuth.guest()
 
         creds: list[Credential] = []
-        if method is not None:
-            creds.append(anon_credential(target, method))
+        if auth is not None:
+            creds.append(anon_credential(target, auth.kind))
             if self._mode in ("full", "null", "guest"):
-                followup, _ = self._run_phase(module.followup_steps(target, method))
+                followup, _ = self._run_phase(module.followup_steps(target, auth))
                 collected += followup
             # dedup: full/shares modes enumerate shares via both null and guest, so the same
             # readable share can appear twice — list each once (dict.fromkeys preserves order).
-            collected += self._walk_shares(target, method, readable_shares(collected))
+            collected += self._walk_shares(target, auth, readable_shares(collected))
 
         # collapse the same share seen by smbclient -L (name only) + netexec --shares (name + perms)
         # into one finding, unioning READ/WRITE — else it persists twice (blank + WRITE). [Abducted]
         collected = dedup_share_findings(collected)
         self._write_findings(collected)
-        return SmbReconResult(self._summarize(collected, method), creds)
+        return SmbReconResult(self._summarize(collected, auth), creds)
+
+    def _run_credentialed(
+        self, target: Target, auth: ReconAuth, collected: list[SmbFinding]
+    ) -> SmbReconResult:
+        # An operator-supplied credential replaces the anonymous phases outright: there is no point
+        # asking whether guest works when you already hold a real account, and the answer would only
+        # muddy the findings with two identities' share lists.
+        self._emit(f"[smb] authenticating as {auth.label}")
+        module = self._module
+        cred_found, auth_ok = self._run_phase(module.credentialed_steps(target, auth))
+        collected += cred_found
+        creds: list[Credential] = []
+        if auth_ok:
+            creds.append(credentialed_credential(target, auth))
+            if self._mode in ("full", "null", "guest"):
+                followup, _ = self._run_phase(module.followup_steps(target, auth))
+                collected += followup
+            collected += self._walk_shares(target, auth, readable_shares(collected))
+        else:
+            # never silent (§24): a rejected credential is the single most useful thing to say here
+            self._emit(f"[smb] {auth.label} was REJECTED — check the password, domain, or lockout")
+        collected = dedup_share_findings(collected)
+        self._write_findings(collected)
+        return SmbReconResult(self._summarize(collected, auth if auth_ok else None), creds)
 
     def _run_smb_step(self, step: SmbStep) -> str:
         base = self._profile.directory
@@ -239,7 +270,7 @@ class SmbEnum(_Engine):
         except OSError:
             return ""
 
-    def _walk_shares(self, target: Target, method: str, shares: list[str]) -> list[SmbFinding]:
+    def _walk_shares(self, target: Target, auth: ReconAuth, shares: list[str]) -> list[SmbFinding]:
         # list each readable share's root, surface its files as findings, and peek small text ones —
         # a bounded content triage across all shares (§12), never bulk exfil.
         found: list[SmbFinding] = []
@@ -247,13 +278,13 @@ class SmbEnum(_Engine):
         for share in dict.fromkeys(shares):
             if self._cancelled():
                 break
-            ls_step = self._module.share_steps(target, share, method)[0]
+            ls_step = self._module.share_steps(target, share, auth)[0]
             for entry in parse_smbclient_ls(self._run_smb_step(ls_step)):
                 path = f"{share}/{entry.name}"
                 detail = "" if entry.is_dir else f"{entry.size} bytes"
                 found.append(SmbFinding("dir" if entry.is_dir else "file", path, detail))
                 if budget > 0 and is_share_peekable(entry):
-                    step = self._module.share_peek_step(target, share, entry.name, method)
+                    step = self._module.share_peek_step(target, share, entry.name, auth)
                     snippet = peek_snippet(strip_smbclient_noise(self._run_smb_step(step)))
                     found.append(SmbFinding("peek", path, snippet))
                     budget -= 1
@@ -265,7 +296,7 @@ class SmbEnum(_Engine):
         now = datetime.now(UTC).isoformat()
         findings.add_findings(self._profile.directory, [f.to_dict(now) for f in collected])
 
-    def _summarize(self, collected: list[SmbFinding], method: str | None) -> list[str]:
+    def _summarize(self, collected: list[SmbFinding], auth: ReconAuth | None) -> list[str]:
         summary: list[str] = []
         signing = [f.value for f in collected if f.kind == "signing"]
         if signing:
@@ -292,14 +323,45 @@ class SmbEnum(_Engine):
             shown = ", ".join(users[:10])
             more = "…" if len(users) > 10 else ""
             summary.append(f"Users ({len(users)}): {shown}{more}")
+        groups = sorted({f.value for f in collected if f.kind == "group"})
+        if groups:
+            shown = ", ".join(groups[:10])
+            summary.append(f"Groups ({len(groups)}): {shown}{'…' if len(groups) > 10 else ''}")
+        sessions = sorted({f.value for f in collected if f.kind == "session"})
+        if sessions:
+            summary.append(f"Logged on ({len(sessions)}): {', '.join(sessions[:10])}")
         for policy in (f for f in collected if f.kind == "policy"):
             summary.append(f"Policy — {policy.value}: {policy.detail}")
-        if method is not None:
-            summary.append(f"Anonymous access: {method} session OK")
+        if auth is None:
+            summary.append(
+                "Authenticated access: credential rejected"
+                if self._auth is not None and not self._auth.anonymous
+                else "Anonymous access: none (null/guest denied)"
+            )
+        elif auth.anonymous:
+            summary.append(f"Anonymous access: {auth.kind} session OK")
         else:
-            summary.append("Anonymous access: none (null/guest denied)")
+            summary.append(f"Authenticated as {auth.label}: session OK")
+        summary.extend(self._credential_tip(auth))
         summary.extend(_suggest_tips(self._module, list(collected), "smb"))
         return summary or ["No SMB findings."]
+
+    def _credential_tip(self, auth: ReconAuth | None) -> list[str]:
+        # an anonymous pass that got nowhere while the vault holds a working credential is the
+        # single most common wasted step — point at the identity control rather than leaving the
+        # operator to remember it exists.
+        if auth is not None and not auth.anonymous:
+            return []
+        if self._auth is not None and not self._auth.anonymous:
+            return []
+        usable = [c for c in self._profile.credentials() if c.username and c.secret]
+        if not usable or auth is not None:
+            return []
+        names = ", ".join(sorted({c.username for c in usable})[:3])
+        return [
+            f"→ null/guest denied, but this project holds {len(usable)} credential(s) ({names}) — "
+            "re-run authenticated: pick it in 'Run as', or `nabu-cli enum smb --as <user>`."
+        ]
 
 
 _FTP_MAX_DIRS = 25
@@ -319,10 +381,12 @@ class FtpEnum(_Engine):
         port: int,
         on_line: Callable[[str], None] | None = None,
         cancel: threading.Event | None = None,
+        auth: ReconAuth | None = None,
     ) -> None:
         super().__init__(profile, on_line, cancel)
         self._mode = mode
         self._port = port
+        self._auth = auth or ReconAuth.null()
         self._module = FtpModule()
 
     def _run_step(self, shell_line: str, output_rel: str) -> str:
@@ -360,10 +424,13 @@ class FtpEnum(_Engine):
                     on_line=self._emit,
                 )
         anon = nmap_anon_ok(nmap_text)
+        if not self._auth.anonymous:
+            self._emit(f"[ftp] authenticating as {self._auth.label}")
 
         walk = self._walk(target, recurse=self._mode == "full")
         collected += walk
-        if any(f.kind in ("file", "dir") for f in walk):
+        logged_in = any(f.kind in ("file", "dir") for f in walk)
+        if logged_in and self._auth.anonymous:
             anon = True  # a non-empty anonymous listing confirms anon even if nmap was inconclusive
 
         # nmap ftp-anon and the curl walk both list the root dir — collapse the overlap so a file
@@ -371,7 +438,7 @@ class FtpEnum(_Engine):
         collected = dedup_ftp_findings(collected)
         creds = [ftp_anon_credential(target)] if anon else []
         self._write_findings(collected)
-        return FtpReconResult(self._summarize(collected, anon), creds)
+        return FtpReconResult(self._summarize(collected, anon, logged_in), creds)
 
     def _walk(self, target: Target, recurse: bool) -> list[FtpFinding]:
         # bounded BFS: curl LISTs each directory (never downloads); depth + total-dir capped so the
@@ -389,7 +456,7 @@ class FtpEnum(_Engine):
             if path in seen:
                 continue
             seen.add(path)
-            step = module.list_step(target, path, self._port)
+            step = module.list_step(target, path, self._port, self._auth)
             text = self._run_step(step.command.shell_line, step.command.output_file)
             listed += 1
             for entry in run_parser(
@@ -416,7 +483,7 @@ class FtpEnum(_Engine):
         for path in paths[:PEEK_MAX_FILES]:
             if self._cancelled():
                 break
-            step = self._module.peek_step(target, path, self._port)
+            step = self._module.peek_step(target, path, self._port, self._auth)
             text = self._run_step(step.command.shell_line, step.command.output_file)
             out.append(FtpFinding("peek", path, peek_snippet(text)))
         if len(paths) > PEEK_MAX_FILES:
@@ -429,7 +496,9 @@ class FtpEnum(_Engine):
         now = datetime.now(UTC).isoformat()
         findings.add_findings(self._profile.directory, [f.to_dict(now) for f in collected])
 
-    def _summarize(self, collected: list[FtpFinding], anon: bool) -> list[str]:
+    def _summarize(
+        self, collected: list[FtpFinding], anon: bool, logged_in: bool = False
+    ) -> list[str]:
         summary: list[str] = []
         banners = [f.value for f in collected if f.kind == "banner"]
         if banners:
@@ -448,7 +517,13 @@ class FtpEnum(_Engine):
             summary.extend(f"  {path} → {snippet}" for path, snippet in peeks)
         if any(f.kind == "note" and "bounce" in f.value for f in collected):
             summary.append("Note: FTP bounce accepted (recon)")
-        summary.append("Anonymous access: allowed" if anon else "Anonymous access: denied")
+        if self._auth.anonymous:
+            summary.append("Anonymous access: allowed" if anon else "Anonymous access: denied")
+        else:
+            summary.append(
+                f"Authenticated as {self._auth.label}: "
+                + ("login OK" if logged_in else "no listing returned — credential may be rejected")
+            )
         summary.extend(_suggest_tips(self._module, list(collected), "ftp"))
         return summary
 
@@ -622,10 +697,12 @@ class LdapEnum(_Engine):
         port: int,
         on_line: Callable[[str], None] | None = None,
         cancel: threading.Event | None = None,
+        auth: ReconAuth | None = None,
     ) -> None:
         super().__init__(profile, on_line, cancel)
         self._basedn = basedn
         self._port = port
+        self._auth = auth or ReconAuth.null()
         self._module = LdapModule()
 
     def _run_step(self, shell_line: str, output_rel: str) -> str:
@@ -651,7 +728,9 @@ class LdapEnum(_Engine):
         module = self._module
         collected: list[LdapFinding] = []
 
-        for step in module.rootdse_steps(target, self._port):
+        if not self._auth.anonymous:
+            self._emit(f"[ldap] binding as {self._auth.label}")
+        for step in module.rootdse_steps(target, self._port, self._auth):
             if self._cancelled():
                 break
             text = self._run_step(step.command.shell_line, step.command.output_file)
@@ -672,7 +751,7 @@ class LdapEnum(_Engine):
                 break
 
         if basedn is not None:
-            user_step = module.user_search_step(target, basedn, self._port)
+            user_step = module.user_search_step(target, basedn, self._port, self._auth)
             if user_step is not None:
                 text = self._run_step(user_step.command.shell_line, user_step.command.output_file)
                 collected += run_parser(
@@ -681,10 +760,11 @@ class LdapEnum(_Engine):
                     on_line=self._emit,
                 )
 
-        anon = any(f.kind == "bind" for f in collected)
+        bound = any(f.kind == "bind" for f in collected)
+        anon = bound and self._auth.anonymous
         creds = [ldap_anon_credential(target)] if anon else []
         self._write_findings(collected)
-        return LdapReconResult(self._summarize(collected, basedn, anon), creds)
+        return LdapReconResult(self._summarize(collected, basedn, bound), creds)
 
     def _write_findings(self, collected: list[LdapFinding]) -> None:
         if not collected:
@@ -692,7 +772,9 @@ class LdapEnum(_Engine):
         now = datetime.now(UTC).isoformat()
         findings.add_findings(self._profile.directory, [f.to_dict(now) for f in collected])
 
-    def _summarize(self, collected: list[LdapFinding], basedn: str | None, anon: bool) -> list[str]:
+    def _summarize(
+        self, collected: list[LdapFinding], basedn: str | None, bound: bool
+    ) -> list[str]:
         summary: list[str] = []
         contexts = sorted({f.value for f in collected if f.kind == "naming-context"})
         if contexts:
@@ -707,7 +789,13 @@ class LdapEnum(_Engine):
             summary.append(f"Users ({len(users)}): {shown}{more}")
         if basedn is not None:
             summary.append(f"Base DN used: {basedn}")
-        summary.append("Anonymous bind: allowed" if anon else "Anonymous bind: denied")
+        if self._auth.anonymous:
+            summary.append("Anonymous bind: allowed" if bound else "Anonymous bind: denied")
+        else:
+            summary.append(
+                f"Bind as {self._auth.label}: "
+                + ("OK" if bound else "failed — credential rejected")
+            )
         summary.extend(_suggest_tips(self._module, list(collected), "ldap"))
         return summary
 

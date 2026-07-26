@@ -16,8 +16,10 @@ from PySide6.QtWidgets import (
 from oscprecon import manual_commands
 from oscprecon.gui.simple_recon import SimpleReconSpec
 from oscprecon.gui.theme import styles
+from oscprecon.gui.widgets.auth_picker import AuthPicker
 from oscprecon.models import DiscoveredService
 from oscprecon.profile import Profile
+from oscprecon.recon_auth import ReconAuth, prefill_identity
 
 _COMMAND_ROLE = Qt.ItemDataRole.UserRole
 
@@ -25,7 +27,7 @@ _COMMAND_ROLE = Qt.ItemDataRole.UserRole
 class SimpleReconPanel(QWidget):
     """One panel for any read-only single-shape module (nfs/snmp/tftp/netbios/ike/ntp/smtp)."""
 
-    recon_requested = Signal(str, int)  # module name, discovered service port
+    recon_requested = Signal(str, int, object)  # module, port, ReconAuth | None
     manual_requested = Signal(str)  # command
 
     def __init__(self, spec: SimpleReconSpec) -> None:
@@ -35,13 +37,21 @@ class SimpleReconPanel(QWidget):
         self._host_ip = ""  # a pivoted host's IP; "" = the entry target
         self._port = 0
 
+        # a "Run as" picker only where the service has an authenticated read-only pass to offer —
+        # a control that changes nothing is worse than no control.
+        self._auth = AuthPicker() if spec.auth_steps_fn is not None else None
+
         self._recon = QPushButton(spec.label)
         self._recon.setStyleSheet(styles.accent_button())  # flagship Tier-1 action
-        self._recon.clicked.connect(lambda: self.recon_requested.emit(spec.module, self._port))
+        self._recon.clicked.connect(self._emit_recon)
         button_box = QGroupBox(
             "Tier 1 — read-only recon (streams to the output pane + findings.json)"
         )
-        QVBoxLayout(button_box).addWidget(self._recon)
+        box_layout = QVBoxLayout(button_box)
+        if self._auth is not None:
+            self._auth.changed.connect(self._on_identity_changed)
+            box_layout.addWidget(self._auth)
+        box_layout.addWidget(self._recon)
 
         self._manual = QListWidget()
         self._manual.itemActivated.connect(self._on_manual_activated)
@@ -70,11 +80,34 @@ class SimpleReconPanel(QWidget):
 
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
+        self.refresh_credentials()
         self._reload_manual()
+        self._relabel_button()
+
+    def refresh_credentials(self) -> None:
+        if self._auth is not None and self._profile is not None:
+            self._auth.set_credentials(list(self._profile.credentials()))
+
+    def selected_auth(self) -> ReconAuth | None:
+        return None if self._auth is None else self._auth.current_auth()
+
+    def _emit_recon(self) -> None:
+        self.recon_requested.emit(self._spec.module, self._port, self.selected_auth())
+
+    def _on_identity_changed(self) -> None:
+        self._relabel_button()
+        self._reload_manual()  # the Tier-2 follow-ups fill from the SAME identity
+
+    def _relabel_button(self) -> None:
+        auth = self.selected_auth()
+        self._recon.setText(
+            self._spec.label if auth is None else f"{self._spec.label} — as {auth.username}"
+        )
 
     def configure(self, service: DiscoveredService, host_ip: str = "") -> None:
         self._host_ip = host_ip
         self._port = service.port
+        self.refresh_credentials()
         self._reload_manual()
 
     def set_running(self, running: bool) -> None:
@@ -98,13 +131,13 @@ class SimpleReconPanel(QWidget):
         if self._profile is None:
             return
         target = self._profile.target
-        # pre-fill {user}/{password}/{domain} from the first password credential (mirrors smb_panel)
-        # so credentialed follow-ups (kerberos/mssql/winrm/…) come filled instead of collapsing the
-        # placeholders to empty strings and looking runnable-but-broken.
-        cred = next((c for c in self._profile.credentials() if c.secret_type == "password"), None)
-        user = cred.username if cred is not None else ""
-        password = cred.secret if cred is not None else ""
-        domain = (cred.domain if cred is not None and cred.domain else "") or target.hostname or ""
+        # pre-fill {user}/{password}/{domain} from the picked identity (else the first password
+        # credential) so credentialed follow-ups (kerberos/mssql/winrm/…) come filled instead of
+        # collapsing the placeholders to empty strings and looking runnable-but-broken.
+        creds = list(self._profile.credentials())
+        user, password, domain = prefill_identity(
+            self.selected_auth(), creds, target.hostname or ""
+        )
         for entry in manual_commands.load_manual_commands(self._spec.manual_yaml):
             command = manual_commands.expand(
                 entry.command,
@@ -117,7 +150,7 @@ class SimpleReconPanel(QWidget):
             item = QListWidgetItem(f"{entry.description}\n    {command}")
             item.setData(_COMMAND_ROLE, command)
             # dim entries that need creds we don't have yet — running them just fails on empty auth.
-            if "creds" in entry.requires and cred is None:
+            if "creds" in entry.requires and not user:
                 item.setFlags(Qt.ItemFlag.NoItemFlags)
                 item.setToolTip("Add a credential first (this command needs {user}/{password}).")
             self._manual.addItem(item)

@@ -209,6 +209,27 @@ class NmapModule(Module):
             )
         ]
 
+    def plan(self, target: Target) -> list[Command]:
+        """Every command this profile's battery will run, in order.
+
+        The whole point is that the operator can read the exact syntax BEFORE committing to a scan
+        that takes ten minutes — "run full recon" must never be a black box. The versioned scan's
+        `-p` list is only known after discovery, so it is shown with a `<discovered ports>`
+        placeholder rather than omitted.
+        """
+        host = target.ip
+        planned = list(self._discovery_battery(host))
+        planned.append(
+            Command(
+                "nmap",
+                f"nmap -sV -sC -p <discovered ports> {host}",
+                "Version + default-script scan on whatever the sweeps above find open.",
+                "1-5 min",
+                "nmap/tcp-versioned.txt",
+            )
+        )
+        return planned + self.deferred_commands(target)
+
     def _discovery_battery(self, host: str) -> list[Command]:
         # why: the profile only shapes the DISCOVERY phase; the versioned -sV -sC scan on found
         # ports is identical everywhere. exam-legal by construction — every line is `nmap` with

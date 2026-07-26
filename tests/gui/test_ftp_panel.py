@@ -24,7 +24,7 @@ def test_recon_buttons_emit_mode_and_port(qtbot: QtBot) -> None:
     qtbot.addWidget(panel)
     panel.configure(DiscoveredService(2121, Proto.TCP, "ftp"))  # non-default port
     captured: list[tuple[str, int]] = []
-    panel.recon_requested.connect(lambda mode, port: captured.append((mode, port)))
+    panel.recon_requested.connect(lambda mode, port, _a: captured.append((mode, port)))
     panel._full.click()
     panel._anon.click()
     assert captured == [("full", 2121), ("anon", 2121)]
@@ -78,7 +78,7 @@ def test_tool_panel_forwards_ftp_signals(qtbot: QtBot, tmp_path: Path) -> None:
     panel.show_service(DiscoveredService(21, Proto.TCP, "ftp"), _ftp_ref())
     modes: list[tuple[str, int]] = []
     manual: list[str] = []
-    panel.ftp_recon_requested.connect(lambda mode, port: modes.append((mode, port)))
+    panel.ftp_recon_requested.connect(lambda mode, port, _a: modes.append((mode, port)))
     panel.run_requested.connect(manual.append)
     panel._ftp._full.click()
     panel._ftp._on_manual_activated(panel._ftp._manual.item(0))

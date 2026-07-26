@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from oscprecon.modules.nxc_auth import parse_login_verdict
+
 
 @dataclass
 class WinrmFinding:
@@ -70,7 +72,15 @@ def parse_winrm_http(text: str) -> list[WinrmFinding]:
     return findings
 
 
-_PARSERS = {"winrm-nxc": parse_winrm_nxc, "winrm-http": parse_winrm_http}
+def parse_login(text: str) -> list[WinrmFinding]:
+    return [WinrmFinding(kind, value, detail) for kind, value, detail in parse_login_verdict(text)]
+
+
+_PARSERS = {
+    "winrm-login": parse_login,
+    "winrm-nxc": parse_winrm_nxc,
+    "winrm-http": parse_winrm_http,
+}
 
 
 def parse_winrm_tool(tool: str, text: str) -> list[WinrmFinding]:
