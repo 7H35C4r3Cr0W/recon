@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -66,6 +68,44 @@ def _root(
     # cosmetic owl-furby banner — stderr + TTY only, so it never pollutes piped stdout or tests
     if sys.stderr.isatty():
         sys.stderr.write("\n" + branding.cli_banner() + "\n")
+
+
+# why: §6a — the audit trail is ONE timeline per project, whether the work was done in a window or
+# headlessly, so the CLI writes the SAME action slugs the GUI does ("run" / "run-finished" /
+# "vuln-scan" / "credential-added" / …). Read-only commands (list/findings/activity/docs/exploit/…)
+# never audit — a read is not project history.
+# lane names mirror gui.task_manager's constants without importing Qt into the CLI.
+_NMAP_LANE = "nmap"
+_TOOL_LANE = "tool"
+_BATTERY_LANE = "battery"
+
+
+def _audit(profile_dir: Path, profile_name: str, action: str, **details: Any) -> None:
+    # best-effort by contract: audit.record swallows + logs every I/O/serialization failure, so an
+    # unwritable audit.jsonl can never fail the command that was actually asked for (§6a).
+    audit.record(profile_dir, profile_name, action, actor="user", details=details)
+
+
+def _audit_profile(prof: Profile, action: str, **details: Any) -> None:
+    _audit(prof.directory, prof.profile_name, action, **details)
+
+
+@contextlib.contextmanager
+def _audited_run(prof: Profile, label: str, **details: Any) -> Iterator[dict[str, Any]]:
+    """Pair a `run` with its `run-finished`, whatever happens in between.
+
+    A `run` with no matching `run-finished` reads as a scan that never ended — which is exactly what
+    a crashed or interrupted headless command used to leave in the trail.
+    """
+    _audit_profile(prof, "run", label=label, **details)
+    outcome: dict[str, Any] = {}
+    try:
+        yield outcome
+    except BaseException:
+        _audit_profile(prof, "run-finished", label=label, outcome="aborted")
+        raise
+    else:
+        _audit_profile(prof, "run-finished", label=label, **outcome)
 
 
 @app.command()
@@ -175,6 +215,8 @@ def scan(
                 typer.echo(f"[error] invalid --hostname: {exc}", err=True)
                 raise typer.Exit(2) from exc
             typer.echo(f"[profile] hostname set to {hostname}")
+            _audit_profile(prof, "set-hostname", hostname=hostname)
+        _audit_profile(prof, "profile-opened", target=prof.target.ip, resume=resume)
         if resume:
             typer.echo(f"[resume] {prof.directory} — {len(prof.command_history)} prior commands")
         else:
@@ -184,16 +226,32 @@ def scan(
             )
     else:
         prof = Profile.create(root, profile, target)
+        _audit_profile(prof, "profile-created", target=prof.target.ip)
     config.add_recent(prof.directory)
     typer.echo(f"[profile] {prof.directory}  (scan profile: {profile_choice})")
-    Orchestrator(
+    label = f"scan:{prof.target.ip}"
+    _audit_profile(
         prof,
-        on_line=lambda line: typer.echo(line),
-        udp_full=udp_full,
+        "run",
+        label=label,
+        lane=_BATTERY_LANE,
+        module="nmap",
         scan_profile=profile_choice,
-        resume=resume,
-        force=force,
-    ).run_nmap()
+        udp_full=udp_full,
+    )
+    try:
+        Orchestrator(
+            prof,
+            on_line=lambda line: typer.echo(line),
+            udp_full=udp_full,
+            scan_profile=profile_choice,
+            resume=resume,
+            force=force,
+        ).run_nmap()
+    finally:
+        # mirrors the GUI, which audits run-finished from the worker's `finished` signal — i.e. also
+        # when the run failed or was interrupted. A started scan always has a matching end.
+        _audit_profile(prof, "run-finished", label=label, services=len(prof.discovered_services))
 
 
 @app.command("export-vault")
@@ -208,7 +266,9 @@ def export_vault_cmd(
 
     Includes credential values IN FULL (CLAUDE.md §6) — treat the export as sensitive.
     """
-    out = vault_export.export_vault(_load_profile(profile, workspace), dest)
+    prof = _load_profile(profile, workspace)
+    out = vault_export.export_vault(prof, dest)
+    _audit_profile(prof, "profile-exported", dest=str(out))
     typer.echo(
         f"[exported] {out} (snapshot — includes credential values IN FULL; treat it as sensitive)"
     )
@@ -233,6 +293,7 @@ def export_project_cmd(
     except portability.ProjectArchiveError as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(2) from exc
+    _audit(directory, profile, "project-exported", dest=str(out))
     typer.echo(f"[exported] {out}  (WARNING: includes creds.json — treat the archive as sensitive)")
 
 
@@ -255,6 +316,7 @@ def import_project_cmd(
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(2) from exc
     config.add_recent(dest)
+    _audit(dest, dest.name, "project-imported", source=str(archive))
     typer.echo(f"[imported] {dest}")
 
 
@@ -939,6 +1001,38 @@ def _tier1_enum_steps(
     return out
 
 
+# services whose Tier-1 recon is a conditional SEQUENCE, not a flat list of commands — they run the
+# shared engine in `service_enum`, which is also what the GUI panels drive.
+_ENGINE_SERVICES = frozenset({"smb", "ftp", "ssh", "dns", "ldap"})
+
+
+def _run_engine_enum(service: str, prof: Profile, port: int) -> None:
+    from oscprecon import findings as findings_mod
+    from oscprecon import service_enum
+
+    target = prof.target
+    engine: service_enum.EnumEngine
+    if service == "smb":
+        engine = service_enum.SmbEnum(prof, "full", typer.echo)
+    elif service == "ftp":
+        engine = service_enum.FtpEnum(prof, "full", port, typer.echo)
+    elif service == "ssh":
+        engine = service_enum.SshEnum(prof, port, typer.echo)
+    elif service == "dns":
+        engine = service_enum.DnsEnum(prof, target.hostname or "", port, typer.echo)
+    else:
+        engine = service_enum.LdapEnum(prof, "", port, typer.echo)
+    result = engine.run()
+    for line in result.summary:
+        typer.echo(f"  {line}")
+    for cred in result.creds:
+        prof.add_credential(cred)
+        typer.echo(f"[cred] {cred.username} (source: {cred.source})")
+    Reporter(prof).write()
+    recorded = len(findings_mod.load_findings(prof.directory))
+    typer.echo(f"\n[enum] {service}: {recorded} finding(s) recorded in this project")
+
+
 def _run_full_module_enum(service: str, profile: str, workspace: Path | None, port: int) -> None:
     # run a full recon Module (native Tier-1 steps -> shell.run -> parse -> record findings),
     # mirroring the GUI's bespoke workers so http/ssh/ftp/dns/ldap/smb/smtp/vhost are enum-runnable.
@@ -1009,6 +1103,20 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
                 f"{prof.target.ip} instead. For a name-based vhost, add "
                 f"'{prof.target.ip} {prof.target.hostname}' to /etc/hosts and re-run."
             )
+    if service in _ENGINE_SERVICES:
+        # smb/ftp/ssh/dns/ldap run the SHARED engine — the same conditional sequence the GUI panel
+        # drives (SMB null -> guest -> follow-ups -> share walk -> peek; FTP's bounded BFS + peek).
+        # The CLI used to run only each module's FIRST phase and stop, so `enum smb` and the SMB
+        # panel's "Run full SMB recon" did visibly different amounts of work. [parity]
+        engine_label = f"{service}:{probe_port}"
+        _audit_profile(
+            prof, "run", label=engine_label, lane=_TOOL_LANE, module=service, port=probe_port
+        )
+        try:
+            _run_engine_enum(service, prof, probe_port)
+        finally:
+            _audit_profile(prof, "run-finished", label=engine_label)
+        return
     raw: dict[str, str] = {}
     issues: list[str] = []
     steps = _tier1_enum_steps(service, module, prof.target, probe_port, ports)
@@ -1025,65 +1133,70 @@ def _run_full_module_enum(service: str, profile: str, workspace: Path | None, po
         )
         typer.echo(f"[enum] {service}: nothing to run — {hint}", err=True)
         raise typer.Exit(2)
-    for command, key in steps:
-        out = prof.directory / command.output_file
-        result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
-        if result.missing_tool is not None:
-            issues.append(f"{result.missing_tool} not installed")
-        elif result.blocked is not None:
-            issues.append("a step was blocked by the recon-only policy")
-        try:
-            text = out.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            text = ""
-        if key:  # unparsed steps (e.g. smb nmap-smb, http headers) run but carry no parser key
-            # ACCUMULATE, don't overwrite: several steps legitimately share one parser key (smb's
-            # null-session AND guest steps are both "netexec-shares"/"smbclient-shares"), so a plain
-            # raw[key]=text let the guest run (often LOGON_FAILURE) clobber the null findings.
-            raw[key] = raw[key] + "\n" + text if key in raw else text
-    # WordPress follow-up (CLAUDE.md §9): when a web port's fingerprint shows WordPress, run wpscan
-    # enumeration (never brute) for that port and fold its JSON into the same parse pass, so users /
-    # plugins / themes / version land in findings.json instead of only being suggested as text.
-    if service == "http":
-        from oscprecon.modules.http import detect_wordpress, is_tls, wordpress_command
-
-        for web_port in ports:
-            port_texts = [v for k, v in raw.items() if k.endswith(f":{web_port.number}")]
-            if not detect_wordpress(*port_texts):
-                continue
-            wp_cmd = wordpress_command(
-                prof.target, web_port.number, is_tls(web_port.service, web_port.number)
-            )
-            typer.echo(
-                f"\n[wordpress] detected on port {web_port.number} — running wpscan enumeration "
-                f"(plugins/themes/users; never brute)…"
-            )
-            wp_out = prof.directory / wp_cmd.output_file
-            wp_result = shell.run(wp_cmd.shell_line, wp_out, cwd=prof.directory, on_line=typer.echo)
-            if wp_result.missing_tool is not None:
-                issues.append(f"{wp_result.missing_tool} not installed")
-            elif wp_result.blocked is not None:
+    label = f"{service}:{probe_port}"
+    with _audited_run(prof, label, lane=_TOOL_LANE, module=service, port=probe_port) as run_details:
+        for command, key in steps:
+            out = prof.directory / command.output_file
+            result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
+            if result.missing_tool is not None:
+                issues.append(f"{result.missing_tool} not installed")
+            elif result.blocked is not None:
                 issues.append("a step was blocked by the recon-only policy")
             try:
-                wp_text = wp_out.read_text(encoding="utf-8", errors="replace")
+                text = out.read_text(encoding="utf-8", errors="replace")
             except OSError:
-                wp_text = ""
-            raw[f"wpscan:{web_port.number}"] = wp_text
-    found = run_parser(lambda: module.parse(raw), label=service, raw="\n".join(raw.values()))
-    if found:
-        now = datetime.now(UTC).isoformat()
-        findings_mod.add_findings(
-            prof.directory,
-            [
-                findings_mod.from_parsed(f.service, f.fields, f.detail, now, port=probe_port)
-                for f in found
-            ],
-        )
-    if issues:
-        typer.echo(
-            f"\n⚠ {len(dict.fromkeys(issues))} step(s) did not run — "
-            f"{'; '.join(dict.fromkeys(issues))}. Findings may be INCOMPLETE."
-        )
+                text = ""
+            if key:  # unparsed steps (e.g. smb nmap-smb, http headers) run but carry no parser key
+                # ACCUMULATE, don't overwrite: several steps legitimately share one parser key
+                # (smb's null-session AND guest steps are both netexec-shares/smbclient-shares), so
+                # raw[key]=text let the guest run (often LOGON_FAILURE) clobber the null findings.
+                raw[key] = raw[key] + "\n" + text if key in raw else text
+        # WordPress follow-up (CLAUDE.md §9): when a web port's fingerprint shows WordPress, run
+        # wpscan enumeration (never brute) for that port and fold its JSON into the same parse pass,
+        # so users / plugins / themes / version land in findings.json, not just a text suggestion.
+        if service == "http":
+            from oscprecon.modules.http import detect_wordpress, is_tls, wordpress_command
+
+            for web_port in ports:
+                port_texts = [v for k, v in raw.items() if k.endswith(f":{web_port.number}")]
+                if not detect_wordpress(*port_texts):
+                    continue
+                wp_cmd = wordpress_command(
+                    prof.target, web_port.number, is_tls(web_port.service, web_port.number)
+                )
+                typer.echo(
+                    f"\n[wordpress] detected on port {web_port.number} — running "
+                    f"wpscan enumeration (plugins/themes/users; never brute)…"
+                )
+                wp_out = prof.directory / wp_cmd.output_file
+                wp_result = shell.run(
+                    wp_cmd.shell_line, wp_out, cwd=prof.directory, on_line=typer.echo
+                )
+                if wp_result.missing_tool is not None:
+                    issues.append(f"{wp_result.missing_tool} not installed")
+                elif wp_result.blocked is not None:
+                    issues.append("a step was blocked by the recon-only policy")
+                try:
+                    wp_text = wp_out.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    wp_text = ""
+                raw[f"wpscan:{web_port.number}"] = wp_text
+        found = run_parser(lambda: module.parse(raw), label=service, raw="\n".join(raw.values()))
+        if found:
+            now = datetime.now(UTC).isoformat()
+            findings_mod.add_findings(
+                prof.directory,
+                [
+                    findings_mod.from_parsed(f.service, f.fields, f.detail, now, port=probe_port)
+                    for f in found
+                ],
+            )
+        if issues:
+            typer.echo(
+                f"\n⚠ {len(dict.fromkeys(issues))} step(s) did not run — "
+                f"{'; '.join(dict.fromkeys(issues))}. Findings may be INCOMPLETE."
+            )
+        run_details["findings"] = len(found)
     typer.echo(f"\n[enum] {service}: {len(found)} finding(s)")
     for f in found:
         typer.echo(
@@ -1168,34 +1281,43 @@ def enum_cmd(
         )
     raw: dict[str, str] = {}
     issues: list[str] = []
-    for command, tool in spec.steps_fn(prof.target, probe_port):
-        out = prof.directory / command.output_file
-        result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
-        if result.missing_tool is not None:
-            issues.append(f"{result.missing_tool} not installed")
-        elif result.blocked is not None:
-            issues.append("a step was blocked by the recon-only policy")
-        if tool:
-            try:
-                raw[tool] = out.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                raw[tool] = ""
-    module = spec.factory()
-    found = run_parser(lambda: module.parse(raw), label=spec.module, raw="\n".join(raw.values()))
-    if found:
-        now = datetime.now(UTC).isoformat()
-        findings_mod.add_findings(
-            prof.directory,
-            [
-                findings_mod.from_parsed(f.service, f.fields, f.detail, now, port=probe_port)
-                for f in found
-            ],
+    # probe_port stays 0 when the scan never found this service (the tool then uses its own
+    # default), and "mssql:0" would read as a port — label it by service alone in that case.
+    label = f"{spec.module}:{probe_port}" if probe_port else spec.module
+    with _audited_run(
+        prof, label, lane=_TOOL_LANE, module=spec.module, port=probe_port
+    ) as run_details:
+        for command, tool in spec.steps_fn(prof.target, probe_port):
+            out = prof.directory / command.output_file
+            result = shell.run(command.shell_line, out, cwd=prof.directory, on_line=typer.echo)
+            if result.missing_tool is not None:
+                issues.append(f"{result.missing_tool} not installed")
+            elif result.blocked is not None:
+                issues.append("a step was blocked by the recon-only policy")
+            if tool:
+                try:
+                    raw[tool] = out.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    raw[tool] = ""
+        module = spec.factory()
+        found = run_parser(
+            lambda: module.parse(raw), label=spec.module, raw="\n".join(raw.values())
         )
-    if issues:
-        typer.echo(
-            f"\n⚠ {len(dict.fromkeys(issues))} step(s) did not run — "
-            f"{'; '.join(dict.fromkeys(issues))}. Findings may be INCOMPLETE."
-        )
+        if found:
+            now = datetime.now(UTC).isoformat()
+            findings_mod.add_findings(
+                prof.directory,
+                [
+                    findings_mod.from_parsed(f.service, f.fields, f.detail, now, port=probe_port)
+                    for f in found
+                ],
+            )
+        if issues:
+            typer.echo(
+                f"\n⚠ {len(dict.fromkeys(issues))} step(s) did not run — "
+                f"{'; '.join(dict.fromkeys(issues))}. Findings may be INCOMPLETE."
+            )
+        run_details["findings"] = len(found)
     typer.echo(f"\n[enum] {spec.module}: {len(found)} finding(s)")
     for f in found:
         kind = f.fields.get("kind", "?")
@@ -1319,7 +1441,24 @@ def vuln_cmd(
         if spec.dos_note and mode != nse_vuln.MODE_SAFE:
             typer.echo(f"[warning] {spec.dos_note}")
         typer.echo(f"$ {command}")
-        result = shell.run(command, out, cwd=prof.directory, on_line=typer.echo)
+        # the GUI emits the same trio per service (run → vuln-scan → run-finished); keep it
+        # identical so a mixed GUI/CLI session reads as one timeline.
+        vuln_label = f"vuln:{spec.key}:{svc_port}"
+        _audit_profile(prof, "run", label=vuln_label, lane=_NMAP_LANE, module=spec.key)
+        _audit_profile(
+            prof,
+            "vuln-scan",
+            service=spec.key,
+            port=svc_port,
+            mode=mode,
+            proto=proto.value,
+            host=prof.target.ip,
+            command=command,
+        )
+        try:
+            result = shell.run(command, out, cwd=prof.directory, on_line=typer.echo)
+        finally:
+            _audit_profile(prof, "run-finished", label=vuln_label)
         if result.missing_tool is not None:
             typer.echo(f"⚠ {result.missing_tool} is not installed — nothing was checked.")
             continue
@@ -1490,6 +1629,7 @@ def add_finding_cmd(
     directory = _profile_dir(profile, workspace)
     if delete:
         if findings_mod.delete_manual_finding(directory, delete):
+            _audit(directory, profile, "finding-deleted", finding_id=delete)
             typer.echo(f"[finding] deleted {delete}")
             raise typer.Exit(0)
         typer.echo(f"[error] no finding of yours with id '{delete}'", err=True)
@@ -1522,6 +1662,17 @@ def add_finding_cmd(
     if port is not None:
         entry["port"] = port
     saved = findings_mod.add_manual_finding(directory, entry)
+    _audit(
+        directory,
+        profile,
+        "finding-added",
+        finding_id=str(saved["id"]),
+        module=module,
+        kind=kind,
+        severity=severity,
+        host=host or "",
+        port=port if port is not None else "",
+    )
     typer.echo(f"[finding] added {saved['id']} — {value}")
 
 
@@ -1550,6 +1701,9 @@ def health_cmd(
     if repair:
         fixed = health_mod.repair_creds_permissions(directory)
         removed = health_mod.repair_remove_stale_temp(directory)
+        # the same slug workspace.bulk records for a GUI repair — only --repair writes; a plain
+        # health check reads and stays out of the trail.
+        _audit(directory, profile, "repair", creds_perms=fixed, removed=len(removed))
         typer.echo(
             f"[health] repaired: creds perms {'set' if fixed else 'ok'}; "
             f"removed {len(removed)} stale temp file(s)."
@@ -1607,6 +1761,9 @@ def delete_project_cmd(
     if not yes and not typer.confirm(f"Permanently delete {directory}? This cannot be undone."):
         typer.echo("[delete] cancelled.")
         raise typer.Exit(0)
+    # recorded BEFORE the folder goes: it vanishes with a successful delete, but survives (and
+    # explains the half-deleted state) when portability.delete_project refuses or fails.
+    _audit(directory, profile, "project-deleted", dest=str(directory))
     try:
         portability.delete_project(directory, Path(root))
     except portability.ProjectArchiveError as exc:
@@ -1708,6 +1865,13 @@ def hosts_cmd(
             )
             raise typer.Exit(1) from None
         added = sum(1 for r in results if r.changed)
+        _audit_profile(
+            prof,
+            "add-hosts-entry",
+            names=" ".join(f"{c.ip}={c.hostname}" for c in cands),
+            added=added,
+            file=str(hosts_file),
+        )
         typer.echo(f"[hosts] {added} new mapping(s) written to {hosts_file} ({len(cands)} total).")
         return
 
@@ -1717,6 +1881,9 @@ def hosts_cmd(
         )
         raise typer.Exit(2)
 
+    # resolve the audit target BEFORE touching /etc/hosts, for the same reason as `config`: a bad
+    # -p must fail before the system file is edited, not after. [review]
+    _hosts_audit_dir = _profile_dir(profile, workspace) if profile is not None else None
     try:
         result = hosts_mod.add_entry(ip, names, hosts_file)
     except ValueError as exc:
@@ -1728,6 +1895,17 @@ def hosts_cmd(
             f"[hosts] can't write {hosts_file} (need root). Run this instead:\n  {cmd}", err=True
         )
         raise typer.Exit(1) from None
+    if profile is not None and _hosts_audit_dir is not None:
+        # only a project carries an audit trail — a bare `hosts IP NAME` edits /etc/hosts with no
+        # project context, so there is nothing to record it against.
+        _audit(
+            _hosts_audit_dir,
+            profile,
+            "add-hosts-entry",
+            ip=ip,
+            names=" ".join(names),
+            file=str(hosts_file),
+        )
     typer.echo(f"[hosts] {result.message}")
 
 
@@ -1782,6 +1960,16 @@ def creds_add_cmd(
             username=username, secret=secret, secret_type=secret_type, domain=domain, source=source
         )
     )
+    # §6a — the GUI logs a credential's field names + source. The secret VALUE is deliberately not
+    # a detail: audit.record would carry it in full under the owner's no-redaction posture.
+    _audit_profile(
+        prof,
+        "credential-added",
+        username=username,
+        domain=domain,
+        secret_type=secret_type,
+        source=source,
+    )
     typer.echo(f"[creds] stored {domain + chr(92) if domain else ''}{username} ({secret_type}).")
 
 
@@ -1806,6 +1994,7 @@ def creds_rm_cmd(
         raise typer.Exit(1)
     for c in matches:
         prof.delete_credential(c)
+    _audit_profile(prof, "credential-deleted", username=username, domain=domain, count=len(matches))
     typer.echo(f"[creds] removed {len(matches)} credential(s) for '{username}'.")
 
 
@@ -1817,6 +2006,14 @@ def config_cmd(
     exploit: bool | None = typer.Option(
         None, "--exploit/--no-exploit", help="Enable/disable exploit execution (§2b)."
     ),
+    profile: str | None = typer.Option(
+        None,
+        "--profile",
+        "-p",
+        help="Record the toggle in this project's audit trail (§6a). The setting itself is "
+        "app-wide either way.",
+    ),
+    workspace: Path | None = typer.Option(None, help="Workspace root (default: ~/oscprecon)."),
 ) -> None:
     """Show or toggle the opt-in mode gates (Spray mode / Exploit execution). No arg = show."""
     from dataclasses import replace
@@ -1831,7 +2028,21 @@ def config_cmd(
         spray_enabled=settings.spray_enabled if spray is None else spray,
         exploit_enabled=settings.exploit_enabled if exploit is None else exploit,
     )
+    # resolve the audit target BEFORE changing anything: _profile_dir exits 2 on an unknown name,
+    # and doing it after the save flipped the gate while telling the operator the command failed.
+    # §2a's premise is that Spray mode is an opt-in you know the state of. [review]
+    audit_dir = _profile_dir(profile, workspace) if profile is not None else None
     config.save_settings(updated)
+    if profile is not None and audit_dir is not None:
+        # the gates are app-wide, so there is no project to own the change unless you name one —
+        # exam-day matters which box you flipped Spray mode for, hence the opt-in -p.
+        _audit(
+            audit_dir,
+            profile,
+            "settings-changed",
+            spray_enabled=updated.spray_enabled,
+            exploit_enabled=updated.exploit_enabled,
+        )
     typer.echo(
         f"[config] spray_enabled={updated.spray_enabled} exploit_enabled={updated.exploit_enabled}"
     )
@@ -1870,18 +2081,25 @@ def spray_cmd(
             service, prof.target.ip, user_file, pass_file, port or None
         )
         typer.echo(f"[spray] {command}")
+        # same slug + details the GUI spray controller writes — service + target, never the material
+        _audit_profile(prof, "credential-spray", service=service, target=prof.target.ip)
         redactor = spray_mod.make_redactor(passwords)
         out = prof.directory / f"spray/{service}.txt"
         spray_mod.secure_output_file(
             out
         )  # 0600 — the spray log holds the winning cred in cleartext
-        shell.run(
-            command,
-            out,
-            cwd=prof.directory,
-            spray=True,
-            on_line=lambda line: typer.echo(redactor(line)),
-        )
+        spray_label = f"spray:{service}"
+        _audit_profile(prof, "run", label=spray_label, lane=_TOOL_LANE, module="spray")
+        try:
+            shell.run(
+                command,
+                out,
+                cwd=prof.directory,
+                spray=True,
+                on_line=lambda line: typer.echo(redactor(line)),
+            )
+        finally:
+            _audit_profile(prof, "run-finished", label=spray_label)
     except ValueError as exc:
         typer.echo(f"[error] {exc}", err=True)
         raise typer.Exit(2) from exc

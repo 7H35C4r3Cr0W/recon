@@ -5,12 +5,12 @@ from pytestqt.qtbot import QtBot
 
 from oscprecon import findings as findings_mod
 from oscprecon import shell
-from oscprecon.gui import main_window as mw
 from oscprecon.gui.widgets.ssh_panel import _COMMAND_ROLE, SshPanel
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef
+from oscprecon.service_enum import SshEnum
 
 _FIXTURES = Path(__file__).parent.parent / "fixtures" / "ssh"
 
@@ -112,8 +112,7 @@ def test_ssh_worker_parses_and_writes_findings(
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     monkeypatch.setattr(shell, "run", _fake_run_factory())
 
-    worker = mw.SshReconWorker(prof, 22)
-    result = worker._drive()
+    result = SshEnum(prof, 22).run()
 
     assert any("Banner: OpenSSH 7.6p1" in line for line in result.summary)
     assert any("Auth methods" in line and "password" in line for line in result.summary)
@@ -144,6 +143,6 @@ def test_ssh_worker_handles_empty_output(
         return shell.ShellResult(shell_line, 0, out, "", "", 0.0)
 
     monkeypatch.setattr(shell, "run", blank_run)
-    result = mw.SshReconWorker(prof, 22)._drive()
+    result = SshEnum(prof, 22).run()
     assert result.summary == ["No SSH findings."]
     assert findings_mod.load_findings(prof.directory) == []  # nothing written on empty parse

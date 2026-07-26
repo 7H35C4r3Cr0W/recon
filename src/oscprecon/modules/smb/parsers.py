@@ -50,7 +50,8 @@ def strip_smbclient_noise(text: str) -> str:
 
 @dataclass
 class SmbFinding:
-    kind: str  # auth | signing | share | user | policy | note | peek
+    kind: str  # auth | signing | share | user | group | policy | os | hostname | domain
+    #          # | dialect | algo-weak | note | peek
     value: str
     detail: str = ""
     module: str = "smb"
@@ -223,7 +224,230 @@ def parse_rpcclient_users(text: str) -> list[SmbFinding]:
     return findings
 
 
+# enum4linux-ng: the single richest source on an SMB box. Its output is colourised, sectioned, and
+# shape-shifts with the version and with what the target allows — so parse it line-wise and tolerate
+# every section being absent. Layout: banner lines carry a `[+]/[-]/[*]/[H]` marker and may open a
+# multi-line YAML-ish block (users, groups, shares, policy) whose members are the following
+# unmarked lines; a marker, a blank line, or a `=== section ===` banner closes the block.
+_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+_E4L_MARKER = re.compile(r"^\[[+\-*H!]\]\s*")
+_E4L_SECTION = re.compile(r"^\s*[=|]")
+_E4L_KV = re.compile(r"^(?P<key>[^:]+):\s*(?P<value>.*)$")
+_E4L_RID = re.compile(r"^'?(?P<rid>\d+)'?:\s*$")
+_E4L_SHARE_NAME = re.compile(r"^(?P<name>[^\s:][^:]*):\s*$")
+_E4L_DIALECT = re.compile(r"^\s+(?P<name>SMB \d[\d.]*):\s*(?P<enabled>true|false)\s*$", re.I)
+_E4L_SIGNING = re.compile(r"^SMB signing required:\s*(?P<required>\S+)", re.I)
+_E4L_AUTH = re.compile(r"allows authentication via username '(?P<user>[^']*)' and password")
+_E4L_MAPPING = re.compile(r"^Mapping:\s*(?P<mapping>\w+),\s*Listing:\s*(?P<listing>.+)$", re.I)
+
+_E4L_BLOCKS = (
+    ("users", re.compile(r"user\(s\).*:$")),
+    ("groups", re.compile(r"group\(s\).*:$")),
+    ("shares", re.compile(r"share\(s\).*:$")),
+    ("policy", re.compile(r"^Found policy:$")),
+    ("dialects", re.compile(r"^Supported dialects:$")),
+)
+# identity keys worth a finding, and the wording that tells the operator which one it is
+_E4L_IDENTITY = {
+    "got domain/workgroup name": ("domain", "netbios workgroup/domain"),
+    "domain": ("domain", "domain via RPC"),
+    "netbios domain name": ("domain", "netbios domain"),
+    "dns domain": ("domain", "dns domain"),
+    "netbios computer name": ("hostname", "netbios computer name"),
+    "fqdn": ("hostname", "fqdn"),
+}
+_E4L_OS_KEYS = ("os", "os version", "os build")
+_E4L_POLICY_KEYS = frozenset(
+    {
+        "minimum password length",
+        "password history length",
+        "maximum password age",
+        "lockout threshold",
+        "account lockout threshold",
+    }
+)
+# enum4linux says "Lockout threshold", netexec says "Account Lockout Threshold" — one policy, two
+# spellings. Normalise so the summary doesn't list it twice with two number formats. [review]
+_E4L_POLICY_ALIASES = {"account lockout threshold": "Lockout threshold"}
+_E4L_EMPTY = frozenset({"", "null", "none", "n/a", "unknown", "not supported"})
+
+
+def _e4l_value(raw: str) -> str:
+    value = raw.strip().strip("'\"").strip()
+    return "" if value.lower() in _E4L_EMPTY else value
+
+
+def _e4l_block(body: str) -> str:
+    for name, pattern in _E4L_BLOCKS:
+        if pattern.search(body):
+            return name
+    return ""
+
+
+def parse_enum4linux(text: str) -> list[SmbFinding]:
+    findings: list[SmbFinding] = []
+    shares: dict[str, SmbFinding] = {}
+    os_info: dict[str, str] = {}
+    dialects: list[str] = []
+    smb1 = False
+    block = ""
+    check = ""
+    tested_share = ""
+    rid = ""
+    last_user: SmbFinding | None = None
+
+    for raw in _ANSI.sub("", text).splitlines():
+        line = raw.rstrip()
+        if not line.strip() or _E4L_SECTION.match(line):
+            block = ""
+            continue
+        body = _E4L_MARKER.sub("", line)
+        is_marker = body != line
+        stripped = body.strip()
+        entry = _e4l_block(stripped)
+        if entry:
+            # the header line only opens the block — its own text ("Found 4 share(s):") is not a
+            # member of it
+            block = entry
+            rid = ""
+            continue
+        if is_marker:
+            block = ""
+            if "Testing share" in stripped:
+                tested_share = stripped.split("Testing share", 1)[1].strip()
+            elif "Check for anonymous access" in stripped:
+                check = "null"
+            elif "Check for guest access" in stripped:
+                check = "guest"
+
+        auth = _E4L_AUTH.search(stripped)
+        if auth is not None:
+            user = auth.group("user")
+            if check == "guest" and user:
+                findings.append(
+                    SmbFinding(
+                        "auth",
+                        "guest session",
+                        f"random username '{user}' accepted — guest/anonymous mapping",
+                    )
+                )
+            else:
+                findings.append(
+                    SmbFinding("auth", "null session", "anonymous SMB session accepted")
+                )
+            continue
+        signing = _E4L_SIGNING.match(stripped)
+        if signing is not None:
+            required = signing.group("required").lower() == "true"
+            findings.append(
+                SmbFinding(
+                    "signing",
+                    "enabled" if required else "disabled",
+                    "required" if required else "signing not required — relay candidate",
+                )
+            )
+            continue
+        mapping = _E4L_MAPPING.match(stripped)
+        if mapping is not None and tested_share:
+            share = shares.setdefault(tested_share, SmbFinding("share", tested_share))
+            if mapping.group("listing").strip().upper() == "OK":
+                share.detail = "READ"
+            continue
+
+        if block == "dialects":
+            dialect = _E4L_DIALECT.match(body)
+            if dialect is not None and dialect.group("enabled").lower() == "true":
+                name = dialect.group("name")
+                dialects.append(name)
+                smb1 = smb1 or name.upper().startswith("SMB 1")
+            continue
+        if block == "shares":
+            share_name = _E4L_SHARE_NAME.match(body)
+            if share_name is not None:
+                name = share_name.group("name")
+                shares.setdefault(name, SmbFinding("share", name))
+            continue
+
+        indented = body[:1].isspace()
+        if block in ("users", "groups"):
+            rid_match = _E4L_RID.match(body)
+            if rid_match is not None:
+                rid = rid_match.group("rid")
+                continue
+            kv = _E4L_KV.match(body)
+            if kv is None or not indented:
+                continue
+            key = kv.group("key").strip().lower()
+            value = _e4l_value(kv.group("value"))
+            if not value:
+                continue
+            if key == "username":
+                last_user = SmbFinding("user", value, f"rid {rid}" if rid else "")
+                findings.append(last_user)
+            elif key == "groupname":
+                findings.append(SmbFinding("group", value, f"rid {rid}" if rid else ""))
+            elif key == "name" and last_user is not None:
+                last_user.detail = ", ".join(p for p in (last_user.detail, value) if p)
+            continue
+
+        kv = _E4L_KV.match(stripped)
+        if kv is None:
+            continue
+        key = kv.group("key").strip().lower()
+        value = _e4l_value(kv.group("value"))
+        if block == "policy" and indented and key in _E4L_POLICY_KEYS:
+            # keep the tool's own casing, but collapse the two spellings of one policy
+            display = _E4L_POLICY_ALIASES.get(key, kv.group("key").strip())
+            findings.append(SmbFinding("policy", display, kv.group("value").strip()))
+            continue
+        if not value:
+            continue
+        if key in _E4L_OS_KEYS:
+            os_info.setdefault(key, value)
+        elif key in _E4L_IDENTITY:
+            kind, detail = _E4L_IDENTITY[key]
+            findings.append(SmbFinding(kind, value, detail))
+
+    if "os" in os_info:
+        detail = ", ".join(
+            f"{label} {os_info[k]}"
+            for label, k in (("version", "os version"), ("build", "os build"))
+            if k in os_info
+        )
+        findings.append(SmbFinding("os", os_info["os"], detail))
+    if dialects:
+        findings.append(SmbFinding("dialect", ", ".join(dialects), "supported dialects"))
+    if smb1:
+        # why: SMBv1 reachable is the MS17-010/EternalBlue precondition — the one dialect fact an
+        # operator acts on. 'algo-weak' is the existing weak-posture kind (finding_severity), so it
+        # surfaces without inventing a severity.
+        findings.append(
+            SmbFinding(
+                "algo-weak",
+                "SMBv1 enabled",
+                "legacy dialect — MS17-010 / EternalBlue precondition; "
+                "confirm with nmap --script smb-vuln-ms17-010",
+            )
+        )
+    findings.extend(shares.values())
+    return _dedup_findings(findings)
+
+
+def _dedup_findings(findings: list[SmbFinding]) -> list[SmbFinding]:
+    # the same fact is reported by several enum methods (SMB session + RPC + merged summary)
+    seen: set[tuple[str, str]] = set()
+    unique: list[SmbFinding] = []
+    for f in findings:
+        key = (f.kind, f.value.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(f)
+    return unique
+
+
 _PARSERS = {
+    "enum4linux": parse_enum4linux,
     "netexec-shares": parse_netexec_shares,
     "netexec-users": parse_netexec_users,
     "netexec-ridbrute": parse_netexec_ridbrute,

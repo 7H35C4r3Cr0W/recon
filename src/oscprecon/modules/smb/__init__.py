@@ -170,6 +170,7 @@ class SmbModule(Module):
                     "1-5 min",
                     f"{base}/enum4linux-ng.txt",
                 ),
+                "enum4linux",
             ),
         ]
 

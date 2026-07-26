@@ -39,7 +39,8 @@ shipped as actions.
   *Scan → Vuln scripts on every discovered service* and `nabu-cli vuln`. A default `-sC -sV` sweep
   does **not** run vuln-category scripts, so a box whose only way in is an `smb-vuln-*` verdict looks
   clean; this runs them per service (`--script vuln`, portrule-scoped to the discovered ports, plus
-  a targeted `smb-vuln-*`-style family and a DoS-free "safe only" mode). Every check prints its
+  a targeted `smb-vuln-*`-style family across 25 service rosters and a DoS-free "safe only" mode).
+  Every check prints its
   verdict — including the ones that came back **clean**, so "nothing found" is backed by evidence —
   a `VULNERABLE` result is recorded as a finding with its CVE/MS ids, and a check that reached **no
   verdict** (timeout, access denied) is reported as *inconclusive*, never as "not vulnerable".
@@ -244,10 +245,14 @@ PORT     STATE SERVICE       VERSION
 ```
 
 Reopen the same folder in the GUI (or `--resume` on the CLI, or `Scan → Resume Recon` in the GUI) and
-the whole state comes back. **The CLI covers the automatable work** — the same engine, the same policy gates, the same files
-on disk. A few things stay GUI-only by nature (the Cytoscape graph, the reference pane, the
-workspace dashboard) and a few are still GUI-first (whole-`/24` network projects with the pivot
-topology, and the HTTP content-discovery builder — use `nabu-cli scan` + your own feroxbuster there):
+the whole state comes back. **The CLI covers the automatable work** — literally the same engine. `nabu-cli enum smb` and the
+SMB panel's *Run full SMB recon* execute one shared code path (`service_enum.py`), so both do the
+whole sequence: null → guest → follow-ups → walk each readable share → bounded content peek, and
+both record the anonymous credential. Headless work also lands in the project's audit trail, so
+`nabu-cli activity` shows one timeline across both front-ends. A few things stay GUI-only by nature
+(the Cytoscape graph, the reference pane, the workspace dashboard) and a couple are still GUI-first
+(whole-`/24` network projects with the pivot topology, and the wordlist-driven HTTP content-discovery
+builder):
 
 - **Recon:** `nabu-cli scan` (staged nmap), `nabu-cli enum <service> -p <profile>` (run a service's
   Tier-1 enumeration headlessly — SMB null-session, SNMP walk, FTP/SMTP/… — the same steps the GUI

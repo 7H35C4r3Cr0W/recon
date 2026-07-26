@@ -99,6 +99,19 @@ output file: launching a second run that would write the same file is refused by
 letting the two interleave. While more than one scan is streaming, each output line is prefixed with
 the run it came from.
 
+## The CLI runs the same recon, not a lighter one
+
+`nabu-cli enum <service>` and the service panel drive one shared engine, so the headless path does
+the whole sequence — for SMB that is banner → null session → guest → follow-ups (users, password
+policy, RID cycling) → a listing of every readable share → a bounded peek at small files — and
+records the anonymous credential exactly as the panel does. It used to stop after the first phase.
+
+`enum4linux-ng` runs in the null-session phase and **its output is parsed** now: workgroup/domain,
+NetBIOS computer name, DNS domain, OS build, users and shares, whether the null session was
+accepted, whether signing is required, and the supported SMB dialects. That last one matters —
+`SMB 1.0: true` is flagged as *SMBv1 enabled — MS17-010 / EternalBlue precondition*, which tells you
+exactly which vuln check to run next.
+
 ## Conservative findings, visible failures
 
 An open port, a version string, or an Exploit-DB match is **never** called a vulnerability — only a

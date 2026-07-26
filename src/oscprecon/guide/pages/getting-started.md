@@ -76,6 +76,14 @@ The **CLI covers the automatable work** — `scan`, `enum`, `vuln`, `findings`, 
 (`--suggested`), `payload`, `gtfobins`, `hashcat`, `hosts`, `pivot`, `export-*`/`import-project`,
 and the gated `spray`/`config`. Run `nabu-cli --help` for the full surface.
 
+**Headless work is audited too.** Anything that changes a project or runs a tool (`scan`, `enum`,
+`vuln`, `creds add/rm`, `add-finding`, `hosts`, `spray`, the import/export/delete commands) appends
+to that project's `audit.jsonl` under the same event names the GUI uses — so `nabu-cli activity -p
+<profile>` (and the GUI's Activity timeline) shows one continuous trail whether you worked in a
+window or in the terminal. Read-only commands (`list`, `findings`, `activity`, `exploit`, `docs`, …)
+record nothing. `nabu-cli config --spray/--exploit` toggles an app-wide gate, so it is only recorded
+when you name the project it belongs to (`-p <profile>`).
+
 Some things stay GUI-first by nature: the graph, the reference pane and the workspace dashboard are
 visual; whole-`/24` network projects with the pivot topology, and the wordlist-driven HTTP content
 -discovery builder, are richest in the GUI.

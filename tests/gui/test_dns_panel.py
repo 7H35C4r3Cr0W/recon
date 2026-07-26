@@ -5,12 +5,12 @@ from pytestqt.qtbot import QtBot
 
 from oscprecon import findings as findings_mod
 from oscprecon import shell
-from oscprecon.gui import main_window as mw
 from oscprecon.gui.widgets.dns_panel import _COMMAND_ROLE, DnsPanel
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef
+from oscprecon.service_enum import DnsEnum
 
 _FIXTURES = Path(__file__).parent.parent / "fixtures" / "dns"
 
@@ -146,8 +146,7 @@ def test_dns_worker_parses_and_writes_findings(
     prof = _profile(tmp_path)
     monkeypatch.setattr(shell, "run", _fake_run_factory())
 
-    worker = mw.DnsReconWorker(prof, "example.htb", 53)
-    result = worker._drive()
+    result = DnsEnum(prof, "example.htb", 53).run()
 
     assert any("Version: 9.11.3" in line for line in result.summary)
     assert any("Zone transfer: allowed" in line for line in result.summary)

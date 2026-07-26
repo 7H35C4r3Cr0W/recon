@@ -1,9 +1,11 @@
 from pathlib import Path
 
+from oscprecon import finding_severity
 from oscprecon.modules.smb.parsers import (
     SmbFinding,
     dedup_share_findings,
     netexec_auth_ok,
+    parse_enum4linux,
     parse_netexec_passpol,
     parse_netexec_ridbrute,
     parse_netexec_shares,
@@ -112,6 +114,109 @@ def test_dispatch_and_garbage() -> None:
     assert parse_smb_tool("unknown", "x") == []
     assert parse_smb_tool("netexec-shares", _read("netexec-shares.txt"))
     assert parse_netexec_users("no users here") == []
+
+
+def _e4l(name: str) -> dict[str, list[SmbFinding]]:
+    by_kind: dict[str, list[SmbFinding]] = {}
+    for f in parse_enum4linux(_read(name)):
+        by_kind.setdefault(f.kind, []).append(f)
+    return by_kind
+
+
+def test_enum4linux_smb1_dialect_is_flagged_through_the_ansi_colours() -> None:
+    # the fixture is verbatim tool output, escape codes and all — SMB 1.0 reachable is the
+    # MS17-010 precondition, and it is the one dialect fact worth a finding of its own.
+    assert "\x1b[" in _read("enum4linux-ansi.txt")
+    found = _e4l("enum4linux-ansi.txt")
+    assert [f.value for f in found["algo-weak"]] == ["SMBv1 enabled"]
+    assert "ms17-010" in found["algo-weak"][0].detail
+    assert found["dialect"][0].value == "SMB 1.0, SMB 2.0.2"  # only the supported ones
+    # a modern host must NOT be flagged: SMB 1.0 is 'false' in the other fixture
+    assert "algo-weak" not in _e4l("enum4linux-full.txt")
+
+
+def test_enum4linux_signing_not_required_reads_as_a_relay_risk() -> None:
+    # 'SMB signing required: false' must land on the existing 'signing'/'disabled' convention, or
+    # finding_severity classifies it as plain info and the relay candidate is lost.
+    signing = _e4l("enum4linux-ansi.txt")["signing"][0]
+    assert (signing.kind, signing.value) == ("signing", "disabled")
+    assert finding_severity.classify(signing.kind, signing.value, signing.detail) == (
+        finding_severity.RELAY_RISK
+    )
+
+
+def test_enum4linux_signing_required_is_only_info() -> None:
+    text = "[+] Supported dialects and settings:\nSMB signing required: true\n"
+    signing = parse_enum4linux(text)[0]
+    assert signing.value == "enabled"
+    assert finding_severity.classify(signing.kind, signing.value, signing.detail) == (
+        finding_severity.INFO
+    )
+
+
+def test_enum4linux_extracts_host_identity_and_os() -> None:
+    found = _e4l("enum4linux-ansi.txt")
+    assert [f.value for f in found["hostname"]] == ["INTERNAL"]
+    assert {f.value for f in found["domain"]} == {"WORKGROUP", "internal"}
+    assert found["os"][0].value.startswith("Windows Server (R) 2008")
+    assert found["os"][0].detail == "version 6.0, build 6001"
+
+
+def test_enum4linux_extracts_null_and_guest_sessions() -> None:
+    # both sessions are reported by the same sentence — only the preceding check line says which,
+    # and the guest one names a RANDOM username (any user works = guest mapping).
+    denied = {
+        (f.value, finding_severity.classify(f.kind, f.value, f.detail))
+        for f in _e4l("enum4linux-ansi.txt")["auth"]
+    }
+    assert denied == {("null session", finding_severity.EXPOSURE)}
+    allowed = {
+        (f.value, finding_severity.classify(f.kind, f.value, f.detail))
+        for f in _e4l("enum4linux-full.txt")["auth"]
+    }
+    assert allowed == {
+        ("null session", finding_severity.EXPOSURE),
+        ("guest session", finding_severity.ACCESS),
+    }
+
+
+def test_enum4linux_extracts_users_shares_and_policy() -> None:
+    found = _e4l("enum4linux-full.txt")
+    assert [(f.value, f.detail) for f in found["user"]] == [("scott", "rid 1000, Scott Mercer")]
+    assert {f.value for f in found["share"]} == {"HP-Reception", "IPC$", "projects", "transfer"}
+    # every share was DENIED or unlistable here — nothing may claim READ and send the walker at it
+    assert all(f.detail == "" for f in found["share"])
+    policy = {f.value: f.detail for f in found["policy"]}
+    assert policy["Minimum password length"] == "5"
+    assert policy["Lockout threshold"] == "None"
+
+
+def test_enum4linux_readable_share_and_groups() -> None:
+    text = (
+        "[+] Found 1 share(s):\n"
+        "IT:\n"
+        "  comment: dept files\n"
+        "  type: Disk\n"
+        "[*] Testing share IT\n"
+        "[+] Mapping: OK, Listing: OK\n"
+        "[+] Found 1 group(s) via 'enumdomgroups':\n"
+        "'512':\n"
+        "  groupname: Domain Admins\n"
+        "  type: domain\n"
+    )
+    findings = parse_enum4linux(text)
+    shares = [f for f in findings if f.kind == "share"]
+    assert [(f.value, f.detail) for f in shares] == [("IT", "READ")]  # one finding, not two
+    assert readable_shares(findings) == ["IT"]
+    assert [(f.value, f.detail) for f in findings if f.kind == "group"] == [
+        ("Domain Admins", "rid 512")
+    ]
+
+
+def test_enum4linux_garbage_and_dispatch() -> None:
+    assert parse_enum4linux("") == []
+    assert parse_enum4linux("not enum4linux output at all\n\x00\x1b[m: :\n{}") == []
+    assert parse_smb_tool("enum4linux", _read("enum4linux-full.txt"))
 
 
 def test_parse_smbclient_ls_extracts_files_dirs_sizes() -> None:

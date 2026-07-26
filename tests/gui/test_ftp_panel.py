@@ -5,12 +5,12 @@ from pytestqt.qtbot import QtBot
 
 from oscprecon import findings as findings_mod
 from oscprecon import shell
-from oscprecon.gui import main_window as mw
 from oscprecon.gui.widgets.ftp_panel import _COMMAND_ROLE, FtpPanel
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef
+from oscprecon.service_enum import FtpEnum
 
 _FIXTURES = Path(__file__).parent.parent / "fixtures" / "ftp"
 
@@ -121,8 +121,8 @@ def test_ftp_worker_full_walk_recurses(
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     monkeypatch.setattr(shell, "run", _fake_run_factory())
 
-    worker = mw.FtpReconWorker(prof, "full", 21)
-    result = worker._drive()
+    engine = FtpEnum(prof, "full", 21)
+    result = engine.run()
 
     assert result.creds and result.creds[0].username == "anonymous"
     assert result.creds[0].source == "ftp-anon-enum"
@@ -141,8 +141,8 @@ def test_ftp_worker_anon_mode_does_not_recurse(
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
     monkeypatch.setattr(shell, "run", _fake_run_factory())
 
-    worker = mw.FtpReconWorker(prof, "anon", 21)
-    worker._drive()
+    engine = FtpEnum(prof, "anon", 21)
+    engine.run()
 
     values = {f.get("value") for f in findings_mod.load_findings(prof.directory)}
     assert "/backups" in values  # root listing captured

@@ -203,6 +203,8 @@ oscp-recon/
 ├── src/oscprecon/
 │   ├── __main__.py           ← `python -m oscprecon` launches the GUI
 │   ├── nse_vuln.py           ← per-service NSE vuln scan: selectors, parser, findings (§8a)
+│   ├── service_enum.py       ← Tier-1 enumeration ENGINE (Qt-free) — GUI panels AND `nabu-cli
+│   │                            enum` both drive it, so neither can run a shallower recon (§7a)
 │   ├── run_paths.py          ← output-path derivation + live-file claims for PARALLEL runs (§19b)
 │   ├── cli.py                ← Typer headless entry (`oscprecon-cli`)
 │   ├── orchestrator.py       ← runs phases against a target
@@ -441,6 +443,11 @@ Entry shape:
 ```
 
 - `actor`: `"user"` | `"system"`. `action`: kebab-case slug. `details`: action-specific object.
+- **The CLI writes here too** (2026-07-26). Every headless command that CHANGES a project or RUNS
+  something (`scan`, `enum`, `vuln`, `creds`, `add-finding`, `hosts`, `spray`, import/export,
+  `delete-project`, `config`) records with the SAME slugs the GUI uses, so one project's timeline
+  reads as one story regardless of which front-end did the work. Read-only commands deliberately
+  write nothing — an audit trail full of `findings`/`list` reads is noise.
 - Events to capture:
   - **Profile lifecycle** — created / opened / closed / saved / exported / imported
   - **Work triggers** — Run / Dry-run / Stop / Add-to-report button clicks
@@ -468,6 +475,20 @@ different profile, or the same profile open read-only for reference).
   (recorded PID no longer alive).
 
 ---
+
+### 7a. One enumeration engine, two front-ends — BUILT (2026-07-26)
+
+`src/oscprecon/service_enum.py` holds the Tier-1 recon **sequence** for smb / ftp / ssh / dns / ldap
+— the conditional flow a flat command list cannot express: SMB banner → null → guest → *follow-ups
+only if one authenticated* → walk each readable share → bounded content peek; FTP's depth- and
+count-capped BFS plus peek. It is **Qt-free**: `gui/workers/service_recon.py` is a thin QThread
+wrapper that forwards `on_line` to a signal, and `nabu-cli enum` calls the same engine directly.
+
+Why it exists: the CLI used to re-implement enumeration as "run the module's first phase and stop",
+so `nabu-cli enum smb` and the SMB panel's *Run full SMB recon* did visibly different amounts of
+work under the same name — no follow-ups, no share walk, no peek, and no anonymous credential
+recorded. A test asserts the workers carry no `_drive` of their own and that importing the engine
+never loads PySide6.
 
 ## 7. Module contract
 
@@ -522,6 +543,10 @@ A default `-sC -sV` sweep does **not** run vuln-category scripts, so a box whose
 scan** — `⚠ Vuln scripts (NSE)` on the tool panel (present for EVERY service, above the per-service
 builder), *Scan → Vuln scripts on every discovered service*, and `nabu-cli vuln [service] [--all]`.
 
+- **Roster:** 25 service families (derived from the 105 vuln-category scripts nmap ships), plus the
+  portrule-driven `vuln` category for everything else — so every discovered service has a runnable
+  check. Note `samba-vuln-*` is listed alongside `smb-vuln-*`: the prefixes differ, and Samba on
+  Linux is common.
 - **Engine:** `src/oscprecon/nse_vuln.py` (pure data, no Qt) — `VulnProfile` per service family,
   `profile_for()`, `plan_scans()` (one pass per family: 139+445 are ONE SMB scan), `build_command()`,
   `parse_vuln_output()`, `to_findings()`. GUI worker: `gui/workers/vuln.py::VulnScanWorker`.

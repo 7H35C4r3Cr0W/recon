@@ -1,0 +1,129 @@
+[92mENUM4LINUX - next generation (v1.3.10)[0m
+
+ ==========================
+|    Target Information    |
+ ==========================
+[94m[*] Target ........... 10.10.10.100[0m
+[94m[*] Username ......... ''[0m
+[94m[*] Random Username .. 'ilyhnrdj'[0m
+[94m[*] Password ......... ''[0m
+[94m[*] Timeout .......... 10 second(s)[0m
+
+ =======================================
+|    Listener Scan on 10.10.10.100    |
+ =======================================
+[94m[*] Checking LDAP[0m
+[91m[-] Could not connect to LDAP on 389/tcp: connection refused[0m
+[94m[*] Checking LDAPS[0m
+[91m[-] Could not connect to LDAPS on 636/tcp: connection refused[0m
+[94m[*] Checking SMB[0m
+[92m[+] SMB is accessible on 445/tcp[0m
+[94m[*] Checking SMB over NetBIOS[0m
+[92m[+] SMB over NetBIOS is accessible on 139/tcp[0m
+
+ =============================================================
+|    NetBIOS Names and Workgroup/Domain for 10.10.10.100    |
+ =============================================================
+[92m[+] Got domain/workgroup name: WORKGROUP[0m
+[92m[+] Full NetBIOS names information:
+- INTERNAL        <00> -         B <ACTIVE>  Workstation Service
+- WORKGROUP       <00> - <GROUP> B <ACTIVE>  Domain/Workgroup Name
+- INTERNAL        <20> -         B <ACTIVE>  File Server Service
+- MAC Address = 00-50-56-00-00-00[0m
+
+ ===========================================
+|    SMB Dialect Check on 10.10.10.100    |
+ ===========================================
+[94m[*] Trying on 445/tcp[0m
+[92m[+] Supported dialects and settings:
+Supported dialects:
+  SMB 1.0: true
+  SMB 2.0.2: true
+  SMB 2.1: false
+  SMB 3.0: false
+  SMB 3.1.1: false
+Preferred dialect: SMB 2.0.2
+SMB1 only: false
+SMB signing required: false[0m
+
+ =============================================================
+|    Domain Information via SMB session for 10.10.10.100    |
+ =============================================================
+[94m[*] Enumerating via unauthenticated SMB session on 445/tcp[0m
+[92m[+] Found domain information via SMB
+NetBIOS computer name: INTERNAL
+NetBIOS domain name: ''
+DNS domain: internal
+FQDN: internal
+Derived membership: workgroup member
+Derived domain: unknown[0m
+
+ ===========================================
+|    RPC Session Check on 10.10.10.100    |
+ ===========================================
+[94m[*] Check for anonymous access (null session)[0m
+[92m[+] Server allows authentication via username '' and password ''[0m
+[94m[*] Check for guest access[0m
+[91m[-] Could not establish guest session: STATUS_LOGON_FAILURE[0m
+
+ =====================================================
+|    Domain Information via RPC for 10.10.10.100    |
+ =====================================================
+[91m[-] Could not get domain information via 'lsaquery': STATUS_ACCESS_DENIED[0m
+
+ =================================================
+|    OS Information via RPC for 10.10.10.100    |
+ =================================================
+[94m[*] Enumerating via unauthenticated SMB session on 445/tcp[0m
+[92m[+] Found OS information via SMB[0m
+[94m[*] Enumerating via 'srvinfo'[0m
+[91m[-] Could not get OS info via 'srvinfo': STATUS_ACCESS_DENIED[0m
+[92m[+] After merging OS information we have the following result:
+OS: Windows Server (R) 2008 Standard 6001 Service Pack 1
+OS version: '6.0'
+OS release: ''
+OS build: '6001'
+Native OS: Windows Server (R) 2008 Standard 6001 Service Pack 1
+Native LAN manager: Windows Server (R) 2008 Standard 6.0
+Platform id: null
+Server type: null
+Server type string: null[0m
+
+ =======================================
+|    Users via RPC on 10.10.10.100    |
+ =======================================
+[94m[*] Enumerating users via 'querydispinfo'[0m
+[91m[-] Could not find users via 'querydispinfo': STATUS_ACCESS_DENIED[0m
+[94m[*] Enumerating users via 'enumdomusers'[0m
+[91m[-] Could not find users via 'enumdomusers': STATUS_ACCESS_DENIED[0m
+
+ ========================================
+|    Groups via RPC on 10.10.10.100    |
+ ========================================
+[94m[*] Enumerating local groups[0m
+[91m[-] Could not get groups via 'enumalsgroups domain': STATUS_ACCESS_DENIED[0m
+[94m[*] Enumerating builtin groups[0m
+[91m[-] Could not get groups via 'enumalsgroups builtin': STATUS_ACCESS_DENIED[0m
+[94m[*] Enumerating domain groups[0m
+[91m[-] Could not get groups via 'enumdomgroups': STATUS_ACCESS_DENIED[0m
+
+ ========================================
+|    Shares via RPC on 10.10.10.100    |
+ ========================================
+[94m[*] Enumerating shares[0m
+[92m[+] Found 0 share(s) for user '' with password '', try a different user[0m
+
+ ===========================================
+|    Policies via RPC for 10.10.10.100    |
+ ===========================================
+[94m[*] Trying port 445/tcp[0m
+[91m[-] SMB connection error on port 445/tcp: STATUS_ACCESS_DENIED[0m
+[94m[*] Trying port 139/tcp[0m
+[91m[-] SMB connection error on port 139/tcp: session failed[0m
+
+ ===========================================
+|    Printers via RPC for 10.10.10.100    |
+ ===========================================
+[91m[-] Could not get printer info via 'enumprinters': STATUS_ACCESS_DENIED[0m
+
+Completed after 7.22 seconds

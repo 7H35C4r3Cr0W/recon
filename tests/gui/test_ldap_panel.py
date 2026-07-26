@@ -5,12 +5,12 @@ from pytestqt.qtbot import QtBot
 
 from oscprecon import findings as findings_mod
 from oscprecon import shell
-from oscprecon.gui import main_window as mw
 from oscprecon.gui.widgets.ldap_panel import _COMMAND_ROLE, LdapPanel
 from oscprecon.gui.widgets.tool_panel import ToolPanel
 from oscprecon.models import DiscoveredService, Proto, Target
 from oscprecon.profile import Profile
 from oscprecon.references import ServiceRef
+from oscprecon.service_enum import LdapEnum
 
 _FIXTURES = Path(__file__).parent.parent / "fixtures" / "ldap"
 
@@ -132,8 +132,7 @@ def test_ldap_worker_two_phase_discovers_basedn_and_users(
     monkeypatch.setattr(shell, "run", _fake_run_factory())
 
     # pass no base DN — the worker must discover it from the root DSE naming contexts
-    worker = mw.LdapReconWorker(prof, "", 389)
-    result = worker._drive()
+    result = LdapEnum(prof, "", 389).run()
 
     assert result.creds and result.creds[0].source == "ldap-anon-enum"
     assert any("Anonymous bind: allowed" in line for line in result.summary)
@@ -166,6 +165,6 @@ def test_ldap_worker_denied_bind_writes_no_cred(
         return shell.ShellResult(shell_line, 0, out, "", "", 0.0)
 
     monkeypatch.setattr(shell, "run", blank_run)
-    result = mw.LdapReconWorker(prof, "", 389)._drive()
+    result = LdapEnum(prof, "", 389).run()
     assert result.creds == []
     assert any("Anonymous bind: denied" in line for line in result.summary)

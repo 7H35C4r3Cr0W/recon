@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import partial
 
@@ -63,6 +63,15 @@ _STEP_TIMEOUT_S = 300.0  # per-step watchdog: enum steps are quick, this only ki
 CANCELLED_NOTE = "⚠ recon cancelled — results are partial"
 
 
+@dataclass
+class EnumResult:
+    """What a Tier-1 service enumeration produced: the operator-facing summary, plus any anonymous
+    credential the run established (SMB null/guest, anonymous FTP, anonymous LDAP bind)."""
+
+    summary: list[str]
+    creds: list[Credential] = field(default_factory=list)
+
+
 class _Engine:
     def __init__(
         self,
@@ -96,6 +105,9 @@ class _Engine:
         except OSError:
             return ""
 
+    def run(self) -> EnumResult:
+        raise NotImplementedError
+
 
 def _suggest_tips(module: object, collected: list[object], service: str) -> list[str]:
     # parity with the CLI enum + SimpleReconWorker: surface the module's suggest() decision-aids in
@@ -117,16 +129,15 @@ def _suggest_tips(module: object, collected: list[object], service: str) -> list
 
 
 @dataclass
-class SmbReconResult:
-    summary: list[str]
-    creds: list[Credential]
+class SmbReconResult(EnumResult):
+    pass
 
 
 class SmbEnum(_Engine):
-
     def __init__(
         self,
-        profile: Profile, mode: str,
+        profile: Profile,
+        mode: str,
         on_line: Callable[[str], None] | None = None,
         cancel: threading.Event | None = None,
     ) -> None:
@@ -167,6 +178,13 @@ class SmbEnum(_Engine):
             )
             if step.tool == "netexec-shares" and netexec_auth_ok(text):
                 auth_ok = True
+        # enum4linux-ng's RPC null session counts too. netexec and enum4linux routinely disagree on
+        # a Windows/Samba box — netexec gets STATUS_ACCESS_DENIED while enum4linux's RPC session
+        # goes through — and gating only on netexec meant the follow-ups, the share walk and the
+        # anonymous credential were all skipped while the findings pane showed a working null
+        # session and a READ share. The summary then said "Anonymous access: none". [review]
+        if not auth_ok and any(f.kind == "auth" and "session" in f.value for f in found):
+            auth_ok = True
         return found, auth_ok
 
     def run(self) -> SmbReconResult:
@@ -289,16 +307,16 @@ _FTP_MAX_DEPTH = 3
 
 
 @dataclass
-class FtpReconResult:
-    summary: list[str]
-    creds: list[Credential]
+class FtpReconResult(EnumResult):
+    pass
 
 
 class FtpEnum(_Engine):
-
     def __init__(
         self,
-        profile: Profile, mode: str, port: int,
+        profile: Profile,
+        mode: str,
+        port: int,
         on_line: Callable[[str], None] | None = None,
         cancel: threading.Event | None = None,
     ) -> None:
@@ -388,9 +406,7 @@ class FtpEnum(_Engine):
                     queue.append((child + "/", depth + 1))
         findings.extend(self._peek_files(target, peekable))
         if queue:  # exited on the dir cap — say so, don't pretend the walk was exhaustive
-            self._emit(
-                f"[ftp] walk bounded at {_FTP_MAX_DIRS} dirs — list deeper paths via Tier-2"
-            )
+            self._emit(f"[ftp] walk bounded at {_FTP_MAX_DIRS} dirs — list deeper paths via Tier-2")
         return findings
 
     def _peek_files(self, target: Target, paths: list[str]) -> list[FtpFinding]:
@@ -404,9 +420,7 @@ class FtpEnum(_Engine):
             text = self._run_step(step.command.shell_line, step.command.output_file)
             out.append(FtpFinding("peek", path, peek_snippet(text)))
         if len(paths) > PEEK_MAX_FILES:
-            self._emit(
-                f"[ftp] peeked {PEEK_MAX_FILES}/{len(paths)} small files — rest via Tier-2"
-            )
+            self._emit(f"[ftp] peeked {PEEK_MAX_FILES}/{len(paths)} small files — rest via Tier-2")
         return out
 
     def _write_findings(self, collected: list[FtpFinding]) -> None:
@@ -440,15 +454,15 @@ class FtpEnum(_Engine):
 
 
 @dataclass
-class SshReconResult:
-    summary: list[str]
+class SshReconResult(EnumResult):
+    pass
 
 
 class SshEnum(_Engine):
-
     def __init__(
         self,
-        profile: Profile, port: int,
+        profile: Profile,
+        port: int,
         on_line: Callable[[str], None] | None = None,
         cancel: threading.Event | None = None,
     ) -> None:
@@ -517,15 +531,16 @@ class SshEnum(_Engine):
 
 
 @dataclass
-class DnsReconResult:
-    summary: list[str]
+class DnsReconResult(EnumResult):
+    pass
 
 
 class DnsEnum(_Engine):
-
     def __init__(
         self,
-        profile: Profile, domain: str, port: int,
+        profile: Profile,
+        domain: str,
+        port: int,
         on_line: Callable[[str], None] | None = None,
         cancel: threading.Event | None = None,
     ) -> None:
@@ -595,16 +610,16 @@ class DnsEnum(_Engine):
 
 
 @dataclass
-class LdapReconResult:
-    summary: list[str]
-    creds: list[Credential]
+class LdapReconResult(EnumResult):
+    pass
 
 
 class LdapEnum(_Engine):
-
     def __init__(
         self,
-        profile: Profile, basedn: str, port: int,
+        profile: Profile,
+        basedn: str,
+        port: int,
         on_line: Callable[[str], None] | None = None,
         cancel: threading.Event | None = None,
     ) -> None:
@@ -695,3 +710,7 @@ class LdapEnum(_Engine):
         summary.append("Anonymous bind: allowed" if anon else "Anonymous bind: denied")
         summary.extend(_suggest_tips(self._module, list(collected), "ldap"))
         return summary
+
+
+# public alias: what the GUI worker and the CLI both hold — an engine you call run() on.
+EnumEngine = _Engine

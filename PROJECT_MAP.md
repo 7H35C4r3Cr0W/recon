@@ -56,7 +56,8 @@ brute/spray, Metasploit/SQLMap, or LLM calls at runtime.
 - **Status:** ✅ Complete.
 - **Files:** `shell.py` (sole exec chokepoint + `policy_violation`), `orchestrator.py`
   (phase runner + `--resume`/`--force`), `models.py` (domain types + target validation),
-  `profile.py` (state under a module `_STATE_LOCK` — scans run in parallel), `run_paths.py`
+  `profile.py` (state under a module `_STATE_LOCK` — scans run in parallel), `service_enum.py`
+  (the Tier-1 enumeration engine both the GUI panels and `nabu-cli enum` drive), `run_paths.py`
   (per-command output paths + live-file claims), `nse_vuln.py` (per-service NSE vuln scan),
   `config.py`, `cli.py` (Typer: `scan`, `vuln`, `doctor`), `__main__.py`.
 - **Does:** every subprocess routes through `shell.run` → logs, times, writes raw output, enforces the

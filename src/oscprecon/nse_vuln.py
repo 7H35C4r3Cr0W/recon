@@ -23,6 +23,17 @@ from oscprecon.models import Finding, Proto
 #     error, so this stays portable to hosts without it.
 #   * a per-service FAMILY glob (smb-vuln-*) for a faster focused run, kept because it is the form
 #     operators know and type, and because it names what a scan is actually going to do.
+#
+# A family names PREFIXES, not services, and the two are not the same word: Samba's own
+# samba-vuln-cve-2012-1182 does NOT match smb-vuln-*, so the SMB family has to list both globs. A
+# prefix nobody listed is a check that silently never runs in targeted mode.
+#
+# The families are a FAST SUBSET, not the full set. ~27 of nmap's 105 vuln-category scripts are
+# reachable only in the default "all" mode — most of them one-off `http-<vendor>-<bug>` checks, plus
+# broadcast-avahi-dos (no portrule; it floods the segment) and firewall-bypass (a host script about
+# the path to the target, not a service on it). That is the intended trade: "targeted" runs the
+# handful an operator would type by hand, "all" runs everything nmap's portrules say applies. A
+# family may not use a bare `<svc>-*` glob to close the gap — that would match `<svc>-brute`.
 
 VULNERS_EXCLUDE = "not *vulners*"
 
@@ -40,7 +51,9 @@ class VulnProfile:
     ports: tuple[int, ...]  # the ports that signal it (used when the caller has no discovered port)
     family: tuple[str, ...]  # targeted NSE selectors — the "smb-vuln-*" form operators type
     why: str
-    dos_note: str = ""  # set when the family contains DoS-category checks that can crash a service
+    # the caution line shown before a non-safe run: a check that can crash the service, or one that
+    # writes to it instead of reading it
+    dos_note: str = ""
 
 
 # nmap service names (and product substrings) -> profile key. Deliberately small: the selector is
@@ -49,6 +62,16 @@ _NAME_KEYS: tuple[tuple[str, str], ...] = (
     ("microsoft-ds", "smb"),
     ("netbios-ssn", "smb"),
     ("smb", "smb"),
+    # why: these tokens outrank the generic http names below on purpose. nmap fronts several of
+    # them with TLS ("8140/tcp open ssl/http Puppet"), and matching "ssl/http" first would hand a
+    # Puppet CA the web family and never run puppet-naivesigning. None of them appears in a normal
+    # web server's product string, so promoting them costs nothing.
+    ("clam", "clamav"),
+    ("distcc", "distcc"),
+    ("puppet", "puppet"),
+    ("qconn", "qconn"),
+    ("netbus", "netbus"),
+    ("wdb", "wdb"),
     ("ssl/http", "http"),
     ("https", "http"),
     ("http-proxy", "http"),
@@ -75,6 +98,24 @@ _NAME_KEYS: tuple[tuple[str, str], ...] = (
     ("ssh", "ssh"),
     ("domain", "dns"),
     ("snmp", "snmp"),
+    # why: BELOW http, unlike the block above — "IPMI" is in the product string of a BMC's *web*
+    # interface on 80/443, and that port wants the web family, not the 623/udp IPMI checks.
+    ("asf-rmcp", "ipmi"),
+    ("ipmi", "ipmi"),
+)
+
+# TLS weaknesses are port-agnostic: every one of these fires on any port nmap negotiates TLS on, so
+# they belong to https AND to a mail port's STARTTLS rather than to one service's family.
+_TLS_CHECKS: tuple[str, ...] = (
+    "ssl-heartbleed",
+    "ssl-poodle",
+    "ssl-ccs-injection",
+    "ssl-dh-params",
+    "sslv2-drown",
+    "ssl-known-key",
+    "ssl-cert-intaddr",
+    "tls-ticketbleed",
+    "rsa-vuln-roca",
 )
 
 PROFILES: tuple[VulnProfile, ...] = (
@@ -82,9 +123,13 @@ PROFILES: tuple[VulnProfile, ...] = (
         key="smb",
         label="SMB / NetBIOS",
         ports=(139, 445),
-        family=("smb-vuln-*", "smb2-vuln-*", "smb-double-pulsar-backdoor"),
-        why="MS08-067, MS17-010, MS09-050/CVE-2009-3103, conficker, DoublePulsar — the classic "
-        "unauthenticated Windows RCE checks. Run this the moment 139/445 is open.",
+        # samba-vuln-* is a SEPARATE prefix, not a spelling of smb-vuln-*: without it the targeted
+        # run skips samba-vuln-cve-2012-1182 entirely, and Samba on Linux answers 139/445 as often
+        # as Windows does.
+        family=("smb-vuln-*", "smb2-vuln-*", "samba-vuln-*", "smb-double-pulsar-backdoor"),
+        why="MS08-067, MS17-010, MS09-050/CVE-2009-3103, conficker, DoublePulsar and the Samba "
+        "pre-auth heap overflow (CVE-2012-1182) — the classic unauthenticated RCE checks on "
+        "Windows AND on Linux Samba. Run this the moment 139/445 is open.",
         dos_note="Several smb-vuln checks are DoS-category (ms06-025, ms07-029, ms08-067, "
         "cve2009-3103) — they can crash a fragile service. Use 'safe checks only' to skip them.",
     ),
@@ -92,9 +137,21 @@ PROFILES: tuple[VulnProfile, ...] = (
         key="http",
         label="HTTP / HTTPS",
         ports=(80, 443, 8000, 8080, 8443, 8888),
-        family=("http-vuln-*", "http-shellshock", "http-iis-webdav-vuln", "http-vmware-path-vuln"),
-        why="Struts/ColdFusion/Drupalgeddon/IIS-WebDAV/Shellshock and the TLS checks "
-        "(heartbleed, POODLE, CCS-injection) when the port is HTTPS.",
+        family=(
+            "http-vuln-*",
+            "http-shellshock",
+            "http-iis-webdav-vuln",
+            "http-vmware-path-vuln",
+            "http-sql-injection",
+            "http-passwd",
+            "http-git",
+            "http-method-tamper",
+            "http-aspnet-debug",
+            *_TLS_CHECKS,
+        ),
+        why="Struts/ColdFusion/Drupalgeddon/IIS-WebDAV/Shellshock, the traversal + exposed-.git + "
+        "verb-tampering checks, and the full TLS set (heartbleed, POODLE, DROWN, CCS-injection, "
+        "ticketbleed, ROCA) when the port speaks HTTPS.",
         dos_note="Some checks are intrusive against a fragile app (slowloris probes, repeated "
         "auth). nmap tags http-slowloris-check 'safe', so 'safe checks only' does NOT drop it — "
         "skip the port if the service must stay up.",
@@ -149,15 +206,9 @@ PROFILES: tuple[VulnProfile, ...] = (
         key="mail-tls",
         label="IMAP / POP3",
         ports=(110, 143, 993, 995),
-        family=(
-            "ssl-heartbleed",
-            "ssl-poodle",
-            "ssl-ccs-injection",
-            "ssl-dh-params",
-            "sslv2-drown",
-            "rsa-vuln-roca",
-        ),
-        why="The TLS weaknesses on a mail port — heartbleed, POODLE, DROWN, CCS-injection.",
+        family=_TLS_CHECKS,
+        why="The TLS weaknesses on a mail port — heartbleed, POODLE, DROWN, CCS-injection, "
+        "ticketbleed, and a ROCA-factorable RSA key.",
     ),
     VulnProfile(
         key="rmi",
@@ -205,16 +256,22 @@ PROFILES: tuple[VulnProfile, ...] = (
         key="ssh",
         label="SSH",
         ports=(22,),
-        family=("sshv1", "ssh2-enum-algos", "ssh-auth-methods", "ssh-hostkey"),
-        why="Protocol/algorithm weaknesses. There is no ssh-vuln-* family — the vuln category "
-        "covers what exists.",
+        # rsa-vuln-roca's own portrule names 22 alongside every TLS port — an SSH host key is one
+        # of the two places a ROCA-factorable key turns up.
+        family=("sshv1", "ssh2-enum-algos", "ssh-auth-methods", "ssh-hostkey", "rsa-vuln-roca"),
+        why="Protocol/algorithm weaknesses plus a ROCA-factorable RSA host key. There is no "
+        "ssh-vuln-* family — the vuln category covers what exists.",
     ),
     VulnProfile(
         key="dns",
         label="DNS",
         ports=(53,),
-        family=("dns-recursion", "dns-cache-snoop", "dns-zone-transfer", "dns-nsid"),
-        why="Recursion, cache-snooping and zone transfer — the DNS misconfigurations.",
+        family=("dns-recursion", "dns-cache-snoop", "dns-zone-transfer", "dns-nsid", "dns-update"),
+        why="Recursion, cache-snooping, zone transfer, and dns-update — whether the server takes "
+        "unauthenticated dynamic updates, the AD-adjacent misconfiguration that lets you plant a "
+        "record. It reports its missing args unless you pass dns-update.hostname/.ip.",
+        dos_note="dns-update WRITES to the zone once dns-update.hostname/.ip (or .test) are "
+        "supplied — it is the one check here that changes the target rather than reading it.",
     ),
     VulnProfile(
         key="snmp",
@@ -229,6 +286,71 @@ PROFILES: tuple[VulnProfile, ...] = (
             "snmp-win32-users",
         ),
         why="Community-string exposure and the SNMP information leaks.",
+    ),
+    VulnProfile(
+        key="clamav",
+        label="ClamAV clamd",
+        ports=(3310,),
+        family=("clamav-exec",),
+        why="clamd taking SCAN/SHUTDOWN from anyone — unauthenticated file-existence enumeration "
+        "across the filesystem, and a remote stop of the AV daemon.",
+        dos_note="clamav-exec's SHUTDOWN stops the AV daemon. It only fires with "
+        "--script-args cmd=shutdown, so do not add that argument to the command box.",
+    ),
+    VulnProfile(
+        key="distcc",
+        label="distcc",
+        ports=(3632,),
+        family=("distcc-cve2004-2687",),
+        why="distccd 3.1 and earlier accept compile jobs from anyone (CVE-2004-2687) — command "
+        "execution as the distccd user, which the check proves by running `id`.",
+    ),
+    VulnProfile(
+        key="ipmi",
+        label="IPMI / BMC",
+        # 623 only. 49152 is ALSO the Supermicro BMC web port, but it is the first Windows
+        # dynamic RPC port before that — open on essentially every Windows box — so claiming it
+        # here pulled msrpc out of its scan group and filed its verdicts under service="ipmi".
+        # supermicro-ipmi-conf still fires on a real BMC: its own portrule covers 49152 in the
+        # default "all" mode, and a genuine BMC resolves by service NAME. [review]
+        ports=(623,),
+        family=("ipmi-cipher-zero", "ipmi-version", "supermicro-ipmi-conf"),
+        why="Cipher-zero auth bypass on 623/udp (any password logs in to the BMC) and, on the "
+        "Supermicro BMC web port 49152, a config download carrying plaintext BMC/AD credentials.",
+    ),
+    VulnProfile(
+        key="netbus",
+        label="NetBus",
+        ports=(12345, 12346),
+        family=("netbus-auth-bypass", "netbus-version"),
+        why="A NetBus backdoor answering on 12345 — the 1.53/2.0 auth bypass hands over full "
+        "remote control without the password.",
+    ),
+    VulnProfile(
+        key="puppet",
+        label="Puppet CA",
+        ports=(8140,),
+        family=("puppet-naivesigning",),
+        why="A Puppet CA with naive autosigning signs ANY certificate request, so an invented node "
+        "name pulls that node's catalog — which routinely carries deployment secrets.",
+        dos_note="puppet-naivesigning submits a CSR and leaves a signed certificate behind on the "
+        "CA — it writes to the target, it does not only read from it.",
+    ),
+    VulnProfile(
+        key="qconn",
+        label="QNX qconn",
+        ports=(8000,),
+        family=("qconn-exec",),
+        why="QNX Neutrino's qconn debug daemon runs arbitrary commands as root with no "
+        "authentication — the check executes one to prove it.",
+    ),
+    VulnProfile(
+        key="wdb",
+        label="VxWorks WDB agent",
+        ports=(17185,),
+        family=("wdb-version",),
+        why="A VxWorks WDB debug agent exposed on 17185/udp (CERT VU#362332) — unauthenticated "
+        "read and write of device memory; the version banner confirms it is listening.",
     ),
 )
 

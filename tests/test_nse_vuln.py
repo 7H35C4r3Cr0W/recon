@@ -350,3 +350,87 @@ def test_the_named_families_cover_the_classic_oscp_checks() -> None:
     assert "smtp-vuln-*" in families["smtp"]
     assert "rdp-vuln-*" in families["rdp"]
     assert "mysql-vuln-*" in families["mysql"]
+
+
+# --- roster width: a vuln script with no family never runs in targeted mode ----------------------
+
+
+def test_the_samba_prefixed_check_is_reachable_from_the_smb_family() -> None:
+    # samba-vuln-cve-2012-1182 is a DIFFERENT PREFIX — smb-vuln-* does not match it. Samba on Linux
+    # answers 139/445 as often as Windows does, so a targeted SMB run that cannot reach the Samba
+    # pre-auth heap overflow is the same silent miss this whole feature exists to prevent.
+    smb = nse_vuln.profile_for("microsoft-ds", 445)
+    selector = nse_vuln.selector(nse_vuln.MODE_TARGETED, smb)
+    assert "samba-vuln-*" in selector
+    assert "smb-vuln-*" in selector  # and the Windows prefix is still there
+
+
+@pytest.mark.parametrize(
+    ("key", "check"),
+    [
+        ("clamav", "clamav-exec"),
+        ("distcc", "distcc-cve2004-2687"),
+        ("ipmi", "ipmi-cipher-zero"),
+        ("ipmi", "supermicro-ipmi-conf"),
+        ("netbus", "netbus-auth-bypass"),
+        ("puppet", "puppet-naivesigning"),
+        ("qconn", "qconn-exec"),
+        ("wdb", "wdb-version"),
+        ("dns", "dns-update"),
+        ("http", "tls-ticketbleed"),
+        ("http", "rsa-vuln-roca"),
+        ("mail-tls", "tls-ticketbleed"),
+        ("ssh", "rsa-vuln-roca"),
+    ],
+)
+def test_each_family_carries_its_signature_check(key: str, check: str) -> None:
+    profile = next(p for p in nse_vuln.PROFILES if p.key == key)
+    assert check in nse_vuln.selector(nse_vuln.MODE_TARGETED, profile)
+
+
+@pytest.mark.parametrize(
+    ("name", "port", "expected"),
+    [
+        ("clam", 3310, "clamav"),
+        ("distccd", 3632, "distcc"),
+        ("asf-rmcp", 623, "ipmi"),
+        ("netbus", 12345, "netbus"),
+        ("puppet", 8140, "puppet"),
+        ("qconn", 8000, "qconn"),
+        ("wdbrpc", 17185, "wdb"),
+        ("", 3632, "distcc"),  # no name: the port still finds the family
+    ],
+)
+def test_profile_for_resolves_the_new_service_names(name: str, port: int, expected: str) -> None:
+    assert nse_vuln.profile_for(name, port).key == expected
+
+
+def test_a_tls_fronted_app_beats_the_generic_web_name() -> None:
+    # nmap reports the Puppet CA as "8140/tcp open ssl/http Puppet". Matching "ssl/http" first would
+    # hand it the web family and never run puppet-naivesigning.
+    assert nse_vuln.profile_for("ssl/http", 8140, "Puppet").key == "puppet"
+
+
+def test_a_bmc_web_page_stays_on_the_web_family() -> None:
+    # the mirror case: "IPMI" is in the product string of a BMC's *web* UI, and port 80 wants the
+    # http checks, not the 623/udp IPMI ones.
+    assert nse_vuln.profile_for("http", 80, "Supermicro IPMI web interface").key == "http"
+
+
+def test_every_new_family_produces_a_runnable_targeted_scan() -> None:
+    for key in ("clamav", "distcc", "ipmi", "netbus", "puppet", "qconn", "wdb"):
+        profile = next(p for p in nse_vuln.PROFILES if p.key == key)
+        command = nse_vuln.build_command(
+            "10.10.10.100", list(profile.ports), mode=nse_vuln.MODE_TARGETED, profile=profile
+        )
+        assert shell.policy_violation(shlex.split(command)) is None, key
+        assert profile.why, key
+
+
+def test_no_family_uses_a_bare_service_glob() -> None:
+    # §2: a glob is judged by what it EXPANDS to, and `smb-*` matches smb-brute. Every selector is
+    # either an explicit script name or a *-vuln-* glob, which cannot reach a credential script.
+    for profile in nse_vuln.PROFILES:
+        for entry in profile.family:
+            if "*" in entry:
+                assert "-vuln-" in entry, entry
