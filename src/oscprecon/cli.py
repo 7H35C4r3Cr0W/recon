@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import typer
 
-from oscprecon import branding, config, diagnostics, guide, shell, vault_export
+from oscprecon import audit, branding, config, diagnostics, guide, shell, vault_export
 from oscprecon import doctor as doctor_mod
 from oscprecon.models import Target
 from oscprecon.orchestrator import Orchestrator
