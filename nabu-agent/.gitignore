@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+secrets/
+*.crt
+*.key
+*.pem
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+frontend/dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

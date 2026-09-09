@@ -1,0 +1,122 @@
+# Nabu Agent — full topology. Internal-only deployment (bind to an internal interface / behind the
+# org VPN; NOT public). `docker compose up` brings up the whole platform.
+#
+#   api      FastAPI (async) — REST + WebSocket (live agent progress). Imports the oscprecon engine.
+#   worker   arq worker(s) — run recon fan-out; SAME image as api (engine + wrapped TOOLS baked in).
+#   frontend React+Vite+TS SPA, built to static assets, served by nginx (reverse-proxies /api + /ws).
+#   postgres projects, users, runs, agents, findings-index, the two audit trails.
+#   redis    arq broker + WebSocket pub/sub fan-out + rate-limit buckets.
+name: nabu-agent
+
+x-engine-image: &engine-image
+  build:
+    context: ..                       # repo ROOT — the image bakes src/oscprecon + this project
+    dockerfile: nabu-agent/deploy/Dockerfile.api
+  image: ${NABU_AGENT_IMAGE:-nabu-agent:latest}
+  env_file: [.env]
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+  volumes:
+    # Shared workspace: engine Profiles/findings/audit.jsonl live on disk here, one project per dir.
+    # api WRITES nothing tool-related; workers own tool execution. Both read for reports/live state.
+    - nabu_workspace:/workspace
+  restart: unless-stopped
+
+services:
+  # One-shot: apply migrations + seed the first admin, then exit. api/worker wait for it.
+  migrate:
+    <<: *engine-image
+    command: ["sh", "-lc", "alembic upgrade head && python -m nabu_agent.bootstrap"]
+    restart: "no"
+    deploy:
+      replicas: 1
+
+  api:
+    <<: *engine-image
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    command: ["uvicorn", "nabu_agent.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--proxy-headers", "--forwarded-allow-ips", "*"]
+    # API never runs recon tools -> drop ALL Linux caps and forbid privilege escalation.
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    # Bind to loopback of the host only; nginx is the sole public-facing edge.
+    ports: ["127.0.0.1:8000:8000"]
+
+  worker:
+    <<: *engine-image
+    # arq worker settings live in nabu_agent.worker.WorkerSettings (queue, concurrency, on_startup).
+    command: ["arq", "nabu_agent.worker.WorkerSettings"]
+    # ONLY the worker needs to reach targets and run raw-socket nmap. Least privilege:
+    #  - drop ALL caps, add back ONLY NET_RAW (nmap SYN/UDP), matching the classic image.
+    #  - no-new-privileges stops any wrapped tool gaining privs via setuid.
+    #  - a restrictive seccomp profile on top of Docker's default (deploy/seccomp/worker.json).
+    cap_drop: ["ALL"]
+    cap_add: ["NET_RAW"]
+    security_opt:
+      - "no-new-privileges:true"
+      - "seccomp:./deploy/seccomp/worker.json"
+    # Egress control: workers attach to an ISOLATED docker network with NO default route, plus the
+    # engagement network. See `networks` below and § SANDBOXING in the design doc.
+    networks: [backend, egress]
+    deploy:
+      replicas: ${NABU_AGENT_WORKERS:-2}
+      resources:
+        limits: { cpus: "2.0", memory: 2g }   # cap a runaway scan/agent
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: nabu-agent/deploy/Dockerfile.frontend
+    image: ${NABU_AGENT_FRONTEND_IMAGE:-nabu-agent-frontend:latest}
+    depends_on: [api]
+    # The ONLY public edge. Terminate TLS here (mount internal CA cert) or front with the org LB.
+    ports: ["${NABU_AGENT_BIND:-127.0.0.1}:8443:8443"]
+    networks: [backend]
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nabu}
+      POSTGRES_DB: ${POSTGRES_DB:-nabu}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: ["nabu_pgdata:/var/lib/postgresql/data"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nabu}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes: ["nabu_redis:/data"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+networks:
+  backend:            # api <-> worker <-> db/redis <-> frontend. internal-only.
+    internal: true
+  egress:             # workers -> engagement targets. Scope-enforced in-app; see § SANDBOXING.
+    driver: bridge
+
+volumes:
+  nabu_workspace:
+  nabu_pgdata:
+  nabu_redis:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt   # gitignored; provisioned per-deploy
