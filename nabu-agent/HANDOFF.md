@@ -25,9 +25,10 @@
 ```
 DATE:        2026-09-09
 BRANCH:      nabu-agent-scaffold
-PHASE:       1 — Scaffold the body  (DONE) → 0.5 manager HTML → Phase 4 push
-DOING NOW:   Manager HTML (0.5), then commit + push + PR
-NEXT UP:     GitHub push (Phase 4). Then Phase 2 (MVP wiring) in a later session.
+PHASE:       Phases 0, 1, 4 DONE — scaffold committed + pushed + PR open
+DOING NOW:   (idle) — awaiting review
+NEXT UP:     Phase 2 (MVP thin slice) in a later session — resume at step 2.1
+PR:          https://github.com/7H35C4r3Cr0W/recon/pull/1  (commit b551866, 123 files)
 BLOCKERS:    none
 VERIFIED:    122 files; 71 backend .py compile clean; engine seam imports against REAL oscprecon
              with PySide6 NOT loaded (headless holds); 12/12 policy-invariant + unit tests PASS;
@@ -80,8 +81,8 @@ a clean stub where the owner attaches the LLM endpoint.
 
 ## Phase 4 — GitHub update
 
-- [ ] **4.1** Stage **`nabu-agent/` only** (never `src/oscprecon`), commit with attribution.
-- [ ] **4.2** Push branch `nabu-agent-scaffold` to `origin` and open a PR (new folder, offshoot product).
+- [x] **4.1** Stage **`nabu-agent/` only** (never `src/oscprecon`), commit with attribution.
+- [x] **4.2** Pushed `nabu-agent-scaffold` → `origin`; **PR #1** open: https://github.com/7H35C4r3Cr0W/recon/pull/1 ✅
 
 ---
 
