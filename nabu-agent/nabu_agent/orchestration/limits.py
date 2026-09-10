@@ -17,6 +17,7 @@ from dataclasses import dataclass
 DEFAULT_MAX_HOSTS_PER_RUN = 32          # alive-check may return a whole /24; cap the fan-out
 APPROVAL_REQUIRED_ABOVE_HOSTS = 16      # more than this needs an explicit "yes, scan all N"
 DEFAULT_MAX_CONCURRENT_SERVICE_AGENTS = 8   # run-scoped semaphore (Arq max_jobs is global)
+DEFAULT_MAX_CONCURRENT_HOSTS = 4            # hosts scanned in parallel for a CIDR run
 DEFAULT_MAX_ENUM_PER_HOST = 4           # avoid hammering one host in parallel
 DEFAULT_AGENT_WALL_CLOCK_S = 900        # per service/research agent, above the 300s step watchdog
 DEFAULT_RUN_WALL_CLOCK_S = 4 * 3600
@@ -31,6 +32,7 @@ class RunLimits:
     max_hosts: int = DEFAULT_MAX_HOSTS_PER_RUN
     approval_required_above_hosts: int = APPROVAL_REQUIRED_ABOVE_HOSTS
     max_concurrent_service_agents: int = DEFAULT_MAX_CONCURRENT_SERVICE_AGENTS
+    max_concurrent_hosts: int = DEFAULT_MAX_CONCURRENT_HOSTS
     max_enum_per_host: int = DEFAULT_MAX_ENUM_PER_HOST
     agent_wall_clock_s: int = DEFAULT_AGENT_WALL_CLOCK_S
     run_wall_clock_s: int = DEFAULT_RUN_WALL_CLOCK_S

@@ -108,7 +108,7 @@ async def test_wide_service_fanout_is_bounded(app_ctx, monkeypatch, tmp_path):
                 break
         dur = time.perf_counter() - start
 
-    cap = RunLimits().max_concurrent_service_agents
+    cap = RunLimits().max_enum_per_host       # per-host enum semaphore (host tier)
     capped_services = min(N, RunLimits().max_total_tasks)
     print(f"\n[load] wide fan-out: {N} services → {len(agents)} enum agents, peak concurrency "
           f"{state['peak']} (cap {cap}), {dur:.1f}s")

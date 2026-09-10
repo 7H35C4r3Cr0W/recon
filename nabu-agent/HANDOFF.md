@@ -238,3 +238,54 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
 - Project delete + on-disk workspace GC ✅ DELETE /api/projects/{id} (owner/admin; refuses while a run is active) removes all DB rows + safely rmtrees the project's workspace dir (traversal-guarded); UI 'Delete project' button. Tested. 51 backend + 12 FE tests.
 - OIDC back-channel logout ✅ per-user session index + POST /api/auth/oidc/backchannel-logout (validates the IdP logout token: sig via JWKS, iss/aud/events/sub, no nonce) → revokes all the user's sessions; unconfigured→404, bad token→400. Tested (validation mocked). 48 backend + 12 FE tests.
 - Retention/quotas ✅ orchestration/retention.py: event-TTL (prune terminal runs' events > N days) + per-project run cap (keep newest N + cascade delete children); Arq cron (hourly + startup) on the worker; admin endpoints GET /api/admin/storage + POST /api/admin/retention (admin-only). Unit + endpoint tests. 45 backend + 12 FE tests. **All Phase-5 items + all optional polish complete.**
+
+---
+
+## Phase 6 — Host tier (multi-host / CIDR fan-out) — closes the LOAD_TEST.md gap
+
+**Goal:** a run whose target is a CIDR (or multi-host scope) sweeps for live hosts and fans out
+per-HOST recon (each host its own Profile + host-scoped map nodes), bounded by the RunLimits host
+guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
+
+- [x] **6.1 Host-scoped node identity** — enum/research/finding node ids include the host
+  (`agent-enum-{host}-{port}`, `agent-research-{host}-{port}`, `finding-{host}-...`; svc already
+  `svc-{host}-{port}-{proto}` when target=host). Update existing tests to the host-scoped ids.
+- [x] **6.2 Per-host Profile** — `workspace_for(project_id, host_ip)` per live host → its own
+  findings.json (fixes the host-less `findings._key` collision without touching the engine).
+- [x] **6.3 `_recon_host()`** — extract the per-host scan→services→enum-fan-out→findings→report from
+  `_run_real`, host-scoped, under a per-host service semaphore (`max_enum_per_host`).
+- [x] **6.4 Multi-host driver** — `_run_real` single host (no `/`) → one `_recon_host`; CIDR →
+  alive-sweep (`check_alive`) → live hosts → clamp `max_hosts` → fan out `_recon_host` concurrently
+  under `max_concurrent_hosts`; global `max_total_tasks` product cap; aggregate → partial/done.
+- [x] **6.5 Wire guardrails** — clamp `max_hosts`; per-host `max_enum_per_host`; `max_concurrent_hosts`
+  (new); `max_total_tasks` as the hosts×services budget; emit a note when `approval_required_above_hosts`
+  is exceeded (full human recon-approval gate = follow-up).
+- [x] **6.6 Tests** — multi-host scan (mock engine: alive-sweep returns N hosts, each with services)
+  asserts per-host host-scoped nodes, per-host profiles, caps enforced (clamp > max_hosts), no
+  cross-host collision.
+
+### Phase 6 progress log
+- (starting 6.1/6.5)
+- DONE — host tier shipped for the `scan` kind. `services/runs.py`: added `_resolve_hosts`
+  (single host -> [t]; CIDR -> `check_alive` sweep -> clamp `max_hosts` -> notice over
+  `approval_required_above_hosts`) + `_recon_host` (per-host Profile via
+  `workspace_for(project_id, host)`, host-scoped nodes `host-/svc-/agent-enum-/finding-`,
+  per-host enum semaphore = `max_enum_per_host`, per-host `report.md`) + rewrote `_run_real`
+  as the multi-host driver (fan out under `max_concurrent_hosts`, `max_total_tasks` product
+  cap via `per_host_budget`, per-host error -> red host node, all-hosts-failed -> surface as
+  driver failure so the `failed`+error-event reliability contract holds). Host-scoped the
+  `_run_agent` ids too (still single target). New limit `max_concurrent_hosts`=4.
+- Tests: `tests/integration/test_multihost_run.py` (2) — CIDR fans out per host with
+  host-scoped subtrees + no collision; alive > `max_hosts` clamps to 32 with a capping log.
+  Updated `test_real_run`/`test_fanout`/`test_agent_run` to the host-scoped ids; load test's
+  wide-fanout cap now asserts `max_enum_per_host` (measured peak 4/4). Full local gate green:
+  ruff clean, mypy 10 (down from 11; new code clean), 53 backend + 2 load + 9 invariant + 7
+  unit + 12 frontend tests pass, frontend build OK.
+- Doc: `docs/LOAD_TEST.md` updated — gap now largely closed for `scan`; guardrail table +
+  verdict revised; remaining follow-ups (agent-kind multi-host, combined report, hard
+  approval checkpoint, distributed supervisor) listed honestly.
+- NOTE surfaced to owner: `nabu-agent/.github/workflows/nabu-agent-ci.yml` is in a location
+  GitHub never scans (workflows must live at repo ROOT `.github/workflows/`), and the repo's
+  root CI is deliberately **manual-only** (`workflow_dispatch`, auto-triggers removed to save
+  Actions minutes) — gates run LOCALLY before push. So the nabu-agent CI never auto-ran. Left
+  as-is (not silently converted to auto-trigger against that policy); flagged for a decision.
