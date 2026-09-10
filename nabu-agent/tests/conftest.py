@@ -21,6 +21,7 @@ async def app_ctx():
     import os
 
     os.environ["NABU_ENV"] = "development"  # so the session cookie isn't Secure-only over http
+    os.environ["NABU_USE_ARQ"] = "false"    # always run in-process in tests, even if a stray .env sets it
     import fakeredis.aioredis
     from nabu_agent import bus
     from nabu_agent.bootstrap import seed_admin
