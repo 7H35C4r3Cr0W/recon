@@ -1,23 +1,37 @@
-"""Redis-backed opaque sessions in an httpOnly, SameSite=strict, Secure cookie.
-
-The WebSocket handshake reuses the SAME cookie (no token-in-URL). Session TTL from
-``Settings.session_ttl_min``. Bodies wired in Phase 2.
-"""
+"""Redis-backed opaque sessions in an httpOnly, SameSite=strict cookie. The WebSocket handshake
+reuses the same cookie (no token-in-URL). TTL from ``Settings.session_ttl_min``."""
 
 from __future__ import annotations
 
+import secrets
+
+from nabu_agent import bus
+from nabu_agent.settings import get_settings
+
 COOKIE_NAME = "nabu_session"
+_PREFIX = "nabu:session:"
+
+
+def _key(sid: str) -> str:
+    return _PREFIX + sid
 
 
 async def create_session(user_id: str) -> str:
-    """Mint an opaque session id, store {user_id, expires} in Redis, return the cookie value."""
-    raise NotImplementedError
+    sid = secrets.token_urlsafe(32)
+    ttl = get_settings().session_ttl_min * 60
+    await bus.get_redis().set(_key(sid), user_id, ex=ttl)
+    return sid
 
 
-async def resolve_session(session_id: str) -> str | None:
-    """Return the user id for a live session, or None if missing/expired."""
-    raise NotImplementedError
+async def resolve_session(sid: str | None) -> str | None:
+    if not sid:
+        return None
+    val = await bus.get_redis().get(_key(sid))
+    if val is None:
+        return None
+    return val if isinstance(val, str) else val.decode()
 
 
-async def destroy_session(session_id: str) -> None:
-    raise NotImplementedError
+async def destroy_session(sid: str | None) -> None:
+    if sid:
+        await bus.get_redis().delete(_key(sid))

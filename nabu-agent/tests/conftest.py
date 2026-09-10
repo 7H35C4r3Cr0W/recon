@@ -1,10 +1,12 @@
-"""Shared fixtures. Policy-invariant AST tests need nothing; integration tests get an in-memory
-async SQLite DB (no Postgres), a fakeredis client, and a FastAPI app with the engine adapter mocked.
+"""Shared fixtures. Integration tests get a temp-file async SQLite DB (shared across the executor's
+own connections — in-memory sqlite is per-connection, which would hide the background task's writes),
+a fakeredis client wired into the bus, a seeded admin, and an httpx client bound to the ASGI app.
 """
 from __future__ import annotations
 
 import pathlib
 import sys
+import tempfile
 
 import pytest
 
@@ -14,17 +16,39 @@ if str(_ROOT) not in sys.path:
 
 
 @pytest.fixture
-async def db():
-    """A fresh in-memory SQLite DB per test (tables created), yielding a session factory."""
+async def app_ctx():
+    """Configure DB (temp-file sqlite) + fakeredis + seeded admin, yield (app, admin creds)."""
+    import os
+
+    os.environ["NABU_ENV"] = "development"  # so the session cookie isn't Secure-only over http
+    import fakeredis.aioredis
+    from nabu_agent import bus
     from nabu_agent.db import session as db_session
-    db_session.configure("sqlite+aiosqlite:///:memory:")
+    from nabu_agent.bootstrap import seed_admin
+    from nabu_agent.settings import get_settings
+
+    get_settings.cache_clear()
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp.close()
+    db_session.configure(f"sqlite+aiosqlite:///{tmp.name}")
     await db_session.create_all()
-    yield db_session
+    bus.set_client(fakeredis.aioredis.FakeRedis(decode_responses=True))
+    await seed_admin("admin@nabu.local", "changeme")
+
+    from nabu_agent.main import create_app
+    app = create_app()
+    yield app, {"email": "admin@nabu.local", "password": "changeme"}
+
     await db_session.dispose()
+    bus.set_client(None)
+    pathlib.Path(tmp.name).unlink(missing_ok=True)
 
 
 @pytest.fixture
-def fake_redis():
-    """A fakeredis async client (no server needed)."""
-    import fakeredis.aioredis
-    return fakeredis.aioredis.FakeRedis()
+async def client(app_ctx):
+    import httpx
+    app, _creds = app_ctx
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
