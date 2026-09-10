@@ -2,7 +2,7 @@
 to its newest N runs, and the admin-only endpoints work (non-admins get 403)."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -16,7 +16,7 @@ async def test_event_ttl_prunes_old_terminal_events_only(app_ctx):
     from nabu_agent.db.session import sessionmaker
     from nabu_agent.orchestration.retention import run_retention
 
-    old = datetime.now(timezone.utc) - timedelta(days=60)
+    old = datetime.now(UTC) - timedelta(days=60)
     async with sessionmaker()() as db:
         done = Run(project_id="p", kind="scan", target="10.0.0.1", state="done")
         live = Run(project_id="p", kind="scan", target="10.0.0.2", state="scanning")
@@ -40,7 +40,7 @@ async def test_per_project_run_cap(app_ctx):
     from nabu_agent.db.session import sessionmaker
     from nabu_agent.orchestration.retention import run_retention
 
-    base = datetime.now(timezone.utc)
+    base = datetime.now(UTC)
     async with sessionmaker()() as db:
         for i in range(5):
             db.add(Run(project_id="capproj", kind="scan", target=f"10.0.0.{i}", state="done",
