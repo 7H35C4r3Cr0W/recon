@@ -97,6 +97,14 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Transient signed-cookie session used ONLY to carry the OAuth state/nonce across the OIDC
+    # redirect round-trip (Authlib). The durable post-login session is our Redis session.
+    from starlette.middleware.sessions import SessionMiddleware
+
+    _secret = settings.session_secret.get_secret_value() or "nabu-agent-dev-secret"
+    app.add_middleware(SessionMiddleware, secret_key=_secret, same_site="lax",
+                       https_only=settings.env == "production", max_age=600)
+
     @app.exception_handler(EngineAdapterError)
     async def _engine_error_handler(request: Request, exc: EngineAdapterError) -> JSONResponse:
         status = _ERROR_STATUS.get(getattr(exc, "code", "engine_error"), 500)

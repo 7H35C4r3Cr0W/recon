@@ -35,7 +35,14 @@ class Settings(BaseSettings):
 
     session_secret: SecretStr = SecretStr("")   # REQUIRED in prod; startup asserts non-empty
     session_ttl_min: int = 480
-    oidc_issuer: str = ""                       # optional org IdP; empty → local accounts only
+    # OIDC / SSO (optional). When oidc_issuer is set, "Sign in with SSO" is offered and users are
+    # JIT-provisioned on first login. Discovery uses <issuer>/.well-known/openid-configuration.
+    oidc_issuer: str = ""                       # empty → local accounts only
+    oidc_client_id: str = ""
+    oidc_client_secret: SecretStr = SecretStr("")
+    oidc_scopes: str = "openid email profile"
+    oidc_redirect_url: str = ""                 # optional override; else derived from the request
+    oidc_first_user_admin: bool = True          # first JIT-provisioned user becomes global admin
 
     # SAFETY — recon-only default. These are GATES, not agent-settable behaviour.
     spray_enabled: bool = False
