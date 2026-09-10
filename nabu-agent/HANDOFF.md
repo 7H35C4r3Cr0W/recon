@@ -71,9 +71,61 @@ the architecture; `ROADMAP.md` for the phased plan). Never edit `../src/oscpreco
 the FastAPI app boots; the provider seam + engine adapter have real (not empty) implementations with
 a clean stub where the owner attaches the LLM endpoint.
 
-## Phase 2 — MVP thin slice (next session)
+## Phase 2 — MVP thin slice — DETAILED PROJECT PLAN
 
-- [ ] **2.1** End-to-end: log in → create project + authorized scope → start recon run → supervisor fans out per-service/research/writer agents → live WebSocket progress → clean report + next steps.
+**Goal (ROADMAP exit):** from a clean deploy an operator logs in, creates a scoped project, starts a
+recon run against ONE authorized IP, watches live progress over WebSocket, and reads a rendered
+report — no manual DB/CLI steps. Single-target only (fan-out is Phase 3). Every step keeps the
+policy-invariant gate green and `../src/oscprecon` untouched.
+
+**How to build it (ordered sub-steps — do in order, test each, tick as you go):**
+
+- [ ] **2.1 Test harness** — `tests/conftest.py`: async in-memory SQLite (`aiosqlite`) engine +
+  `Base.metadata.create_all` fixture; `fakeredis.aioredis` fixture; a FastAPI `TestClient`/`httpx`
+  fixture with dependency overrides (`get_db`, redis, and the engine adapter mocked). Deps already in
+  the test venv (`.venv-agent`): `pytest-asyncio`, `aiosqlite`, `fakeredis`.
+- [ ] **2.2 DB session wiring** — make `db/session.py` build the engine from `Settings.database_url`
+  lazily (not at import) so tests can point it at sqlite; add `create_all()` helper for dev/test;
+  keep `get_db` the injected dependency.
+- [ ] **2.3 Auth (local first)** — implement `auth/providers.LocalProvider` (argon2 verify),
+  `auth/sessions` (redis-backed opaque session in the httpOnly cookie), `auth/deps`
+  (`get_current_user`, `require_role`, `require_project_role`, `csrf_protect`), and
+  `bootstrap.seed_admin`. Wire `routers/auth.py` login/logout/me. OIDC stays scaffolded.
+- [ ] **2.4 Projects + scope** — `routers/projects.py` create → `engine.gateway.create_project_profile`
+  (`Profile.create`), list/get/patch, members, settings (spray/exploit gates, admin only);
+  `routers/scope.py` allowlist CRUD with `models.validate_host_or_range` + human-gated promote. RBAC
+  via `auth/deps`. Platform-audit each mutation (`nabu_agent.audit`).
+- [ ] **2.5 Runs API** — `routers/runs.py`: `POST /projects/{id}/runs` → `assert_in_scope` +
+  RBAC + gating + `admission.acquire_run_slot` + enqueue `supervise_run`; `GET /runs/{id}` (+ tasks),
+  `POST /runs/{id}/cancel`. Persist `runs`/`agent_tasks`/`run_events` (monotonic `seq`).
+- [ ] **2.6 Orchestration (single target, no fan-out)** — implement `bus.py` (redis enqueue /
+  cancel-flag / publish-subscribe), `orchestration/admission.py`, the single-writer `blackboard.py`,
+  and `orchestration/tasks.supervise_run` for ONE host: validating → alive_check (`check_alive`) →
+  scanning (`run_scan`) → enriching (one `enum_service` per discovered service, still serial) →
+  synthesizing (`generate_report`) → report_ready. Engine calls run in a worker thread; cancel flag →
+  `threading.Event`; idempotency key; blocked/missing_tool recorded, never retried → `partial`.
+- [ ] **2.7 WebSocket** — `ws/hub.py`: cookie-auth handshake, replay `run_events` by `seq` then tail
+  the redis `run:{id}` channel, ~20s heartbeat, ~250ms coalescing of `task.updated`/`log.line`.
+- [ ] **2.8 Reports/findings** — `routers/reports.py` (`gateway.render_report`, artifacts) +
+  `routers/findings.py` (`gateway.list_findings/list_services/build_graph`); apply
+  `agents/report_grounding.validate_claims` and delimit AI-narrative.
+- [ ] **2.9 Frontend** — finish `api/client.ts` + `ws/client.ts`; build the pages: Login, Projects
+  (list + create + scope), RunLive (task tree + streamed log via WS), Report. Route guards on auth.
+- [ ] **2.10 Integration tests** — happy path: login → create project (mock `Profile.create`) →
+  start run (mocked engine tools) → receive `run_events` → fetch rendered report; error-contract
+  mapping (out-of-scope → 403 `scope_violation`); WS replay-by-seq reconnect; grounding validator
+  rejects an injected unbacked claim. Keep the invariant gate green.
+
+**Phase 2 exit checklist (all must pass):**
+- [ ] clean deploy → operator completes login → project+scope → run → live progress → report, no CLI.
+- [ ] mid-run WS reconnect reconciles to the same task tree (replay-by-seq).
+- [ ] out-of-scope target refused at the API (403) and never enqueued.
+- [ ] secrets absent from `run_events`/WS payloads (cred_ref only); `creds.json` stays 0600.
+- [ ] happy-path API + WS integration test green in CI; policy-invariant gate still green.
+
+**Testing notes:** use `.venv-agent` (already built) — `PYTHONPATH=. .venv-agent/bin/python -m pytest`.
+No docker needed for unit/integration (sqlite + fakeredis + mocked engine). Full `docker compose up`
+is the manual acceptance check when Postgres/Redis are available.
 
 ## Phase 3 — Hardening (later)
 
