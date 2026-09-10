@@ -94,6 +94,8 @@ select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
 "nabu_agent/routers/*.py" = ["B008"]
 "nabu_agent/auth/deps.py" = ["B008"]
 "nabu_agent/routers/health.py" = ["B008"]
+# tests legitimately use compact multi-statement setup lines
+"tests/**/*.py" = ["E501", "E701", "E702", "SIM115"]
 
 [tool.mypy]
 python_version = "3.11"

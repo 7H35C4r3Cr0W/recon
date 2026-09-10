@@ -4,7 +4,6 @@ Uses httpx-ws over the in-process ASGI app so everything stays on one event loop
 from __future__ import annotations
 
 import asyncio
-import contextlib
 
 import httpx
 import pytest

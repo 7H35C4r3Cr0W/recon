@@ -23,8 +23,8 @@ async def app_ctx():
     os.environ["NABU_ENV"] = "development"  # so the session cookie isn't Secure-only over http
     import fakeredis.aioredis
     from nabu_agent import bus
-    from nabu_agent.db import session as db_session
     from nabu_agent.bootstrap import seed_admin
+    from nabu_agent.db import session as db_session
     from nabu_agent.settings import get_settings
 
     get_settings.cache_clear()

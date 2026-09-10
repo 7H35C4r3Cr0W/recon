@@ -2,7 +2,7 @@
 event so the live view unblocks; a run with a fresh heartbeat is left alone."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -15,7 +15,7 @@ async def test_reaper_fails_stale_but_not_fresh(app_ctx):
     from nabu_agent.orchestration.reaper import reap_stale_runs
     from nabu_agent.services.runs import replay_events
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     async with sessionmaker()() as db:
         stale = Run(project_id="p", kind="scan", target="10.0.0.1", state="scanning",
                     heartbeat_at=now - timedelta(seconds=300))

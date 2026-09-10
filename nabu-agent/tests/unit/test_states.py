@@ -1,7 +1,7 @@
 """Unit: the run state machine's forward-only transitions."""
 from __future__ import annotations
 
-from nabu_agent.orchestration.states import RunState, TERMINAL, can_transition
+from nabu_agent.orchestration.states import TERMINAL, RunState, can_transition
 
 
 def test_happy_path_transitions() -> None:

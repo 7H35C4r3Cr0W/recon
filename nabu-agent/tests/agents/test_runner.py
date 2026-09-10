@@ -3,15 +3,11 @@ the loop dispatches allowed tools, feeds results back, terminates on a final ans
 SafetyGate blocks a tool the role isn't allowed / any exploit-shaped argument."""
 from __future__ import annotations
 
-import json
-
 import pytest
-
 from nabu_agent.agents.runner import AgentRunner
 from nabu_agent.agents.safety import SafetyGate
 from nabu_agent.engine.errors import AutonomyViolation
-from nabu_agent.llm.base import ChatRequest, ChatResponse, Message, ToolCall, ToolSpec, Usage
-
+from nabu_agent.llm.base import ChatRequest, ChatResponse, ToolCall, Usage
 
 
 class FakeProvider:

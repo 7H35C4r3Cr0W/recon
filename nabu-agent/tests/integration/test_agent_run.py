@@ -14,10 +14,10 @@ pytestmark = pytest.mark.asyncio
 
 @pytest.fixture
 def brain_and_engine(monkeypatch, tmp_path):
-    from nabu_agent.llm import factory
-    from nabu_agent.llm.base import ChatResponse, ToolCall, Usage
     from nabu_agent.engine import tools as etools
     from nabu_agent.engine import workspace as ews
+    from nabu_agent.llm import factory
+    from nabu_agent.llm.base import ChatResponse, ToolCall, Usage
     from nabu_agent.settings import get_settings
 
     svc = SimpleNamespace(port=445, proto="tcp", service="smb", product="Samba", version="4.15",
@@ -77,7 +77,7 @@ async def test_agent_run_streams_live_map(client, brain_and_engine):
         if "done" in types:
             break
     assert "done" in types, f"agent run did not finish; types={types}"
-    assert f"host-10.10.10.5" in node_ids
+    assert "host-10.10.10.5" in node_ids
     assert f"agent-llm-{run_id}" in node_ids  # the LLM agent node appeared + moved on the map
     assert f"report-{run_id}" in node_ids
     assert (await client.get(f"/api/runs/{run_id}")).json()["state"] == "done"
