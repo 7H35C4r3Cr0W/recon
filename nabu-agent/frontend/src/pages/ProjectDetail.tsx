@@ -5,6 +5,7 @@ import { api } from "../api/client";
 interface ScopeT { id: string; target: string; kind: string; }
 interface RunT { id: string; state: string; target: string; kind: string; }
 interface ActT { ts: string | null; action: string; result: string; actor_user_id: string | null; }
+interface MemberT { user_id: string; email: string | null; role: string; }
 
 export function ProjectDetail() {
   const { projectId } = useParams();
@@ -12,16 +13,33 @@ export function ProjectDetail() {
   const [scope, setScope] = useState<ScopeT[]>([]);
   const [runs, setRuns] = useState<RunT[]>([]);
   const [activity, setActivity] = useState<ActT[]>([]);
+  const [members, setMembers] = useState<MemberT[]>([]);
   const [target, setTarget] = useState("");
   const [runTarget, setRunTarget] = useState("");
   const [kind, setKind] = useState("demo");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberRole, setMemberRole] = useState("operator");
   const [err, setErr] = useState("");
+
+  async function addMember(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await api(`/projects/${projectId}/members`, { method: "POST",
+        body: JSON.stringify({ email: memberEmail, role: memberRole }) });
+      setMemberEmail(""); load();
+    } catch (e) { setErr(String(e)); }
+  }
+  async function removeMember(uid: string) {
+    try { await api(`/projects/${projectId}/members/${uid}`, { method: "DELETE" }); load(); }
+    catch (e) { setErr(String(e)); }
+  }
 
   async function load() {
     try {
       setScope((await api<{ scope: ScopeT[] }>(`/projects/${projectId}/scope`)).scope);
       setRuns((await api<{ runs: RunT[] }>(`/projects/${projectId}/runs`)).runs);
       setActivity((await api<{ activity: ActT[] }>(`/projects/${projectId}/activity`)).activity ?? []);
+      setMembers((await api<{ members: MemberT[] }>(`/projects/${projectId}/members`)).members ?? []);
     } catch (e) { setErr(String(e)); }
   }
   useEffect(() => { load(); }, [projectId]);
@@ -99,6 +117,34 @@ export function ProjectDetail() {
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <h3>Team</h3>
+        <form onSubmit={addMember} className="row" style={{ marginBottom: 10 }}>
+          <input className="input" style={{ flex: 1 }} placeholder="teammate email"
+                 value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} />
+          <select className="select" value={memberRole} onChange={(e) => setMemberRole(e.target.value)}>
+            <option value="operator">operator</option>
+            <option value="viewer">viewer</option>
+            <option value="owner">owner</option>
+          </select>
+          <button className="btn" type="submit">Add member</button>
+        </form>
+        <ul className="list">
+          {members.map((m) => (
+            <li key={m.user_id} className="row" style={{ justifyContent: "space-between" }}>
+              <span className="row" style={{ gap: 8 }}>
+                <span className="pill">{m.role}</span>
+                <span className="mono" style={{ fontSize: 12 }}>{m.email ?? m.user_id.slice(0, 8)}</span>
+              </span>
+              {m.role !== "owner" && (
+                <button className="btn" style={{ borderColor: "var(--red)", color: "var(--red)" }}
+                        onClick={() => removeMember(m.user_id)}>Remove</button>
+              )}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>

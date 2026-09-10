@@ -13,10 +13,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nabu_agent import audit, bus
-from nabu_agent.auth.deps import get_current_user, require_project_member, require_run_access
+from nabu_agent.auth.deps import (
+    get_current_user,
+    require_project_member,
+    require_project_perm,
+    require_run_access,
+    require_run_perm,
+)
 from nabu_agent.db.models import Checkpoint, Run, ScopeTarget, User
 from nabu_agent.db.session import get_db
 from nabu_agent.engine.errors import ScopeViolation
+from nabu_agent.rbac import Perm
 from nabu_agent.services import runs as runs_svc
 
 router = APIRouter(tags=["runs"])
@@ -42,7 +49,7 @@ def _in_scope(target: str, scopes: list[str]) -> bool:
 @router.post("/projects/{project_id}/runs")
 async def start_run(project_id: str, body: RunBody, db: AsyncSession = Depends(get_db),
                     user: User = Depends(get_current_user),
-                    _auth: str = Depends(require_project_member)) -> dict:
+                    _auth: str = Depends(require_project_perm(Perm.RUN_START))) -> dict:
     scopes = [s.target for s in (await db.execute(
         select(ScopeTarget).where(ScopeTarget.project_id == project_id))).scalars().all()]
     if not scopes:
@@ -90,7 +97,7 @@ async def run_events(after: int = 0, db: AsyncSession = Depends(get_db),
 @router.post("/runs/{run_id}/cancel")
 async def cancel_run(db: AsyncSession = Depends(get_db),
                      user: User = Depends(get_current_user),
-                     run: Run = Depends(require_run_access)) -> dict:
+                     run: Run = Depends(require_run_perm(Perm.RUN_CANCEL))) -> dict:
     await bus.request_cancel(run.id)
     if run.state not in {"done", "failed", "cancelled", "partial"}:
         run.cancel_requested = True
@@ -145,12 +152,12 @@ async def _decide_checkpoint(cp_id: str, run: Run, user: User, db: AsyncSession,
 @router.post("/runs/{run_id}/checkpoints/{cp_id}/approve")
 async def approve_checkpoint(cp_id: str, db: AsyncSession = Depends(get_db),
                              user: User = Depends(get_current_user),
-                             run: Run = Depends(require_run_access)) -> dict:
+                             run: Run = Depends(require_run_perm(Perm.CHECKPOINT_DECIDE))) -> dict:
     return await _decide_checkpoint(cp_id, run, user, db, "approved")
 
 
 @router.post("/runs/{run_id}/checkpoints/{cp_id}/reject")
 async def reject_checkpoint(cp_id: str, db: AsyncSession = Depends(get_db),
                             user: User = Depends(get_current_user),
-                            run: Run = Depends(require_run_access)) -> dict:
+                            run: Run = Depends(require_run_perm(Perm.CHECKPOINT_DECIDE))) -> dict:
     return await _decide_checkpoint(cp_id, run, user, db, "rejected")
