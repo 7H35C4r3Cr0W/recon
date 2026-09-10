@@ -78,6 +78,7 @@ addopts = "-q"
 asyncio_mode = "auto"
 markers = [
     "invariant: safety/policy invariants — a separate REQUIRED CI gate (pytest -m invariant)",
+    "load: heavy /24-scale load tests — run explicitly (pytest -m load), excluded from unit CI",
 ]
 
 [tool.ruff]
