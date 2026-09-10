@@ -22,6 +22,8 @@ from nabu_agent.settings import get_settings
 
 _log = structlog.get_logger("nabu_agent.oidc")
 _oauth = None
+_jwks_cache = None  # (issuer, JsonWebKeySet)
+_LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"
 
 
 def is_configured() -> bool:
@@ -78,3 +80,49 @@ async def provision_user(db: AsyncSession, *, issuer: str, subject: str, email: 
         user.is_active = True
     await db.commit()
     return user
+
+
+async def _discovery_and_jwks():
+    """Fetch + cache the IdP's canonical issuer and JWKS (for validating the logout token)."""
+    global _jwks_cache
+    if _jwks_cache is None:
+        import httpx
+        from authlib.jose import JsonWebKey
+
+        s = get_settings()
+        url = f"{s.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
+        async with httpx.AsyncClient(timeout=10) as c:
+            disc = (await c.get(url)).json()
+            jwks = (await c.get(disc["jwks_uri"])).json()
+        _jwks_cache = (disc.get("issuer", s.oidc_issuer), JsonWebKey.import_key_set(jwks))
+    return _jwks_cache
+
+
+async def validate_logout_token(token: str) -> dict:
+    """Validate an OIDC back-channel *logout token* (a signed JWT) per the Back-Channel Logout spec:
+    verify signature against the IdP JWKS, then iss/aud, the required ``events`` claim, that it carries
+    a ``sub`` or ``sid``, and that it does NOT carry a ``nonce``. Raises ``ValueError`` on any failure.
+    """
+    from authlib.jose import jwt
+    from authlib.jose.errors import JoseError
+
+    s = get_settings()
+    issuer, keys = await _discovery_and_jwks()
+    try:
+        claims = jwt.decode(token, keys)
+        claims.validate()  # exp/iat when present
+    except JoseError as exc:
+        raise ValueError(f"invalid logout token: {exc}") from exc
+    if claims.get("iss") != issuer:
+        raise ValueError("logout token issuer mismatch")
+    aud = claims.get("aud")
+    auds = [aud] if isinstance(aud, str) else list(aud or [])
+    if s.oidc_client_id and s.oidc_client_id not in auds:
+        raise ValueError("logout token audience mismatch")
+    if _LOGOUT_EVENT not in (claims.get("events") or {}):
+        raise ValueError("not a back-channel logout token (missing events claim)")
+    if "nonce" in claims:
+        raise ValueError("logout token must not contain a nonce")
+    if not (claims.get("sub") or claims.get("sid")):
+        raise ValueError("logout token missing sub/sid")
+    return dict(claims)

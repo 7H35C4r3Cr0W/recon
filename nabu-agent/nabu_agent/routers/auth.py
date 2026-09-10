@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,3 +88,29 @@ async def oidc_callback(request: Request, db: AsyncSession = Depends(_get_db)):
     response = RedirectResponse(url="/", status_code=303)
     _set_session_cookie(response, sid)
     return response
+
+
+@router.post("/auth/oidc/backchannel-logout")
+async def oidc_backchannel_logout(request: Request, db: AsyncSession = Depends(_get_db)) -> JSONResponse:
+    """OIDC Back-Channel Logout: the IdP POSTs a signed logout_token (server-to-server, no browser);
+    we validate it and revoke ALL of that user's sessions here. 200 on success, 400 on a bad token."""
+    if not oidc.is_configured():
+        raise HTTPException(status_code=404, detail="OIDC is not configured")
+    form = await request.form()
+    token = form.get("logout_token")
+    if not token:
+        raise HTTPException(status_code=400, detail="missing logout_token")
+    try:
+        claims = await oidc.validate_logout_token(str(token))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"invalid logout_token: {exc}") from exc
+    revoked = 0
+    sub = claims.get("sub")
+    if sub:
+        user = (await db.execute(select(User).where(
+            User.oidc_issuer == claims.get("iss"), User.oidc_subject == sub))).scalar_one_or_none()
+        if user:
+            revoked = await sessions.destroy_user_sessions(user.id)
+    resp = JSONResponse({"revoked": revoked})
+    resp.headers["Cache-Control"] = "no-store"   # never cache a logout response
+    return resp
