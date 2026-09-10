@@ -36,30 +36,34 @@ export function ProjectDetail() {
   }
 
   return (
-    <main style={{ fontFamily: "system-ui", padding: 24, maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ maxWidth: 720 }}>
       <h1>Project</h1>
-      {err && <p style={{ color: "crimson" }}>{err}</p>}
-      <section>
+      {err && <p className="err">{err}</p>}
+
+      <div className="card" style={{ marginBottom: 12 }}>
         <h3>Authorized scope</h3>
-        <form onSubmit={addScope} style={{ display: "flex", gap: 8 }}>
-          <input placeholder="IP or CIDR (e.g. 10.10.10.0/24)" value={target} onChange={(e) => setTarget(e.target.value)} style={{ flex: 1, padding: 8 }} />
-          <button type="submit">Add to scope</button>
+        <form onSubmit={addScope} className="row">
+          <input className="input" style={{ flex: 1 }} placeholder="IP or CIDR (e.g. 10.10.10.0/24)" value={target} onChange={(e) => setTarget(e.target.value)} />
+          <button className="btn" type="submit">Add to scope</button>
         </form>
-        <ul>{scope.map((s) => <li key={s.id}>{s.target} <span style={{ color: "#888" }}>({s.kind})</span></li>)}</ul>
-      </section>
-      <section>
+        <ul className="list" style={{ marginTop: 10 }}>
+          {scope.map((s) => <li key={s.id} className="row"><span className="pill">{s.kind}</span> <span className="mono">{s.target}</span></li>)}
+        </ul>
+      </div>
+
+      <div className="card">
         <h3>Run recon</h3>
-        <form onSubmit={startRun} style={{ display: "flex", gap: 8 }}>
-          <input placeholder="Target in scope (e.g. 10.10.10.5)" value={runTarget} onChange={(e) => setRunTarget(e.target.value)} style={{ flex: 1, padding: 8 }} />
-          <select value={kind} onChange={(e) => setKind(e.target.value)} style={{ padding: 8 }}>
-            <option value="demo">demo (no tools/LLM — animated)</option>
-            <option value="scan">scan (real recon, no LLM)</option>
-            <option value="agent">agent (LLM-driven — needs NABU_LLM_BASE_URL)</option>
+        <form onSubmit={startRun} className="row">
+          <input className="input" style={{ flex: 1 }} placeholder="Target in scope (e.g. 10.10.10.5)" value={runTarget} onChange={(e) => setRunTarget(e.target.value)} />
+          <select className="select" value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="demo">demo (animated)</option>
+            <option value="scan">scan (real recon)</option>
+            <option value="agent">agent (LLM-driven)</option>
           </select>
-          <button type="submit">Start run ▸</button>
+          <button className="btn btn-primary" type="submit">Start run ▸</button>
         </form>
-        <p style={{ color: "#888", fontSize: 13 }}>The run opens the live BloodHound-style map — agents light up green (active), teal (done), yellow (stuck), red (error).</p>
-      </section>
-    </main>
+        <p className="muted" style={{ fontSize: 13 }}>Opens the live map — agents light up green (active), teal (done), yellow (stuck), red (error).</p>
+      </div>
+    </div>
   );
 }

@@ -22,20 +22,22 @@ export function Projects() {
   }
 
   return (
-    <main style={{ fontFamily: "system-ui", padding: 24, maxWidth: 720, margin: "0 auto" }}>
+    <div>
       <h1>Projects</h1>
-      <form onSubmit={create} style={{ display: "flex", gap: 8, margin: "12px 0" }}>
-        <input placeholder="New engagement name" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, padding: 8 }} />
-        <button type="submit">Create</button>
+      <form onSubmit={create} className="row" style={{ marginBottom: 16, maxWidth: 520 }}>
+        <input className="input" style={{ flex: 1 }} placeholder="New engagement name" value={name} onChange={(e) => setName(e.target.value)} />
+        <button className="btn btn-primary" type="submit">Create</button>
       </form>
-      {err && <p style={{ color: "crimson" }}>{err}</p>}
-      <ul style={{ listStyle: "none", padding: 0 }}>
+      {err && <p className="err">{err}</p>}
+      <div className="grid">
         {projects.map((p) => (
-          <li key={p.id} style={{ padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8, marginBottom: 8 }}>
-            <Link to={`/projects/${p.id}`}><b>{p.display_name}</b></Link> <span style={{ color: "#888" }}>· {p.status}</span>
-          </li>
+          <Link key={p.id} to={`/projects/${p.id}`} className="card" style={{ display: "block" }}>
+            <h3>{p.display_name}</h3>
+            <span className="pill">{p.status}</span>
+          </Link>
         ))}
-      </ul>
-    </main>
+      </div>
+      {projects.length === 0 && <p className="muted">No projects yet — create one above.</p>}
+    </div>
   );
 }

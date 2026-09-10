@@ -1,0 +1,64 @@
+/* Nabu Agent — dark "hacker" theme. Near-black ground, teal/green accents, monospace headings.
+   Easy on the eyes for long sessions. Consistent with the live-map colours. */
+:root{
+  --bg:#0b0f14; --bg-2:#0e141a; --panel:#121a22; --panel-2:#0e141a; --sunk:#0a0e13;
+  --line:#1f2b34; --line-2:#2a3a45;
+  --ink:#d7e2e8; --ink-2:#9fb0ba; --muted:#6b7d88;
+  --accent:#35d0ba; --accent-2:#2f9e57; --accent-ink:#0b0f14;
+  --gold:#f0b429; --red:#f07a7a; --blue:#4fb6f0; --grey:#8394a0;
+  --mono:"JetBrains Mono","Cascadia Code","SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --shadow:0 1px 2px rgba(0,0,0,.5),0 8px 24px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em}
+code,.mono{font-family:var(--mono)}
+.muted{color:var(--muted)} .ink2{color:var(--ink-2)}
+
+/* app shell */
+.shell{display:grid;grid-template-columns:220px 1fr;grid-template-rows:52px 1fr;height:100vh}
+.topbar{grid-column:1/3;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--bg-2);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-weight:700;color:var(--ink)}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+.brand small{color:var(--muted);font-weight:400;font-size:12px}
+.grow{flex:1}
+.sidebar{background:var(--bg-2);border-right:1px solid var(--line);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:9px;color:var(--ink-2);font-family:var(--mono);font-size:13px}
+.nav a:hover{background:var(--panel);color:var(--ink);text-decoration:none}
+.nav a.on{background:var(--panel);color:var(--accent);border:1px solid var(--line-2)}
+.nav .ic{width:16px;text-align:center}
+.content{padding:22px 26px;overflow:auto}
+.content h1{font-size:20px;margin:0 0 14px}
+.userbox{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+
+/* primitives */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow)}
+.card h3{font-size:14px;margin:0 0 8px}
+.row{display:flex;gap:10px;align-items:center}
+.stack{display:flex;flex-direction:column;gap:10px}
+.input,.select{background:var(--sunk);border:1px solid var(--line-2);border-radius:8px;padding:9px 11px;color:var(--ink);font-family:var(--mono);font-size:13px;min-width:0}
+.input:focus,.select:focus{outline:none;border-color:var(--accent)}
+.btn{font-family:var(--mono);font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--line-2);border-radius:8px;padding:8px 13px;cursor:pointer}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.btn-primary:hover{color:var(--accent-ink);filter:brightness(1.08)}
+.badge{font-family:var(--mono);font-size:10px;font-weight:700;border-radius:20px;padding:1px 7px;background:var(--accent);color:var(--accent-ink)}
+.pill{font-family:var(--mono);font-size:11px;border-radius:20px;padding:2px 9px;border:1px solid var(--line-2);color:var(--ink-2)}
+.st-done,.st-report_ready{color:var(--blue);border-color:color-mix(in srgb,var(--blue) 45%,var(--line-2))}
+.st-scanning,.st-fan_out,.st-enriching,.st-researching,.st-queued,.st-validating,.st-alive_check,.st-synthesizing{color:var(--accent-2);border-color:color-mix(in srgb,var(--accent-2) 45%,var(--line-2))}
+.st-failed,.st-error{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,var(--line-2))}
+.st-awaiting_approval,.st-partial,.st-stuck,.st-cancelled{color:var(--gold);border-color:color-mix(in srgb,var(--gold) 45%,var(--line-2))}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.err{color:var(--red);font-size:13px}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.feed-item{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.feed-item.attn{border-left:3px solid var(--gold)}
+.feed-item.live{border-left:3px solid var(--accent-2)}
+.feed-item .t{font-family:var(--mono);font-size:12.5px}
+.feed-item .meta{margin-left:auto;color:var(--muted);font-size:12px;font-family:var(--mono)}
+.centerpane{max-width:380px;margin:8vh auto 0;text-align:left}
+kbd{font-family:var(--mono);background:var(--sunk);border:1px solid var(--line-2);border-radius:5px;padding:1px 6px;font-size:12px}

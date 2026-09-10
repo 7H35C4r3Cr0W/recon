@@ -211,18 +211,23 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
   → **reporter**, each an `AgentRunner` streaming its own map node + log. Bounded by RunLimits; each
   role's node goes green→teal (or yellow/red). Falls back cleanly if no LLM configured. Tests with a
   scripted fake provider assert every role node appears.
-- [ ] **5.3 Notifications / feed (backend)** — a per-user activity **feed**: recent runs (start/finish),
+- [x] **5.3 Notifications / feed (backend)** — a per-user activity **feed**: recent runs (start/finish),
   findings, checkpoints (approvals needed), across the user's projects. `GET /api/feed` (+ unread
   count); lightweight (derived from runs/agent_tasks/findings_index + a notifications table for
   approvals). WS or poll for live updates.
-- [ ] **5.4 UX shell + dark "hacker" theme** — a real SPA design system: dark theme tokens (near-black
+- [x] **5.4 UX shell + dark "hacker" theme** — a real SPA design system: dark theme tokens (near-black
   bg, green/teal accents, monospace headings), an app shell (top bar + left nav: Feed / Projects /
   Help), and restyled Login / Projects / Project / RunLive pages. Easy on the eyes, consistent.
-- [ ] **5.5 Feed page (frontend)** — a "feed" landing view at the front (notifications + recent
+- [x] **5.5 Feed page (frontend)** — a "feed" landing view at the front (notifications + recent
   activity), with an unread badge in the top bar; live via the project WS or polling.
-- [ ] **5.6 Help guide (frontend)** — an in-app, easy-to-read Help page: what Nabu Agent is, how to
+- [x] **5.6 Help guide (frontend)** — an in-app, easy-to-read Help page: what Nabu Agent is, how to
   run recon, the run kinds (demo/scan/agent), the live map colours, attaching the LLM, SSO, safety.
 
 ### Progress log (append one line per completed step)
 - 5.1 ✅ WS-path integration test (httpx-ws): auth-reject, live-tail→done, reconnect-to-finished terminates.
-- 5.2 ✅ full agent roster wired: `_run_agent` = scan → planner → enum agents (per svc, concurrent) → research agents (per svc) → reporter; each an AgentRunner with its own map node. test_agent_run asserts all role nodes appear. 39 tests.
+- 5.2 ✅ full agent roster wired (planner/enum/research/reporter), each a map node.
+- 5.3 ✅ feed backend: GET /api/feed (per-user activity across projects + unread/attention count); test_feed isolates per user.
+- 5.4 ✅ dark 'hacker' theme (theme.css) + app Shell (topbar + sidebar nav + live unread badge).
+- 5.5 ✅ Feed page = the front '/' (live auto-refresh, click → run live view).
+- 5.6 ✅ Help guide page (what it is, getting started, run kinds, map colours, LLM attach, SSO, safety).
+- Frontend builds clean (tsc strict + vite + theme). 40 backend tests.

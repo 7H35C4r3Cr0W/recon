@@ -139,6 +139,7 @@ def create_app() -> FastAPI:
         auth,
         catalog,
         creds,
+        feed,
         findings,
         projects,
         reports,
@@ -151,7 +152,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router, prefix="/api")
-    for module in (auth, projects, scope, runs, reports, findings, catalog, creds, users, audit, settings_router):
+    for module in (auth, projects, scope, runs, reports, findings, catalog, creds, feed, users, audit, settings_router):
         app.include_router(module.router, prefix="/api")
 
     # WebSocket hub under /ws.
