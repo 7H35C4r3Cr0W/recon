@@ -51,6 +51,17 @@ async def require_project_member(project_id: str = Path(...), db: AsyncSession =
     return project_id
 
 
+async def require_project_owner(project_id: str = Path(...), db: AsyncSession = Depends(get_db),
+                                user: User = Depends(get_current_user)) -> str:
+    """Owner-or-admin guard (stronger than membership) for destructive project ops like delete."""
+    if user.role == "admin":
+        return project_id
+    proj = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    if proj is None or proj.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="project not found")
+    return project_id
+
+
 async def require_run_access(run_id: str = Path(...), db: AsyncSession = Depends(get_db),
                              user: User = Depends(get_current_user)) -> Run:
     """Authorize the caller for /runs/{run_id}: they must be a member of the run's project."""

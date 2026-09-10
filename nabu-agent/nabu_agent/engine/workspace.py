@@ -30,6 +30,7 @@ Mapping
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -105,3 +106,25 @@ def workspace_for(
         hostname=hostname,
         settings=settings or load_engine_settings(),
     )
+
+
+def project_root(project_id: str, settings: EngineSettings | None = None) -> Path:
+    """The on-disk root holding ALL of a project's per-target Profile folders."""
+    s = settings or load_engine_settings()
+    return s.workspace_root / project_id
+
+
+def delete_project_workspace(project_id: str, settings: EngineSettings | None = None) -> dict:
+    """Safely remove a project's on-disk workspace (all its Profile folders). Confined to a single
+    segment directly under the workspace root — refuses anything that would escape it (traversal).
+    Returns {"removed": bool, "path": str}. Idempotent (missing dir → removed False)."""
+    s = settings or load_engine_settings()
+    root = s.workspace_root.resolve()
+    d = (s.workspace_root / project_id).resolve()
+    # d MUST be exactly one segment under the workspace root (blocks '..', absolute, nested escapes)
+    if d.parent != root or d == root:
+        raise InvalidTarget(f"refusing to delete workspace outside the root: {d}")
+    if not d.exists():
+        return {"removed": False, "path": str(d)}
+    shutil.rmtree(d, ignore_errors=True)
+    return {"removed": True, "path": str(d)}
