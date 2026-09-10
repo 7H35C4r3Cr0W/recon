@@ -34,7 +34,8 @@ async def login(body: LoginBody, request: Request, response: Response,
                 db: AsyncSession = Depends(get_db)) -> dict:
     ip = request.client.host if request.client else None
     user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
-    if user is None or not user.password_hash or not verify_password(user.password_hash, body.password):
+    if (user is None or not user.is_active or not user.password_hash
+            or not verify_password(user.password_hash, body.password)):
         await audit.record(actor_user_id=(user.id if user else None), action=audit.LOGIN_FAILED,
                            result="denied", actor_ip=ip, details={"email": body.email})
         raise HTTPException(status_code=401, detail="invalid credentials")

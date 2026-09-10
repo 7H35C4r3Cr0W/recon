@@ -9,6 +9,7 @@ import { Report } from "./pages/Report";
 import { Help } from "./pages/Help";
 import { Health } from "./pages/Health";
 import { LlmSetup } from "./pages/LlmSetup";
+import { Users } from "./pages/Users";
 import { NotFound } from "./pages/NotFound";
 
 // Login + the full-screen live run view sit outside the Shell; everything else renders inside it.
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "/help", element: <Help /> },
       { path: "/health", element: <Health /> },
       { path: "/admin/llm", element: <LlmSetup /> },
+      { path: "/admin/users", element: <Users /> },
     ],
   },
   { path: "*", element: <NotFound /> },
