@@ -203,7 +203,7 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
 `SAFETY_PREAMBLE`. Attack (spray/exploit) is NEVER an agent — only a human-gated checkpoint.
 
 ### Ordered steps (logical order)
-- [ ] **5.1 WS-path integration test** — a real WebSocket client drives `/ws/runs/{id}` end-to-end
+- [x] **5.1 WS-path integration test** — a real WebSocket client drives `/ws/runs/{id}` end-to-end
   (auth handshake, replay-by-seq, live tail, terminal close) using Starlette's WS test client on the
   in-process app + a demo run. Closes the last review-flagged test gap.
 - [ ] **5.2 Wire up ALL agents (multi-role fan-out)** — `_run_agent` becomes: scan → **planner** →
@@ -224,4 +224,4 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
   run recon, the run kinds (demo/scan/agent), the live map colours, attaching the LLM, SSO, safety.
 
 ### Progress log (append one line per completed step)
-- (none yet — starting 5.1)
+- 5.1 ✅ WS-path integration test (httpx-ws): auth-reject, live-tail→done, reconnect-to-finished terminates. 38 tests.
