@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Nabu Agent — manager-facing one-page overview: brain/body/hands, architecture, agent flow, roadmap, safety.
+     Design system adapted from ../docs/presentation.html (the classic Nabu deck) for brand continuity. -->
+<title>Nabu Agent — Agentic Recon Platform · by Lagus</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{color-scheme:light dark;
+    --ground:#f4f7f6;--panel:#fff;--panel-2:#eef2f0;--sunk:#e6ece9;--ink:#16221e;--ink-2:#3c4a45;--muted:#6a7a73;--line:#d3ddd9;--line-2:#c2cfca;
+    --brand:#0f9d8c;--brand-ink:#0b7568;--gold:#b7791f;--gold-soft:#fbeecb;--gold-ink:#8a5a12;
+    --agent:#0f9d8c;--gated:#b7791f;--tool:#5a63c4;--store:#2b7fb8;--infra:#64748b;--good:#2f9e57;--bad:#d05050;
+    --shadow:0 1px 2px rgba(16,32,28,.05),0 8px 22px rgba(16,32,28,.06);
+    --mono:"JetBrains Mono","Cascadia Code","SF Mono",ui-monospace,Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --ground:#0c1116;--panel:#131b22;--panel-2:#182029;--sunk:#0e141a;--ink:#e7eef2;--ink-2:#b7c4cc;--muted:#8394a0;--line:#233039;--line-2:#2e3d48;
+    --brand:#35d0ba;--brand-ink:#6ee3d0;--gold:#f0b429;--gold-soft:#2a2413;--gold-ink:#f0c256;
+    --agent:#35d0ba;--gated:#f0b429;--tool:#8c94f2;--store:#4fb6f0;--infra:#93a2b0;--good:#52c98a;--bad:#f07a7a;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.34);}}
+  :root[data-theme="dark"]{
+    --ground:#0c1116;--panel:#131b22;--panel-2:#182029;--sunk:#0e141a;--ink:#e7eef2;--ink-2:#b7c4cc;--muted:#8394a0;--line:#233039;--line-2:#2e3d48;
+    --brand:#35d0ba;--brand-ink:#6ee3d0;--gold:#f0b429;--gold-soft:#2a2413;--gold-ink:#f0c256;
+    --agent:#35d0ba;--gated:#f0b429;--tool:#8c94f2;--store:#4fb6f0;--infra:#93a2b0;--good:#52c98a;--bad:#f07a7a;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.34);}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+  .mono{font-family:var(--mono)}
+  a{color:var(--brand-ink);text-decoration:none}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+  header.bar{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--ground) 90%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .bar-in{display:flex;align-items:center;gap:10px;height:56px}
+  .brand{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-weight:700}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 4px color-mix(in srgb,var(--brand) 22%,transparent)}
+  .brand b{font-size:15px}.brand span{color:var(--muted);font-size:12px}.grow{flex:1}
+  .btn{font-family:var(--mono);font-size:12px;color:var(--ink-2);background:var(--panel);border:1px solid var(--line-2);border-radius:8px;padding:7px 11px;cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:var(--brand);color:var(--brand-ink)}
+  .tabs{position:sticky;top:56px;z-index:45;background:color-mix(in srgb,var(--ground) 92%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .tabs-in{display:flex;gap:3px;overflow-x:auto;padding:8px 0}
+  .tabs button{font-family:var(--mono);font-size:12.5px;border:1px solid transparent;background:transparent;color:var(--ink-2);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .tabs button:hover{background:var(--panel-2)}
+  .tabs button.on{background:var(--panel);color:var(--brand-ink);border-color:var(--line-2);box-shadow:var(--shadow)}
+
+  .view{display:none;animation:fade .2s ease} .view.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  section{padding:26px 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
+  .sec-head h2{font-family:var(--mono);font-weight:700;font-size:20px;margin:0}
+  .sec-head .num{font-family:var(--mono);color:var(--brand);font-weight:700;font-size:13px}
+  .sec-sub{color:var(--muted);max-width:82ch;margin:2px 0 18px;font-size:13.5px}
+
+  .hero{padding:44px 0 6px}
+  .hero h1{font-family:var(--mono);font-weight:700;letter-spacing:-.02em;font-size:clamp(28px,4.8vw,44px);line-height:1.05;margin:14px 0 13px;text-wrap:balance}
+  .hero h1 .a{color:var(--brand)}
+  .lede{font-size:clamp(15px,1.9vw,18px);color:var(--ink-2);max-width:74ch;margin:0}
+  .byline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:18px;font-family:var(--mono);font-size:12.5px;color:var(--ink-2)}
+  .byline .who{font-weight:700;color:var(--ink)} .byline .sep{color:var(--line-2)}
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:26px 0 6px}
+  .stat{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:13px 14px;box-shadow:var(--shadow)}
+  .stat b{font-family:var(--mono);font-size:20px;font-variant-numeric:tabular-nums;display:block;line-height:1.05}
+  .stat small{color:var(--muted);font-size:10px;letter-spacing:.03em;display:block;margin-top:5px;text-transform:uppercase}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+  .cardx{border:1px solid var(--line);background:var(--panel);border-radius:13px;padding:16px 18px;box-shadow:var(--shadow);border-top:3px solid var(--cc,var(--brand))}
+  .cardx h3{font-family:var(--mono);font-size:14.5px;margin:0 0 7px;display:flex;align-items:center;gap:8px}
+  .cardx h3 .i{font-size:17px}
+  .cardx p{margin:0;font-size:13px;color:var(--ink-2)}.cardx p+p{margin-top:8px}
+  .cardx ul{margin:8px 0 0;padding-left:17px;font-size:12.5px;color:var(--ink-2);display:flex;flex-direction:column;gap:4px}
+  .cardx code{font-family:var(--mono);font-size:11.5px;background:var(--sunk);padding:1px 5px;border-radius:5px;color:var(--brand-ink)}
+  .callout{display:flex;gap:11px;padding:13px 15px;border-radius:12px;background:var(--gold-soft);border:1px solid color-mix(in srgb,var(--gold) 40%,var(--line-2));margin-top:14px}
+  .callout .l{color:var(--gold-ink);font-family:var(--mono);font-weight:700;white-space:nowrap}
+  .callout p{margin:0;font-size:13px;color:var(--ink-2)}
+  .proc{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .pstep{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:13px;box-shadow:var(--shadow);position:relative}
+  .pstep .n{font-family:var(--mono);font-size:11px;font-weight:700;color:#fff;background:var(--brand);width:22px;height:22px;border-radius:7px;display:grid;place-items:center}
+  .pstep h4{font-family:var(--mono);font-size:12.5px;margin:9px 0 5px} .pstep p{margin:0;font-size:11.5px;color:var(--ink-2)}
+
+  /* flow diagram */
+  .flow{border:1px solid var(--line);background:var(--panel);border-radius:14px;box-shadow:var(--shadow);padding:18px;overflow-x:auto}
+  .flow-row{display:flex;align-items:stretch;gap:10px;min-width:760px}
+  .node{flex:1;border:1px solid var(--line-2);border-radius:11px;padding:11px 12px;background:var(--panel-2)}
+  .node .t{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--c,var(--agent))}
+  .node .nm{font-weight:650;font-size:12.5px;margin:4px 0 3px}.node .d{font-size:11px;color:var(--ink-2)}
+  .arrow{align-self:center;color:var(--muted);font-family:var(--mono);font-size:18px}
+  .fanwrap{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}
+  .agentcard{border:1px solid var(--line-2);border-left:3px solid var(--agent);border-radius:10px;padding:10px 12px;background:var(--panel)}
+  .agentcard.gated{border-left-color:var(--gated)}
+  .agentcard .r{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--agent)}
+  .agentcard.gated .r{color:var(--gated)}
+  .agentcard .nm{font-weight:650;font-size:12.5px;margin:3px 0 3px}.agentcard .d{font-size:11px;color:var(--ink-2)}
+
+  /* state machine stepper */
+  .steps-line{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:var(--mono);font-size:11.5px;margin-top:6px}
+  .schip{border:1px solid var(--line-2);border-radius:20px;padding:5px 11px;background:var(--panel);color:var(--ink-2)}
+  .schip.human{border-color:color-mix(in srgb,var(--gated) 55%,var(--line-2));color:var(--gold-ink);background:var(--gold-soft)}
+  .schip.term{border-color:color-mix(in srgb,var(--good) 45%,var(--line-2));color:var(--good)}
+  .sarrow{color:var(--muted)}
+
+  /* roadmap */
+  .phase{border:1px solid var(--line);background:var(--panel);border-radius:13px;padding:15px 17px;box-shadow:var(--shadow);margin-bottom:11px}
+  .phase-h{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .phase-h .k{font-family:var(--mono);font-weight:700;font-size:14px}
+  .pill{font-family:var(--mono);font-size:10px;font-weight:700;border-radius:20px;padding:3px 9px;letter-spacing:.04em;text-transform:uppercase}
+  .pill.done{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good);border:1px solid color-mix(in srgb,var(--good) 40%,transparent)}
+  .pill.next{background:color-mix(in srgb,var(--brand) 16%,transparent);color:var(--brand-ink);border:1px solid color-mix(in srgb,var(--brand) 40%,transparent)}
+  .pill.later{background:var(--sunk);color:var(--muted);border:1px solid var(--line-2)}
+  .phase p{margin:0 0 6px;font-size:13px;color:var(--ink-2)}
+  .exit{font-size:12px;color:var(--muted);font-family:var(--mono)}
+  .checks{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-2)}
+  .checks li::before{content:"✅ ";}
+  .checks li.todo::before{content:"☐ ";color:var(--muted)}
+  .foot{color:var(--muted);font-size:12px;padding:26px 0;border-top:1px solid var(--line);margin-top:20px;font-family:var(--mono)}
+  table.dm{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  table.dm th,table.dm td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+  table.dm th{background:var(--panel-2);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  table.dm td code{font-family:var(--mono);font-size:11px;color:var(--brand-ink)}
+  @media (max-width:820px){.stats{grid-template-columns:repeat(3,1fr)}.grid2,.grid3,.proc,.fanwrap{grid-template-columns:1fr 1fr}.proc{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header class="bar"><div class="wrap bar-in">
+  <div class="brand"><span class="dot"></span><b>NABU · AGENT</b><span>· by Lagus</span></div>
+  <div class="grow"></div>
+  <a class="btn" href="https://github.com/7H35C4r3Cr0W/recon" target="_blank" rel="noopener">GitHub ↗</a>
+  <button class="btn" id="theme" title="Toggle theme">◐</button>
+</div></header>
+<nav class="tabs"><div class="wrap tabs-in" id="tabs">
+  <button data-v="ov" class="on">Overview</button>
+  <button data-v="ar">Architecture</button>
+  <button data-v="fl">Agent Flow</button>
+  <button data-v="rm">Roadmap &amp; Steps</button>
+  <button data-v="sf">Safety</button>
+</div></nav>
+
+<main>
+<!-- ============ OVERVIEW ============ -->
+<div class="view on" id="v-ov"><div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Internal · Agent-driven recon platform · built on the Nabu engine</div>
+    <h1>A scan becomes <span class="a">an autonomous recon team</span> — with a human at the gate.</h1>
+    <p class="lede">Nabu Agent turns the classic Nabu desktop recon tool into an internally-hosted web platform. An operator logs in, creates a scope-limited engagement, and launches an autonomous recon run against an IP or IP/range. A supervisor fans out one agent per port/service plus research and report-writer agents; each does its own work, and the platform streams live progress and hands back a clean report with next steps. Every attack action stays behind an explicit human approval.</p>
+    <div class="byline">
+      <span>Offshoot of</span><span class="who">Nabu</span><span class="sep">·</span>
+      <span>the owner attaches the LLM "brain" (internal, OpenAI-compatible)</span><span class="sep">·</span>
+      <span>this project is the "body"</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>6</b><small>non-negotiables enforced in code</small></div>
+      <div class="stat"><b>8</b><small>engine agent-tools</small></div>
+      <div class="stat"><b>183 svc</b><small>reused catalog · ~3,200 actions</small></div>
+      <div class="stat"><b>5</b><small>agent roles</small></div>
+      <div class="stat"><b>1</b><small>shell.run chokepoint</small></div>
+      <div class="stat"><b>your&nbsp;LLM</b><small>swappable brain seam</small></div>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head"><span class="num">01</span><h2>Brain · Body · Hands</h2></div>
+    <p class="sec-sub">A clean separation of concerns — and of trust. The LLM plans; the platform enforces; the engine executes.</p>
+    <div class="grid3">
+      <div class="cardx" style="--cc:var(--tool)"><h3><span class="i">🧠</span> Brain — you attach it</h3>
+        <p>An internally-hosted, <b>OpenAI-compatible</b> LLM (GPT-5.1 today). Point <code>NABU_LLM_BASE_URL</code> at it and it plans, chooses tools, and writes prose.</p>
+        <p>It is an <b>untrusted planner</b>: its tool calls are validated and safety-gated before dispatch; its prose is grounded against engine artifacts before an operator sees it. Fully swappable via <code>NABU_LLM_PROVIDER</code> — no vendor lock-in.</p></div>
+      <div class="cardx" style="--cc:var(--agent)"><h3><span class="i">🦾</span> Body — this project</h3>
+        <p>FastAPI edge (REST + live WebSocket), Arq orchestration workers, the engine adapter, Postgres + Redis, and a React/Vite/TS SPA.</p>
+        <p>It owns state, scope, gates, and audit. <b>Safety is code here, not prompt text.</b></p></div>
+      <div class="cardx" style="--cc:var(--store)"><h3><span class="i">🛠️</span> Hands — the Nabu engine</h3>
+        <p>The classic <code>oscprecon</code> recon engine, imported <b>read-only</b>: its 183-service catalog, service parsers, NSE profiles, references, reporter — and its single allow-listed <code>shell.run</code> executor.</p>
+        <p>Nabu Agent never rebuilds recon knowledge and <b>never modifies</b> <code>src/oscprecon</code>.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">02</span><h2>What happens when an operator clicks "Run"</h2></div>
+    <div class="proc">
+      <div class="pstep"><div class="n">1</div><h4>Log in</h4><p>SSO / local account. Every action is audited.</p></div>
+      <div class="pstep"><div class="n">2</div><h4>Project + scope</h4><p>Create an engagement; add the authorized IP / range allowlist.</p></div>
+      <div class="pstep"><div class="n">3</div><h4>Launch recon</h4><p>Supervisor validates scope, checks liveness, runs the staged nmap battery.</p></div>
+      <div class="pstep"><div class="n">4</div><h4>Fan out</h4><p>One enum agent per discovered service + research agents, capped &amp; concurrent.</p></div>
+      <div class="pstep"><div class="n">5</div><h4>Watch live</h4><p>Agent-task tree + streamed tool output over WebSocket.</p></div>
+      <div class="pstep"><div class="n">6</div><h4>Report</h4><p>A grounded report + prioritised next steps; attacks proposed, never auto-run.</p></div>
+    </div>
+    <div class="callout"><span class="l">Read-only engine</span><p>Classic Nabu (the desktop tool) is untouched. Nabu Agent lives in its own <code>nabu-agent/</code> folder in the same repo and consumes the engine as a non-editable dependency — a CI job fails any change that touches <code>src/oscprecon</code>.</p></div>
+  </section>
+</div></div>
+
+<!-- ============ ARCHITECTURE ============ -->
+<div class="view" id="v-ar"><div class="wrap">
+  <section>
+    <div class="sec-head"><span class="num">01</span><h2>The five layers</h2></div>
+    <p class="sec-sub">One canonical package (<code>nabu_agent/</code>). The API tier runs no tools; only the worker executes recon, and only through the single chokepoint.</p>
+    <div class="grid2">
+      <div class="cardx" style="--cc:var(--store)"><h3><span class="i">🌐</span> Web platform <code>nabu_agent/</code></h3>
+        <p>FastAPI app factory + middleware, pluggable auth (OIDC / local), RBAC, the platform audit log, REST routers, and the WebSocket hub. Reaches the engine only through a <b>read-only facade</b> — the api container drops all Linux caps and runs no tools.</p></div>
+      <div class="cardx" style="--cc:var(--agent)"><h3><span class="i">🔀</span> Orchestration <code>orchestration/</code></h3>
+        <p>The supervisor + fan-out agent graph on Arq/Redis: a run-state machine, a non-blocking supervisor with a re-trigger-on-last-finisher barrier, run limits (host / concurrency / token caps), admission control (one active run per project), and the human checkpoints.</p></div>
+      <div class="cardx" style="--cc:var(--bad)"><h3><span class="i">🔒</span> Engine adapter <code>engine/</code></h3>
+        <p>The <b>only</b> importer of <code>oscprecon</code>. Eight typed agent-tools, the read-only gateway, the workspace mapping (one Profile per host), and <code>shell_gateway.py</code> — the single <code>shell.run</code> chokepoint (recon path + the sole human-gated exploit executor).</p></div>
+      <div class="cardx" style="--cc:var(--tool)"><h3><span class="i">🧠</span> Brain seam <code>llm/</code> + <code>agents/</code></h3>
+        <p>The <code>LLMProvider</code> contract + OpenAI-compatible adapter (SSE + tool-call reassembly), the tool-calling <code>AgentRunner</code>, role prompts, the <code>SafetyGate</code>, token budgets, and the canonical live-event envelope.</p></div>
+    </div>
+    <div class="grid2" style="margin-top:13px">
+      <div class="cardx" style="--cc:var(--infra)"><h3><span class="i">📦</span> Deploy / ops <code>deploy/</code></h3>
+        <p>Docker Compose: nginx SPA edge, api, arq worker(s), Postgres, Redis, and a one-shot migrate step. Least-privilege containers (worker drops all caps, re-adds only <code>NET_RAW</code>, seccomp, non-root), internal network, isolated egress, and a policy-invariant CI gate.</p></div>
+      <div class="cardx" style="--cc:var(--good)"><h3><span class="i">🗄️</span> State</h3>
+        <p><b>Postgres</b> holds product + orchestration state and read-models; <b>Redis</b> is the queue + live pub/sub + budget ledger; the <b>Profile folder</b> on the workspace volume remains the authoritative recon truth (findings, creds, audit trail, report).</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">02</span><h2>Request → run → report</h2></div>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="node" style="--c:var(--store)"><div class="t">Browser</div><div class="nm">React SPA</div><div class="d">login · projects · live run · report</div></div>
+        <div class="arrow">→</div>
+        <div class="node" style="--c:var(--infra)"><div class="t">Edge</div><div class="nm">nginx</div><div class="d">TLS · /api · /ws</div></div>
+        <div class="arrow">→</div>
+        <div class="node" style="--c:var(--agent)"><div class="t">API</div><div class="nm">FastAPI</div><div class="d">REST + WebSocket · runs no tools</div></div>
+        <div class="arrow">→</div>
+        <div class="node" style="--c:var(--tool)"><div class="t">Queue</div><div class="nm">Redis + Arq</div><div class="d">enqueue · pub/sub · cancel</div></div>
+        <div class="arrow">→</div>
+        <div class="node" style="--c:var(--bad)"><div class="t">Worker</div><div class="nm">shell_gateway → oscprecon</div><div class="d">the one chokepoint → /workspace</div></div>
+      </div>
+    </div>
+    <div class="sec-head" style="margin-top:22px"><span class="num">03</span><h2>Core data model (Postgres)</h2></div>
+    <table class="dm">
+      <tr><th>Table</th><th>Holds</th></tr>
+      <tr><td><code>users · api_keys</code></td><td>identity, roles, machine clients</td></tr>
+      <tr><td><code>projects · project_members · scope_targets</code></td><td>engagements, RBAC, the authorized-scope allowlist</td></tr>
+      <tr><td><code>runs · agent_tasks · checkpoints</code></td><td>run lifecycle, the fan-out tree, the human spray/exploit gate</td></tr>
+      <tr><td><code>run_events</code></td><td>durable, seq-ordered replay feed for live WebSocket (secrets stripped)</td></tr>
+      <tr><td><code>findings_index · services_mirror · artifacts</code></td><td>read-models of the engine's findings/services + report artifacts</td></tr>
+      <tr><td><code>audit_log · llm_call</code></td><td>platform who-did-what + per-agent LLM accounting</td></tr>
+    </table>
+  </section>
+</div></div>
+
+<!-- ============ AGENT FLOW ============ -->
+<div class="view" id="v-fl"><div class="wrap">
+  <section>
+    <div class="sec-head"><span class="num">01</span><h2>The run lifecycle</h2></div>
+    <p class="sec-sub">A recon run is fully automated. The only human branch is <b>awaiting approval</b> — reached only when an agent proposes a spray/exploit follow-up.</p>
+    <div class="steps-line">
+      <span class="schip">queued</span><span class="sarrow">→</span>
+      <span class="schip">validating</span><span class="sarrow">→</span>
+      <span class="schip">alive check</span><span class="sarrow">→</span>
+      <span class="schip">scanning</span><span class="sarrow">→</span>
+      <span class="schip">fan out</span><span class="sarrow">→</span>
+      <span class="schip">enriching</span><span class="sarrow">→</span>
+      <span class="schip">researching</span><span class="sarrow">→</span>
+      <span class="schip">synthesizing</span><span class="sarrow">→</span>
+      <span class="schip term">report ready</span>
+      <span class="sarrow">⋯</span>
+      <span class="schip human">awaiting approval</span><span class="sarrow">→</span>
+      <span class="schip human">executing approved</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">02</span><h2>Who fans out</h2></div>
+    <div class="flow">
+      <div class="flow-row" style="min-width:640px">
+        <div class="node" style="--c:var(--agent)"><div class="t">Supervisor</div><div class="nm">supervise_run</div><div class="d">scan → read discovered services → fan out → join → advance</div></div>
+        <div class="arrow">⇒</div>
+        <div class="node" style="--c:var(--store)"><div class="t">Discovered</div><div class="nm">open ports / services</div><div class="d">the fork point for every downstream agent</div></div>
+      </div>
+      <div class="fanwrap">
+        <div class="agentcard"><div class="r">Recon</div><div class="nm">Scan / alive</div><div class="d">staged nmap; liveness for a range</div></div>
+        <div class="agentcard"><div class="r">Per service</div><div class="nm">Enum / write</div><div class="d">one agent per service; Tier-1 recon → findings</div></div>
+        <div class="agentcard"><div class="r">Per finding</div><div class="nm">Research</div><div class="d">HackTricks / Exploit-DB / GTFOBins / patterns</div></div>
+        <div class="agentcard"><div class="r">Synthesis</div><div class="nm">Writer</div><div class="d">grounded report + prioritised next steps</div></div>
+      </div>
+      <div class="fanwrap" style="grid-template-columns:1fr">
+        <div class="agentcard gated"><div class="r">Human-gated</div><div class="nm">Attack (spray / exploit)</div><div class="d">agents only <b>propose</b> a checkpoint with a rationale; an operator must approve before anything runs — the sole path that can set the engine's gate flags.</div></div>
+      </div>
+    </div>
+    <div class="callout"><span class="l">Guardrails</span><p>Range explosion is capped at every layer (hosts per run, concurrent service agents, per-run token budget, a hard total-task ceiling). Tool output is treated as untrusted data — an injected "run exploit" never reaches an exploit call.</p></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">03</span><h2>The eight engine tools the brain can call</h2></div>
+    <p class="sec-sub">Each wraps a real Nabu engine call and returns JSON. There is deliberately <b>no spray/exploit tool</b> — attack actions are reachable only through the human-gated executor.</p>
+    <div class="grid3">
+      <div class="cardx"><h3>Recon (execute)</h3><ul><li><code>check_alive</code> — host liveness</li><li><code>run_scan</code> — staged nmap → services</li><li><code>enum_service</code> — Tier-1 per-service recon</li></ul></div>
+      <div class="cardx"><h3>Read-only</h3><ul><li><code>list_discovered_services</code></li><li><code>catalog_actions_for</code> — decision-aid, display-only</li><li><code>suggest_next_steps</code> — pattern-based</li></ul></div>
+      <div class="cardx"><h3>Research &amp; report</h3><ul><li><code>research_finding</code> — refs + CVE lookup</li><li><code>generate_report</code> — clean markdown</li></ul></div>
+    </div>
+  </section>
+</div></div>
+
+<!-- ============ ROADMAP ============ -->
+<div class="view" id="v-rm"><div class="wrap">
+  <section>
+    <div class="sec-head"><span class="num">01</span><h2>Phased build plan</h2></div>
+    <p class="sec-sub">Each phase has explicit exit criteria; every phase keeps <code>src/oscprecon</code> untouched and the policy-invariant CI gate green. Progress is tracked live in <code>HANDOFF.md</code>.</p>
+
+    <div class="phase"><div class="phase-h"><span class="k">Phase 0 — Design &amp; grounding</span><span class="pill done">Done</span></div>
+      <p>Analyze classic Nabu; map its reusable engine APIs; design the platform across five dimensions with adversarial verification; synthesize the design doc, roadmap, and scaffold manifest.</p>
+      <ul class="checks"><li>Engine integration map</li><li>DESIGN.md + ROADMAP.md + SCAFFOLD_MANIFEST.md</li></ul></div>
+
+    <div class="phase"><div class="phase-h"><span class="k">Phase 1 — Runnable scaffold (the body)</span><span class="pill done">Done</span></div>
+      <p>The whole tree: backend package, config + brain seam, engine adapter + single chokepoint, orchestration, data model + migrations, routers + WebSocket, React SPA, docker-compose, CI, and the policy-invariant test suite.</p>
+      <ul class="checks"><li>71 backend files compile; engine seam imports against real oscprecon, headless (no Qt)</li><li>12/12 policy-invariant + unit tests pass</li><li>compose / seccomp / CI YAML valid</li></ul></div>
+
+    <div class="phase"><div class="phase-h"><span class="k">Phase 2 — MVP thin slice</span><span class="pill next">Next</span></div>
+      <p>End-to-end for one operator: log in → create a scoped project → run recon against one IP → live progress over WebSocket → rendered report.</p>
+      <p class="exit">Exit: from a clean deploy, no manual DB/CLI steps; a mid-run reconnect reconciles; report claims are grounded.</p></div>
+
+    <div class="phase"><div class="phase-h"><span class="k">Phase 3 — Agent fan-out</span><span class="pill later">Later</span></div>
+      <p>The LLM loop + SafetyGate + budgets; the non-blocking supervisor fan-out over multi-service / multi-host; spray/exploit as human-gated checkpoint proposals.</p></div>
+
+    <div class="phase"><div class="phase-h"><span class="k">Phase 4 — Hardening</span><span class="pill later">Later</span></div>
+      <p>OIDC/SSO, observability + tracing, artifact lifecycle/retention, at-rest encryption, resilience &amp; load testing a /24, full CI matrix.</p></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">02</span><h2>Measured steps (from <code>HANDOFF.md</code>)</h2></div>
+    <p class="sec-sub">Work proceeds in small, recoverable steps; the live tracker always knows where we are, so a paused session resumes exactly where it stopped.</p>
+    <div class="grid2">
+      <div class="cardx" style="--cc:var(--good)"><h3>✅ Complete</h3><ul>
+        <li>0.1–0.4 — analysis, engine map, design, synthesis</li>
+        <li>1.1 project + deps (engine path-dep, headless)</li>
+        <li>1.2 config + <code>.env.example</code> (brain-seam keys)</li>
+        <li>1.3 LLM provider seam (OpenAI-compatible default)</li>
+        <li>1.4 engine adapter + single chokepoint</li>
+        <li>1.5 orchestration (states, limits, checkpoints, worker)</li>
+        <li>1.6 agent layer (safety, roles, budgets, prompts)</li>
+        <li>1.7 web platform (auth, RBAC, DB, routers, WS)</li>
+        <li>1.8 React + Vite + TS frontend skeleton</li>
+        <li>1.9 deploy + CI + policy-invariant tests</li>
+      </ul></div>
+      <div class="cardx" style="--cc:var(--brand)"><h3>⏭ Next</h3><ul>
+        <li>0.5 this interactive overview → shared with leadership</li>
+        <li>Phase 4 push — new folder, PR, classic tool untouched</li>
+        <li>2.1 wire the MVP thin slice end-to-end</li>
+      </ul>
+      <p style="margin-top:10px">Open questions for leadership: auth source (OIDC vs local), hosting (VM vs k8s) &amp; egress policy, and confirmation that engagements are always authorized-scope.</p></div>
+    </div>
+  </section>
+</div></div>
+
+<!-- ============ SAFETY ============ -->
+<div class="view" id="v-sf"><div class="wrap">
+  <section>
+    <div class="sec-head"><span class="num">01</span><h2>The six non-negotiables — enforced in code</h2></div>
+    <p class="sec-sub">Carried over from classic Nabu's exam-legal posture and adapted for an autonomous, networked context. These are structural, not prompt text.</p>
+    <div class="grid2">
+      <div class="cardx" style="--cc:var(--bad)"><h3><span class="i">①</span> Read-only engine</h3><p><code>src/oscprecon</code> is a non-editable dependency; a CI hygiene job fails any PR that diffs it. A test asserts PySide6 is never imported (headless).</p></div>
+      <div class="cardx" style="--cc:var(--bad)"><h3><span class="i">②</span> One <code>shell.run</code> chokepoint</h3><p>Exactly one module executes tools. An AST test proves no <code>subprocess</code> / <code>shell=True</code> exists elsewhere.</p></div>
+      <div class="cardx" style="--cc:var(--gated)"><h3><span class="i">③</span> Authorized-scope-only</h3><p>Every target is validated by the engine's own validators <b>and</b> confirmed in the project's scope allowlist before any tool runs — re-checked per host on a range.</p></div>
+      <div class="cardx" style="--cc:var(--gated)"><h3><span class="i">④</span> No blind auto-exploit</h3><p>Recon is automated; spray/exploit need a per-project toggle <b>plus</b> a human-approved checkpoint. The gate flags live in exactly one executor, unreachable from any agent path.</p></div>
+      <div class="cardx" style="--cc:var(--tool)"><h3><span class="i">⑤</span> Swappable brain</h3><p>All LLM access goes through one provider seam; endpoint + model come from config. No vendor SDK, no hardcoded endpoint.</p></div>
+      <div class="cardx" style="--cc:var(--agent)"><h3><span class="i">⑥</span> Audit everything</h3><p>Two trails: the engine's per-project record of <i>what ran</i>, and the platform log of <i>who did what</i>. Every denied authorization is recorded too.</p></div>
+    </div>
+    <div class="callout"><span class="l">The gate</span><p>An agent can <b>propose</b> an attack action (with a rationale and a source), but only a human decision on a server-minted, non-forgeable checkpoint can execute it. The approval — not a tool block-list — is the safety model, exactly as in the classic tool.</p></div>
+  </section>
+  <section>
+    <div class="sec-head"><span class="num">02</span><h2>Verified in the scaffold</h2></div>
+    <ul class="checks">
+      <li>Engine adapter imports against the <b>real</b> <code>oscprecon</code> — 8 tools registered, PySide6 not loaded</li>
+      <li>Single-chokepoint AST invariant: <code>shell.run</code> called only from <code>shell_gateway.py</code></li>
+      <li>Exploit-gate invariant: gate flags appear only in <code>execute_gated_action</code>; <code>run_recon_tool</code> has no such parameter</li>
+      <li>Scope-lock refuses an out-of-scope target before execution; a gated action refuses an unapproved checkpoint</li>
+      <li>12 / 12 policy-invariant + unit tests pass</li>
+    </ul>
+  </section>
+</div></div>
+</main>
+
+<div class="wrap"><div class="foot">Nabu Agent — agentic recon platform · offshoot of Nabu · by Lagus. This page is a living overview; the authoritative documents are <span class="mono">docs/DESIGN.md</span>, <span class="mono">docs/ROADMAP.md</span>, and the live tracker <span class="mono">HANDOFF.md</span>.</div></div>
+
+<script>
+  // tab switching
+  const tabs = document.getElementById('tabs');
+  tabs.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-v]'); if (!b) return;
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+    const v = b.dataset.v;
+    document.querySelectorAll('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  // theme toggle (persists per-viewer; falls back gracefully)
+  const root = document.documentElement, tbtn = document.getElementById('theme');
+  try { const s = localStorage.getItem('nabu-agent-theme'); if (s) root.setAttribute('data-theme', s); } catch (_) {}
+  tbtn.addEventListener('click', () => {
+    const cur = root.getAttribute('data-theme');
+    const dark = cur ? cur === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    const next = dark ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('nabu-agent-theme', next); } catch (_) {}
+  });
+</script>
+</body>
+</html>

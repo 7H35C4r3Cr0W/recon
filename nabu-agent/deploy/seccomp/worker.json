@@ -1,0 +1,15 @@
+{
+  "_comment": "Restrictive seccomp profile for the recon WORKER container. Starts from Docker's",
+  "_comment2": "default allow-list and additionally blocks syscalls a recon tool never needs but a",
+  "_comment3": "post-exploitation payload would want: mount/umount, kexec, ptrace, module load, and",
+  "_comment4": "the *at-scale* raw fiddling beyond what NET_RAW+nmap uses. Full profile is generated",
+  "_comment5": "in CI from docker's default with the denylist below applied; this is the source list.",
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "baseProfile": "docker-default",
+  "denySyscalls": [
+    "mount", "umount2", "pivot_root", "chroot",
+    "kexec_load", "kexec_file_load", "init_module", "finit_module", "delete_module",
+    "ptrace", "process_vm_readv", "process_vm_writev",
+    "bpf", "perf_event_open", "reboot", "swapon", "swapoff"
+  ]
+}

@@ -1,0 +1,67 @@
+# syntax=docker/dockerfile:1
+###############################################################################################
+# Nabu Agent — api + worker image (ONE image, two commands: uvicorn for api, arq for worker).
+#
+# Bakes in: (1) the wrapped recon TOOLSET (nmap, feroxbuster, smbclient, ... — the classic
+# allow-list), (2) the classic oscprecon engine, imported HEADLESS (no Qt), and (3) this
+# nabu-agent project. Build context is the REPO ROOT so both packages are present.
+#
+#   docker build -f nabu-agent/deploy/Dockerfile.api -t nabu-agent:latest .
+###############################################################################################
+FROM kalilinux/kali-rolling AS base
+
+ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 \
+    PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# 1) Recon toolset ONLY (no Qt/GUI libs — headless server). Mirrors the classic allow-list.
+#    NO attack tools by default; WITH_ATTACK=1 adds spray/crack tools (still human-gated per project).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      nmap feroxbuster gobuster ffuf dirsearch dirb nikto whatweb wpscan curl wget wfuzz \
+      smbclient smbmap enum4linux-ng enum4linux impacket-scripts netexec \
+      ldap-utils snmp onesixtyone dnsrecon bind9-dnsutils ike-scan nbtscan \
+      ntpsec-ntpdate redis-tools nfs-common rpcbind dnsenum openssh-client rsync \
+      finger subversion default-mysql-client postgresql-client exploitdb \
+      ca-certificates git libcap2-bin procps iproute2 python3 python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG WITH_ATTACK=0
+RUN if [ "$WITH_ATTACK" = "1" ]; then apt-get update \
+      && apt-get install -y --no-install-recommends hydra medusa evil-winrm john hashcat \
+      && rm -rf /var/lib/apt/lists/* ; fi
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
+# 2) Copy the ENGINE (repo root pyproject + src/oscprecon) and the AGENT, preserving the sibling
+#    layout so the agent's `oscp-recon = { path = ".." }` dependency resolves. src/oscprecon is
+#    COPIED READ-ONLY and never edited.
+WORKDIR /src
+COPY pyproject.toml README.md LICENSE ./
+COPY src ./src
+COPY nabu-agent ./nabu-agent
+
+# 3) Install HEADLESS. The engine's own pyproject declares pyside6; we install the engine with
+#    --no-deps + only the Qt-free runtime deps the imported modules actually use (typer/jinja2/
+#    pyyaml). Then the agent with its full dep set. Result: no Qt in the image.
+RUN uv pip install --system --no-deps /src \
+    && uv pip install --system typer jinja2 pyyaml \
+    && uv pip install --system --no-deps /src/nabu-agent \
+    && uv pip install --system \
+        "fastapi>=0.111" "uvicorn[standard]>=0.30" "pydantic>=2.7" "pydantic-settings>=2.2" \
+        "python-multipart>=0.0.9" "email-validator>=2.1" "itsdangerous>=2.2" \
+        "authlib>=1.3" "argon2-cffi>=23" "pyjwt>=2.8" \
+        "sqlalchemy[asyncio]>=2.0" "asyncpg>=0.29" "alembic>=1.13" "redis>=5.0" "arq>=0.26" \
+        "httpx[http2]>=0.27" "tenacity>=8.3" "structlog>=24.1" \
+        "opentelemetry-sdk>=1.25" "opentelemetry-instrumentation-fastapi>=0.46b0" \
+    && rm -rf /root/.cache
+
+# 4) Re-cap the real nmap binary to cap_net_raw ONLY (Kali's nmap carries cap_net_admin which is
+#    outside Docker's default bounding set -> exec EPERM). NET_RAW is granted via container caps.
+RUN setcap cap_net_raw+ep /usr/lib/nmap/nmap 2>/dev/null || true
+
+# 5) Non-root, no-login service user. The engine writes only under /workspace.
+RUN useradd --system --uid 10001 --home /workspace --shell /usr/sbin/nologin nabu \
+    && mkdir -p /workspace && chown nabu:nabu /workspace
+USER nabu
+
+WORKDIR /src/nabu-agent
+# command supplied by docker-compose (uvicorn for api, arq for worker, alembic for migrate).
