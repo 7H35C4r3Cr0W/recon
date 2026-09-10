@@ -177,3 +177,51 @@ is the manual acceptance check when Postgres/Redis are available.
 - Auth source of truth (OIDC/SSO provider details vs. local accounts) for the internal deployment.
 - Where it will be hosted (single VM vs. k8s) and network-egress policy for tool execution.
 - Confirmation that engagements are always against authorized scope (scope-allowlist per project).
+
+---
+
+## Phase 5 — Full agent orchestration + UX (feed, help guide, dark "hacker" theme)
+
+**Owner asks (2026-09-09), to do in a LOGICAL order (not the order stated):** wire up ALL the agent
+roles into a real fan-out; add a notifications/**feed** at the front of the app; add a **help guide**;
+give the whole SPA an easy-to-read **dark "hacker" theme** + good UX; add the deferred **WS-path
+integration test**. Track every step here and tick as done (multi-session safe).
+
+### The agent roster (what "all the agents" means)
+The run graph is a supervisor + LLM worker agents. Each LLM agent is an `AgentRunner` (role prompt +
+allow-listed tools + SafetyGate + budget) and shows as its own node on the live BloodHound map.
+
+| Agent | Kind | Tools (allow-list) | Does | Map node |
+|---|---|---|---|---|
+| **Supervisor** | orchestration (no LLM) | — | drives the RunState machine, scan, fan-out, join | `run-<id>` |
+| **Planner** | LLM | list_discovered_services, suggest_next_steps, catalog_actions_for | reads discovered services, decides enum order + what to research | `agent-planner-<id>` |
+| **Enum agent** (1 per service) | LLM | enum_service, list_discovered_services | drives Tier-1 recon for its service → findings | `agent-enum-<port>` |
+| **Research agent** (per notable finding/service) | LLM | research_finding, catalog_actions_for, list_discovered_services | HackTricks/EDB/GTFOBins + candidate next steps (proposals only) | `agent-research-<port>` |
+| **Reporter** | LLM | generate_report, suggest_next_steps, list_discovered_services | synthesizes the grounded report + prioritised next steps | `agent-report-<id>` |
+
+Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / reporter) + shared
+`SAFETY_PREAMBLE`. Attack (spray/exploit) is NEVER an agent — only a human-gated checkpoint.
+
+### Ordered steps (logical order)
+- [ ] **5.1 WS-path integration test** — a real WebSocket client drives `/ws/runs/{id}` end-to-end
+  (auth handshake, replay-by-seq, live tail, terminal close) using Starlette's WS test client on the
+  in-process app + a demo run. Closes the last review-flagged test gap.
+- [ ] **5.2 Wire up ALL agents (multi-role fan-out)** — `_run_agent` becomes: scan → **planner** →
+  fan out **enum agents** (per service, concurrent) → **research agents** (per notable service/finding)
+  → **reporter**, each an `AgentRunner` streaming its own map node + log. Bounded by RunLimits; each
+  role's node goes green→teal (or yellow/red). Falls back cleanly if no LLM configured. Tests with a
+  scripted fake provider assert every role node appears.
+- [ ] **5.3 Notifications / feed (backend)** — a per-user activity **feed**: recent runs (start/finish),
+  findings, checkpoints (approvals needed), across the user's projects. `GET /api/feed` (+ unread
+  count); lightweight (derived from runs/agent_tasks/findings_index + a notifications table for
+  approvals). WS or poll for live updates.
+- [ ] **5.4 UX shell + dark "hacker" theme** — a real SPA design system: dark theme tokens (near-black
+  bg, green/teal accents, monospace headings), an app shell (top bar + left nav: Feed / Projects /
+  Help), and restyled Login / Projects / Project / RunLive pages. Easy on the eyes, consistent.
+- [ ] **5.5 Feed page (frontend)** — a "feed" landing view at the front (notifications + recent
+  activity), with an unread badge in the top bar; live via the project WS or polling.
+- [ ] **5.6 Help guide (frontend)** — an in-app, easy-to-read Help page: what Nabu Agent is, how to
+  run recon, the run kinds (demo/scan/agent), the live map colours, attaching the LLM, SSO, safety.
+
+### Progress log (append one line per completed step)
+- (none yet — starting 5.1)
