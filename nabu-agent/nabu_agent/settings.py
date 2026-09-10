@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     # executor beats every ~10s, so this is many missed beats of margin.
     run_stale_after_s: int = 120
 
+    # Data retention / quotas (housekeeping cron + admin trigger).
+    retention_enabled: bool = True
+    retention_run_events_days: int = 30          # drop finished runs' event stream after N days
+    max_runs_per_project: int = 200              # keep only the newest N runs per project
+
     log_level: str = "INFO"
     log_format: str = "json"
 
