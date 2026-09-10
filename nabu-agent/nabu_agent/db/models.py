@@ -255,3 +255,16 @@ class LLMCall(Base):
     http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class FindingTriage(Base):
+    """Operator triage overlay on engine findings (which are immutable recon truth). Keyed by a
+    stable hash of the finding (host|port|kind|value) so it survives re-runs."""
+    __tablename__ = "finding_triage"
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), primary_key=True)
+    finding_key: Mapped[str] = mapped_column(String(32), primary_key=True)
+    status: Mapped[str] = mapped_column(String(12), default="open")  # open|reviewed|confirmed|dismissed
+    note: Mapped[str] = mapped_column(Text, default="")
+    updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+                                                 server_default=func.now(), onupdate=func.now())
