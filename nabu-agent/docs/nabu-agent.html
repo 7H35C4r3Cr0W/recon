@@ -305,15 +305,14 @@
       <p>The whole tree: backend package, config + brain seam, engine adapter + single chokepoint, orchestration, data model + migrations, routers + WebSocket, React SPA, docker-compose, CI, and the policy-invariant test suite.</p>
       <ul class="checks"><li>71 backend files compile; engine seam imports against real oscprecon, headless (no Qt)</li><li>12/12 policy-invariant + unit tests pass</li><li>compose / seccomp / CI YAML valid</li></ul></div>
 
-    <div class="phase"><div class="phase-h"><span class="k">Phase 2 — MVP thin slice</span><span class="pill next">Next</span></div>
-      <p>End-to-end for one operator: log in → create a scoped project → run recon against one IP → live progress over WebSocket → rendered report.</p>
-      <p class="exit">Exit: from a clean deploy, no manual DB/CLI steps; a mid-run reconnect reconciles; report claims are grounded.</p></div>
+    <div class="phase"><div class="phase-h"><span class="k">Phase 2 — MVP thin slice</span><span class="pill done">Done</span></div>
+      <p>End-to-end for one operator: log in → scoped project → recon a host or range → live agent map over WebSocket (auto-reconnecting) → grounded report + one-click export. No manual DB/CLI steps from a clean deploy.</p></div>
 
-    <div class="phase"><div class="phase-h"><span class="k">Phase 3 — Agent fan-out</span><span class="pill later">Later</span></div>
-      <p>The LLM loop + SafetyGate + budgets; the non-blocking supervisor fan-out over multi-service / multi-host; spray/exploit as human-gated checkpoint proposals.</p></div>
+    <div class="phase"><div class="phase-h"><span class="k">Phase 3 — Agent fan-out</span><span class="pill done">Done</span></div>
+      <p>The LLM roster (planner → enum → research → reporter) + SafetyGate + budgets; per-host + per-service supervisor fan-out over a CIDR with a human approval gate above a host threshold; a distributed (Arq) worker path. Spray/exploit stay human-gated checkpoint proposals. The <code>agent</code> run kind is dormant only until the internal model is attached (Admin → LLM setup).</p></div>
 
-    <div class="phase"><div class="phase-h"><span class="k">Phase 4 — Hardening</span><span class="pill later">Later</span></div>
-      <p>OIDC/SSO, observability + tracing, artifact lifecycle/retention, at-rest encryption, resilience &amp; load testing a /24, full CI matrix.</p></div>
+    <div class="phase"><div class="phase-h"><span class="k">Phase 4 — Hardening</span><span class="pill done">Done</span></div>
+      <p>OIDC/SSO + back-channel logout, per-project RBAC + team management, the platform audit trail, credentials vault, artifact retention/quotas, brute-force + request-id middleware, a load-tested /24, the admin LLM setup + test-fire, and a deploy runbook. CI is registered (manual).</p></div>
   </section>
 
   <section>
@@ -332,12 +331,12 @@
         <li>1.8 React + Vite + TS frontend skeleton</li>
         <li>1.9 deploy + CI + policy-invariant tests</li>
       </ul></div>
-      <div class="cardx" style="--cc:var(--brand)"><h3>⏭ Next</h3><ul>
-        <li>0.5 this interactive overview → shared with leadership</li>
-        <li>Phase 4 push — new folder, PR, classic tool untouched</li>
-        <li>2.1 wire the MVP thin slice end-to-end</li>
+      <div class="cardx" style="--cc:var(--brand)"><h3>⏭ Remaining</h3><ul>
+        <li><b>Attach the LLM brain</b> — internal OpenAI-compatible endpoint (Admin → LLM setup + test-fire). This is the only thing gating <code>agent</code> runs.</li>
+        <li>Wire spray/exploit <i>execution</i> behind the existing human checkpoint (a deliberate later phase).</li>
+        <li>Throughput polish + a live-cluster smoke of the distributed worker path.</li>
       </ul>
-      <p style="margin-top:10px">Open questions for leadership: auth source (OIDC vs local), hosting (VM vs k8s) &amp; egress policy, and confirmation that engagements are always authorized-scope.</p></div>
+      <p style="margin-top:10px">The body is feature-complete and deployable today (deterministic <code>scan</code> recon, live map, reports, RBAC, audit). See <span class="mono">deploy/RUNBOOK.md</span>.</p></div>
     </div>
   </section>
 </div></div>
@@ -364,7 +363,7 @@
       <li>Single-chokepoint AST invariant: <code>shell.run</code> called only from <code>shell_gateway.py</code></li>
       <li>Exploit-gate invariant: gate flags appear only in <code>execute_gated_action</code>; <code>run_recon_tool</code> has no such parameter</li>
       <li>Scope-lock refuses an out-of-scope target before execution; a gated action refuses an unapproved checkpoint</li>
-      <li>12 / 12 policy-invariant + unit tests pass</li>
+      <li>~99 backend + 23 frontend tests pass; ruff + mypy clean; <code>alembic upgrade head</code> verified</li>
     </ul>
   </section>
 </div></div>
