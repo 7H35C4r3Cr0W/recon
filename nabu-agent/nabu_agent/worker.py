@@ -43,7 +43,7 @@ def _redis_settings() -> Any:
 
 
 class WorkerSettings:
-    functions = [tasks.supervise_run]
+    functions = [tasks.supervise_run, tasks.recon_host_job]
     # reap stale/killed runs every 30s so a dead worker's run doesn't stay stuck
     cron_jobs = [
         cron(reaper.reap_job, second={0, 30}, run_at_startup=True),

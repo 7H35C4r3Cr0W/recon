@@ -265,6 +265,26 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   cross-host collision.
 
 ### Phase 6 progress log
+- DONE (follow-up) — **distributed (two-pool) supervisor + admission control**. Under `NABU_USE_ARQ`
+  the supervisor (`execute_run` via `supervise_run`) now, at the per-host fan-out step, ENQUEUES one
+  `recon_host_job` per live host onto the Arq worker pool and AWAITS its result (gather = the fan-in
+  barrier) instead of running all hosts in its own coroutine — so heavy per-host recon spreads across
+  the pool (bounded by worker `max_jobs`) while the supervisor stays a light coordinator that still
+  owns the single terminal DONE + heartbeat + gate. `services/runs._dispatch_host` picks in-process
+  (use_arq off; unchanged) vs enqueue-and-await (on); `run_host_in_worker` is the host job's body
+  (rebuilds publish/cancel/log-pump, beats heartbeat); `tasks.recon_host_job` + `worker.py` function.
+  **Admission** (`orchestration/admission.py`): one active run per project (Redis SET-NX mutex on the
+  Profile dir, TTL `RUN_SLOT_TTL_S`) + global ceiling (`DEFAULT_GLOBAL_RUN_CEILING`), acquired at the
+  top of `execute_run` (project-less demo runs skip it), released in finally; a refused run ends
+  `failed` with a clear error. New limit `host_job_timeout_s`. Blackboard single-writer-Profile deltas
+  left UNIMPLEMENTED on purpose — per-host Profiles make cross-process findings.json races impossible,
+  so the supervisor need not be the sole writer. Tests: `test_admission.py` (3 unit, fakeredis),
+  `test_distributed_run.py` (2 — fake Arq pool runs enqueued tasks inline: asserts 1 supervise_run + 3
+  recon_host_job enqueues, per-host nodes, single DONE; + admission refuses a 2nd run on a busy
+  project). CAVEAT: the real multi-worker Arq path can't be integration-tested here (fakeredis, no
+  worker) — the fake pool exercises the choreography; a live-cluster smoke test is still needed. Gate:
+  ruff clean, mypy 10, 69 backend + 2 load + 9 invariant + 14 frontend, build OK.
+
 - DONE (follow-up) — **hard host-count approval checkpoint**. A fan-out above
   `RunLimits.approval_required_above_hosts` (16) now PARKS the run: `services/runs._gate_host_fanout`
   (called by both drivers after `_resolve_hosts`) persists a `hosts` Checkpoint, sets state

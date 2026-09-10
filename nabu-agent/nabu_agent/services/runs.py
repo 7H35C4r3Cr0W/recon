@@ -236,6 +236,78 @@ async def _gate_host_fanout(run_id: str, target: str, hosts: list[str], publish,
     return "failed"
 
 
+# --- distributed fan-out (two-pool supervisor) --------------------------------------------------
+# In-process (dev/tests, NABU_USE_ARQ off) each host is recon'd in the supervisor coroutine under a
+# semaphore. In production (use_arq) the supervisor instead ENQUEUES one recon_host_job per host onto
+# the Arq worker pool and AWAITS its result — so the heavy per-host recon spreads across the pool
+# (bounded by the worker max_jobs) while the supervisor stays a light coordinator that still owns the
+# single terminal DONE. Each host writes its OWN per-host Profile, so separate worker processes never
+# race one findings.json (the supervisor need not be the sole Profile writer).
+async def _dispatch_host(run_id: str, host: str, kind: str, publish, *, project_id: str,
+                         cancel_event, on_line, run_node: str, limits, service_budget: int,
+                         provider=None) -> str:
+    from nabu_agent.settings import get_settings
+
+    if get_settings().use_arq:
+        pool = await bus.get_arq_pool()
+        job = await pool.enqueue_job("recon_host_job", run_id, host, kind, project_id, service_budget,
+                                     _job_id=f"run:{run_id}:host:{host}")
+        return await job.result(timeout=limits.host_job_timeout_s)
+
+    if kind == "agent":
+        return await _agent_host(run_id, host, publish, project_id=project_id, cancel_event=cancel_event,
+                                 on_line=on_line, run_node=run_node, provider=provider, limits=limits,
+                                 service_budget=service_budget)
+    return await _recon_host(run_id, host, publish, project_id=project_id, cancel_event=cancel_event,
+                             on_line=on_line, run_node=run_node, limits=limits, service_budget=service_budget)
+
+
+async def run_host_in_worker(run_id: str, host: str, kind: str, project_id: str,
+                             service_budget: int) -> str:
+    """Body of the ``recon_host_job`` Arq task: recon ONE host as its own worker job. Rebuilds the
+    per-run publish/cancel/log machinery, beats the heartbeat (so the reaper leaves the run alone
+    while its host jobs run on the pool), and returns the host's terminal string to the supervisor."""
+    from nabu_agent.llm.factory import build_provider
+    from nabu_agent.orchestration.limits import RunLimits
+    from nabu_agent.settings import get_settings
+
+    async def publish(type_: RunEventType, data: dict[str, Any]) -> None:
+        await _emit(run_id, type_, data)
+
+    cancel_event = threading.Event()
+
+    async def watch_cancel() -> None:
+        try:
+            while not cancel_event.is_set():
+                if await bus.is_cancelled(run_id):
+                    cancel_event.set()
+                    return
+                await asyncio.sleep(1.0)
+        except Exception:
+            pass
+
+    watcher = asyncio.create_task(watch_cancel())
+    pump = LogPump(run_id, publish)
+    pump_task = asyncio.create_task(pump.drain())
+    await _touch_heartbeat(run_id)
+    run_node, limits = f"run-{run_id}", RunLimits()
+    try:
+        if kind == "agent":
+            provider = build_provider(get_settings().llm)
+            return await _agent_host(run_id, host, publish, project_id=project_id, cancel_event=cancel_event,
+                                     on_line=pump.feed, run_node=run_node, provider=provider, limits=limits,
+                                     service_budget=service_budget)
+        return await _recon_host(run_id, host, publish, project_id=project_id, cancel_event=cancel_event,
+                                 on_line=pump.feed, run_node=run_node, limits=limits, service_budget=service_budget)
+    finally:
+        cancel_event.set()
+        watcher.cancel()
+        pump.stop()
+        with contextlib.suppress(Exception):
+            await pump.flush()
+        pump_task.cancel()
+
+
 async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
     """Background driver: run the choreography (demo) or real recon, persisting + streaming events."""
     async def publish(type_: RunEventType, data: dict[str, Any]) -> None:
@@ -256,6 +328,21 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
 
     await _set_state(run_id, "scanning")
     await _touch_heartbeat(run_id)
+    # admission: one active run per project (Redis mutex + global ceiling); project-less demo runs
+    # skip it. A refused run ends immediately with a clear error rather than racing another's Profile.
+    _admitted, _profile_dir = False, ""
+    if project_id:
+        from nabu_agent.engine.workspace import project_root
+        from nabu_agent.orchestration import admission
+        _profile_dir = str(project_root(project_id))
+        _admitted = await admission.acquire_run_slot(project_id, _profile_dir)
+        if not _admitted:
+            await _set_state(run_id, "failed")
+            with contextlib.suppress(Exception):
+                await _emit(run_id, RunEventType.ERROR,
+                            {"message": "another run is already active for this project"})
+            await _emit(run_id, RunEventType.DONE, {"state": "failed"})
+            return
     watcher = asyncio.create_task(watch_cancel())
     heart = asyncio.create_task(_heartbeat_loop(run_id, cancel_event))
     pump = LogPump(run_id, publish)
@@ -294,6 +381,10 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
         with contextlib.suppress(Exception):
             await pump.flush()
         pump_task.cancel()
+        if _admitted and project_id:
+            from nabu_agent.orchestration import admission
+            with contextlib.suppress(Exception):
+                await admission.release_run_slot(project_id, _profile_dir)
         _EMIT_LOCKS.pop(run_id, None)
 
 async def _resolve_hosts(run_id: str, target: str, publish, *, project_id: str,
@@ -418,9 +509,9 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
             if cancel_event.is_set():
                 return "cancelled"
             try:
-                return await _recon_host(run_id, host, publish, project_id=project_id,
-                                         cancel_event=cancel_event, on_line=on_line, run_node=run_node,
-                                         limits=limits, service_budget=per_host_budget)
+                return await _dispatch_host(run_id, host, "scan", publish, project_id=project_id,
+                                            cancel_event=cancel_event, on_line=on_line, run_node=run_node,
+                                            limits=limits, service_budget=per_host_budget)
             except Exception as exc:  # one host crashing must not sink the whole run
                 await publish(RunEventType.TASK_UPDATED,
                               {"node_id": f"host-{host}", "node_state": NodeState.ERROR.value})
@@ -607,9 +698,9 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
             if cancel_event.is_set():
                 return "cancelled"
             try:
-                return await _agent_host(run_id, host, publish, project_id=project_id,
-                                         cancel_event=cancel_event, on_line=on_line, run_node=run_node,
-                                         provider=provider, limits=limits, service_budget=per_host_budget)
+                return await _dispatch_host(run_id, host, "agent", publish, project_id=project_id,
+                                            cancel_event=cancel_event, on_line=on_line, run_node=run_node,
+                                            limits=limits, service_budget=per_host_budget, provider=provider)
             except Exception as exc:  # one host crashing must not sink the whole run
                 await publish(RunEventType.TASK_UPDATED,
                               {"node_id": f"host-{host}", "node_state": NodeState.ERROR.value})

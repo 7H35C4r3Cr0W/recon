@@ -133,8 +133,15 @@ The per-host fan-out described as missing below has since been implemented for t
   Checkpoint and does not fan out until a human approves (or rejects / it times out) via
   `POST /runs/{id}/checkpoints/{cp}/approve|reject`; RunLive shows an Approve/Reject banner.
   Both drivers gate through `services/runs._gate_host_fanout`. (`tests/integration/test_approval_gate.py`.)
-- The **two-pool supervisor / blackboard / admission** remain stubs; a `/24` still runs
-  in one worker slot.
+- ~~The **two-pool supervisor / admission** remain stubs; a `/24` runs in one worker slot.~~
+  **DONE** — with `NABU_USE_ARQ` the supervisor now enqueues one `recon_host_job` per host onto
+  the worker pool and awaits their results, so per-host recon spreads across the pool (bounded by
+  the worker `max_jobs`) while the supervisor stays a light coordinator that owns the single DONE.
+  **Admission** (`orchestration/admission.py`) is implemented: one active run per project (Redis
+  mutex on the Profile dir) + a global concurrent-run ceiling, wired into `execute_run`. (The
+  single-writer-Profile *blackboard* is intentionally NOT needed: each host writes its OWN per-host
+  Profile, so separate worker processes never race one `findings.json`; the fan-in is `await`ing the
+  host jobs, not a Redis barrier.)
 
 The original pre-host-tier assessment follows, kept for the record.
 
@@ -172,11 +179,12 @@ Consequences, all real today:
   (`engine/workspace.py`, `oscprecon/findings.py`). `ServiceDTO` and every map node id
   (`svc-{target}-{port}`) are likewise host-less, so two hosts with the same port
   collide on one node.
-- The two-pool non-blocking supervisor + DECR fan-in barrier that DESIGN.md names as
-  the thing bounding a /24 is **not implemented** — `orchestration/blackboard.py` and
-  `orchestration/admission.py` are `NotImplementedError` stubs; the real worker is a
-  single blocking supervisor on one 16-slot Arq pool (`worker.py:46,54`). A whole /24
-  would live in one worker slot/process = single point of failure.
+- ~~The two-pool supervisor + admission are not implemented...~~ **Now implemented** (see the
+  host-tier update above): under `NABU_USE_ARQ` the supervisor fans out one `recon_host_job` per
+  host across the worker pool and awaits results; `orchestration/admission.py` enforces one active
+  run per project + a global ceiling. The heavy per-host recon no longer all lives in one process.
+  (`blackboard.py`'s single-writer-Profile delta system stays unimplemented on purpose — per-host
+  Profiles make it unnecessary.)
 
 ### The guardrails that WOULD bound a real /24 (and their status)
 
@@ -189,14 +197,17 @@ Consequences, all real today:
 | `max_hosts` | 32 | **Wired** (host tier) — `_resolve_hosts` clamps the alive-sweep to it + emits a capping log event |
 | `approval_required_above_hosts` | 16 | **Wired** — over-threshold PARKS the run in `awaiting_approval` (blocking human Checkpoint) before fan-out |
 | `max_enum_per_host` | 4 | **Wired** (host tier) — per-host enum semaphore, measured 4/4 bound |
-| admission (1 active run/project, profile mutex) | — | **Stub** — `acquire/release_run_slot` raise `NotImplementedError`, called from nowhere; one-active-run index is Postgres-only |
+| admission (1 active run/project, profile mutex) | — | **Wired** — Redis mutex + global ceiling in `admission.py`, acquired/released in `execute_run` |
 
 **Verdict (updated):** the event/persistence substrate + per-service fan-out are ready
 for /24 volume, and per-host fan-out + the host guardrails are now built and wired for the
 `scan` kind (see [Update: host tier](#update-host-tier-built--recon-runs)). A deterministic
 recon `/24` is now possible and bounded — with multi-host for the `agent` (LLM) kind, a combined
 multi-host report, and a blocking host-count approval checkpoint all now shipped. Remaining
-follow-up: the distributed supervisor/admission model (a `/24` still runs in one worker slot).
+follow-up: none of the load-test recommendations remain open — the distributed (two-pool) supervisor
+and admission control are now built too. What is left is throughput polish (batch `_emit` commits,
+debounce the frontend Cytoscape relayout, page/resume WS replay) and validating the real Arq path on
+a staging cluster (the distributed choreography is unit-tested here via a fake pool, not a live worker).
 
 ---
 
