@@ -1,0 +1,89 @@
+name: nabu-agent CI
+# Scoped to the agent offshoot. MANUAL-ONLY (workflow_dispatch) to match this repo's policy of not
+# burning Actions minutes on every push — the same gates (ruff/mypy/pytest/invariants/frontend) run
+# locally before each push. Run from the Actions tab when you want a clean hosted check. This never
+# edits or re-tests src/oscprecon beyond importing it (see the hygiene job).
+#
+# NOTE: GitHub only discovers workflows in the REPO-ROOT .github/workflows/, which is why this lives
+# here rather than under nabu-agent/. It is separate from the classic engine's ci.yml.
+on:
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: nabu-agent
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Sync (agent + engine path dep)
+        run: uv sync
+      - name: ruff
+        run: uv run ruff check
+      - name: mypy
+        run: uv run mypy nabu_agent
+      - name: unit tests (engine mocked)
+        run: uv run pytest -q -m "not invariant and not load"
+
+  # SEPARATE, must-pass gate: if any safety invariant regresses, this fails independently of the unit
+  # suite, so a bypass can never ride in green behind unrelated test noise.
+  policy-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: uv sync
+      - name: policy-invariant suite
+        run: uv run pytest -q -m invariant
+
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }   # full history so we can diff against origin/main
+      # REPO-HYGIENE GUARANTEE: fail if the current branch touches src/oscprecon (read-only engine).
+      - name: assert src/oscprecon untouched
+        run: |
+          git fetch -q origin main || true
+          if git rev-parse -q --verify origin/main >/dev/null \
+             && git diff --name-only origin/main...HEAD | grep -q '^src/oscprecon/'; then
+            echo "::error::nabu-agent changes must not modify src/oscprecon (read-only engine dep)"
+            exit 1
+          fi
+          echo "ok: src/oscprecon untouched"
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: install SPA deps
+        working-directory: nabu-agent/frontend
+        run: npm install --no-audit --no-fund
+      - name: frontend component tests
+        working-directory: nabu-agent/frontend
+        run: npm test
+      - name: build SPA
+        working-directory: nabu-agent/frontend
+        run: npm run build
+
+  compose-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: validate compose config
+        working-directory: nabu-agent
+        run: |
+          cp .env.example .env
+          docker compose config >/dev/null
+      # A full image build (Kali base + toolset) is heavy; gate it behind a label if ever needed.
