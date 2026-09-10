@@ -1,21 +1,25 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 
 interface ScopeT { id: string; target: string; kind: string; }
+interface RunT { id: string; state: string; target: string; kind: string; }
 
 export function ProjectDetail() {
   const { projectId } = useParams();
   const nav = useNavigate();
   const [scope, setScope] = useState<ScopeT[]>([]);
+  const [runs, setRuns] = useState<RunT[]>([]);
   const [target, setTarget] = useState("");
   const [runTarget, setRunTarget] = useState("");
   const [kind, setKind] = useState("demo");
   const [err, setErr] = useState("");
 
   async function load() {
-    try { setScope((await api<{ scope: ScopeT[] }>(`/projects/${projectId}/scope`)).scope); }
-    catch (e) { setErr(String(e)); }
+    try {
+      setScope((await api<{ scope: ScopeT[] }>(`/projects/${projectId}/scope`)).scope);
+      setRuns((await api<{ runs: RunT[] }>(`/projects/${projectId}/runs`)).runs);
+    } catch (e) { setErr(String(e)); }
   }
   useEffect(() => { load(); }, [projectId]);
 
@@ -69,6 +73,29 @@ export function ProjectDetail() {
           <button className="btn btn-primary" type="submit">Start run ▸</button>
         </form>
         <p className="muted" style={{ fontSize: 13 }}>Opens the live map — agents light up green (active), teal (done), yellow (stuck), red (error).</p>
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="row" style={{ justifyContent: "space-between" }}>
+          <h3 style={{ margin: 0 }}>Runs</h3>
+          <Link className="btn" to={`/projects/${projectId}/report`}>Report &amp; outputs ▸</Link>
+        </div>
+        {runs.length === 0 ? (
+          <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>No runs yet — start one above.</p>
+        ) : (
+          <ul className="list" style={{ marginTop: 10 }}>
+            {runs.map((r) => (
+              <li key={r.id} className="row" style={{ justifyContent: "space-between" }}>
+                <span className="row" style={{ gap: 8 }}>
+                  <span className={`pill st-${r.state}`}>{r.state}</span>
+                  <span className="pill">{r.kind}</span>
+                  <span className="mono">{r.target}</span>
+                </span>
+                <Link className="btn" to={`/projects/${projectId}/runs/${r.id}`}>Open map ▸</Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div style={{ marginTop: 16 }}>

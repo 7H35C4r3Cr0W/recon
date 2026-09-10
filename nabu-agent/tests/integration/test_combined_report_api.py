@@ -42,3 +42,24 @@ async def test_cidr_report_before_any_run_is_friendly(client, monkeypatch, tmp_p
     r = await client.get(f"/api/projects/{pid}/report")
     assert r.status_code == 200, r.text
     assert "No report yet" in r.json()["markdown"]
+
+
+async def test_cidr_findings_are_aggregated_across_hosts(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("NABU_AGENT_WORKSPACE_ROOT", str(tmp_path))
+    import oscprecon.findings as ef
+    from nabu_agent.engine.workspace import workspace_for
+
+    await client.post("/api/auth/login", json={"email": "admin@nabu.local", "password": "changeme"})
+    pid = (await client.post("/api/projects", json={"display_name": "RangeF"})).json()["id"]
+    await client.post(f"/api/projects/{pid}/scope", json={"target": "10.10.30.0/29"})
+    a = workspace_for(pid, "10.10.30.5").open_or_create()
+    b = workspace_for(pid, "10.10.30.6").open_or_create()
+    ef.add_findings(a.directory, [{"kind": "vuln", "value": "on-a", "port": 445, "severity": "vulnerable"}])
+    ef.add_findings(b.directory, [{"kind": "world-readable", "value": "on-b", "port": 445, "severity": "exposure"}])
+
+    rows = (await client.get(f"/api/projects/{pid}/findings")).json()["findings"]
+    vals = {r["value"] for r in rows}
+    assert {"on-a", "on-b"} <= vals                         # both hosts' findings aggregated
+    hosts = {r.get("_host") for r in rows}
+    assert {"10.10.30.5", "10.10.30.6"} <= hosts            # each tagged with its host
+    assert rows[0]["_category"] == "vulnerable"             # sorted strongest-first

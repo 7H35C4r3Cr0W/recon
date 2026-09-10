@@ -38,7 +38,12 @@ async def get_findings(project_id: str, db: AsyncSession = Depends(get_db),
     if not scope:
         return {"findings": []}
     try:
-        rows = await asyncio.to_thread(gateway.list_findings, project_id, scope, None)
+        # a CIDR scope fans out per host — aggregate every per-host Profile's findings, not just the
+        # (near-empty) sweep Profile; a single host reads its own findings.json directly.
+        if "/" in scope:
+            rows = await asyncio.to_thread(gateway.list_combined_findings, project_id)
+        else:
+            rows = await asyncio.to_thread(gateway.list_findings, project_id, scope, None)
     except ProjectNotFound:
         return {"findings": []}
     return {"findings": rows}

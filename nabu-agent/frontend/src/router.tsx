@@ -5,6 +5,7 @@ import { Feed } from "./pages/Feed";
 import { Projects } from "./pages/Projects";
 import { ProjectDetail } from "./pages/ProjectDetail";
 import { RunLive } from "./pages/RunLive";
+import { Report } from "./pages/Report";
 import { Help } from "./pages/Help";
 import { NotFound } from "./pages/NotFound";
 
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
       { path: "/", element: <Feed /> },
       { path: "/projects", element: <Projects /> },
       { path: "/projects/:projectId", element: <ProjectDetail /> },
+      { path: "/projects/:projectId/report", element: <Report /> },
       { path: "/help", element: <Help /> },
     ],
   },

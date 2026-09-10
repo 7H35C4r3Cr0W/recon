@@ -62,3 +62,9 @@ code,.mono{font-family:var(--mono)}
 .feed-item .meta{margin-left:auto;color:var(--muted);font-size:12px;font-family:var(--mono)}
 .centerpane{max-width:380px;margin:8vh auto 0;text-align:left}
 kbd{font-family:var(--mono);background:var(--sunk);border:1px solid var(--line-2);border-radius:5px;padding:1px 6px;font-size:12px}
+
+/* report / outputs tables */
+.rpt-table{border-collapse:collapse;width:100%;font-size:13px}
+.rpt-table th,.rpt-table td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+.rpt-table th{color:var(--ink-2);font-weight:700;background:var(--sunk)}
+.rpt-table code{font-size:12px}

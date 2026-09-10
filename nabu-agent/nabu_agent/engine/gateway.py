@@ -61,6 +61,35 @@ def _demote_headings(md: str, levels: int = 2) -> str:
     return "\n".join(out)
 
 
+def list_combined_findings(project_id: str) -> list[dict[str, Any]]:
+    """Findings aggregated across EVERY per-host Profile under a project (skips the CIDR sweep
+    Profile), each tagged with its host (`_host`), severity category (`_category`) and rank
+    (`_rank`), sorted strongest-first. The per-scope :func:`list_findings` only sees one Profile, so
+    a CIDR project must use this to see all its hosts' findings. Read-only."""
+    root = project_root(project_id)
+    if not root.exists():
+        raise ProjectNotFound(project_id)
+    rows: list[dict[str, Any]] = []
+    for d in sorted((p for p in root.iterdir() if p.is_dir()), key=lambda p: p.name):
+        if not (d / "profile.json").is_file():
+            continue
+        try:
+            prof = Profile.load(d)
+        except Exception:
+            continue
+        host = getattr(prof.target, "ip", "") or ""
+        if "/" in host:  # the CIDR/range sweep Profile, not a host
+            continue
+        for row in findings_mod.load_findings(prof.directory):
+            cat = category_of(row)
+            row["_host"] = host
+            row["_category"] = cat
+            row["_rank"] = rank(cat)
+            rows.append(row)
+    rows.sort(key=lambda r: (r.get("_rank", 99), r.get("_host", "")))
+    return rows
+
+
 def render_combined_report(project_id: str) -> str:
     """Aggregate EVERY per-host Profile under a project into ONE report: a cross-host summary
     (services + findings + top severity per host), an aggregate severity tally, suggested next steps
@@ -183,7 +212,7 @@ def activity(project_id: str, scope: str, hostname: str | None = None, *, limit:
 
 
 __all__ = [
-    "create_project_profile", "load_profile", "render_report", "render_combined_report",
+    "create_project_profile", "load_profile", "render_report", "render_combined_report", "list_combined_findings",
     "list_services", "list_findings", "build_graph", "activity",
     "ProjectNotFound",
 ]
