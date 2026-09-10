@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nabu_agent import audit
+from nabu_agent import audit, bus
 from nabu_agent.auth import oidc, sessions
 from nabu_agent.auth.deps import get_current_user
 from nabu_agent.auth.providers import verify_password
@@ -33,12 +33,21 @@ async def providers() -> dict:
 async def login(body: LoginBody, request: Request, response: Response,
                 db: AsyncSession = Depends(get_db)) -> dict:
     ip = request.client.host if request.client else None
+    ip_s = ip or "unknown"
+    # brute-force throttle: too many recent failures for this (ip, email) → refuse before verifying
+    if await bus.login_failure_count(ip_s, body.email) >= bus.LOGIN_MAX_FAILURES:
+        await audit.record(actor_user_id=None, action=audit.LOGIN_FAILED, result="denied",
+                           actor_ip=ip, details={"email": body.email, "reason": "rate-limited"})
+        raise HTTPException(status_code=429, detail="too many attempts — try again later",
+                            headers={"Retry-After": str(bus.LOGIN_WINDOW_S)})
     user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if (user is None or not user.is_active or not user.password_hash
             or not verify_password(user.password_hash, body.password)):
+        await bus.register_login_failure(ip_s, body.email)
         await audit.record(actor_user_id=(user.id if user else None), action=audit.LOGIN_FAILED,
                            result="denied", actor_ip=ip, details={"email": body.email})
         raise HTTPException(status_code=401, detail="invalid credentials")
+    await bus.clear_login_failures(ip_s, body.email)
     sid = await sessions.create_session(user.id)
     response.set_cookie(sessions.COOKIE_NAME, sid, httponly=True, samesite="strict",
                         secure=get_settings().env == "production", max_age=get_settings().session_ttl_min * 60)

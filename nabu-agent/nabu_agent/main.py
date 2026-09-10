@@ -105,6 +105,17 @@ def create_app() -> FastAPI:
     app.add_middleware(SessionMiddleware, secret_key=_secret, same_site="lax",
                        https_only=settings.env == "production", max_age=600)
 
+    @app.middleware("http")
+    async def _request_id(request: Request, call_next):
+        """Correlate a request across logs + the error envelope. Honour an inbound X-Request-ID
+        (from the edge/LB) else mint one; echo it on the response."""
+        import uuid
+        rid = request.headers.get("x-request-id") or uuid.uuid4().hex[:16]
+        request.state.request_id = rid
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
+
     @app.exception_handler(EngineAdapterError)
     async def _engine_error_handler(request: Request, exc: EngineAdapterError) -> JSONResponse:
         status = _ERROR_STATUS.get(getattr(exc, "code", "engine_error"), 500)
@@ -116,7 +127,7 @@ def create_app() -> FastAPI:
             content={
                 "code": getattr(exc, "code", "engine_error"),
                 "message": str(exc),
-                "request_id": request.headers.get("x-request-id", ""),
+                "request_id": getattr(request.state, "request_id", "") or request.headers.get("x-request-id", ""),
                 "details": {},
             },
         )
@@ -127,10 +138,11 @@ def create_app() -> FastAPI:
         instead of a bare stack trace, so failures are traceable and clients get a consistent shape."""
         _errlog().error("unhandled-error", path=str(request.url.path), method=request.method,
                         error=str(exc), exc_info=True)
+        rid = getattr(request.state, "request_id", "") or request.headers.get("x-request-id", "")
         return JSONResponse(
             status_code=500,
             content={"code": "internal_error", "message": "internal server error",
-                     "request_id": request.headers.get("x-request-id", ""), "details": {}},
+                     "request_id": rid, "details": {}},
         )
 
     # Routers under /api. auth/projects/runs/reports/findings/audit are wired; the rest are scaffolds.

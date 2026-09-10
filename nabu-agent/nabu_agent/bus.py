@@ -81,6 +81,33 @@ async def subscribe(run_id: str) -> AsyncIterator[dict[str, Any]]:
         await pubsub.aclose()
 
 
+# --- login brute-force throttle (per ip+email, sliding-ish window via TTL) ---
+LOGIN_MAX_FAILURES = 8          # failures allowed within the window before a temporary block
+LOGIN_WINDOW_S = 900            # 15 min
+
+
+def _login_key(ip: str, email: str) -> str:
+    return f"nabu:login-fail:{ip}|{email.lower()}"
+
+
+async def login_failure_count(ip: str, email: str) -> int:
+    return int(await get_redis().get(_login_key(ip, email)) or 0)
+
+
+async def register_login_failure(ip: str, email: str) -> int:
+    """INCR the failure counter for (ip, email); set the window TTL on first failure. Returns count."""
+    r = get_redis()
+    key = _login_key(ip, email)
+    n = int(await r.incr(key))
+    if n == 1:
+        await r.expire(key, LOGIN_WINDOW_S)
+    return n
+
+
+async def clear_login_failures(ip: str, email: str) -> None:
+    await get_redis().delete(_login_key(ip, email))
+
+
 async def request_cancel(run_id: str) -> None:
     await get_redis().set(cancel_key(run_id), "1")
 
