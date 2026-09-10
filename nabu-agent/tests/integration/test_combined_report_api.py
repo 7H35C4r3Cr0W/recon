@@ -68,7 +68,6 @@ async def test_cidr_findings_are_aggregated_across_hosts(client, monkeypatch, tm
 async def test_project_export_bundle(client, monkeypatch, tmp_path):
     monkeypatch.setenv("NABU_AGENT_WORKSPACE_ROOT", str(tmp_path))
     import oscprecon.findings as ef
-
     from nabu_agent.engine.workspace import workspace_for
 
     await client.post("/api/auth/login", json={"email": "admin@nabu.local", "password": "changeme"})
