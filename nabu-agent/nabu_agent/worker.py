@@ -1,43 +1,51 @@
-"""Arq worker entrypoint: ``arq nabu_agent.worker.WorkerSettings``.
+"""Arq worker entrypoint: `arq nabu_agent.worker.WorkerSettings` (docker-compose `worker` service).
 
-Engine calls are synchronous/blocking (``subprocess.Popen`` inside ``shell.run``), so the worker
-runs them in threads and keeps its pool separate from the FastAPI process. ``job_timeout`` is a
-coarse backstop ABOVE the engine's per-step 300 s watchdog and the per-agent wall clock in
-:class:`~nabu_agent.orchestration.limits.RunLimits`.
-
-Two logical pools (supervisor vs agent-work) prevent an awaiting supervisor from starving the
-children it is waiting on; here they share one WorkerSettings but the supervisor is written to be
-NON-blocking (fan out, return its slot, re-trigger on the last finisher) so a single pool is safe
-for the scaffold. Split into two ``arq`` worker deployments in Phase 3 if needed.
+The worker runs runs off the api process. Engine calls are blocking, so the driver executes them in
+worker threads and fans out per-service agents concurrently. on_startup wires this process's own DB
+engine + Redis client (for event publish); the api enqueues jobs via bus.enqueue_run.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 from nabu_agent.orchestration import tasks
 
 
+async def on_startup(ctx: dict[str, Any]) -> None:
+    import redis.asyncio as aioredis
+
+    from nabu_agent import bus
+    from nabu_agent.db import session as db_session
+    from nabu_agent.obs import logging as obs_logging
+    from nabu_agent.settings import get_settings
+
+    s = get_settings()
+    obs_logging.configure(s.log_level, s.log_format)
+    db_session.configure()                       # this process's async DB engine
+    bus.set_client(aioredis.from_url(s.redis_url, decode_responses=True))  # publish channel
+
+
+async def on_shutdown(ctx: dict[str, Any]) -> None:
+    from nabu_agent.db import session as db_session
+
+    await db_session.dispose()
+
+
+def _redis_settings() -> Any:
+    from arq.connections import RedisSettings
+
+    from nabu_agent.settings import get_settings
+
+    return RedisSettings.from_dsn(get_settings().redis_url)
+
+
 class WorkerSettings:
-    """Arq worker configuration. ``functions`` are the fan-out task graph."""
-
-    functions = [
-        tasks.supervise_run,
-        tasks.recon_alive,
-        tasks.recon_scan,
-        tasks.enum_service,
-        tasks.vuln_service,
-        tasks.research_service,
-        tasks.synthesize_report,
-        tasks.execute_approved_action,  # human-gated; enqueued only after approve()
-    ]
-    max_jobs = 16          # global cap; per-run width bounded by RunLimits
-    job_timeout = 1200     # seconds; backstop above the engine's 300s per-step watchdog
-    max_tries = 3          # transient infra only; blocked / missing_tool are never retried
+    functions = [tasks.supervise_run]
+    on_startup = on_startup
+    on_shutdown = on_shutdown
+    max_jobs = 16          # concurrent runs; per-run fan-out is bounded separately (RunLimits)
+    job_timeout = 3600     # a full run may take a while; per-step watchdog is the engine's 300s
+    max_tries = 1          # a run drives its own partial/failed handling; don't blindly re-run tools
     keep_result = 3600
-    # redis_settings is wired from Settings.redis_url in on_startup (see Phase 1).
-
-
-def is_retryable(shell_outcome: str) -> bool:
-    """``blocked`` (policy refusal) and ``missing_tool`` (not on PATH) are DATA, not failures — they
-    are recorded on the agent_task row and surfaced in the report, never retried. Only transient
-    infra (``error`` / ``timeout``) is retryable."""
-    return shell_outcome in {"error", "timeout"}
+    redis_settings = _redis_settings()  # a RedisSettings instance (DSN parse only, no connection)

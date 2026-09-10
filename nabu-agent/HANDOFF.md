@@ -24,20 +24,23 @@
 
 ```
 DATE:        2026-09-09
-BRANCH:      main  (PRs #1–#4 merged: scaffold, MVP, real-recon+views, Phase-3 LLM loop + review fixes)
-PHASE:       BODY DONE for internal deploy + LLM attach. Phase 2 complete; Phase 3 CORE complete.
-STATUS:      Login → project → scope → run (demo|scan|agent) → live BloodHound map + logs → report.
-             LLM seam wired; real recon through the chokepoint; per-project RBAC; 23/23 tests pass
-             (MVP + real-recon + LLM-agent + authz + policy-invariants), ruff clean, frontend builds,
-             engine headless, src/oscprecon untouched. Two adversarial review rounds; all findings fixed.
-ATTACH THE BRAIN:
-             set NABU_LLM_BASE_URL (+ NABU_LLM_API_KEY, NABU_LLM_MODEL) → your internal
-             OpenAI-compatible endpoint, then start a run with kind="agent". No code change.
-REMAINING (hardening/scale, not blockers): move the in-process executor onto the Arq worker for
-             multi-run scale + true per-service fan-out; a WS-path integration test; OIDC wiring;
-             cancel of a real scan's process group; artifact retention/quotas.
+BRANCH:      nabu-agent-arq (off main; PRs #1-#5 merged). This branch = Arq worker + fan-out + fixes.
+PHASE:       Body done + on the Arq worker with concurrent per-service fan-out.
+STATUS:      Login → project → scope → run (demo|scan|agent) → live BloodHound map (multiple agents
+             green at once) + logs → report. Runs execute on the Arq worker pool in prod
+             (NABU_USE_ARQ=true); in-process for dev/tests. LLM seam wired (kind=agent).
+             28/28 tests pass (incl. fan-out concurrency, arq dispatch gate, run-failure reliability,
+             authz, invariants); ruff clean; frontend builds; engine headless + untouched.
+             THREE adversarial review rounds; all confirmed findings fixed.
+ATTACH BRAIN: set NABU_LLM_BASE_URL (+ API_KEY, MODEL) → kind="agent". No code change.
+KNOWN LIMITATIONS (documented, not blockers):
+  - a worker KILLED mid-run (OOM/SIGKILL) leaves that run 'scanning' until restart — needs a
+    heartbeat + reaper to requeue (max_tries=1 by design so tools don't blindly re-run). 
+  - the engine on_line→WS log bridge has no backpressure under an extremely chatty scan.
+  - real-scan process-group cancel + Reporter.write atomicity live in the read-only engine.
+NEXT UP (optional hardening): run heartbeat/reaper; OIDC; WS-path integration test; per-agent map
+  nodes from LLM tool calls; artifact retention/quotas.
 HOW TO TEST: cd nabu-agent && PYTHONPATH=. .venv-agent/bin/python -m pytest -q -o asyncio_mode=auto
-             Full stack: docker compose up (Postgres+Redis). Deploy: see README + .env.example.
 ```
 
 ### Live-visualization requirements (owner, 2026-09-09) — build into Phase 2

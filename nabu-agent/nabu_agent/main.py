@@ -66,6 +66,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await engine.dispose()
     except Exception:  # pragma: no cover
         pass
+    try:
+        from nabu_agent import bus
+
+        await bus.close_arq_pool()
+    except Exception:  # pragma: no cover
+        pass
 
 
 def create_app() -> FastAPI:

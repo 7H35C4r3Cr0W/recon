@@ -91,5 +91,4 @@ async def run_demo(run_id: str, target: str, publish: Publish, *, step_delay: fl
     await asyncio.sleep(step_delay)
     await emit(RunEventType.TASK_UPDATED, node_id=report_node, node_state=NodeState.DONE)
     await emit(RunEventType.RUN_STATUS, node_id=run_node, node_state=NodeState.DONE, state="report_ready")
-    await emit(RunEventType.DONE, state="done")
     return "done"

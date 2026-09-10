@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     exploit_enabled: bool = False               # never wired to an agent path regardless
     autonomy: Autonomy = Autonomy.RECON_ONLY
 
+    # When True, runs execute on the Arq worker pool (production/docker); when False they run
+    # in-process in the api (dev/tests). docker-compose sets NABU_USE_ARQ=true.
+    use_arq: bool = False
+
     log_level: str = "INFO"
     log_format: str = "json"
 

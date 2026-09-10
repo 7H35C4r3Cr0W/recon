@@ -40,6 +40,18 @@ from .schemas import CatalogActionDTO, ServiceDTO, to_service_dto
 
 OnLine = Callable[[str], None] | None
 
+# creds.json read-modify-write in the classic engine is not internally locked; serialize per Profile
+# so the CONCURRENT fan-out (many enum agents on one Profile) can't lose a credential (lost update).
+# The engine is read-only to us, so the guard lives here, at the one place we write credentials.
+_CRED_LOCKS: dict[str, threading.Lock] = {}
+_CRED_REGISTRY_LOCK = threading.Lock()
+
+
+def _cred_lock(directory: object) -> threading.Lock:
+    key = str(directory)
+    with _CRED_REGISTRY_LOCK:
+        return _CRED_LOCKS.setdefault(key, threading.Lock())
+
 
 # ------------------------------------------------------------------ 1. check_alive
 
@@ -160,11 +172,12 @@ def enum_service(
     result = engine.run()
 
     creds_added = 0
-    for cred in result.creds:
-        profile.add_credential(cred)   # dedup by cred_key; does not auto-save creds beyond its write
-        creds_added += 1
-
-    Reporter(profile).write()          # refresh report.md (engine side-effect parity with CLI)
+    with _cred_lock(profile.directory):   # serialize the unguarded creds read-modify-write per Profile
+        for cred in result.creds:
+            profile.add_credential(cred)  # dedup by cred_key
+            creds_added += 1
+    # NOTE: report.md is regenerated once at the end of the run (generate_report); we do NOT write it
+    # here — concurrent enum agents writing report.md would race (the engine's write is not atomic).
     after = len(findings_mod.load_findings(profile.directory))
     gw.audit(profile, "enum", details={"service": key, "mode": mode,
                                            "as": (auth.label if auth else None)})
