@@ -16,7 +16,7 @@
 - **Stack (locked):** FastAPI (async) + Postgres + Redis + Arq workers · React + Vite + TypeScript SPA
   (live progress over WebSocket) · Docker Compose. Engine reached **only** through the read-only
   adapter seam (`nabu_agent/engine/`).
-- **Repo:** `git@github.com:7H35C4r3Cr0W/recon.git` · working branch **`nabu-agent-scaffold`**.
+- **Repo:** `git@github.com:7H35C4r3Cr0W/recon.git` · latest on **`main`** (PRs #1 scaffold, #2 Phase-2 MVP merged).
 
 ---
 
@@ -24,19 +24,18 @@
 
 ```
 DATE:        2026-09-09
-BRANCH:      nabu-agent-phase2   (Phase 0/1/4 on main via PR #1)
-PHASE:       2 — MVP thin slice  (VERTICAL SLICE WORKING + TESTED)
-DOING NOW:   demo-mode end-to-end done; wrapping the visual preview + commit
-VERIFIED:    16/16 tests pass incl. MVP integration (login→project→scope→demo run→live events→done)
-             + 3 review bugs fixed (regression-locked). Frontend builds clean (tsc strict + vite +
-             Cytoscape). Engine seam headless. sqlite+fakeredis, no docker needed for tests.
-DONE:        Phases 0,1,4; Phase 2 sub-steps 2.1–2.5, 2.7, 2.9, 2.10 (demo path).
-DEFERRED:    2.6 REAL single-target recon (_run_real is stubbed; demo path proves the pipeline+viz),
-             2.8 reports/findings router bodies (gateway funcs exist), full per-project RBAC
-             enforcement + OIDC (Phase 3/4). Cancel is best-effort in demo (real path wires the
-             engine cancel Event).
-NEXT UP:     wire _run_real via engine.tools through the chokepoint (2.6); reports/findings routers
-             (2.8); move executor onto Arq worker (Phase 3 fan-out); RBAC/OIDC hardening.
+BRANCH:      main   (PR #1 scaffold + PR #2 Phase-2 MVP both MERGED)
+PHASE:       2 — MVP thin slice: demo path WORKING + TESTED + MERGED
+DOING NOW:   (paused at a clean, tested checkpoint)
+VERIFIED:    16/16 tests pass on merged main incl. MVP integration (login→project→scope→demo run→
+             live events→done). Frontend builds clean (tsc strict + vite + cytoscape). Headless.
+DONE:        Phases 0,1,4; Phase 2 sub-steps 2.1–2.5, 2.7, 2.9, 2.10 (demo path). Live BloodHound-
+             style map + colour-coded node states + live log working. Preview: docs/live-map-demo.html.
+NEXT UP (resume here): 2.6 wire `_run_real` (executor) to engine.tools via the chokepoint for REAL
+             single-target recon; 2.8 reports/findings router bodies (gateway funcs exist); then
+             Phase 3 — move executor onto the Arq worker + agent fan-out + LLM loop; RBAC/OIDC.
+HOW TO TEST: cd nabu-agent && PYTHONPATH=. .venv-agent/bin/python -m pytest -q -o asyncio_mode=auto
+             (sqlite+fakeredis, no docker). Full stack: docker compose up (needs Postgres/Redis).
 ```
 
 ### Live-visualization requirements (owner, 2026-09-09) — build into Phase 2
