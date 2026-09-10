@@ -6,12 +6,25 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nabu_agent.auth.deps import get_current_user, require_project_member
-from nabu_agent.db.models import Project, ProjectMember, ScopeTarget, User
+from nabu_agent.auth.deps import get_current_user, require_project_member, require_project_owner
+from nabu_agent.db.models import (
+    AgentTask,
+    Artifact,
+    Checkpoint,
+    FindingIndex,
+    Project,
+    ProjectMember,
+    Run,
+    RunEvent,
+    ScopeTarget,
+    ServiceMirror,
+    User,
+)
 from nabu_agent.db.session import get_db
+from nabu_agent.engine.workspace import delete_project_workspace
 from nabu_agent.settings import get_settings
 
 router = APIRouter(tags=["projects"])
@@ -91,3 +104,35 @@ async def add_scope(project_id: str, body: ScopeBody, db: AsyncSession = Depends
     db.add(row)
     await db.commit()
     return {"id": row.id, "target": row.target, "kind": row.kind}
+
+
+_TERMINAL = ("done", "partial", "failed", "cancelled")
+
+
+@router.delete("/projects/{project_id}")
+async def delete_project(project_id: str, db: AsyncSession = Depends(get_db),
+                         _owner: str = Depends(require_project_owner)) -> dict:
+    """Delete a project: refuse while a run is active, then remove all DB rows AND the on-disk
+    workspace (its Profile folders). Owner-or-admin only."""
+    active = (await db.execute(select(Run.id).where(
+        Run.project_id == project_id, Run.state.notin_(_TERMINAL)).limit(1))).scalar_one_or_none()
+    if active is not None:
+        raise HTTPException(status_code=409, detail="cancel the active run before deleting the project")
+
+    run_ids = (await db.execute(select(Run.id).where(Run.project_id == project_id))).scalars().all()
+    if run_ids:
+        await db.execute(delete(RunEvent).where(RunEvent.run_id.in_(run_ids)))
+        await db.execute(delete(Checkpoint).where(Checkpoint.run_id.in_(run_ids)))
+        await db.execute(delete(AgentTask).where(AgentTask.run_id.in_(run_ids)))
+    await db.execute(delete(Run).where(Run.project_id == project_id))
+    await db.execute(delete(FindingIndex).where(FindingIndex.project_id == project_id))
+    await db.execute(delete(ServiceMirror).where(ServiceMirror.project_id == project_id))
+    await db.execute(delete(Artifact).where(Artifact.project_id == project_id))
+    await db.execute(delete(ScopeTarget).where(ScopeTarget.project_id == project_id))
+    await db.execute(delete(ProjectMember).where(ProjectMember.project_id == project_id))
+    await db.execute(delete(Project).where(Project.id == project_id))
+    await db.commit()
+
+    # remove the on-disk workspace (Profile folders); confined to the workspace root
+    ws = delete_project_workspace(project_id)
+    return {"deleted": True, "runs_removed": len(run_ids), "workspace": ws}

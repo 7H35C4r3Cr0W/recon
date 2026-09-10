@@ -25,6 +25,12 @@ export function ProjectDetail() {
     catch (e) { setErr(String(e)); }
   }
 
+  async function del() {
+    if (!confirm("Delete this project? This removes all its runs, findings, and on-disk recon data.")) return;
+    try { await api(`/projects/${projectId}`, { method: "DELETE" }); nav("/projects"); }
+    catch (e) { setErr(String(e)); }
+  }
+
   async function startRun(e: React.FormEvent) {
     e.preventDefault();
     try {
@@ -63,6 +69,12 @@ export function ProjectDetail() {
           <button className="btn btn-primary" type="submit">Start run ▸</button>
         </form>
         <p className="muted" style={{ fontSize: 13 }}>Opens the live map — agents light up green (active), teal (done), yellow (stuck), red (error).</p>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <button className="btn" style={{ borderColor: "var(--red)", color: "var(--red)" }} onClick={del}>
+          Delete project
+        </button>
       </div>
     </div>
   );
