@@ -24,17 +24,33 @@
 
 ```
 DATE:        2026-09-09
-BRANCH:      nabu-agent-scaffold
-PHASE:       Phases 0, 1, 4 DONE — scaffold committed + pushed + PR open
-DOING NOW:   (idle) — awaiting review
-NEXT UP:     Phase 2 (MVP thin slice) in a later session — resume at step 2.1
-PR:          https://github.com/7H35C4r3Cr0W/recon/pull/1  (commit b551866, 123 files)
+BRANCH:      nabu-agent-phase2   (Phase 0/1/4 merged to main via PR #1, commit 435ae4a)
+PHASE:       2 — MVP thin slice  (BUILDING, in order)
+DOING NOW:   Phase 2 sub-steps in order (2.1 → 2.10); test at each testable point
+NEXT UP:     step 2.1 test harness → 2.2 db → 2.3 auth → … → 2.10 integration tests
 BLOCKERS:    none
-VERIFIED:    122 files; 71 backend .py compile clean; engine seam imports against REAL oscprecon
-             with PySide6 NOT loaded (headless holds); 12/12 policy-invariant + unit tests PASS;
-             docker-compose + seccomp + CI YAML valid.
-NOT DONE:    manager HTML, GitHub push; then MVP wiring (Phase 2) + hardening (Phase 3) later.
+VERIFIED:    Scaffold empirically green in `.venv-agent`: all 71 modules import, FastAPI app builds
+             (17 routes), 12/12 tests pass, headless (no Qt). PR #1 merged to main.
+DONE:        Phases 0, 1, 4 (design, scaffold, GitHub push+merge).
+NOT DONE:    Phase 2 bodies (auth/projects/runs/orchestration/WS/frontend live map) + Phase 3 fan-out.
 ```
+
+### Live-visualization requirements (owner, 2026-09-09) — build into Phase 2
+The run view is a **BloodHound-style flow-chart map** (like the classic Nabu graph), showing the
+**agents in motion**, with a **live action log** and **color-coded node states** updated in real time
+and persisted onto the map so anyone watching sees it live:
+- **glowing green** = active / where the run currently is · **yellow** = stuck/blocked/needs-approval
+  · **red** = error/failed · (plus: grey = queued, blue/teal = done).
+- Nodes = the run graph: target → discovered services → per-service agents → findings → report; edges
+  show hand-offs. As agents transition (`task.updated`, `finding.added`, `run.status`), the map
+  re-colours the node live and the log pane appends the action line.
+- Implemented with **Cytoscape.js** in the SPA (same library the desktop GUI vendored), driven by the
+  canonical WebSocket `Event` envelope. The state colour is carried in `event.data.node_state`; the
+  frontend keeps a node-state map keyed by `task_id`/`node_id` and restyles on each event.
+- Login → **project page** is where all the work happens (create/scope/run/watch/report on one page).
+This extends sub-steps **2.5–2.9** (event model carries node state; `ws/hub` streams it; the frontend
+RunLive page renders the Cytoscape map + live log). See DESIGN §6.1 (event envelope) — add
+`node_state` to `task.*`/`run.status` `data`.
 
 **How to resume:** read this file → check the last ✅ step → continue at the first ☐. Design inputs
 are in `docs/` (`ENGINE_INTEGRATION.md` is authoritative for how to call the engine; `DESIGN.md` for
