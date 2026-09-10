@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nabu_agent import bus
+from nabu_agent import audit, bus
 from nabu_agent.auth.deps import get_current_user, require_project_member, require_run_access
 from nabu_agent.db.models import Checkpoint, Run, ScopeTarget, User
 from nabu_agent.db.session import get_db
@@ -61,6 +61,9 @@ async def start_run(project_id: str, body: RunBody, db: AsyncSession = Depends(g
         run.error = f"failed to start: {exc}"
         await db.commit()
         raise HTTPException(status_code=503, detail="could not start run (worker/queue unavailable)") from exc
+    await audit.record(actor_user_id=user.id, action=audit.RUN_STARTED, object_type="run",
+                       object_id=run.id, project_id=project_id,
+                       details={"target": body.target, "kind": body.kind})
     return {"run_id": run.id, "state": "queued", "target": body.target, "kind": body.kind}
 
 
@@ -86,11 +89,14 @@ async def run_events(after: int = 0, db: AsyncSession = Depends(get_db),
 
 @router.post("/runs/{run_id}/cancel")
 async def cancel_run(db: AsyncSession = Depends(get_db),
+                     user: User = Depends(get_current_user),
                      run: Run = Depends(require_run_access)) -> dict:
     await bus.request_cancel(run.id)
     if run.state not in {"done", "failed", "cancelled", "partial"}:
         run.cancel_requested = True
         await db.commit()
+    await audit.record(actor_user_id=user.id, action=audit.RUN_CANCELLED, object_type="run",
+                       object_id=run.id, project_id=run.project_id)
     return {"ok": True}
 
 
@@ -130,6 +136,9 @@ async def _decide_checkpoint(cp_id: str, run: Run, user: User, db: AsyncSession,
     cp.approved_by = user.id
     cp.approved_at = datetime.now(UTC)
     await db.commit()
+    await audit.record(actor_user_id=user.id, action=audit.CHECKPOINT_DECIDED, object_type="checkpoint",
+                       object_id=cp.id, project_id=run.project_id,
+                       details={"status": status, "kind": cp.kind})
     return {"ok": True, "status": status, "checkpoint_id": cp.id}
 
 

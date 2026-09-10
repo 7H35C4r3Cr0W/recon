@@ -4,12 +4,14 @@ import { api } from "../api/client";
 
 interface ScopeT { id: string; target: string; kind: string; }
 interface RunT { id: string; state: string; target: string; kind: string; }
+interface ActT { ts: string | null; action: string; result: string; actor_user_id: string | null; }
 
 export function ProjectDetail() {
   const { projectId } = useParams();
   const nav = useNavigate();
   const [scope, setScope] = useState<ScopeT[]>([]);
   const [runs, setRuns] = useState<RunT[]>([]);
+  const [activity, setActivity] = useState<ActT[]>([]);
   const [target, setTarget] = useState("");
   const [runTarget, setRunTarget] = useState("");
   const [kind, setKind] = useState("demo");
@@ -19,6 +21,7 @@ export function ProjectDetail() {
     try {
       setScope((await api<{ scope: ScopeT[] }>(`/projects/${projectId}/scope`)).scope);
       setRuns((await api<{ runs: RunT[] }>(`/projects/${projectId}/runs`)).runs);
+      setActivity((await api<{ activity: ActT[] }>(`/projects/${projectId}/activity`)).activity ?? []);
     } catch (e) { setErr(String(e)); }
   }
   useEffect(() => { load(); }, [projectId]);
@@ -92,6 +95,23 @@ export function ProjectDetail() {
                   <span className="mono">{r.target}</span>
                 </span>
                 <Link className="btn" to={`/projects/${projectId}/runs/${r.id}`}>Open map ▸</Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <h3>Activity</h3>
+        {activity.length === 0 ? (
+          <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>No activity recorded yet.</p>
+        ) : (
+          <ul className="list" style={{ marginTop: 4 }}>
+            {activity.slice(0, 12).map((a, i) => (
+              <li key={i} className="row" style={{ gap: 8, fontFamily: "var(--mono)", fontSize: 12 }}>
+                <span className="muted" style={{ minWidth: 128 }}>{a.ts ? new Date(a.ts).toLocaleString() : ""}</span>
+                <span className={"pill " + (a.result === "denied" ? "st-failed" : "")}>{a.action}</span>
+                <span className="muted">{a.actor_user_id ? a.actor_user_id.slice(0, 8) : "—"}</span>
               </li>
             ))}
           </ul>
