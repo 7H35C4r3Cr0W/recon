@@ -232,4 +232,5 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
 - 5.6 ✅ Help guide page (what it is, getting started, run kinds, map colours, LLM attach, SSO, safety).
 - Frontend builds clean (tsc strict + vite + theme). 40 backend tests.
 - FE tests ✅ Vitest + React Testing Library: 12 tests; CI runs `npm test`.
-- Richer map edges ✅ labeled hand-off edges: planner→enum (dispatch), enum→finding (found), enum→research (feeds), all agents→report (feeds); frontend renders labeled edges; demo choreography too. test_agent_run asserts the edges.
+- Richer map edges ✅ labeled hand-off edges (planner→enum, enum→finding/research, agents→report).
+- Log backpressure ✅ LogPump: engine on_line lines buffered in a bounded deque (cap 2000) + drained in ~250ms batches as one log.line event with a 'suppressed' overflow count (no per-line coroutine flood). Frontend renders batched lines + a suppressed notice. Unit-tested. 42 backend + 12 FE tests.
