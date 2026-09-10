@@ -143,24 +143,39 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
                       "kind": "service", "label": f"{s['port']}/{s.get('service') or s.get('proto')}",
                       "parent": host_node, "product": s.get("product", "")})
 
-    # per-service enum agents
-    partial = False
-    for s in services:
+    # per-service enum agents — FAN OUT: one agent per service, concurrent (bounded), so several
+    # nodes are 'active' (green) on the live map at once, then join. Blocking engine calls run in
+    # worker threads; the per-run _emit lock keeps the event stream ordered.
+    from nabu_agent.orchestration.limits import RunLimits
+
+    limits = RunLimits.from_settings(len(services) or 1)
+    sem = asyncio.Semaphore(max(1, limits.max_concurrent_service_agents))
+    partial_flags: list[bool] = []
+
+    async def _enum_one(s: dict) -> None:
         svc_node = f"svc-{target}-{s['port']}-{s.get('proto', 'tcp')}"
         agent_node = f"agent-enum-{s['port']}"
         service_name = s.get("service") or s.get("proto") or ""
-        await publish(RunEventType.TASK_CREATED, {"node_id": agent_node, "node_state": NodeState.ACTIVE.value,
-                      "kind": "agent", "role": "enum", "label": f"enum {service_name}", "parent": svc_node})
-        try:
-            await asyncio.to_thread(etools.enum_service, profile, service_name, "full",
-                                    port=int(s["port"]), on_line=on_line, cancel=cancel_event)
-            await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.DONE.value})
-        except Exception as exc:  # a blocked/missing enum marks the node stuck; the run continues (partial)
-            partial = True
-            await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.STUCK.value})
-            await publish(RunEventType.LOG_LINE, {"line": f"[enum] {service_name}:{s['port']} — {exc}"})
-        if cancel_event.is_set():
-            return "cancelled"
+        async with sem:
+            if cancel_event.is_set():
+                await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.STUCK.value})
+                return
+            await publish(RunEventType.TASK_CREATED, {"node_id": agent_node, "node_state": NodeState.ACTIVE.value,
+                          "kind": "agent", "role": "enum", "label": f"enum {service_name}", "parent": svc_node})
+            try:
+                await asyncio.to_thread(etools.enum_service, profile, service_name, "full",
+                                        port=int(s["port"]), on_line=on_line, cancel=cancel_event)
+                await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.DONE.value})
+            except Exception as exc:  # a blocked/missing enum marks the node stuck; the run continues (partial)
+                partial_flags.append(True)
+                await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.STUCK.value})
+                await publish(RunEventType.LOG_LINE, {"line": f"[enum] {service_name}:{s['port']} — {exc}"})
+
+    await asyncio.gather(*[_enum_one(s) for s in services])
+    partial = bool(partial_flags)
+    if cancel_event.is_set():
+        await publish(RunEventType.DONE, {"state": "cancelled"})
+        return "cancelled"
 
     # findings → map
     for i, f in enumerate(await asyncio.to_thread(ef.load_findings, profile.directory)):
@@ -181,9 +196,23 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
     return "partial" if partial else "done"
 
 
+async def start(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
+    """Start a run. In production (settings.use_arq) the API just ENQUEUES the supervisor job onto the
+    Arq worker pool and returns immediately; in dev/tests it runs in-process. Either way the run
+    driver (execute_run) fans out per-service agents concurrently and streams the same events."""
+    from nabu_agent.settings import get_settings
+
+    if get_settings().use_arq:
+        from nabu_agent import bus
+
+        await bus.enqueue_run(run_id, target, kind, project_id or "unknown")
+        return
+    launch(run_id, target, kind, project_id=project_id)
+
+
 def launch(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
-    """Fire-and-forget the executor as an asyncio task in the api process (MVP). Phase 3 moves this
-    onto the Arq worker pool for multi-run scale + fan-out."""
+    """Run the driver in-process (dev/tests, or when Arq is disabled). A strong reference is retained
+    so the event loop can't GC/cancel the task mid-run."""
     task = asyncio.create_task(execute_run(run_id, target, kind, project_id=project_id))
     _RUNNING.add(task)
     task.add_done_callback(_RUNNING.discard)

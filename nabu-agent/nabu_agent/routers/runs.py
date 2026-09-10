@@ -53,7 +53,7 @@ async def start_run(project_id: str, body: RunBody, db: AsyncSession = Depends(g
               requested_by=user.id)
     db.add(run)
     await db.commit()
-    runs_svc.launch(run.id, body.target, body.kind, project_id=project_id)
+    await runs_svc.start(run.id, body.target, body.kind, project_id=project_id)
     return {"run_id": run.id, "state": "queued", "target": body.target, "kind": body.kind}
 
 

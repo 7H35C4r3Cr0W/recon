@@ -86,3 +86,28 @@ async def request_cancel(run_id: str) -> None:
 
 async def is_cancelled(run_id: str) -> bool:
     return bool(await get_redis().get(cancel_key(run_id)))
+
+
+# --- Arq queue (production run execution on the worker pool) ---
+_arq_pool: Any = None
+
+
+async def get_arq_pool() -> Any:
+    """Cached Arq redis pool for enqueuing run jobs onto the worker."""
+    global _arq_pool
+    if _arq_pool is None:
+        from arq import create_pool
+        from arq.connections import RedisSettings
+        _arq_pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
+    return _arq_pool
+
+
+def set_arq_pool(pool: Any) -> None:
+    global _arq_pool
+    _arq_pool = pool
+
+
+async def enqueue_run(run_id: str, target: str, kind: str, project_id: str) -> None:
+    """Enqueue the supervisor job for a run onto the Arq worker pool."""
+    pool = await get_arq_pool()
+    await pool.enqueue_job("supervise_run", run_id, target, kind, project_id, _job_id=f"run:{run_id}")
