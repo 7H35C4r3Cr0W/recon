@@ -206,7 +206,7 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
 - [x] **5.1 WS-path integration test** — a real WebSocket client drives `/ws/runs/{id}` end-to-end
   (auth handshake, replay-by-seq, live tail, terminal close) using Starlette's WS test client on the
   in-process app + a demo run. Closes the last review-flagged test gap.
-- [ ] **5.2 Wire up ALL agents (multi-role fan-out)** — `_run_agent` becomes: scan → **planner** →
+- [x] **5.2 Wire up ALL agents (multi-role fan-out)** — `_run_agent` becomes: scan → **planner** →
   fan out **enum agents** (per service, concurrent) → **research agents** (per notable service/finding)
   → **reporter**, each an `AgentRunner` streaming its own map node + log. Bounded by RunLimits; each
   role's node goes green→teal (or yellow/red). Falls back cleanly if no LLM configured. Tests with a
@@ -224,4 +224,5 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
   run recon, the run kinds (demo/scan/agent), the live map colours, attaching the LLM, SSO, safety.
 
 ### Progress log (append one line per completed step)
-- 5.1 ✅ WS-path integration test (httpx-ws): auth-reject, live-tail→done, reconnect-to-finished terminates. 38 tests.
+- 5.1 ✅ WS-path integration test (httpx-ws): auth-reject, live-tail→done, reconnect-to-finished terminates.
+- 5.2 ✅ full agent roster wired: `_run_agent` = scan → planner → enum agents (per svc, concurrent) → research agents (per svc) → reporter; each an AgentRunner with its own map node. test_agent_run asserts all role nodes appear. 39 tests.
