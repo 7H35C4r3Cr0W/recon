@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api/client";
 
 // MVP local login (Phase 2 wires the session cookie + OIDC button).
@@ -6,6 +6,8 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState("");
+  const [oidc, setOidc] = useState(false);
+  useEffect(() => { api<{ oidc: boolean }>("/auth/providers").then((p) => setOidc(p.oidc)).catch(() => {}); }, []);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     try {
@@ -23,6 +25,11 @@ export function Login() {
         <input placeholder="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         <button type="submit">Sign in</button>
       </form>
+      {oidc && (
+        <p style={{ marginTop: 16 }}>
+          <a href="/api/auth/oidc/login"><button type="button">Sign in with SSO</button></a>
+        </p>
+      )}
       {msg && <p style={{ color: "crimson" }}>{msg}</p>}
     </main>
   );

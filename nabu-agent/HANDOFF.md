@@ -33,12 +33,13 @@ STATUS:      Login → project → scope → run (demo|scan|agent) → live Bloo
              authz, invariants); ruff clean; frontend builds; engine headless + untouched.
              THREE adversarial review rounds; all confirmed findings fixed. Heartbeat + stale-run REAPER
              added (killed runs are marked failed + emit a terminal event); app-wide error handler +
-             structured error logs added.
+             structured error logs added. OIDC/SSO login wired (Authlib authorization-code + JIT
+             provisioning; local login still works; SSO button on the login page).
 ATTACH BRAIN: set NABU_LLM_BASE_URL (+ API_KEY, MODEL) → kind="agent". No code change.
 KNOWN LIMITATIONS (documented, not blockers):
   - the engine on_line→WS log bridge has no backpressure under an extremely chatty scan.
   - real-scan process-group cancel + Reporter.write atomicity live in the read-only engine.
-NEXT UP (optional hardening): run heartbeat/reaper; OIDC; WS-path integration test; per-agent map
+NEXT UP (optional hardening): WS-path integration test; per-agent map
   nodes from LLM tool calls; artifact retention/quotas.
 HOW TO TEST: cd nabu-agent && PYTHONPATH=. .venv-agent/bin/python -m pytest -q -o asyncio_mode=auto
 ```

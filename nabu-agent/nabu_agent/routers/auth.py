@@ -2,15 +2,17 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nabu_agent.auth import sessions
+from nabu_agent.auth import oidc, sessions
 from nabu_agent.auth.deps import get_current_user
 from nabu_agent.auth.providers import verify_password
 from nabu_agent.db.models import User
 from nabu_agent.db.session import get_db
+from nabu_agent.db.session import get_db as _get_db
 from nabu_agent.settings import get_settings
 
 router = APIRouter(tags=["auth"])
@@ -47,3 +49,42 @@ async def logout(request: Request, response: Response) -> dict:
 @router.get("/auth/me")
 async def me(user: User = Depends(get_current_user)) -> dict:
     return {"id": user.id, "email": user.email, "display_name": user.display_name, "role": user.role}
+
+
+def _set_session_cookie(response: Response, sid: str) -> None:
+    s = get_settings()
+    response.set_cookie(sessions.COOKIE_NAME, sid, httponly=True, samesite="lax",
+                        secure=s.env == "production", max_age=s.session_ttl_min * 60)
+
+
+@router.get("/auth/oidc/login")
+async def oidc_login(request: Request):
+    """Redirect to the IdP's authorize endpoint. 404 if OIDC isn't configured."""
+    if not oidc.is_configured():
+        raise HTTPException(status_code=404, detail="OIDC is not configured")
+    s = get_settings()
+    redirect_uri = s.oidc_redirect_url or str(request.url_for("oidc_callback"))
+    return await oidc.client().authorize_redirect(request, redirect_uri)
+
+
+@router.get("/auth/oidc/callback", name="oidc_callback")
+async def oidc_callback(request: Request, db: AsyncSession = Depends(_get_db)):
+    """Exchange the code, validate the ID token, JIT-provision the user, start a session, redirect
+    to the SPA. Any failure is a 401 (never a stack trace)."""
+    if not oidc.is_configured():
+        raise HTTPException(status_code=404, detail="OIDC is not configured")
+    try:
+        token = await oidc.client().authorize_access_token(request)
+    except Exception as exc:  # bad state/code/nonce, token exchange failure, etc.
+        raise HTTPException(status_code=401, detail="OIDC login failed") from exc
+    claims = token.get("userinfo") or {}
+    issuer = claims.get("iss") or get_settings().oidc_issuer
+    subject = claims.get("sub")
+    if not subject:
+        raise HTTPException(status_code=401, detail="OIDC token missing subject")
+    user = await oidc.provision_user(db, issuer=issuer, subject=subject,
+                                     email=claims.get("email", ""), name=claims.get("name", ""))
+    sid = await sessions.create_session(user.id)
+    response = RedirectResponse(url="/", status_code=303)
+    _set_session_cookie(response, sid)
+    return response
