@@ -8,34 +8,15 @@ import asyncio
 import pytest
 from nabu_agent.services import runs as runs_svc
 
+from tests._mocks import install_recon_mocks
+
 pytestmark = pytest.mark.asyncio
 
 HOSTS = [f"10.10.10.{i}" for i in range(1, 21)]   # 20 live hosts > threshold (16)
 
 
 def _install(monkeypatch, tmp_path, live_hosts):
-    from types import SimpleNamespace
-
-    import oscprecon.findings as ef
-    from nabu_agent.engine import tools as etools
-    from nabu_agent.engine import workspace as ews
-
-    prof = SimpleNamespace(directory=tmp_path, profile_name="p",
-                           target=SimpleNamespace(ip="10.10.10.5", hostname=None), discovered_services=[])
-    monkeypatch.setattr(ews, "workspace_for", lambda *a, **k: SimpleNamespace(open_or_create=lambda: prof))
-
-    def _alive(p, t=None, **k):
-        if t and "/" in t:
-            return {"up": True, "count": len(live_hosts), "hosts": list(live_hosts)}
-        return {"up": True, "count": 1, "hosts": [t]}
-    monkeypatch.setattr(etools, "check_alive", _alive)
-    monkeypatch.setattr(etools, "run_scan", lambda p, sp="default", **k: {"services": []})
-    monkeypatch.setattr(etools, "list_discovered_services",
-                        lambda p: {"services": [{"port": 445, "proto": "tcp", "service": "smb"}]})
-    monkeypatch.setattr(etools, "enum_service", lambda p, s, m="full", **k: {"service": s, "findings_added": 0})
-    monkeypatch.setattr(etools, "generate_report", lambda p, **k: {"markdown": "# r"})
-    monkeypatch.setattr(ef, "load_findings", lambda d: [])
-
+    install_recon_mocks(monkeypatch, tmp_path, live_hosts=live_hosts)
 
 async def _start_cidr_run(client):
     await client.post("/api/auth/login", json={"email": "admin@nabu.local", "password": "changeme"})

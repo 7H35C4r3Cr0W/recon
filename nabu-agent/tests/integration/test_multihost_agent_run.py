@@ -9,35 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from tests._mocks import SmartProvider as _SmartProvider
+
 pytestmark = pytest.mark.asyncio
-
-
-class _SmartProvider:
-    """Stateless per-call fake: finish once a tool result is in the conversation, else call the first
-    offered tool with minimal valid args."""
-    model = "fake-gpt"
-    _ARGS = {"enum_service": '{"service":"smb","port":445}',
-             "catalog_actions_for": '{"service":"smb"}',
-             "research_finding": '{"finding":{"service":"smb","port":445}}'}
-
-    async def chat(self, request):
-        from nabu_agent.llm.base import ChatResponse, ToolCall, Usage
-        if any(getattr(m.role, "value", m.role) == "tool" for m in request.messages):
-            return ChatResponse(content="assessment complete.", tool_calls=[], finish_reason="stop",
-                                usage=Usage(total_tokens=10), model=self.model)
-        if request.tools:
-            name = request.tools[0].name
-            return ChatResponse(content="", tool_calls=[ToolCall(id="c", name=name,
-                                arguments=self._ARGS.get(name, "{}"))],
-                                finish_reason="tool_calls", usage=Usage(total_tokens=10), model=self.model)
-        return ChatResponse(content="done", tool_calls=[], finish_reason="stop",
-                            usage=Usage(total_tokens=5), model=self.model)
-
-    def stream(self, request):
-        raise NotImplementedError
-
-    def count_tokens(self, messages, tools=()):
-        return 10
 
 
 def _setup(monkeypatch, tmp_path, live_hosts):
