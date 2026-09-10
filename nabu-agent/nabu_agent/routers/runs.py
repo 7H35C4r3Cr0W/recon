@@ -5,6 +5,7 @@ require membership of the run's project (closes the IDOR gaps)."""
 from __future__ import annotations
 
 import ipaddress
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -50,7 +51,7 @@ async def start_run(project_id: str, body: RunBody, db: AsyncSession = Depends(g
         # the authorized-scope-only gate — ScopeViolation is mapped to 403 + the typed error envelope
         raise ScopeViolation(f"{body.target} is outside the project scope")
     run = Run(project_id=project_id, kind=body.kind, target=body.target, state="queued",
-              requested_by=user.id)
+              requested_by=user.id, heartbeat_at=datetime.now(UTC))
     db.add(run)
     await db.commit()
     try:

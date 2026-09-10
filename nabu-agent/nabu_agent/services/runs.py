@@ -9,8 +9,10 @@ import asyncio
 import contextlib
 import threading
 import time
+from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from sqlalchemy import select
 
 from nabu_agent import bus
@@ -18,6 +20,8 @@ from nabu_agent.db.models import Run, RunEvent
 from nabu_agent.db.session import sessionmaker
 from nabu_agent.events.schema import NodeState, RunEventType, make_event
 from nabu_agent.orchestration.executor import run_demo
+
+_log = structlog.get_logger("nabu_agent.runs")
 
 # Strong refs to in-flight driver tasks so the event loop can't GC/cancel a run mid-execution
 # (a bare create_task is only weakly referenced — caught in review).
@@ -50,6 +54,27 @@ async def _emit(run_id: str, type_: RunEventType, data: dict[str, Any]) -> None:
         await bus.publish_event(run_id, ev.to_json())
 
 
+async def _touch_heartbeat(run_id: str) -> None:
+    """Stamp the run's heartbeat so the reaper knows the worker is alive. Best-effort."""
+    from sqlalchemy import update
+    with contextlib.suppress(Exception):
+        async with sessionmaker()() as db:
+            await db.execute(update(Run).where(Run.id == run_id).values(heartbeat_at=datetime.now(UTC)))
+            await db.commit()
+
+
+async def _heartbeat_loop(run_id: str, cancel_event: threading.Event, period_s: float = 10.0) -> None:
+    """Beat every ~10s while the run executes; stops when the run ends (cancel_event set)."""
+    try:
+        while not cancel_event.is_set():
+            await _touch_heartbeat(run_id)
+            await asyncio.sleep(period_s)
+    except asyncio.CancelledError:
+        pass
+    except Exception:  # never let a heartbeat failure affect the run
+        _log.warning("heartbeat-loop-error", run_id=run_id, exc_info=True)
+
+
 async def _set_state(run_id: str, state: str) -> None:
     async with sessionmaker()() as db:
         run = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one_or_none()
@@ -79,7 +104,9 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
             pass
 
     await _set_state(run_id, "scanning")
+    await _touch_heartbeat(run_id)
     watcher = asyncio.create_task(watch_cancel())
+    heart = asyncio.create_task(_heartbeat_loop(run_id, cancel_event))
     final = "failed"
     try:
         try:
@@ -93,9 +120,12 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
                                         cancel_event=cancel_event)
         except asyncio.CancelledError:
             final = "cancelled"
+            _log.warning("run-cancelled", run_id=run_id, kind=kind)
             raise
         except Exception as exc:  # surface + persist the error live; never leave a run wedged
-            await publish(RunEventType.ERROR, {"message": str(exc)})
+            _log.error("run-error", run_id=run_id, kind=kind, target=target, error=str(exc), exc_info=True)
+            with contextlib.suppress(Exception):
+                await publish(RunEventType.ERROR, {"message": str(exc)})
             final = "failed"
     finally:
         # exactly ONE terminal event on EVERY path (success/error/cancel/no-LLM) so the live WS
@@ -106,6 +136,7 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
             await _emit(run_id, RunEventType.DONE, {"state": final})
         cancel_event.set()
         watcher.cancel()
+        heart.cancel()
         _EMIT_LOCKS.pop(run_id, None)
 
 async def _run_real(run_id: str, target: str, publish, *, project_id: str,

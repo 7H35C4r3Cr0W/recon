@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # When True, runs execute on the Arq worker pool (production/docker); when False they run
     # in-process in the api (dev/tests). docker-compose sets NABU_USE_ARQ=true.
     use_arq: bool = False
+    # A non-terminal run whose heartbeat is older than this is reaped (worker likely died). The
+    # executor beats every ~10s, so this is many missed beats of margin.
+    run_stale_after_s: int = 120
 
     log_level: str = "INFO"
     log_format: str = "json"
