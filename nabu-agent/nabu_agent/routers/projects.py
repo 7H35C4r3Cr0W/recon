@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nabu_agent import audit
 from nabu_agent.auth.deps import get_current_user, require_project_member, require_project_owner
 from nabu_agent.db.models import (
     AgentTask,
@@ -56,6 +57,8 @@ async def create_project(body: ProjectBody, db: AsyncSession = Depends(get_db),
     await db.flush()
     db.add(ProjectMember(project_id=proj.id, user_id=user.id, role="owner"))
     await db.commit()
+    await audit.record(actor_user_id=user.id, action=audit.PROJECT_CREATED, object_type="project",
+                       object_id=proj.id, project_id=proj.id, details={"name": proj.display_name})
     return {"id": proj.id, "slug": proj.slug, "display_name": proj.display_name}
 
 
@@ -103,6 +106,8 @@ async def add_scope(project_id: str, body: ScopeBody, db: AsyncSession = Depends
                       source="manual", added_by=user.id)
     db.add(row)
     await db.commit()
+    await audit.record(actor_user_id=user.id, action=audit.SCOPE_ADDED, object_type="scope",
+                       object_id=row.id, project_id=project_id, details={"target": row.target})
     return {"id": row.id, "target": row.target, "kind": row.kind}
 
 
@@ -111,6 +116,7 @@ _TERMINAL = ("done", "partial", "failed", "cancelled")
 
 @router.delete("/projects/{project_id}")
 async def delete_project(project_id: str, db: AsyncSession = Depends(get_db),
+                         user: User = Depends(get_current_user),
                          _owner: str = Depends(require_project_owner)) -> dict:
     """Delete a project: refuse while a run is active, then remove all DB rows AND the on-disk
     workspace (its Profile folders). Owner-or-admin only."""
@@ -135,4 +141,6 @@ async def delete_project(project_id: str, db: AsyncSession = Depends(get_db),
 
     # remove the on-disk workspace (Profile folders); confined to the workspace root
     ws = delete_project_workspace(project_id)
+    await audit.record(actor_user_id=user.id, action=audit.PROJECT_DELETED, object_type="project",
+                       object_id=project_id, project_id=project_id, details={"runs_removed": len(run_ids)})
     return {"deleted": True, "runs_removed": len(run_ids), "workspace": ws}

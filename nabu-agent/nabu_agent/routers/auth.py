@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nabu_agent import audit
 from nabu_agent.auth import oidc, sessions
 from nabu_agent.auth.deps import get_current_user
 from nabu_agent.auth.providers import verify_password
@@ -29,20 +30,29 @@ async def providers() -> dict:
 
 
 @router.post("/auth/login")
-async def login(body: LoginBody, response: Response, db: AsyncSession = Depends(get_db)) -> dict:
+async def login(body: LoginBody, request: Request, response: Response,
+                db: AsyncSession = Depends(get_db)) -> dict:
+    ip = request.client.host if request.client else None
     user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if user is None or not user.password_hash or not verify_password(user.password_hash, body.password):
+        await audit.record(actor_user_id=(user.id if user else None), action=audit.LOGIN_FAILED,
+                           result="denied", actor_ip=ip, details={"email": body.email})
         raise HTTPException(status_code=401, detail="invalid credentials")
     sid = await sessions.create_session(user.id)
     response.set_cookie(sessions.COOKIE_NAME, sid, httponly=True, samesite="strict",
                         secure=get_settings().env == "production", max_age=get_settings().session_ttl_min * 60)
+    await audit.record(actor_user_id=user.id, action=audit.LOGIN, actor_ip=ip)
     return {"id": user.id, "email": user.email, "display_name": user.display_name, "role": user.role}
 
 
 @router.post("/auth/logout")
 async def logout(request: Request, response: Response) -> dict:
-    await sessions.destroy_session(request.cookies.get(sessions.COOKIE_NAME))
+    sid = request.cookies.get(sessions.COOKIE_NAME)
+    uid = await sessions.resolve_session(sid)
+    await sessions.destroy_session(sid)
     response.delete_cookie(sessions.COOKIE_NAME)
+    await audit.record(actor_user_id=uid, action=audit.LOGOUT,
+                       actor_ip=request.client.host if request.client else None)
     return {"ok": True}
 
 
