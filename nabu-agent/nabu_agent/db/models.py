@@ -113,7 +113,7 @@ class AgentTask(Base):
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
     parent_task_id: Mapped[str | None] = mapped_column(ForeignKey("agent_tasks.id"), nullable=True)
     arq_job_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    role: Mapped[str] = mapped_column(String(12))  # recon|enum|vuln|research|writer|attack
+    role: Mapped[str] = mapped_column(String(12))  # planner|enum_writer|research|reporter (agent roles; never "attack")
     host: Mapped[str | None] = mapped_column(String(120), nullable=True)
     port: Mapped[int | None] = mapped_column(Integer, nullable=True)
     proto: Mapped[str | None] = mapped_column(String(4), nullable=True)
@@ -135,7 +135,7 @@ class Checkpoint(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), index=True)
     task_id: Mapped[str | None] = mapped_column(ForeignKey("agent_tasks.id"), nullable=True)
-    kind: Mapped[str] = mapped_column(String(8))  # spray | exploit
+    kind: Mapped[str] = mapped_column(String(8))  # hosts (fan-out approval) | spray | exploit
     status: Mapped[str] = mapped_column(String(10), default="proposed")
     target: Mapped[str] = mapped_column(String(120))
     action_id: Mapped[str] = mapped_column(String(120))

@@ -43,6 +43,7 @@ export function Shell() {
         </Link>
         <Link to="/projects" className={on("/projects") ? "on" : ""}><span className="ic">▤</span> Projects</Link>
         <Link to="/help" className={on("/help") ? "on" : ""}><span className="ic">?</span> Help</Link>
+        <Link to="/health" className={on("/health") ? "on" : ""}><span className="ic">✧</span> Health</Link>
         <div className="grow" />
         <div className="navlabel" style={{ opacity: .7 }}>v0.1 · dark</div>
       </nav>

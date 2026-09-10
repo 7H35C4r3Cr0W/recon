@@ -57,8 +57,8 @@ code,.mono{font-family:var(--mono)}
 /* primitives */
 .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
 .card h3{font-size:13.5px;margin:0 0 10px;color:var(--ink-2);letter-spacing:.01em}
-a.card,.card.clickable{transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease}
-a.card:hover,.card.clickable:hover{transform:translateY(-2px);border-color:var(--line-2);box-shadow:var(--shadow),var(--glow);text-decoration:none}
+a.card{transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease}
+a.card:hover{transform:translateY(-2px);border-color:var(--line-2);box-shadow:var(--shadow),var(--glow);text-decoration:none}
 .row{display:flex;gap:10px;align-items:center}
 .stack{display:flex;flex-direction:column;gap:10px}
 .input,.select{background:var(--sunk);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px;color:var(--ink);font-family:var(--mono);font-size:13px;min-width:0;transition:border-color .12s ease,box-shadow .12s ease}
@@ -95,7 +95,6 @@ kbd{font-family:var(--mono);background:var(--sunk);border:1px solid var(--line-2
 .hero-brand .dot{width:15px;height:15px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 18%,transparent),0 0 22px var(--accent);animation:pulse 2.4s ease-in-out infinite}
 .hero-tag{color:var(--ink-2);font-family:var(--mono);font-size:13px;margin-top:-10px;letter-spacing:.02em}
 .hero .card{width:340px;max-width:92vw;box-shadow:var(--shadow),0 0 40px color-mix(in srgb,var(--accent) 14%,transparent)}
-.centerpane{max-width:380px;margin:8vh auto 0;text-align:left}
 
 /* report / outputs tables */
 .rpt-table{border-collapse:collapse;width:100%;font-size:13px}

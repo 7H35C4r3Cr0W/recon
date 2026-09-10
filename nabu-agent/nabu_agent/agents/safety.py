@@ -4,19 +4,21 @@ This is defence-in-depth in CODE (the system-prompt preamble is only advisory). 
 call the runner proposes is dispatched, the gate enforces:
 
   * **Per-role tool allowlist** — an agent may only call the tools its role is granted.
-  * **Absolute exploit ban** — any tool call carrying an ``exploit``-shaped argument is BLOCKED
-    outright; the recon tools do not expose one, so this catches a hallucinated/injected attempt.
-  * **Scope-lock** — target arguments are validated + confirmed in scope via the single
-    ``shell_gateway.assert_in_scope`` (no second implementation).
-  * **Spray double-gate** — a spray-shaped proposal never runs inline; it is turned into a
-    ``needs_approval`` outcome (a Checkpoint proposal), never executed by an agent.
+  * **Absolute exploit/spray ban** — any tool call carrying an ``exploit``- or ``spray``-shaped
+    argument is BLOCKED outright (raises ``AutonomyViolation``); the recon tools do not expose one,
+    so this catches a hallucinated/injected attempt. Agents never execute attacks — full stop.
+
+Scope-lock is NOT applied here: the LLM cannot set a target (the tool schemas expose no host/target
+field — the run's resolved, already-in-scope host is passed by the dispatcher), and the engine tools
+re-assert scope via ``shell_gateway.assert_in_scope`` before ``shell.run``. This gate is the
+tool-allowlist + attack-argument backstop, not the scope authority.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from nabu_agent.engine.errors import AutonomyViolation, ScopeViolation
+from nabu_agent.engine.errors import AutonomyViolation
 
 # argument names that must never appear in an agent-proposed tool call
 _BANNED_ARG_TOKENS = {"exploit", "spray"}
@@ -26,7 +28,6 @@ _BANNED_ARG_TOKENS = {"exploit", "spray"}
 class GateResult:
     allowed: bool
     reason: str = ""
-    needs_approval: bool = False
 
 
 class SafetyGate:
@@ -42,12 +43,3 @@ class SafetyGate:
                 # An agent tried to set a gate flag — the autonomy boundary. Hard block.
                 raise AutonomyViolation(f"agent attempted to set {key}=True (blocked by SafetyGate)")
         return GateResult(True)
-
-    @staticmethod
-    def assert_scope(profile, target: str, allowlist=None) -> str:
-        """Delegate to the ONE scope function — never a second implementation."""
-        from nabu_agent.engine import shell_gateway
-        try:
-            return shell_gateway.assert_in_scope(profile, target, allowlist=allowlist)
-        except ScopeViolation:
-            raise

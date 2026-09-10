@@ -265,6 +265,37 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   cross-host collision.
 
 ### Phase 6 progress log
+- DONE (full code review + fixes — 4-dimension review: roster / runs+orchestration / org+dead-code /
+  security). Verdict: the load-bearing SAFETY invariants HOLD (single shell chokepoint; exploit/spray
+  only in execute_gated_action; attacks never an agent — no attack role/tool, SafetyGate hard-blocks;
+  membership RBAC/IDOR closed). Fixes applied:
+  * **Batch A (correctness):** health/main engine()→dispose bug (readiness DB check was always false +
+    pool never disposed); retention prune now deletes ALL FK children (findings_index/artifacts/
+    llm_call were missed → prune always rolled back → run cap never applied) + only prunes terminal
+    runs; heartbeat now beats through cancel unwind (was stopping on cancel → reaper double-DONE
+    race); reaper releases the admission slot (global counter + project mutex leaked on worker crash);
+    admission-refused path suppress-guarded + no _EMIT_LOCKS leak. mypy 10→0.
+  * **Batch B (security):** `_resolve_hosts` now drops swept hosts outside the scoped CIDR (the
+    per-host assert_in_scope was tautological — real containment backstop now).
+  * **Batch C (dead code + honesty):** deleted `agents/budget.py` (superseded by RoleDef inline
+    enforcement) and `orchestration/blackboard.py` (moot — per-host Profiles make the single-writer
+    design unnecessary); deleted the orphaned `Approvals.tsx`; wired the (now-fixed) Health page into
+    the router+nav; removed dead `SafetyGate.assert_scope`/`needs_approval` + corrected its docstring;
+    fixed `db/models` comments (role no longer names "attack"; Checkpoint lists the real `hosts` kind);
+    trimmed unused CSS. Regression tests added (retention FK children, reaper slot release, out-of-scope
+    host dropped). Gate: ruff clean, mypy clean, 75 tests (backend+load+invariant) + 18 frontend, build OK.
+- CORRECTED DOC DRIFT: earlier claims that audit.py / rbac.py / orchestration/checkpoints.py were
+  "done/full" were STALE — they are PLANNED stubs, NOT wired: `audit.py` (platform audit trail) writes
+  no rows; `rbac.py` capability matrix is unenforced (only binary project membership is — fine today,
+  since the only member is the owner; MUST be wired before member-provisioning ships); `checkpoints.py`
+  spray/exploit approve/reject gate is unused (the host-count gate uses the DB-model flow). Test counts
+  in this doc's older sections ("28/28") are stale — real: ~75 backend/load/invariant + 18 frontend.
+- REVIEW FOLLOW-UPS (documented, NOT done): run-level LLM token ceiling + per-agent wall-clock are
+  defined but unenforced (inert until the brain is attached — wire in run_role when LLM lands); wire
+  rbac.can into start/cancel/scope/approve before member-provisioning; implement audit.py; the
+  _run_real/_run_agent + _recon_host/_agent_host duplication + shared test-mock fixture could be
+  factored; client-side WS reconnect/replay-by-seq isn't implemented.
+
 - DONE (design pass — demo-ready UI). Rewrote `frontend/src/theme.css` into a cohesive dark design
   system: soft teal/green accent glow (radial backdrops), display/mono type scale, cards with hover
   lift + accent, status pills with animated live dots, refined inputs/buttons/nav (active glow bar),

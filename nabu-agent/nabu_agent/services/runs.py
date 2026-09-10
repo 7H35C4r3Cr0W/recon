@@ -413,6 +413,25 @@ async def _resolve_hosts(run_id: str, target: str, publish, *, project_id: str,
         await publish(RunEventType.LOG_LINE, {"line": f"[alive] sweep failed: {exc}"})
         return []
     hosts = list(res.get("hosts") or [])
+    # SCOPE GUARD (defence in depth): only fan out to hosts actually inside the swept range. The
+    # per-host guard's assert_in_scope is tautological (each host profile's scope == that host), so
+    # this is the real backstop against the alive-parser ever yielding an address outside the CIDR.
+    import ipaddress
+    try:
+        net = ipaddress.ip_network(target, strict=False)
+        in_scope: list[str] = []
+        for h in hosts:
+            try:
+                if ipaddress.ip_address(h) in net:
+                    in_scope.append(h)
+            except ValueError:
+                continue  # unparseable host — drop it
+        if len(in_scope) != len(hosts):
+            await publish(RunEventType.LOG_LINE, {"line":
+                f"[alive] dropped {len(hosts) - len(in_scope)} host(s) outside scope {target}"})
+        hosts = in_scope
+    except ValueError:
+        pass  # target wasn't a parseable network (shouldn't happen — router validated scope)
     await publish(RunEventType.LOG_LINE, {"line": f"[alive] {len(hosts)} host(s) up in {target}"})
     if len(hosts) > limits.max_hosts:
         await publish(RunEventType.LOG_LINE,
