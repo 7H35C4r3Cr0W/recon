@@ -18,6 +18,7 @@ export function RunLive() {
   // a large fan-out parks the run in awaiting_approval — surface the pending checkpoint for a human
   const [pending, setPending] = useState<{ id: string; message: string } | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const lastSeqRef = useRef(0);  // dedup by seq so a WS reconnect's backlog replay is idempotent
 
   async function decide(action: "approve" | "reject") {
     if (!pending || !runId) return;
@@ -31,14 +32,16 @@ export function RunLive() {
 
   useEffect(() => {
     if (!runId) return;
-    const ws = connectRun(runId, (e: RunEvent) => apply(e));
-    ws.onopen = () => setStatus("live");
-    ws.onclose = () => setStatus((s) => (s === "done" ? "done" : "disconnected"));
-    return () => ws.close();
+    const conn = connectRun(runId, (e: RunEvent) => apply(e), setStatus);
+    return () => conn.close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId]);
 
   function apply(e: RunEvent) {
+    if (typeof e.seq === "number" && e.seq > 0) {   // skip anything already applied (reconnect replay)
+      if (e.seq <= lastSeqRef.current) return;
+      lastSeqRef.current = e.seq;
+    }
     const d = e.data || {};
     if (e.type === "log.line") {
       const add: string[] = [];
