@@ -50,7 +50,7 @@ async def feed(limit: int = 50, db: AsyncSession = Depends(get_db),
             select(RunEvent.run_id, func.count()).where(
                 RunEvent.run_id.in_(run_ids), RunEvent.type == "finding.added"
             ).group_by(RunEvent.run_id))).all()
-        finding_counts = dict(fc)
+        finding_counts = {r[0]: r[1] for r in fc}
 
     items = []
     unread = 0

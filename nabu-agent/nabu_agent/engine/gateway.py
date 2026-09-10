@@ -22,7 +22,7 @@ from oscprecon.profile import Profile
 from oscprecon.reporter import Reporter
 
 from .errors import ProjectNotFound
-from .schemas import to_service_dto
+from .schemas import ServiceDTO, to_service_dto
 from .settings import EngineSettings, load_engine_settings
 from .workspace import AgentWorkspace, project_root, workspace_for
 
@@ -179,7 +179,7 @@ def render_report(project_id: str, scope: str, hostname: str | None = None) -> s
     return Reporter(load_profile(project_id, scope, hostname)).render()
 
 
-def list_services(project_id: str, scope: str, hostname: str | None = None) -> list[dict[str, Any]]:
+def list_services(project_id: str, scope: str, hostname: str | None = None) -> list[ServiceDTO]:
     prof = load_profile(project_id, scope, hostname)
     return [to_service_dto(s) for s in prof.discovered_services]
 

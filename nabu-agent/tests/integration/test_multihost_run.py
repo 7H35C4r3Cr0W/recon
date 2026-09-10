@@ -109,3 +109,13 @@ async def test_cidr_clamps_to_max_hosts(client, monkeypatch, tmp_path):
     host_nodes = [n for n in node_ids if n.startswith("host-")]
     assert len(host_nodes) == cap, f"expected clamp to {cap}, got {len(host_nodes)}"
     assert any(f"capping to max_hosts={cap}" in ln for ln in lines)
+
+
+async def test_out_of_scope_swept_host_is_dropped(client, monkeypatch, tmp_path):
+    """Defence in depth: if the alive-sweep ever yields a host outside the scoped CIDR, the driver
+    drops it before fan-out (never recons an out-of-scope address)."""
+    _install(monkeypatch, tmp_path, ["10.10.10.5", "10.10.10.6", "10.20.99.99"])  # last is out of /29
+    _run_id, node_ids, _lines = await _drive(client, "10.10.10.0/29")
+    assert "host-10.10.10.5" in node_ids and "host-10.10.10.6" in node_ids
+    assert "host-10.20.99.99" not in node_ids            # out-of-scope host never recon'd
+    assert len([n for n in node_ids if n.startswith("host-")]) == 2

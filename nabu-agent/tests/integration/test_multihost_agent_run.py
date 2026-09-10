@@ -86,8 +86,8 @@ async def test_cidr_agent_roster_fans_out_per_host(client, monkeypatch, tmp_path
     try:
         await client.post("/api/auth/login", json={"email": "admin@nabu.local", "password": "changeme"})
         pid = (await client.post("/api/projects", json={"display_name": "CIDR-agent"})).json()["id"]
-        await client.post(f"/api/projects/{pid}/scope", json={"target": "10.10.10.0/30"})
-        rr = await client.post(f"/api/projects/{pid}/runs", json={"target": "10.10.10.0/30", "kind": "agent"})
+        await client.post(f"/api/projects/{pid}/scope", json={"target": "10.10.10.0/24"})
+        rr = await client.post(f"/api/projects/{pid}/runs", json={"target": "10.10.10.0/24", "kind": "agent"})
         assert rr.status_code == 200, rr.text
         run_id = rr.json()["run_id"]
 

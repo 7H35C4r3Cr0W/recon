@@ -8,7 +8,8 @@ Two policies, both best-effort and safe to re-run:
      runs are deleted along with their children (run_events / agent_tasks / checkpoints).
 
 Runs as an Arq cron on the worker (hourly + at startup) and via an admin endpoint. Models have no
-ON DELETE CASCADE, so children are deleted before their run.
+ON DELETE CASCADE, so EVERY child table that FKs runs.id (run_events / checkpoints / agent_tasks /
+findings_index / artifacts / llm_call) is deleted before its run. Only terminal runs are pruned.
 """
 
 from __future__ import annotations
@@ -19,7 +20,15 @@ from typing import Any
 import structlog
 from sqlalchemy import delete, func, select
 
-from nabu_agent.db.models import AgentTask, Checkpoint, Run, RunEvent
+from nabu_agent.db.models import (
+    AgentTask,
+    Artifact,
+    Checkpoint,
+    FindingIndex,
+    LLMCall,
+    Run,
+    RunEvent,
+)
 from nabu_agent.db.session import sessionmaker
 from nabu_agent.settings import get_settings
 
@@ -42,21 +51,23 @@ async def run_retention(*, run_events_days: int | None = None,
             terminal_run_ids = select(Run.id).where(Run.state.in_(_TERMINAL))
             res = await db.execute(delete(RunEvent).where(
                 RunEvent.ts < cutoff, RunEvent.run_id.in_(terminal_run_ids)))
-            deleted_events += res.rowcount or 0
+            deleted_events += getattr(res, "rowcount", 0) or 0
 
             # 2) per-project run cap — delete the oldest runs beyond the newest `cap`, + children
             project_ids = (await db.execute(select(Run.project_id).distinct())).scalars().all()
             for pid in project_ids:
+                # only prune TERMINAL runs — never delete a run that's still executing
                 old_ids = (await db.execute(
-                    select(Run.id).where(Run.project_id == pid)
+                    select(Run.id).where(Run.project_id == pid, Run.state.in_(_TERMINAL))
                     .order_by(Run.started_at.desc()).offset(cap))).scalars().all()
                 if not old_ids:
                     continue
-                await db.execute(delete(RunEvent).where(RunEvent.run_id.in_(old_ids)))
-                await db.execute(delete(Checkpoint).where(Checkpoint.run_id.in_(old_ids)))
-                await db.execute(delete(AgentTask).where(AgentTask.run_id.in_(old_ids)))
+                # delete EVERY child that FKs runs.id before the run (no ON DELETE CASCADE), or the
+                # final delete(Run) hits an IntegrityError and the whole prune rolls back
+                for child in (RunEvent, Checkpoint, AgentTask, FindingIndex, Artifact, LLMCall):
+                    await db.execute(delete(child).where(child.run_id.in_(old_ids)))
                 res = await db.execute(delete(Run).where(Run.id.in_(old_ids)))
-                pruned_runs += res.rowcount or len(old_ids)
+                pruned_runs += getattr(res, "rowcount", 0) or len(old_ids)
             await db.commit()
     except Exception:
         _log.error("retention-failed", exc_info=True)

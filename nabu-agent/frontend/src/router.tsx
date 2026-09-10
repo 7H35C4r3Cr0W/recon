@@ -7,6 +7,7 @@ import { ProjectDetail } from "./pages/ProjectDetail";
 import { RunLive } from "./pages/RunLive";
 import { Report } from "./pages/Report";
 import { Help } from "./pages/Help";
+import { Health } from "./pages/Health";
 import { NotFound } from "./pages/NotFound";
 
 // Login + the full-screen live run view sit outside the Shell; everything else renders inside it.
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: "/projects/:projectId", element: <ProjectDetail /> },
       { path: "/projects/:projectId/report", element: <Report /> },
       { path: "/help", element: <Help /> },
+      { path: "/health", element: <Health /> },
     ],
   },
   { path: "*", element: <NotFound /> },
