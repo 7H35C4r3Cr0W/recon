@@ -12,8 +12,8 @@ The ``api`` process runs NO recon tools — it only reads engine state via
 from __future__ import annotations
 
 import sys
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -92,7 +92,19 @@ def create_app() -> FastAPI:
 
     # Routers under /api. auth/projects/scope/runs are wired (Phase 2); the rest are scaffolded.
     from nabu_agent.routers import (
-        audit, auth, catalog, creds, findings, projects, reports, runs, scope, settings as settings_router, users,
+        audit,
+        auth,
+        catalog,
+        creds,
+        findings,
+        projects,
+        reports,
+        runs,
+        scope,
+        users,
+    )
+    from nabu_agent.routers import (
+        settings as settings_router,
     )
 
     app.include_router(health.router, prefix="/api")

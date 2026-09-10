@@ -40,7 +40,7 @@ class RunLimits:
     max_total_tasks: int = DEFAULT_MAX_TOTAL_TASKS
 
     @classmethod
-    def from_settings(cls, max_concurrency: int, **overrides: int) -> "RunLimits":
+    def from_settings(cls, max_concurrency: int, **overrides: int) -> RunLimits:
         """Build limits, clamping concurrency to the operator's engine Settings.
 
         max_concurrency comes from oscprecon.config.Settings (already clamped to

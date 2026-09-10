@@ -3,6 +3,7 @@ tail the Redis run channel live. This is the feed the BloodHound-style map + log
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -50,8 +51,5 @@ async def ws_run(websocket: WebSocket, run_id: str) -> None:
         pass
     finally:
         hb.cancel()
-        with_close = getattr(websocket, "client_state", None)
-        try:
+        with contextlib.suppress(Exception):
             await websocket.close()
-        except Exception:
-            pass

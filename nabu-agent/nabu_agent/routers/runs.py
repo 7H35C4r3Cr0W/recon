@@ -50,14 +50,15 @@ async def start_run(project_id: str, body: RunBody, db: AsyncSession = Depends(g
               requested_by=user.id)
     db.add(run)
     await db.commit()
-    runs_svc.launch(run.id, body.target, body.kind)
+    runs_svc.launch(run.id, body.target, body.kind, project_id=project_id)
     return {"run_id": run.id, "state": "queued", "target": body.target, "kind": body.kind}
 
 
 @router.get("/projects/{project_id}/runs")
 async def list_runs(project_id: str, db: AsyncSession = Depends(get_db),
                     user: User = Depends(get_current_user)) -> dict:
-    rows = (await db.execute(select(Run).where(Run.project_id == project_id).order_by(Run.started_at.desc()))).scalars().all()
+    stmt = select(Run).where(Run.project_id == project_id).order_by(Run.started_at.desc())
+    rows = (await db.execute(stmt)).scalars().all()
     return {"runs": [{"id": r.id, "state": r.state, "target": r.target, "kind": r.kind} for r in rows]}
 
 

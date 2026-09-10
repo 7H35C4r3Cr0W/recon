@@ -80,12 +80,19 @@ markers = [
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py311"
 src = ["nabu_agent", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's public API requires calling Depends()/Query() in parameter defaults (same carve-out the
+# engine's pyproject makes for Typer's Option()/Argument()). This is idiomatic, not a bug.
+"nabu_agent/routers/*.py" = ["B008"]
+"nabu_agent/auth/deps.py" = ["B008"]
+"nabu_agent/routers/health.py" = ["B008"]
 
 [tool.mypy]
 python_version = "3.11"

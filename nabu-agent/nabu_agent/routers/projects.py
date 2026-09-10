@@ -76,7 +76,7 @@ async def add_scope(project_id: str, body: ScopeBody, db: AsyncSession = Depends
     try:
         target = validate_host_or_range(body.target)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=f"invalid target: {exc}")
+        raise HTTPException(status_code=422, detail=f"invalid target: {exc}") from exc
     kind = "range" if "/" in target else "host"
     row = ScopeTarget(project_id=project_id, target=target, kind=kind, is_entry=body.is_entry,
                       source="manual", added_by=user.id)
