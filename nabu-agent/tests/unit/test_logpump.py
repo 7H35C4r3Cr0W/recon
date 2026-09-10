@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 
 import pytest
-
 from nabu_agent.events.schema import RunEventType
 from nabu_agent.services.runs import LogPump
 
