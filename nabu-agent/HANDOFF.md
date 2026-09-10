@@ -31,11 +31,11 @@ STATUS:      Login → project → scope → run (demo|scan|agent) → live Bloo
              (NABU_USE_ARQ=true); in-process for dev/tests. LLM seam wired (kind=agent).
              28/28 tests pass (incl. fan-out concurrency, arq dispatch gate, run-failure reliability,
              authz, invariants); ruff clean; frontend builds; engine headless + untouched.
-             THREE adversarial review rounds; all confirmed findings fixed.
+             THREE adversarial review rounds; all confirmed findings fixed. Heartbeat + stale-run REAPER
+             added (killed runs are marked failed + emit a terminal event); app-wide error handler +
+             structured error logs added.
 ATTACH BRAIN: set NABU_LLM_BASE_URL (+ API_KEY, MODEL) → kind="agent". No code change.
 KNOWN LIMITATIONS (documented, not blockers):
-  - a worker KILLED mid-run (OOM/SIGKILL) leaves that run 'scanning' until restart — needs a
-    heartbeat + reaper to requeue (max_tries=1 by design so tools don't blindly re-run). 
   - the engine on_line→WS log bridge has no backpressure under an extremely chatty scan.
   - real-scan process-group cancel + Reporter.write atomicity live in the read-only engine.
 NEXT UP (optional hardening): run heartbeat/reaper; OIDC; WS-path integration test; per-agent map

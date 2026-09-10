@@ -23,6 +23,11 @@ from nabu_agent.obs import logging as obs_logging
 from nabu_agent.routers import health
 from nabu_agent.settings import get_settings
 
+
+def _errlog():
+    import structlog
+    return structlog.get_logger("nabu_agent.api")
+
 # code → HTTP status (mirrors DESIGN §6.3)
 _ERROR_STATUS: dict[str, int] = {
     "invalid_target": 422,
@@ -57,6 +62,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         import structlog
 
         structlog.get_logger().warning("engine-import-check-failed", error=str(exc))
+    # best-effort: reap any runs orphaned before this process started (worker + api both down)
+    try:
+        from nabu_agent.orchestration.reaper import reap_stale_runs
+
+        reaped = await reap_stale_runs()
+        if reaped:
+            _errlog().warning("startup-reaped-runs", count=len(reaped))
+    except Exception:  # pragma: no cover - never block startup
+        pass
     # DB/Redis pools are created lazily by db.session / bus; nothing to open eagerly here yet.
     yield
     # Dispose the async DB engine on shutdown.
@@ -86,6 +100,9 @@ def create_app() -> FastAPI:
     @app.exception_handler(EngineAdapterError)
     async def _engine_error_handler(request: Request, exc: EngineAdapterError) -> JSONResponse:
         status = _ERROR_STATUS.get(getattr(exc, "code", "engine_error"), 500)
+        if status >= 500:
+            _errlog().error("engine-error", code=getattr(exc, "code", "engine_error"),
+                            path=str(request.url.path), error=str(exc), exc_info=True)
         return JSONResponse(
             status_code=status,
             content={
@@ -94,6 +111,18 @@ def create_app() -> FastAPI:
                 "request_id": request.headers.get("x-request-id", ""),
                 "details": {},
             },
+        )
+
+    @app.exception_handler(Exception)
+    async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        """Log every unhandled exception with context and return the standard error envelope (500)
+        instead of a bare stack trace, so failures are traceable and clients get a consistent shape."""
+        _errlog().error("unhandled-error", path=str(request.url.path), method=request.method,
+                        error=str(exc), exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"code": "internal_error", "message": "internal server error",
+                     "request_id": request.headers.get("x-request-id", ""), "details": {}},
         )
 
     # Routers under /api. auth/projects/scope/runs are wired (Phase 2); the rest are scaffolded.
