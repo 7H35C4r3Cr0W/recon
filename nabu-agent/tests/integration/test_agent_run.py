@@ -41,11 +41,13 @@ class _SmartProvider:
 
 @pytest.fixture
 def brain_and_engine(monkeypatch, tmp_path):
+    import oscprecon.findings as ef
     from nabu_agent.agents.tools import dispatch as td
-    from nabu_agent.engine import gateway, tools as etools, workspace as ews
+    from nabu_agent.engine import gateway
+    from nabu_agent.engine import tools as etools
+    from nabu_agent.engine import workspace as ews
     from nabu_agent.llm import factory
     from nabu_agent.settings import get_settings
-    import oscprecon.findings as ef
 
     svcs = [SimpleNamespace(port=445, proto="tcp", service="smb", product="Samba", version="4.15",
                             nmap_scripts_output="", state="open"),
