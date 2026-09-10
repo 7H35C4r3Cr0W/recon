@@ -9,51 +9,14 @@ import asyncio
 import pytest
 from nabu_agent.services import runs as runs_svc
 
+from tests._mocks import install_recon_mocks
+
 pytestmark = pytest.mark.asyncio
 
 
 def _install(monkeypatch, tmp_path, live_hosts):
-    """Patch the engine seams. check_alive on a CIDR returns ``live_hosts``; every host gets its own
-    Profile directory so findings.json is per-host."""
-    import oscprecon.findings as ef
-    from nabu_agent.engine import tools as etools
-    from nabu_agent.engine import workspace as ews
-
-    def _slug(t: str) -> str:
-        return "".join(c if (c.isalnum() or c in ".-") else "_" for c in t)
-
-    class _Prof:
-        def __init__(self, scope: str):
-            self.directory = tmp_path / _slug(scope)
-            self.directory.mkdir(parents=True, exist_ok=True)
-            self.profile_name = scope
-
-    class _WS:
-        def __init__(self, scope):
-            self.scope = scope
-
-        def open_or_create(self):
-            return _Prof(self.scope)
-
-    monkeypatch.setattr(ews, "workspace_for", lambda pid, scope, *a, **k: _WS(scope))
-
-    def _alive(profile, target=None, *, on_line=None, cancel=None):
-        if target and "/" in target:            # CIDR sweep
-            return {"up": True, "count": len(live_hosts), "hosts": list(live_hosts)}
-        return {"up": True, "count": 1, "hosts": [target]}
-
-    monkeypatch.setattr(etools, "check_alive", _alive)
-    monkeypatch.setattr(etools, "run_scan",
-                        lambda p, sp="default", **k: {"services": []})
-    monkeypatch.setattr(etools, "list_discovered_services",
-                        lambda p: {"services": [{"port": 445, "proto": "tcp", "service": "smb"}]})
-    monkeypatch.setattr(etools, "enum_service",
-                        lambda p, s, m="full", **k: {"service": s, "findings_added": 1})
-    monkeypatch.setattr(etools, "generate_report",
-                        lambda p, **k: {"markdown": "# r", "path": str(p.directory / "report.md")})
-    monkeypatch.setattr(ef, "load_findings",
-                        lambda d: [{"kind": "smb-signing", "value": "SMB signing off", "port": 445}])
-
+    install_recon_mocks(monkeypatch, tmp_path, live_hosts=live_hosts,
+                        findings=[{"kind": "smb-signing", "value": "SMB signing off", "port": 445}])
 
 async def _drive(client, cidr):
     await client.post("/api/auth/login", json={"email": "admin@nabu.local", "password": "changeme"})
