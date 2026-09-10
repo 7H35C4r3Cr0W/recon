@@ -265,6 +265,24 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   cross-host collision.
 
 ### Phase 6 progress log
+- DONE (UX completion) — the frontend had orphaned/stub pages; closed the real gaps the owner flagged:
+  * **Report & outputs page** (`frontend/src/pages/Report.tsx`, was a stub + unrouted) — now routed at
+    `/projects/:projectId/report`: a severity-coloured findings table + the full report rendered from
+    markdown (small safe renderer: headings/tables/lists/bold). Reachable from ProjectDetail.
+  * **Run history on the project page** (`ProjectDetail.tsx`) — lists past runs (state pill + kind +
+    target), each linking to its live agent map (`/projects/:pid/runs/:rid`) + a "Report & outputs"
+    link. So the agent chain/map IS reachable from the project page (open any run → the Cytoscape map).
+  * **Aggregated findings for CIDR** — `GET /projects/{id}/findings` had the same
+    read-the-sweep-Profile gap the report had; added `gateway.list_combined_findings` (per-host
+    aggregation, host-tagged, severity-sorted) and wired the router (CIDR → combined, single host
+    unchanged). Backend test added.
+  Tests: `Report.test.tsx` (2), `ProjectDetail.test.tsx` (2), `test_combined_report_api` +1 (findings
+  aggregation). Gate: ruff clean, mypy 10, 70 backend + 2 load + 9 invariant + 18 frontend, build OK.
+  STILL orphaned (documented, low priority): `Approvals.tsx` stub (the in-run RunLive banner + the
+  Feed 'attention' state cover approvals) and `Health.tsx` (real readiness page, just not linked).
+  NO attack execution exists (recon only; attacks are human-gated + deliberately unwired) — the live
+  view shows live RECON, not an attack. The LLM `agent` kind needs the brain (`NABU_LLM_*`) attached.
+
 - DONE (follow-up) — **distributed (two-pool) supervisor + admission control**. Under `NABU_USE_ARQ`
   the supervisor (`execute_run` via `supervise_run`) now, at the per-host fan-out step, ENQUEUES one
   `recon_host_job` per live host onto the Arq worker pool and AWAITS its result (gather = the fan-in

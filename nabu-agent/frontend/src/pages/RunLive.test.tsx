@@ -25,10 +25,11 @@ function renderRun() {
 }
 
 function fireApproval() {
-  act(() => captured?.({
-    type: "approval.required" as RunEvent["type"],
+  const ev = {
+    type: "approval.required", run_id: "r1", seq: 1, ts: null,
     data: { node_id: "run-r1", checkpoint_id: "cp1", message: "20 live hosts exceed the threshold" },
-  } as RunEvent));
+  } as unknown as RunEvent;
+  act(() => captured?.(ev));
 }
 
 describe("RunLive approval gate", () => {
