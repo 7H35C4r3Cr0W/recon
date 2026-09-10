@@ -212,58 +212,68 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
         pump_task.cancel()
         _EMIT_LOCKS.pop(run_id, None)
 
-async def _run_real(run_id: str, target: str, publish, *, project_id: str,
-                    cancel_event: threading.Event, on_line=None) -> str:
-    """REAL single-target recon via the engine tools, through the shell.run chokepoint.
+async def _resolve_hosts(run_id: str, target: str, publish, *, project_id: str,
+                         cancel_event, on_line, limits) -> list[str]:
+    """Single host (no '/') -> [target]. CIDR -> alive-sweep, then clamp to the host guardrails."""
+    if "/" not in target:
+        return [target]
+    from nabu_agent.engine import tools as etools
+    from nabu_agent.engine.workspace import workspace_for
 
-    Emits the SAME node ids/events as the demo (run/host/svc-*/agent-enum-*/finding-*/report) so the
-    live map is identical. The blocking engine calls run in a worker thread; the engine's on_line
-    sink is bridged onto the event loop as log.line events. Honours the cancel Event.
-    """
+    await publish(RunEventType.LOG_LINE, {"line": f"[alive] sweeping {target} for live hosts"})
+    sweep = await asyncio.to_thread(workspace_for(project_id, target).open_or_create)
+    try:
+        res = await asyncio.to_thread(etools.check_alive, sweep, target, on_line=on_line, cancel=cancel_event)
+    except Exception as exc:
+        await publish(RunEventType.LOG_LINE, {"line": f"[alive] sweep failed: {exc}"})
+        return []
+    hosts = list(res.get("hosts") or [])
+    await publish(RunEventType.LOG_LINE, {"line": f"[alive] {len(hosts)} host(s) up in {target}"})
+    if len(hosts) > limits.max_hosts:
+        await publish(RunEventType.LOG_LINE,
+                      {"line": f"[alive] capping to max_hosts={limits.max_hosts} (of {len(hosts)})"})
+        hosts = hosts[: limits.max_hosts]
+    if len(hosts) > limits.approval_required_above_hosts:
+        await publish(RunEventType.LOG_LINE, {"line": f"[alive] {len(hosts)} hosts exceeds the approval "
+                      f"threshold ({limits.approval_required_above_hosts}); auto-proceeding for a scan run"})
+    return hosts
+
+
+async def _recon_host(run_id: str, host: str, publish, *, project_id: str, cancel_event, on_line,
+                      run_node: str, limits, service_budget: int) -> str:
+    """Recon ONE host into its OWN Profile, with host-scoped map nodes: host -> services ->
+    concurrent enum agents (bounded by max_enum_per_host) -> findings -> per-host report."""
     import oscprecon.findings as ef
 
     from nabu_agent.engine import tools as etools
     from nabu_agent.engine.workspace import workspace_for
 
-    run_node, host_node = f"run-{run_id}", f"host-{target}"
-    await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.ACTIVE.value,
-                                            "state": "scanning", "label": "recon run"})
+    host_node = f"host-{host}"
     await publish(RunEventType.TASK_CREATED, {"node_id": host_node, "node_state": NodeState.ACTIVE.value,
-                                              "kind": "host", "label": target})
-
-    ws = workspace_for(project_id, target)
-    profile = await asyncio.to_thread(ws.open_or_create)
-
-    # liveness (best-effort — a down host still gets a scan attempt)
+                  "kind": "host", "label": host, "parent": run_node})
+    profile = await asyncio.to_thread(workspace_for(project_id, host).open_or_create)
     try:
-        await asyncio.to_thread(etools.check_alive, profile, target, on_line=on_line, cancel=cancel_event)
+        await asyncio.to_thread(etools.check_alive, profile, host, on_line=on_line, cancel=cancel_event)
     except Exception as exc:
-        await publish(RunEventType.LOG_LINE, {"line": f"[alive] {exc}"})
-
-    # scan
+        await publish(RunEventType.LOG_LINE, {"line": f"[alive] {host}: {exc}"})
     await asyncio.to_thread(etools.run_scan, profile, "default", on_line=on_line, cancel=cancel_event)
     await publish(RunEventType.TASK_UPDATED, {"node_id": host_node, "node_state": NodeState.DONE.value})
 
-    services = etools.list_discovered_services(profile)["services"]
+    services = etools.list_discovered_services(profile)["services"][:service_budget]
+    svc_by_port: dict[int, str] = {}
     for s in services:
-        nid = f"svc-{target}-{s['port']}-{s.get('proto', 'tcp')}"
+        nid = f"svc-{host}-{s['port']}-{s.get('proto', 'tcp')}"
+        svc_by_port[int(s["port"])] = nid
         await publish(RunEventType.TASK_CREATED, {"node_id": nid, "node_state": NodeState.DONE.value,
                       "kind": "service", "label": f"{s['port']}/{s.get('service') or s.get('proto')}",
-                      "parent": host_node, "product": s.get("product", "")})
+                      "parent": host_node})
 
-    # per-service enum agents — FAN OUT: one agent per service, concurrent (bounded), so several
-    # nodes are 'active' (green) on the live map at once, then join. Blocking engine calls run in
-    # worker threads; the per-run _emit lock keeps the event stream ordered.
-    from nabu_agent.orchestration.limits import RunLimits
-
-    limits = RunLimits()  # conservative defaults; not driven by the number of services
-    services = services[: limits.max_total_tasks]  # hard cap the fan-out width
-    sem = asyncio.Semaphore(max(1, limits.max_concurrent_service_agents))
+    sem = asyncio.Semaphore(max(1, limits.max_enum_per_host))
     partial_flags: list[bool] = []
 
-    async def _enum_one(s: dict) -> None:
-        svc_node = f"svc-{target}-{s['port']}-{s.get('proto', 'tcp')}"
-        agent_node = f"agent-enum-{s['port']}"
+    async def _enum(s) -> None:
+        svc_node = f"svc-{host}-{s['port']}-{s.get('proto', 'tcp')}"
+        agent_node = f"agent-enum-{host}-{s['port']}"
         service_name = s.get("service") or s.get("proto") or ""
         async with sem:
             if cancel_event.is_set():
@@ -275,54 +285,77 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
                 await asyncio.to_thread(etools.enum_service, profile, service_name, "full",
                                         port=int(s["port"]), on_line=on_line, cancel=cancel_event)
                 await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.DONE.value})
-            except Exception as exc:  # a blocked/missing enum marks the node stuck; the run continues (partial)
+            except Exception as exc:
                 partial_flags.append(True)
                 await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.STUCK.value})
-                await publish(RunEventType.LOG_LINE, {"line": f"[enum] {service_name}:{s['port']} — {exc}"})
+                await publish(RunEventType.LOG_LINE, {"line": f"[enum] {host}:{service_name}:{s['port']} — {exc}"})
 
-    await asyncio.gather(*[_enum_one(s) for s in services], return_exceptions=True)
-    partial = bool(partial_flags)
+    await asyncio.gather(*[_enum(s) for s in services], return_exceptions=True)
+
+    with contextlib.suppress(Exception):
+        for i, f in enumerate(await asyncio.to_thread(ef.load_findings, profile.directory)):
+            port = int(f.get("port") or 0)
+            fid = f"finding-{host}-{port}-{i}"
+            await publish(RunEventType.FINDING_ADDED, {
+                "node_id": fid, "node_state": NodeState.DONE.value, "kind": "finding",
+                "label": str(f.get("value", "finding"))[:40],
+                "parent": svc_by_port.get(port, host_node),
+                "edges": [{"source": f"agent-enum-{host}-{port}", "target": fid, "label": "found"}]})
+
+    with contextlib.suppress(Exception):
+        await asyncio.to_thread(etools.generate_report, profile, persist=True)
+    return "partial" if (partial_flags or cancel_event.is_set()) else "done"
+
+
+async def _run_real(run_id: str, target: str, publish, *, project_id: str,
+                    cancel_event, on_line=None) -> str:
+    """Multi-host recon. Single host -> one _recon_host. A CIDR -> alive-sweep -> per-host fan-out,
+    each host its own Profile + host-scoped map subtree, bounded by the RunLimits host guardrails
+    (max_hosts / max_concurrent_hosts / max_enum_per_host / max_total_tasks product cap)."""
+    from nabu_agent.orchestration.limits import RunLimits
+
+    run_node = f"run-{run_id}"
+    await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.ACTIVE.value,
+                  "state": "scanning", "label": "recon run"})
+    limits = RunLimits()
+    hosts = await _resolve_hosts(run_id, target, publish, project_id=project_id,
+                                 cancel_event=cancel_event, on_line=on_line, limits=limits)
+    if not hosts:
+        await publish(RunEventType.LOG_LINE, {"line": "[scan] no live hosts to recon"})
+        return "failed"
+
+    per_host_budget = max(1, limits.max_total_tasks // len(hosts))  # global hosts x services cap
+    host_sem = asyncio.Semaphore(max(1, limits.max_concurrent_hosts))
+
+    async def _one(host: str):
+        async with host_sem:
+            if cancel_event.is_set():
+                return "cancelled"
+            try:
+                return await _recon_host(run_id, host, publish, project_id=project_id,
+                                         cancel_event=cancel_event, on_line=on_line, run_node=run_node,
+                                         limits=limits, service_budget=per_host_budget)
+            except Exception as exc:  # one host crashing must not sink the whole run
+                await publish(RunEventType.TASK_UPDATED,
+                              {"node_id": f"host-{host}", "node_state": NodeState.ERROR.value})
+                await publish(RunEventType.LOG_LINE, {"line": f"[host] {host} failed: {exc}"})
+                return exc
+
+    results = await asyncio.gather(*[_one(h) for h in hosts])
     if cancel_event.is_set():
         return "cancelled"
+    errors = [r for r in results if isinstance(r, Exception)]
+    if errors and len(errors) == len(hosts):
+        raise errors[0]  # every host failed -> surface as a driver failure (ERROR event + state=failed)
+    partial = bool(errors) or any(r in (None, "partial", "cancelled") for r in results)
 
-    # findings → map
-    for i, f in enumerate(await asyncio.to_thread(ef.load_findings, profile.directory)):
-        fid = f"finding-{f.get('kind', i)}-{f.get('port', '')}"
-        await publish(RunEventType.FINDING_ADDED, {"node_id": fid, "node_state": NodeState.DONE.value,
-                      "kind": "finding", "label": str(f.get("value", "finding"))[:40],
-                      "parent": f"svc-{target}-{f.get('port', 0)}-tcp"})
-
-    # report
     report_node = f"report-{run_id}"
     await publish(RunEventType.TASK_CREATED, {"node_id": report_node, "node_state": NodeState.ACTIVE.value,
-                  "kind": "report", "label": "report", "parent": run_node})
-    await asyncio.to_thread(etools.generate_report, profile, persist=True)
+                  "kind": "report", "label": f"report ({len(hosts)} host(s))", "parent": run_node})
     await publish(RunEventType.TASK_UPDATED, {"node_id": report_node, "node_state": NodeState.DONE.value})
     await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.DONE.value,
                   "state": "report_ready"})
     return "partial" if partial else "done"
-
-
-async def start(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
-    """Start a run. In production (settings.use_arq) the API just ENQUEUES the supervisor job onto the
-    Arq worker pool and returns immediately; in dev/tests it runs in-process. Either way the run
-    driver (execute_run) fans out per-service agents concurrently and streams the same events."""
-    from nabu_agent.settings import get_settings
-
-    if get_settings().use_arq:
-        from nabu_agent import bus
-
-        await bus.enqueue_run(run_id, target, kind, project_id or "unknown")
-        return
-    launch(run_id, target, kind, project_id=project_id)
-
-
-def launch(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
-    """Run the driver in-process (dev/tests, or when Arq is disabled). A strong reference is retained
-    so the event loop can't GC/cancel the task mid-run."""
-    task = asyncio.create_task(execute_run(run_id, target, kind, project_id=project_id))
-    _RUNNING.add(task)
-    task.add_done_callback(_RUNNING.discard)
 
 
 async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
@@ -412,9 +445,9 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
     # --- enum agents (one per service, concurrent) ---
     async def _enum(s: dict) -> dict | None:
         async with sem:
-            return await run_role("enum_writer", f"agent-enum-{s['port']}",
+            return await run_role("enum_writer", f"agent-enum-{target}-{s['port']}",
                                   f"enum {s.get('service') or s['port']}", _svc_node(s), _svc_ctx(s),
-                                  edges=[{"source": planner_node, "target": f"agent-enum-{s['port']}",
+                                  edges=[{"source": planner_node, "target": f"agent-enum-{target}-{s['port']}",
                                           "label": "dispatch"}])
     enum_res = await asyncio.gather(*[_enum(s) for s in services], return_exceptions=True)
     if any(r is None or isinstance(r, Exception) for r in enum_res):
@@ -432,7 +465,7 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
                 "node_id": fid, "node_state": NodeState.DONE.value, "kind": "finding",
                 "label": str(f.get("value", "finding"))[:40],
                 "parent": svc_by_port.get(port, host_node),
-                "edges": [{"source": f"agent-enum-{port}", "target": fid, "label": "found"}]})
+                "edges": [{"source": f"agent-enum-{target}-{port}", "target": fid, "label": "found"}]})
 
     # --- research agents (one per service, concurrent; proposals only) ---
     research_ctx = await ContextAssembler(project_id, target).build()
@@ -442,10 +475,10 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
                "finding": {"service": s.get("service", ""), "port": s["port"],
                            "product": s.get("product", "")}}
         async with sem:
-            return await run_role("research", f"agent-research-{s['port']}",
+            return await run_role("research", f"agent-research-{target}-{s['port']}",
                                   f"research {s.get('service') or s['port']}", _svc_node(s), ctx,
-                                  edges=[{"source": f"agent-enum-{s['port']}",
-                                          "target": f"agent-research-{s['port']}", "label": "feeds"}])
+                                  edges=[{"source": f"agent-enum-{target}-{s['port']}",
+                                          "target": f"agent-research-{target}-{s['port']}", "label": "feeds"}])
     await asyncio.gather(*[_research(s) for s in services], return_exceptions=True)
     if cancel_event.is_set():
         return "cancelled"
@@ -454,8 +487,8 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
     report_node = f"agent-report-{run_id}"
     report_edges = [{"source": planner_node, "target": report_node, "label": "feeds"}]
     for s in services:
-        report_edges.append({"source": f"agent-enum-{s['port']}", "target": report_node, "label": "feeds"})
-        report_edges.append({"source": f"agent-research-{s['port']}", "target": report_node, "label": "feeds"})
+        report_edges.append({"source": f"agent-enum-{target}-{s['port']}", "target": report_node, "label": "feeds"})
+        report_edges.append({"source": f"agent-research-{target}-{s['port']}", "target": report_node, "label": "feeds"})
     report_ctx = await ContextAssembler(project_id, target).build()
     await run_role("reporter", report_node, "report writer", run_node, report_ctx, edges=report_edges)
     with contextlib.suppress(Exception):
@@ -464,3 +497,27 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
     await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.DONE.value,
                   "state": "report_ready"})
     return "partial" if partial else "done"
+
+
+async def start(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
+    """Start a run. In production (settings.use_arq) the API just ENQUEUES the supervisor job onto the
+    Arq worker pool and returns immediately; in dev/tests it runs in-process. Either way the run
+    driver (execute_run) fans out per-service agents concurrently and streams the same events."""
+    from nabu_agent.settings import get_settings
+
+    if get_settings().use_arq:
+        from nabu_agent import bus
+
+        await bus.enqueue_run(run_id, target, kind, project_id or "unknown")
+        return
+    launch(run_id, target, kind, project_id=project_id)
+
+
+def launch(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
+    """Run the driver in-process (dev/tests, or when Arq is disabled). A strong reference is retained
+    so the event loop can't GC/cancel the task mid-run."""
+    task = asyncio.create_task(execute_run(run_id, target, kind, project_id=project_id))
+    _RUNNING.add(task)
+    task.add_done_callback(_RUNNING.discard)
+
+

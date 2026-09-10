@@ -4,9 +4,12 @@ How the platform is load-tested, what the numbers actually prove, and where the
 honest gap is. Scope: a class-C (/24, 256 hosts) recon run.
 
 TL;DR: the **event pipeline** and the **per-service fan-out** are measured and
-provably bounded. **Per-host fan-out does not exist yet** — the harness synthesizes
-/24 event volume, it does not drive 256 real hosts. The RunLimits caps that *would*
-bound a real /24 are defined but not yet wired. See [Does it hold up at /24?](#does-it-hold-up-at-24).
+provably bounded. **UPDATE (host tier built):** per-HOST fan-out now exists for the
+`scan` kind — a CIDR scope alive-sweeps, clamps to the host guardrails, and fans out
+per-host recon (each host its own Profile + host-scoped map subtree). The gap below is
+now largely closed for real recon runs; the remaining items are called out in
+[Update: host tier](#update-host-tier-built--recon-runs). The original assessment is
+preserved below for the record. See [Does it hold up at /24?](#does-it-hold-up-at-24).
 
 ---
 
@@ -91,7 +94,42 @@ regardless of fan-out width (see recs #4).
 
 ## Does it hold up at /24?
 
-**Partially — and only the parts the harness can reach.**
+### Update: host tier built (recon runs)
+
+The per-host fan-out described as missing below has since been implemented for the
+`scan` kind (`services/runs._resolve_hosts` + `_recon_host` + the `_run_real` driver):
+
+- A CIDR target **alive-sweeps** (`check_alive`) to the live host list, then fans out
+  **one `_recon_host` per host**, each concurrently under `max_concurrent_hosts` (4).
+- Each host gets its **own Profile folder** (`workspace_for(project_id, host)`), so each
+  host has its own `findings.json` — cross-host findings no longer collide at storage
+  (this sidesteps the host-less `findings._key()` without touching the read-only engine).
+- **Host-scoped map node ids** — `host-{ip}`, `svc-{ip}-{port}-{proto}`,
+  `agent-enum-{ip}-{port}`, `finding-{ip}-{port}-{i}` — so two hosts sharing a port no
+  longer collide on one node. The live map now renders a run -> host -> service -> agent
+  subtree per host automatically (no frontend change).
+- **Guardrails wired:** `max_hosts` (clamp the sweep, with a "capping" log event),
+  `max_concurrent_hosts` (host-level semaphore), `max_enum_per_host` (per-host enum
+  semaphore — now the measured 4/4 bound), and `max_total_tasks` as a hosts x services
+  product cap (`per_host_budget = max_total_tasks // len(hosts)`). A host-count over
+  `approval_required_above_hosts` emits a notice. Verified by
+  `tests/integration/test_multihost_run.py` (per-host subtrees + no collision + clamp).
+
+**Still open after the host tier** (follow-ups, not blockers for a scan `/24`):
+- The **`agent` (LLM) kind** still runs single-target; the roster does not yet fan out
+  per host. Multi-host applies to the deterministic `scan` kind.
+- **Combined multi-host report** — each host writes its own `report.md`; there is no
+  run-level aggregate report yet (`GET /report` reads the entry scope's Profile).
+- **Hard human approval checkpoint** above N hosts is a log notice, not a blocking
+  Checkpoint gate.
+- The **two-pool supervisor / blackboard / admission** remain stubs; a `/24` still runs
+  in one worker slot.
+
+The original pre-host-tier assessment follows, kept for the record.
+
+---
+
+**Partially — and only the parts the harness can reach.** *(original assessment, pre host tier)*
 
 ### Proven
 
@@ -135,18 +173,19 @@ Consequences, all real today:
 
 | Guardrail (`limits.py`) | Default | Status |
 |-------------------------|---------|--------|
-| `max_concurrent_service_agents` | 8 | **Enforced** (measured; inner semaphore) |
-| `max_total_tasks` | 512 | **Partially wired** — applied as a flat slice of ONE host's services (`services/runs.py:260`), not a hosts x services global ceiling; fails silently, not as a "capped" event |
-| `max_hosts` | 32 | **Dead constant** — read nowhere; `check_alive` returns the host list but `_run_real` discards it |
-| `approval_required_above_hosts` | 16 | **Dead constant** — no host-count approval gate exists |
-| `max_enum_per_host` | 4 | **Dead constant** — not enforced as a per-host semaphore |
+| `max_concurrent_service_agents` | 8 | **Enforced** (run-scoped); host tier adds `max_concurrent_hosts`=4 as the host-level semaphore |
+| `max_total_tasks` | 512 | **Wired** (host tier) — hosts x services product cap via `per_host_budget = max_total_tasks // len(hosts)` |
+| `max_hosts` | 32 | **Wired** (host tier) — `_resolve_hosts` clamps the alive-sweep to it + emits a capping log event |
+| `approval_required_above_hosts` | 16 | **Partially wired** (host tier) — over-threshold emits a notice; a hard blocking checkpoint is still a follow-up |
+| `max_enum_per_host` | 4 | **Wired** (host tier) — per-host enum semaphore, measured 4/4 bound |
 | admission (1 active run/project, profile mutex) | — | **Stub** — `acquire/release_run_slot` raise `NotImplementedError`, called from nowhere; one-active-run index is Postgres-only |
 
-**Verdict:** the event/persistence substrate and per-service fan-out are ready for
-/24 volume. The orchestration layer above them is not — per-host fan-out must be
-built and the RunLimits host guardrails wired before a real /24 run is safe or even
-possible. Until then the caps that are supposed to bound the explosion are largely
-inert.
+**Verdict (updated):** the event/persistence substrate + per-service fan-out are ready
+for /24 volume, and per-host fan-out + the host guardrails are now built and wired for the
+`scan` kind (see [Update: host tier](#update-host-tier-built--recon-runs)). A deterministic
+recon `/24` is now possible and bounded. Remaining follow-ups: multi-host for the `agent`
+kind, a combined multi-host report, a hard host-count approval checkpoint, and the
+distributed supervisor/admission model (a `/24` still runs in one worker slot).
 
 ---
 

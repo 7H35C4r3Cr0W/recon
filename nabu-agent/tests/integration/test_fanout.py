@@ -60,6 +60,6 @@ async def test_services_enumerated_concurrently(client, mock_multi_service):
             break
     assert "done" in types
     # one agent node per service
-    assert {"agent-enum-22", "agent-enum-80", "agent-enum-445", "agent-enum-3306"} <= node_ids
+    assert {"agent-enum-10.10.10.5-22", "agent-enum-10.10.10.5-80", "agent-enum-10.10.10.5-445", "agent-enum-10.10.10.5-3306"} <= node_ids  # host-scoped
     # the fan-out ran them concurrently (serial would peak at 1)
     assert mock_multi_service["peak"] >= 2, f"expected concurrent enum, peak={mock_multi_service['peak']}"

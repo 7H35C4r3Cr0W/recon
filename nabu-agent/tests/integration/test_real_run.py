@@ -79,7 +79,7 @@ async def test_real_run_choreography(client, mock_engine):
     # host, both services, both enum agents, the finding, and the report all appeared on the map
     assert "host-10.10.10.5" in node_ids
     assert {"svc-10.10.10.5-22-tcp", "svc-10.10.10.5-445-tcp"} <= node_ids
-    assert {"agent-enum-22", "agent-enum-445"} <= node_ids
+    assert {"agent-enum-10.10.10.5-22", "agent-enum-10.10.10.5-445"} <= node_ids  # host-scoped
     assert any(n.startswith("finding-") for n in node_ids)
     assert f"report-{run_id}" in node_ids
     assert {"active", "done"} <= states
