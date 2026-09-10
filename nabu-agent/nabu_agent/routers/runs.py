@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nabu_agent import bus
 from nabu_agent.auth.deps import get_current_user, require_project_member, require_run_access
-from nabu_agent.db.models import Run, ScopeTarget, User
+from nabu_agent.db.models import Checkpoint, Run, ScopeTarget, User
 from nabu_agent.db.session import get_db
 from nabu_agent.engine.errors import ScopeViolation
 from nabu_agent.services import runs as runs_svc
@@ -92,3 +92,56 @@ async def cancel_run(db: AsyncSession = Depends(get_db),
         run.cancel_requested = True
         await db.commit()
     return {"ok": True}
+
+
+# --- human-in-the-loop checkpoints (the host-count fan-out gate) ---------------------------------
+# A run parked in `awaiting_approval` has a `proposed` Checkpoint; a project member approves it to
+# resume the fan-out, or rejects it to stop the run before it spends the fan-out. (Spray/exploit
+# checkpoints are proposal-only for now — their execution gate is a later phase.)
+_APPROVABLE_KINDS = {"hosts"}
+
+
+def _cp_view(cp: Checkpoint) -> dict:
+    return {"id": cp.id, "run_id": cp.run_id, "kind": cp.kind, "status": cp.status,
+            "target": cp.target, "action_id": cp.action_id, "rationale": cp.rationale,
+            "approved_by": cp.approved_by,
+            "approved_at": cp.approved_at.isoformat() if cp.approved_at else None}
+
+
+@router.get("/runs/{run_id}/checkpoints")
+async def list_checkpoints(db: AsyncSession = Depends(get_db),
+                           run: Run = Depends(require_run_access)) -> dict:
+    rows = (await db.execute(select(Checkpoint).where(Checkpoint.run_id == run.id)
+                             .order_by(Checkpoint.id))).scalars().all()
+    return {"checkpoints": [_cp_view(c) for c in rows]}
+
+
+async def _decide_checkpoint(cp_id: str, run: Run, user: User, db: AsyncSession, status: str) -> dict:
+    cp = (await db.execute(select(Checkpoint).where(
+        Checkpoint.id == cp_id, Checkpoint.run_id == run.id))).scalar_one_or_none()
+    if cp is None:
+        raise HTTPException(status_code=404, detail="checkpoint not found")
+    if cp.kind not in _APPROVABLE_KINDS:
+        # spray/exploit approval is gated separately (spray_enabled / per-action confirm) — not here
+        raise HTTPException(status_code=409, detail=f"checkpoint kind '{cp.kind}' is not approvable here")
+    if cp.status != "proposed":
+        raise HTTPException(status_code=409, detail=f"checkpoint already {cp.status}")
+    cp.status = status
+    cp.approved_by = user.id
+    cp.approved_at = datetime.now(UTC)
+    await db.commit()
+    return {"ok": True, "status": status, "checkpoint_id": cp.id}
+
+
+@router.post("/runs/{run_id}/checkpoints/{cp_id}/approve")
+async def approve_checkpoint(cp_id: str, db: AsyncSession = Depends(get_db),
+                             user: User = Depends(get_current_user),
+                             run: Run = Depends(require_run_access)) -> dict:
+    return await _decide_checkpoint(cp_id, run, user, db, "approved")
+
+
+@router.post("/runs/{run_id}/checkpoints/{cp_id}/reject")
+async def reject_checkpoint(cp_id: str, db: AsyncSession = Depends(get_db),
+                            user: User = Depends(get_current_user),
+                            run: Run = Depends(require_run_access)) -> dict:
+    return await _decide_checkpoint(cp_id, run, user, db, "rejected")

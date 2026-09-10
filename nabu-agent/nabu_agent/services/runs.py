@@ -152,6 +152,90 @@ async def _set_state(run_id: str, state: str) -> None:
 
 
 
+# --- host-count approval gate -------------------------------------------------------------------
+# A fan-out to more than RunLimits.approval_required_above_hosts live hosts PARKS the run in
+# awaiting_approval and waits for an explicit human decision before spending the fan-out. A paused
+# run holds its worker coroutine (heartbeat keeps beating so the reaper leaves it alone), so the wait
+# is bounded by _APPROVAL_TIMEOUT_S. Tests monkeypatch these to run fast.
+_APPROVAL_POLL_S = 2.0
+_APPROVAL_TIMEOUT_S = 30 * 60.0
+
+
+async def _create_host_checkpoint(run_id: str, target: str, n_hosts: int) -> str:
+    from nabu_agent.db.models import Checkpoint
+    async with sessionmaker()() as db:
+        cp = Checkpoint(run_id=run_id, kind="hosts", status="proposed", target=target,
+                        action_id=f"fan-out:{n_hosts}",
+                        rationale=f"{n_hosts} live hosts exceed the approval threshold")
+        db.add(cp)
+        await db.commit()
+        return cp.id
+
+
+async def _checkpoint_status(cp_id: str) -> str:
+    from nabu_agent.db.models import Checkpoint
+    async with sessionmaker()() as db:
+        cp = (await db.execute(select(Checkpoint).where(Checkpoint.id == cp_id))).scalar_one_or_none()
+        return cp.status if cp else "rejected"  # a vanished checkpoint -> stop, never silently fan out
+
+
+async def _expire_checkpoint(cp_id: str) -> None:
+    from nabu_agent.db.models import Checkpoint
+    async with sessionmaker()() as db:
+        cp = (await db.execute(select(Checkpoint).where(Checkpoint.id == cp_id))).scalar_one_or_none()
+        if cp and cp.status == "proposed":
+            cp.status = "expired"
+            await db.commit()
+
+
+async def _gate_host_fanout(run_id: str, target: str, hosts: list[str], publish, *,
+                            project_id: str, cancel_event) -> str | None:
+    """Human gate before a large fan-out. Returns None to proceed (approved, or the count is under
+    the threshold), or a terminal state string ('cancelled'/'failed') if the run must stop."""
+    from nabu_agent.orchestration.limits import RunLimits
+
+    limit = RunLimits().approval_required_above_hosts
+    if len(hosts) <= limit:
+        return None
+
+    run_node = f"run-{run_id}"
+    cp_id = await _create_host_checkpoint(run_id, target, len(hosts))
+    await _set_state(run_id, "awaiting_approval")
+    await publish(RunEventType.APPROVAL_REQUIRED, {
+        "node_id": run_node, "node_state": NodeState.STUCK.value, "state": "awaiting_approval",
+        "checkpoint_id": cp_id, "hosts": len(hosts), "threshold": limit,
+        "message": f"{len(hosts)} live hosts exceed the approval threshold ({limit}); "
+                   "approve to fan out or reject to stop."})
+    await publish(RunEventType.LOG_LINE, {"line":
+        f"[approval] {len(hosts)} hosts > threshold {limit} — awaiting operator decision (checkpoint {cp_id})"})
+
+    waited = 0.0
+    while waited < _APPROVAL_TIMEOUT_S:
+        if cancel_event.is_set():
+            await publish(RunEventType.LOG_LINE, {"line": "[approval] cancelled while awaiting approval"})
+            return "cancelled"
+        status = await _checkpoint_status(cp_id)
+        if status == "approved":
+            await _set_state(run_id, "scanning")
+            await publish(RunEventType.RUN_STATUS, {"node_id": run_node,
+                          "node_state": NodeState.ACTIVE.value, "state": "scanning"})
+            await publish(RunEventType.LOG_LINE,
+                          {"line": f"[approval] approved — fanning out to {len(hosts)} host(s)"})
+            return None
+        if status in ("rejected", "expired"):
+            await publish(RunEventType.LOG_LINE,
+                          {"line": "[approval] rejected by operator — run stopped before fan-out"})
+            return "cancelled"
+        await asyncio.sleep(_APPROVAL_POLL_S)
+        waited += _APPROVAL_POLL_S
+
+    with contextlib.suppress(Exception):
+        await _expire_checkpoint(cp_id)
+    await publish(RunEventType.LOG_LINE,
+                  {"line": f"[approval] no decision within {_APPROVAL_TIMEOUT_S:.0f}s — run stopped"})
+    return "failed"
+
+
 async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
     """Background driver: run the choreography (demo) or real recon, persisting + streaming events."""
     async def publish(type_: RunEventType, data: dict[str, Any]) -> None:
@@ -233,9 +317,6 @@ async def _resolve_hosts(run_id: str, target: str, publish, *, project_id: str,
         await publish(RunEventType.LOG_LINE,
                       {"line": f"[alive] capping to max_hosts={limits.max_hosts} (of {len(hosts)})"})
         hosts = hosts[: limits.max_hosts]
-    if len(hosts) > limits.approval_required_above_hosts:
-        await publish(RunEventType.LOG_LINE, {"line": f"[alive] {len(hosts)} hosts exceeds the approval "
-                      f"threshold ({limits.approval_required_above_hosts}); auto-proceeding for a scan run"})
     return hosts
 
 
@@ -323,6 +404,11 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
     if not hosts:
         await publish(RunEventType.LOG_LINE, {"line": "[scan] no live hosts to recon"})
         return "failed"
+
+    stop = await _gate_host_fanout(run_id, target, hosts, publish, project_id=project_id,
+                                   cancel_event=cancel_event)
+    if stop:
+        return stop
 
     per_host_budget = max(1, limits.max_total_tasks // len(hosts))  # global hosts x services cap
     host_sem = asyncio.Semaphore(max(1, limits.max_concurrent_hosts))
@@ -507,6 +593,11 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
     if not hosts:
         await publish(RunEventType.LOG_LINE, {"line": "[scan] no live hosts to recon"})
         return "failed"
+
+    stop = await _gate_host_fanout(run_id, target, hosts, publish, project_id=project_id,
+                                   cancel_event=cancel_event)
+    if stop:
+        return stop
 
     per_host_budget = max(1, limits.max_total_tasks // len(hosts))
     host_sem = asyncio.Semaphore(max(1, limits.max_concurrent_hosts))

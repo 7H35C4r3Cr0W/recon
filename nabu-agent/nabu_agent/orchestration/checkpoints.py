@@ -23,6 +23,7 @@ from enum import StrEnum
 class CheckpointKind(StrEnum):
     SPRAY = "spray"
     EXPLOIT = "exploit"
+    HOSTS = "hosts"    # recon-scale gate: fan-out to > approval_required_above_hosts live hosts
 
 
 class CheckpointStatus(StrEnum):
