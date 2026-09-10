@@ -100,39 +100,36 @@ export function RunLive() {
   }, {});
 
   return (
-    <div style={{ fontFamily: "system-ui", height: "100vh", display: "flex", flexDirection: "column", background: "#0c1116", color: "#e7eef2" }}>
-      <header style={{ display: "flex", alignItems: "center", gap: 16, padding: "10px 18px", borderBottom: "1px solid #233039" }}>
-        <b style={{ fontFamily: "monospace" }}>NABU · AGENT</b>
-        <span style={{ color: "#8394a0" }}>run {runId}</span>
-        <span style={{ marginLeft: "auto", display: "flex", gap: 12, fontFamily: "monospace", fontSize: 12 }}>
+    <div className="live-wrap">
+      <header className="live-head">
+        <span className="brand"><span className="dot" /> NABU·AGENT</span>
+        <span className="mono muted">run {runId}</span>
+        <span className="legend">
           {(["active", "done", "stuck", "error", "queued"] as NodeState[]).map((s) => (
-            <span key={s} style={{ color: NODE_COLORS[s] }}>● {s} {counts[s] || 0}</span>
+            <span key={s} className="lg" style={{ color: NODE_COLORS[s] }}>
+              <span className="d" style={{ background: NODE_COLORS[s] }} /> {s} {counts[s] || 0}
+            </span>
           ))}
-          <span style={{ color: status === "live" ? "#35d0ba" : "#b7791f" }}>◗ {status}</span>
+          <span className="rec" style={{ color: status === "live" ? "var(--accent)" : "var(--gold)" }}>
+            <span className="d" style={{ background: "currentColor" }} /> {status}
+          </span>
         </span>
       </header>
       {pending && (
-        <div role="alert" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px",
-          background: "#3a2c0e", borderBottom: "1px solid #b7791f", color: "#f5d98b", fontSize: 13 }}>
+        <div role="alert" className="approve-bar">
           <b>⏸ Approval required</b>
-          <span style={{ color: "#e7d6a3" }}>{pending.message}</span>
+          <span style={{ color: "var(--ink-2)" }}>{pending.message}</span>
           <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <button onClick={() => decide("approve")} style={{ background: "#1f7a4d", color: "#e7fff2",
-              border: "1px solid #35d0ba", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}>
-              Approve fan-out
-            </button>
-            <button onClick={() => decide("reject")} style={{ background: "#5a1f1f", color: "#ffe7e7",
-              border: "1px solid #d05353", borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}>
-              Reject
-            </button>
+            <button className="btn-approve" onClick={() => decide("approve")}>Approve fan-out</button>
+            <button className="btn-reject" onClick={() => decide("reject")}>Reject</button>
           </span>
         </div>
       )}
-      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 380px", gap: 10, padding: 10, minHeight: 0 }}>
+      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 400px", gap: 12, padding: 12, minHeight: 0 }}>
         <RunGraph elements={elements} />
-        <div ref={logRef} style={{ overflowY: "auto", background: "#0e141a", border: "1px solid #233039", borderRadius: 10, padding: 12, fontFamily: "monospace", fontSize: 12, lineHeight: 1.6 }}>
-          <div style={{ color: "#8394a0", marginBottom: 6 }}>live action log</div>
-          {logs.map((l, i) => <div key={i} style={{ color: "#b7c4cc" }}>{l}</div>)}
+        <div ref={logRef} className="logpane">
+          <div className="lead">live action log</div>
+          {logs.map((l, i) => <div key={i} className="ln">{l}</div>)}
         </div>
       </div>
     </div>

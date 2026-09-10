@@ -18,8 +18,9 @@ export function Login() {
     }
   }
   return (
-    <div className="centerpane">
-      <div className="brand" style={{ fontSize: 20, marginBottom: 18 }}><span className="dot" /> NABU·AGENT</div>
+    <div className="hero">
+      <div className="hero-brand"><span className="dot" /> NABU·AGENT</div>
+      <div className="hero-tag">Automated, agent-driven recon — live on the map.</div>
       <div className="card">
         <h3>Sign in</h3>
         <form onSubmit={submit} className="stack">

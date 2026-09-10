@@ -34,14 +34,17 @@ export function Shell() {
       <div className="topbar">
         <div className="brand"><span className="dot" /> NABU·AGENT <small>recon platform</small></div>
         <div className="grow" />
-        <div className="userbox">{email}<button className="btn" onClick={logout}>Sign out</button></div>
+        <div className="userbox"><span className="muted">{email}</span><button className="btn" onClick={logout}>Sign out</button></div>
       </div>
       <nav className="sidebar nav">
+        <div className="navlabel">Workspace</div>
         <Link to="/" className={on("/") ? "on" : ""}>
           <span className="ic">◎</span> Feed {unread > 0 && <span className="badge">{unread}</span>}
         </Link>
         <Link to="/projects" className={on("/projects") ? "on" : ""}><span className="ic">▤</span> Projects</Link>
         <Link to="/help" className={on("/help") ? "on" : ""}><span className="ic">?</span> Help</Link>
+        <div className="grow" />
+        <div className="navlabel" style={{ opacity: .7 }}>v0.1 · dark</div>
       </nav>
       <div className="content"><Outlet /></div>
     </div>

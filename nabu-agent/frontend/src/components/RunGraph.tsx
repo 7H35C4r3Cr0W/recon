@@ -19,30 +19,46 @@ export function RunGraph({ elements }: { elements: ElementDefinition[] }) {
             "background-color": ((n: any) =>
               NODE_COLORS[(n.data("state") || "queued") as keyof typeof NODE_COLORS] || "#8394a0") as any,
             label: "data(label)",
-            color: "#cfe0e6",
+            color: "#cddbe3",
             "font-size": 10,
             "font-family": "monospace",
             "text-valign": "bottom",
-            "text-margin-y": 4,
-            width: 34,
-            height: 34,
+            "text-margin-y": 5,
+            "text-outline-color": "#070a0e",
+            "text-outline-width": 2,
+            width: 38,
+            height: 38,
             "border-width": 2,
-            "border-color": "#0e141a",
-          },
+            "border-color": "#070a0e",
+            "transition-property": "background-color border-color shadow-blur",
+            "transition-duration": "0.25s",
+          } as any,
         },
-        { selector: 'node[kind="run"]', style: { shape: "round-rectangle", width: 46, height: 30 } },
-        { selector: 'node[kind="host"]', style: { shape: "hexagon", width: 44, height: 44 } },
-        { selector: 'node[kind="finding"]', style: { shape: "diamond" } },
-        { selector: 'node[kind="report"]', style: { shape: "star" } },
+        { selector: 'node[kind="run"]', style: { shape: "round-rectangle", width: 52, height: 34, "font-size": 11 } },
+        { selector: 'node[kind="host"]', style: { shape: "hexagon", width: 48, height: 48, "font-size": 11 } },
+        { selector: 'node[kind="service"]', style: { shape: "round-rectangle" } },
+        { selector: 'node[kind="finding"]', style: { shape: "diamond", width: 30, height: 30 } },
+        { selector: 'node[kind="report"]', style: { shape: "star", width: 46, height: 46 } },
         {
           selector: 'node[state="active"]',
           style: {
-            "border-color": "#35d0ba",
-            "border-width": 4,
-            "shadow-blur": 24,
-            "shadow-color": "#2f9e57",
-            "shadow-opacity": 0.9,
+            "border-color": "#3ad9c0", "border-width": 4,
+            "shadow-blur": 30, "shadow-color": "#3ad9c0", "shadow-opacity": 0.95,
           } as any,
+        },
+        {
+          selector: 'node[state="done"]',
+          style: { "shadow-blur": 14, "shadow-color": "#54b9f2", "shadow-opacity": 0.4 } as any,
+        },
+        {
+          selector: 'node[state="error"]',
+          style: { "border-color": "#f27a7a", "border-width": 3,
+                   "shadow-blur": 20, "shadow-color": "#f27a7a", "shadow-opacity": 0.7 } as any,
+        },
+        {
+          selector: 'node[state="stuck"]',
+          style: { "border-color": "#f2b636", "border-width": 3,
+                   "shadow-blur": 20, "shadow-color": "#f2b636", "shadow-opacity": 0.7 } as any,
         },
         {
           selector: "edge",
@@ -93,5 +109,8 @@ export function RunGraph({ elements }: { elements: ElementDefinition[] }) {
     cy.layout({ name: "breadthfirst", directed: true, spacingFactor: 1.25, padding: 20 }).run();
   }, [elements]);
 
-  return <div ref={ref} style={{ width: "100%", height: "100%", background: "#0c1116", borderRadius: 10 }} />;
+  return <div ref={ref} style={{
+    width: "100%", height: "100%", borderRadius: 11, border: "1px solid var(--line)",
+    background: "radial-gradient(700px 420px at 30% 15%, #10201f 0%, transparent 60%), var(--sunk)",
+  }} />;
 }
