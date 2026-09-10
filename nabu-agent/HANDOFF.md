@@ -234,4 +234,5 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
 - FE tests ✅ Vitest + React Testing Library: 12 tests; CI runs `npm test`.
 - Richer map edges ✅ labeled hand-off edges (planner→enum, enum→finding/research, agents→report).
 - Log backpressure ✅ LogPump (bounded deque + coalesced batches + suppressed count).
+- OIDC back-channel logout ✅ per-user session index + POST /api/auth/oidc/backchannel-logout (validates the IdP logout token: sig via JWKS, iss/aud/events/sub, no nonce) → revokes all the user's sessions; unconfigured→404, bad token→400. Tested (validation mocked). 48 backend + 12 FE tests.
 - Retention/quotas ✅ orchestration/retention.py: event-TTL (prune terminal runs' events > N days) + per-project run cap (keep newest N + cascade delete children); Arq cron (hourly + startup) on the worker; admin endpoints GET /api/admin/storage + POST /api/admin/retention (admin-only). Unit + endpoint tests. 45 backend + 12 FE tests. **All Phase-5 items + all optional polish complete.**
