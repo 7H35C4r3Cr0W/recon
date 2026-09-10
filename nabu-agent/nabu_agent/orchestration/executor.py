@@ -79,14 +79,17 @@ async def run_demo(run_id: str, target: str, publish: Publish, *, step_delay: fl
         fid = f"finding-{f['engine_key']}"
         st = NodeState.ERROR if f["category"] == "vulnerable" else NodeState.DONE
         await emit(RunEventType.FINDING_ADDED, node_id=fid, node_state=st, kind="finding",
-                   label=f["value"][:40], parent=f"svc-{target}-{f['port']}-tcp", category=f["category"])
+                   label=f["value"][:40], parent=f"svc-{target}-{f['port']}-tcp", category=f["category"],
+                   edges=[{"source": f"agent-enum-{f['port']}", "target": fid, "label": "found"}])
         await emit(RunEventType.LOG_LINE, line=f"[finding] {f['value']}")
         await asyncio.sleep(step_delay / 3)
 
-    # writer / report
+    # writer / report — every enum agent converges into the report
     report_node = f"report-{run_id}"
+    report_edges = [{"source": f"agent-enum-{s['port']}", "target": report_node, "label": "feeds"}
+                    for s in _DEMO_SERVICES]
     await emit(RunEventType.TASK_CREATED, node_id=report_node, node_state=NodeState.ACTIVE,
-               kind="report", label="report", parent=run_node)
+               kind="report", label="report", parent=run_node, edges=report_edges)
     await emit(RunEventType.LOG_LINE, line="[report] synthesizing findings + next steps")
     await asyncio.sleep(step_delay)
     await emit(RunEventType.TASK_UPDATED, node_id=report_node, node_state=NodeState.DONE)

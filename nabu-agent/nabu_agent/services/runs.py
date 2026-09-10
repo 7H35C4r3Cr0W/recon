@@ -296,12 +296,13 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
     limits = RunLimits()
     partial = False
 
-    async def run_role(role: str, node_id: str, label: str, parent: str, context: dict) -> dict | None:
+    async def run_role(role: str, node_id: str, label: str, parent: str, context: dict,
+                       edges: list | None = None) -> dict | None:
         """Run one LLM agent role with its own live map node (active → done / error)."""
         if cancel_event.is_set():
             return None
         await publish(RunEventType.TASK_CREATED, {"node_id": node_id, "node_state": NodeState.ACTIVE.value,
-                      "kind": "agent", "role": role, "label": label, "parent": parent})
+                      "kind": "agent", "role": role, "label": label, "parent": parent, "edges": edges or []})
         runner = AgentRunner(role, provider, project_id=project_id, target=target, run_id=run_id,
                              emit=emit, cancel=cancel_event)
         try:
@@ -328,10 +329,12 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
         await publish(RunEventType.TASK_CREATED, {"node_id": nid, "node_state": NodeState.DONE.value,
                       "kind": "service", "label": f"{s['port']}/{s.get('service') or s.get('proto')}",
                       "parent": host_node})
+    svc_by_port = {int(s["port"]): f"svc-{target}-{s['port']}-{s.get('proto', 'tcp')}" for s in services}
+    planner_node = f"agent-planner-{run_id}"
 
     # --- planner ---
     base_ctx = await ContextAssembler(project_id, target).build()
-    if await run_role("planner", f"agent-planner-{run_id}", "planner", run_node, base_ctx) is None:
+    if await run_role("planner", planner_node, "planner", run_node, base_ctx) is None:
         partial = True
 
     sem = asyncio.Semaphore(max(1, limits.max_concurrent_service_agents))
@@ -348,12 +351,26 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
     async def _enum(s: dict) -> dict | None:
         async with sem:
             return await run_role("enum_writer", f"agent-enum-{s['port']}",
-                                  f"enum {s.get('service') or s['port']}", _svc_node(s), _svc_ctx(s))
+                                  f"enum {s.get('service') or s['port']}", _svc_node(s), _svc_ctx(s),
+                                  edges=[{"source": planner_node, "target": f"agent-enum-{s['port']}",
+                                          "label": "dispatch"}])
     enum_res = await asyncio.gather(*[_enum(s) for s in services], return_exceptions=True)
     if any(r is None or isinstance(r, Exception) for r in enum_res):
         partial = True
     if cancel_event.is_set():
         return "cancelled"
+
+    # --- surface findings the enum agents produced onto the map (edge from the producing agent) ---
+    from nabu_agent.engine import gateway as _gw
+    with contextlib.suppress(Exception):
+        for i, f in enumerate(await asyncio.to_thread(_gw.list_findings, project_id, target, None)):
+            port = int(f.get("port") or 0)
+            fid = f"finding-{port}-{i}"
+            await publish(RunEventType.FINDING_ADDED, {
+                "node_id": fid, "node_state": NodeState.DONE.value, "kind": "finding",
+                "label": str(f.get("value", "finding"))[:40],
+                "parent": svc_by_port.get(port, host_node),
+                "edges": [{"source": f"agent-enum-{port}", "target": fid, "label": "found"}]})
 
     # --- research agents (one per service, concurrent; proposals only) ---
     research_ctx = await ContextAssembler(project_id, target).build()
@@ -364,14 +381,21 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
                            "product": s.get("product", "")}}
         async with sem:
             return await run_role("research", f"agent-research-{s['port']}",
-                                  f"research {s.get('service') or s['port']}", _svc_node(s), ctx)
+                                  f"research {s.get('service') or s['port']}", _svc_node(s), ctx,
+                                  edges=[{"source": f"agent-enum-{s['port']}",
+                                          "target": f"agent-research-{s['port']}", "label": "feeds"}])
     await asyncio.gather(*[_research(s) for s in services], return_exceptions=True)
     if cancel_event.is_set():
         return "cancelled"
 
-    # --- reporter ---
+    # --- reporter (all agents converge -> report) ---
+    report_node = f"agent-report-{run_id}"
+    report_edges = [{"source": planner_node, "target": report_node, "label": "feeds"}]
+    for s in services:
+        report_edges.append({"source": f"agent-enum-{s['port']}", "target": report_node, "label": "feeds"})
+        report_edges.append({"source": f"agent-research-{s['port']}", "target": report_node, "label": "feeds"})
     report_ctx = await ContextAssembler(project_id, target).build()
-    await run_role("reporter", f"agent-report-{run_id}", "report writer", run_node, report_ctx)
+    await run_role("reporter", report_node, "report writer", run_node, report_ctx, edges=report_edges)
     with contextlib.suppress(Exception):
         await asyncio.to_thread(etools.generate_report, profile, persist=True)
 

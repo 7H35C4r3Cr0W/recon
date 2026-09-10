@@ -11,7 +11,7 @@ interface NodeRec { id: string; label: string; kind: string; state: NodeState; p
 export function RunLive() {
   const { runId } = useParams();
   const [nodes, setNodes] = useState<Record<string, NodeRec>>({});
-  const [edges, setEdges] = useState<Record<string, { source: string; target: string }>>({});
+  const [edges, setEdges] = useState<Record<string, { source: string; target: string; label?: string }>>({});
   const [logs, setLogs] = useState<string[]>([]);
   const [status, setStatus] = useState<string>("connecting…");
   const logRef = useRef<HTMLDivElement>(null);
@@ -51,6 +51,16 @@ export function RunLive() {
         setEdges((prev) => (prev[eid] ? prev : { ...prev, [eid]: { source: d.parent as string, target: nodeId } }));
       }
     }
+    // richer hand-off edges: planner→enum, enum→finding, enum→research, agents→report, …
+    if (Array.isArray(d.edges)) {
+      setEdges((prev) => {
+        const next = { ...prev };
+        for (const e of d.edges as Array<{ source: string; target: string; label?: string }>) {
+          if (e && e.source && e.target) next[`${e.source}->${e.target}`] = e;
+        }
+        return next;
+      });
+    }
   }
 
   useEffect(() => { logRef.current?.scrollTo(0, logRef.current.scrollHeight); }, [logs]);
@@ -60,7 +70,7 @@ export function RunLive() {
     for (const n of Object.values(nodes))
       els.push({ data: { id: n.id, label: n.label, kind: n.kind, state: n.state } });
     for (const [id, e] of Object.entries(edges))
-      els.push({ data: { id, source: e.source, target: e.target } });
+      els.push({ data: { id, source: e.source, target: e.target, label: e.label || "" } });
     return els;
   }, [nodes, edges]);
 

@@ -87,13 +87,17 @@ async def test_agent_run_full_roster(client, brain_and_engine):
     assert (await client.get("/api/llm/health")).json()["configured"] is True
     run_id = (await client.post(f"/api/projects/{pid}/runs", json={"target": "10.10.10.5", "kind": "agent"})).json()["run_id"]
 
-    types, node_ids, states = set(), set(), set()
+    types, node_ids, states, edge_labels = set(), set(), set(), set()
+    edges = set()
     for _ in range(100):
         await asyncio.sleep(0.1)
         for e in (await client.get(f"/api/runs/{run_id}/events")).json()["events"]:
             types.add(e["type"])
             if e["data"].get("node_id"): node_ids.add(e["data"]["node_id"])
             if e["data"].get("node_state"): states.add(e["data"]["node_state"])
+            for edge in (e["data"].get("edges") or []):
+                edges.add((edge["source"], edge["target"]))
+                edge_labels.add(edge.get("label"))
         if "done" in types:
             break
     assert "done" in types, f"agent run did not finish; types={types}"
@@ -103,4 +107,9 @@ async def test_agent_run_full_roster(client, brain_and_engine):
     assert {"agent-research-445", "agent-research-80"} <= node_ids  # one research agent per service
     assert f"agent-report-{run_id}" in node_ids
     assert {"active", "done"} <= states
+    # richer per-agent hand-off edges: planner→enum (dispatch), enum→research (feeds), *→report (feeds)
+    assert ("agent-planner-" + run_id, "agent-enum-445") in edges
+    assert ("agent-enum-445", "agent-research-445") in edges
+    assert ("agent-enum-445", "agent-report-" + run_id) in edges
+    assert {"dispatch", "feeds"} <= edge_labels
     assert (await client.get(f"/api/runs/{run_id}")).json()["state"] in {"done", "partial"}
