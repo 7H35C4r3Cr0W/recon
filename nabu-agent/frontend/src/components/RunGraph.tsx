@@ -47,12 +47,29 @@ export function RunGraph({ elements }: { elements: ElementDefinition[] }) {
         {
           selector: "edge",
           style: {
-            width: 1.5,
+            width: 1.4,
             "line-color": "#2e3d48",
             "target-arrow-color": "#2e3d48",
             "target-arrow-shape": "triangle",
             "curve-style": "bezier",
           },
+        },
+        {
+          // labeled hand-off edges (planner→enum, enum→finding/research, agents→report) stand out
+          selector: "edge[label]",
+          style: {
+            label: "data(label)",
+            "font-size": 8,
+            "font-family": "monospace",
+            color: "#6b7d88",
+            "text-rotation": "autorotate",
+            "text-background-color": "#0c1116",
+            "text-background-opacity": 0.85,
+            "text-background-padding": "1px",
+            "line-color": "#35d0ba",
+            "target-arrow-color": "#35d0ba",
+            "line-opacity": 0.6,
+          } as any,
         },
       ],
       wheelSensitivity: 0.3,

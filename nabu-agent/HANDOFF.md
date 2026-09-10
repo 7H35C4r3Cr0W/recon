@@ -231,4 +231,5 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
 - 5.5 ✅ Feed page = the front '/' (live auto-refresh, click → run live view).
 - 5.6 ✅ Help guide page (what it is, getting started, run kinds, map colours, LLM attach, SSO, safety).
 - Frontend builds clean (tsc strict + vite + theme). 40 backend tests.
-- FE tests ✅ Vitest + React Testing Library: 12 tests (api client, ws client, nodeColors, Feed, Login, Shell, Help). CI runs `npm test`.
+- FE tests ✅ Vitest + React Testing Library: 12 tests; CI runs `npm test`.
+- Richer map edges ✅ labeled hand-off edges: planner→enum (dispatch), enum→finding (found), enum→research (feeds), all agents→report (feeds); frontend renders labeled edges; demo choreography too. test_agent_run asserts the edges.
