@@ -26,10 +26,19 @@ async def seed_admin(email: str, password: str, display_name: str = "admin") -> 
         return user.id
 
 
+_WEAK_ADMIN_PASSWORDS = {"", "changeme", "change-me-now", "password", "admin"}
+
+
 async def _main() -> None:
+    from nabu_agent.settings import get_settings
+
     await create_all()  # dev convenience; prod relies on alembic having run first
     email = os.environ.get("NABU_ADMIN_EMAIL", "admin@nabu.local")
     password = os.environ.get("NABU_ADMIN_PASSWORD", "changeme")
+    # In production, refuse to seed a known-weak/default admin password (a wide-open admin account is
+    # the worst possible bootstrap). Dev/test may use the default.
+    if get_settings().env == "production" and (password in _WEAK_ADMIN_PASSWORDS or len(password) < 12):
+        raise SystemExit("refusing to seed admin: set a strong NABU_ADMIN_PASSWORD (>=12 chars) in production")
     uid = await seed_admin(email, password)
     print(f"seeded admin {email}" if uid else "users already present — no seed")
     await dispose()
