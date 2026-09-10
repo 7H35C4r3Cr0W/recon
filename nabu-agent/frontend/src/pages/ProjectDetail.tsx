@@ -6,6 +6,7 @@ interface ScopeT { id: string; target: string; kind: string; }
 interface RunT { id: string; state: string; target: string; kind: string; }
 interface ActT { ts: string | null; action: string; result: string; actor_user_id: string | null; }
 interface MemberT { user_id: string; email: string | null; role: string; }
+interface SettingsT { scan_profile: string; spray_enabled: boolean; exploit_enabled: boolean; status: string; }
 
 export function ProjectDetail() {
   const { projectId } = useParams();
@@ -14,6 +15,13 @@ export function ProjectDetail() {
   const [runs, setRuns] = useState<RunT[]>([]);
   const [activity, setActivity] = useState<ActT[]>([]);
   const [members, setMembers] = useState<MemberT[]>([]);
+  const [cfg, setCfg] = useState<SettingsT | null>(null);
+
+  async function saveSetting(patch: Partial<SettingsT>) {
+    try { setCfg((await api<SettingsT>(`/projects/${projectId}/settings`,
+      { method: "PATCH", body: JSON.stringify(patch) }))); }
+    catch (e) { setErr(String(e)); }
+  }
   const [target, setTarget] = useState("");
   const [runTarget, setRunTarget] = useState("");
   const [kind, setKind] = useState("demo");
@@ -40,6 +48,7 @@ export function ProjectDetail() {
       setRuns((await api<{ runs: RunT[] }>(`/projects/${projectId}/runs`)).runs);
       setActivity((await api<{ activity: ActT[] }>(`/projects/${projectId}/activity`)).activity ?? []);
       setMembers((await api<{ members: MemberT[] }>(`/projects/${projectId}/members`)).members ?? []);
+      setCfg(await api<SettingsT>(`/projects/${projectId}/settings`));
     } catch (e) { setErr(String(e)); }
   }
   useEffect(() => { load(); }, [projectId]);
@@ -128,6 +137,35 @@ export function ProjectDetail() {
           </ul>
         )}
       </div>
+
+      {cfg && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <h3>Settings</h3>
+          <div className="row" style={{ flexWrap: "wrap", gap: 16 }}>
+            <label className="row" style={{ gap: 6 }}>
+              <span className="muted" style={{ fontSize: 12 }}>scan profile</span>
+              <select className="select" value={cfg.scan_profile}
+                      onChange={(e) => saveSetting({ scan_profile: e.target.value })}>
+                {["quick", "default", "exam", "full"].map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+            <label className="row" style={{ gap: 6 }}>
+              <input type="checkbox" checked={cfg.spray_enabled}
+                     onChange={(e) => saveSetting({ spray_enabled: e.target.checked })} />
+              <span style={{ color: "var(--gold)" }}>spray gate</span>
+            </label>
+            <label className="row" style={{ gap: 6 }}>
+              <input type="checkbox" checked={cfg.exploit_enabled}
+                     onChange={(e) => saveSetting({ exploit_enabled: e.target.checked })} />
+              <span style={{ color: "var(--red)" }}>exploit gate</span>
+            </label>
+          </div>
+          <p className="muted" style={{ fontSize: 11.5, margin: "8px 0 0" }}>
+            The gates are one of two locks — an attack still needs a per-action human-approved checkpoint.
+            Only the project owner can change these.
+          </p>
+        </div>
+      )}
 
       <div className="card" style={{ marginTop: 12 }}>
         <h3>Team</h3>

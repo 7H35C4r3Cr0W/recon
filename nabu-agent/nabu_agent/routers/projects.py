@@ -232,3 +232,56 @@ async def remove_member(project_id: str, user_id: str, db: AsyncSession = Depend
     await audit.record(actor_user_id=user.id, action=audit.MEMBER_CHANGED, object_type="member",
                        object_id=user_id, project_id=project_id, details={"removed": True})
     return {"removed": True}
+
+
+class SettingsBody(BaseModel):
+    scan_profile: str | None = None
+    spray_enabled: bool | None = None
+    exploit_enabled: bool | None = None
+    status: str | None = None
+
+
+@router.get("/projects/{project_id}/settings")
+async def get_project_settings(project_id: str, db: AsyncSession = Depends(get_db),
+                               _auth: str = Depends(require_project_member)) -> dict:
+    """The project's scan profile + attack gates + status. Any member may read it."""
+    p = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    if p is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    return {"scan_profile": p.scan_profile, "spray_enabled": p.spray_enabled,
+            "exploit_enabled": p.exploit_enabled, "status": p.status}
+
+
+@router.patch("/projects/{project_id}/settings")
+async def update_project_settings(project_id: str, body: SettingsBody, db: AsyncSession = Depends(get_db),
+                                  user: User = Depends(get_current_user),
+                                  _auth: str = Depends(require_project_perm(Perm.SETTINGS_EDIT))) -> dict:
+    """Update scan profile / attack gates / status. SETTINGS_EDIT = owner/admin only — flipping the
+    spray or exploit gate is an owner decision (and is still only ONE of the two locks: an attack
+    also needs a per-action human-approved checkpoint)."""
+    p = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    if p is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    changed: dict = {}
+    if body.scan_profile is not None:
+        if body.scan_profile not in ("quick", "default", "exam", "full"):
+            raise HTTPException(status_code=422, detail="scan_profile must be quick|default|exam|full")
+        p.scan_profile = body.scan_profile
+        changed["scan_profile"] = body.scan_profile
+    if body.spray_enabled is not None:
+        p.spray_enabled = body.spray_enabled
+        changed["spray_enabled"] = body.spray_enabled
+    if body.exploit_enabled is not None:
+        p.exploit_enabled = body.exploit_enabled
+        changed["exploit_enabled"] = body.exploit_enabled
+    if body.status is not None:
+        if body.status not in ("active", "archived"):
+            raise HTTPException(status_code=422, detail="status must be active|archived")
+        p.status = body.status
+        changed["status"] = body.status
+    await db.commit()
+    if changed:
+        await audit.record(actor_user_id=user.id, action=audit.SETTINGS_CHANGED, object_type="project",
+                           object_id=project_id, project_id=project_id, details=changed)
+    return {"scan_profile": p.scan_profile, "spray_enabled": p.spray_enabled,
+            "exploit_enabled": p.exploit_enabled, "status": p.status}
