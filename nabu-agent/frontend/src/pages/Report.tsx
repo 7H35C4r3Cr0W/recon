@@ -5,7 +5,9 @@ import { api } from "../api/client";
 interface Finding {
   value?: string; kind?: string; port?: number | string;
   _host?: string; _category?: string;
+  id?: string; triage?: { status: string; note: string };
 }
+const TRIAGE = ["open", "reviewed", "confirmed", "dismissed"];
 
 // severity category -> theme colour (finding_severity: vulnerable is strongest)
 const CAT_COLOR: Record<string, string> = {
@@ -86,6 +88,16 @@ export function Report() {
     return () => { alive = false; };
   }, [projectId]);
 
+  async function triage(f: Finding, status: string) {
+    if (!f.id) return;
+    try {
+      await api(`/projects/${projectId}/findings/${f.id}/triage`,
+        { method: "POST", body: JSON.stringify({ status, note: f.triage?.note ?? "" }) });
+      const r = await api<{ findings: Finding[] }>(`/projects/${projectId}/findings`);
+      setFindings(r.findings || []);
+    } catch (e) { setErr(String(e)); }
+  }
+
   async function downloadExport() {
     try {
       const bundle = await api(`/projects/${projectId}/export`, { method: "POST" });
@@ -117,14 +129,20 @@ export function Report() {
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table className="rpt-table">
-                <thead><tr><th>Severity</th><th>Host</th><th>Port</th><th>Finding</th></tr></thead>
+                <thead><tr><th>Severity</th><th>Host</th><th>Port</th><th>Finding</th><th>Triage</th></tr></thead>
                 <tbody>
                   {findings.map((f, i) => (
-                    <tr key={i}>
+                    <tr key={i} style={{ opacity: f.triage?.status === "dismissed" ? 0.5 : 1 }}>
                       <td><span className="pill" style={{ color: CAT_COLOR[f._category || "info"], borderColor: CAT_COLOR[f._category || "info"] }}>{f._category || "info"}</span></td>
                       <td className="mono">{f._host || "—"}</td>
                       <td className="mono">{f.port ?? "—"}</td>
                       <td>{String(f.value ?? f.kind ?? "")}</td>
+                      <td>
+                        <select className="select" style={{ fontSize: 11, padding: "3px 6px" }}
+                                value={f.triage?.status || "open"} onChange={(e) => triage(f, e.target.value)}>
+                          {TRIAGE.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
