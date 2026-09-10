@@ -112,7 +112,7 @@ The per-host fan-out described as missing below has since been implemented for t
   `max_concurrent_hosts` (host-level semaphore), `max_enum_per_host` (per-host enum
   semaphore — now the measured 4/4 bound), and `max_total_tasks` as a hosts x services
   product cap (`per_host_budget = max_total_tasks // len(hosts)`). A host-count over
-  `approval_required_above_hosts` emits a notice. Verified by
+  `approval_required_above_hosts` PARKS the run for human approval (see below). Verified by
   `tests/integration/test_multihost_run.py` (per-host subtrees + no collision + clamp).
 
 **Still open after the host tier** (follow-ups):
@@ -128,8 +128,11 @@ The per-host fan-out described as missing below has since been implemented for t
   instead of the per-target subfolder `open()` reads — without which the host tier's
   per-host Profiles silently collapsed into one `findings.json`. Regression:
   `tests/unit/test_workspace_isolation.py`.)
-- **Hard human approval checkpoint** above N hosts is a log notice, not a blocking
-  Checkpoint gate.
+- ~~**Hard human approval checkpoint** above N hosts is a log notice.~~ **DONE** — a fan-out
+  above `approval_required_above_hosts` now PARKS the run in `awaiting_approval` with a proposed
+  Checkpoint and does not fan out until a human approves (or rejects / it times out) via
+  `POST /runs/{id}/checkpoints/{cp}/approve|reject`; RunLive shows an Approve/Reject banner.
+  Both drivers gate through `services/runs._gate_host_fanout`. (`tests/integration/test_approval_gate.py`.)
 - The **two-pool supervisor / blackboard / admission** remain stubs; a `/24` still runs
   in one worker slot.
 
@@ -184,16 +187,16 @@ Consequences, all real today:
 | `max_concurrent_service_agents` | 8 | **Enforced** (run-scoped); host tier adds `max_concurrent_hosts`=4 as the host-level semaphore |
 | `max_total_tasks` | 512 | **Wired** (host tier) — hosts x services product cap via `per_host_budget = max_total_tasks // len(hosts)` |
 | `max_hosts` | 32 | **Wired** (host tier) — `_resolve_hosts` clamps the alive-sweep to it + emits a capping log event |
-| `approval_required_above_hosts` | 16 | **Partially wired** (host tier) — over-threshold emits a notice; a hard blocking checkpoint is still a follow-up |
+| `approval_required_above_hosts` | 16 | **Wired** — over-threshold PARKS the run in `awaiting_approval` (blocking human Checkpoint) before fan-out |
 | `max_enum_per_host` | 4 | **Wired** (host tier) — per-host enum semaphore, measured 4/4 bound |
 | admission (1 active run/project, profile mutex) | — | **Stub** — `acquire/release_run_slot` raise `NotImplementedError`, called from nowhere; one-active-run index is Postgres-only |
 
 **Verdict (updated):** the event/persistence substrate + per-service fan-out are ready
 for /24 volume, and per-host fan-out + the host guardrails are now built and wired for the
 `scan` kind (see [Update: host tier](#update-host-tier-built--recon-runs)). A deterministic
-recon `/24` is now possible and bounded. Remaining follow-ups: multi-host for the `agent`
-kind, a combined multi-host report, a hard host-count approval checkpoint, and the
-distributed supervisor/admission model (a `/24` still runs in one worker slot).
+recon `/24` is now possible and bounded — with multi-host for the `agent` (LLM) kind, a combined
+multi-host report, and a blocking host-count approval checkpoint all now shipped. Remaining
+follow-up: the distributed supervisor/admission model (a `/24` still runs in one worker slot).
 
 ---
 

@@ -265,6 +265,19 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   cross-host collision.
 
 ### Phase 6 progress log
+- DONE (follow-up) — **hard host-count approval checkpoint**. A fan-out above
+  `RunLimits.approval_required_above_hosts` (16) now PARKS the run: `services/runs._gate_host_fanout`
+  (called by both drivers after `_resolve_hosts`) persists a `hosts` Checkpoint, sets state
+  `awaiting_approval`, emits `approval.required` (run node -> stuck/yellow), and polls the checkpoint
+  until approved (-> resume fan-out) / rejected (-> cancelled) / cancel / timeout (`_APPROVAL_TIMEOUT_S`
+  default 30m -> failed). Heartbeat keeps beating while parked so the reaper leaves it alone. API:
+  `GET /runs/{id}/checkpoints`, `POST .../{cp}/approve|reject` (`require_run_access`; only kind
+  `hosts` is approvable here — spray/exploit stay proposal-only). Frontend: RunLive shows an
+  Approve/Reject banner on `approval.required`. New CheckpointKind.HOSTS. Tests:
+  `test_approval_gate.py` (4: approve->proceed, reject->cancelled, timeout->failed, small fan-out no
+  gate), RunLive.test.tsx (2), + updated `test_multihost_run` (_drive auto-approves; setup.ts stubs
+  Element.scrollTo). Gate: ruff clean, mypy 10, 64 backend + 2 load + 9 invariant + 14 frontend, build OK.
+
 - DONE (follow-up) — **combined multi-host report** + a **workspace isolation fix** (the important
   one). `gateway.render_combined_report(project_id)` enumerates every per-host Profile under the
   project (skips the CIDR 'sweep' Profile whose target has '/'), and builds one markdown: cross-host

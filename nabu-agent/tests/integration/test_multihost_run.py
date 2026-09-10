@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from nabu_agent.services import runs as runs_svc
 
 pytestmark = pytest.mark.asyncio
 
@@ -65,6 +66,12 @@ async def _drive(client, cidr):
     node_ids, types, lines = set(), set(), []
     for _ in range(200):
         await asyncio.sleep(0.1)
+        # a fan-out above the approval threshold parks in awaiting_approval — auto-approve so the
+        # deterministic choreography (clamp, per-host subtrees) can be asserted (the gate itself is
+        # covered by test_approval_gate.py)
+        for c in (await client.get(f"/api/runs/{run_id}/checkpoints")).json()["checkpoints"]:
+            if c["status"] == "proposed" and c["kind"] == "hosts":
+                await client.post(f"/api/runs/{run_id}/checkpoints/{c['id']}/approve")
         for e in (await client.get(f"/api/runs/{run_id}/events")).json()["events"]:
             types.add(e["type"])
             if e["data"].get("node_id"):
@@ -92,6 +99,7 @@ async def test_cidr_fans_out_per_host(client, monkeypatch, tmp_path):
 
 
 async def test_cidr_clamps_to_max_hosts(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(runs_svc, "_APPROVAL_POLL_S", 0.1)   # >32 hosts trips the approval gate
     from nabu_agent.orchestration.limits import RunLimits
     cap = RunLimits().max_hosts
     many = [f"10.10.10.{i}" for i in range(1, cap + 9)]     # cap + 8 live hosts
