@@ -10,7 +10,12 @@ from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nabu_agent import audit
-from nabu_agent.auth.deps import get_current_user, require_project_member, require_project_owner
+from nabu_agent.auth.deps import (
+    get_current_user,
+    require_project_member,
+    require_project_owner,
+    require_project_perm,
+)
 from nabu_agent.db.models import (
     AgentTask,
     Artifact,
@@ -26,6 +31,7 @@ from nabu_agent.db.models import (
 )
 from nabu_agent.db.session import get_db
 from nabu_agent.engine.workspace import delete_project_workspace
+from nabu_agent.rbac import Perm
 from nabu_agent.settings import get_settings
 
 router = APIRouter(tags=["projects"])
@@ -95,7 +101,7 @@ async def list_scope(project_id: str, db: AsyncSession = Depends(get_db),
 @router.post("/projects/{project_id}/scope")
 async def add_scope(project_id: str, body: ScopeBody, db: AsyncSession = Depends(get_db),
                     user: User = Depends(get_current_user),
-                    _auth: str = Depends(require_project_member)) -> dict:
+                    _auth: str = Depends(require_project_perm(Perm.SCOPE_EDIT))) -> dict:
     from oscprecon.models import validate_host_or_range  # engine validator (argv-injection guard)
     try:
         target = validate_host_or_range(body.target)
@@ -144,3 +150,67 @@ async def delete_project(project_id: str, db: AsyncSession = Depends(get_db),
     await audit.record(actor_user_id=user.id, action=audit.PROJECT_DELETED, object_type="project",
                        object_id=project_id, project_id=project_id, details={"runs_removed": len(run_ids)})
     return {"deleted": True, "runs_removed": len(run_ids), "workspace": ws}
+
+
+class MemberBody(BaseModel):
+    email: str
+    role: str = "viewer"   # owner | operator | viewer (per-project)
+
+
+@router.get("/projects/{project_id}/members")
+async def list_members(project_id: str, db: AsyncSession = Depends(get_db),
+                       _auth: str = Depends(require_project_member)) -> dict:
+    """The project team: the owner plus explicit members. Any member may view it."""
+    proj = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    rows = (await db.execute(select(ProjectMember).where(
+        ProjectMember.project_id == project_id))).scalars().all()
+    ids = {proj.owner_id} | {r.user_id for r in rows} if proj else {r.user_id for r in rows}
+    users = {u.id: u for u in (await db.execute(select(User).where(User.id.in_(ids)))).scalars().all()}
+    out: list[dict[str, str | None]] = []
+    if proj and proj.owner_id in users:
+        out.append({"user_id": proj.owner_id, "email": users[proj.owner_id].email, "role": "owner"})
+    for r in rows:
+        if proj and r.user_id == proj.owner_id:
+            continue  # the owner's power comes from ownership, not a member row
+        out.append({"user_id": r.user_id, "email": users[r.user_id].email if r.user_id in users else None,
+                    "role": r.role})
+    return {"members": out}
+
+
+@router.post("/projects/{project_id}/members")
+async def add_member(project_id: str, body: MemberBody, db: AsyncSession = Depends(get_db),
+                     user: User = Depends(get_current_user),
+                     _owner: str = Depends(require_project_owner)) -> dict:
+    """Add or re-role a project member (owner/admin only). The role gates capabilities via rbac."""
+    if body.role not in ("owner", "operator", "viewer"):
+        raise HTTPException(status_code=422, detail="role must be owner, operator, or viewer")
+    target = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=404, detail="no user with that email")
+    m = (await db.execute(select(ProjectMember).where(
+        ProjectMember.project_id == project_id, ProjectMember.user_id == target.id))).scalar_one_or_none()
+    if m is None:
+        db.add(ProjectMember(project_id=project_id, user_id=target.id, role=body.role))
+    else:
+        m.role = body.role
+    await db.commit()
+    await audit.record(actor_user_id=user.id, action=audit.MEMBER_CHANGED, object_type="member",
+                       object_id=target.id, project_id=project_id,
+                       details={"email": target.email, "role": body.role})
+    return {"user_id": target.id, "email": target.email, "role": body.role}
+
+
+@router.delete("/projects/{project_id}/members/{user_id}")
+async def remove_member(project_id: str, user_id: str, db: AsyncSession = Depends(get_db),
+                        user: User = Depends(get_current_user),
+                        _owner: str = Depends(require_project_owner)) -> dict:
+    """Remove a project member (owner/admin only). The owner cannot be removed this way."""
+    proj = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    if proj and proj.owner_id == user_id:
+        raise HTTPException(status_code=409, detail="the project owner cannot be removed")
+    await db.execute(delete(ProjectMember).where(
+        ProjectMember.project_id == project_id, ProjectMember.user_id == user_id))
+    await db.commit()
+    await audit.record(actor_user_id=user.id, action=audit.MEMBER_CHANGED, object_type="member",
+                       object_id=user_id, project_id=project_id, details={"removed": True})
+    return {"removed": True}
