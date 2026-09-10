@@ -120,6 +120,24 @@ async def add_scope(project_id: str, body: ScopeBody, db: AsyncSession = Depends
 _TERMINAL = ("done", "partial", "failed", "cancelled")
 
 
+@router.delete("/projects/{project_id}/scope/{target_id}")
+async def remove_scope(project_id: str, target_id: str, db: AsyncSession = Depends(get_db),
+                       user: User = Depends(get_current_user),
+                       _auth: str = Depends(require_project_perm(Perm.SCOPE_EDIT))) -> dict:
+    """Remove an authorized-scope target. Needs the SCOPE_EDIT capability (operator/owner)."""
+    row = (await db.execute(select(ScopeTarget).where(
+        ScopeTarget.id == target_id, ScopeTarget.project_id == project_id))).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="scope target not found")
+    target = row.target
+    await db.execute(delete(ScopeTarget).where(
+        ScopeTarget.id == target_id, ScopeTarget.project_id == project_id))
+    await db.commit()
+    await audit.record(actor_user_id=user.id, action=audit.SCOPE_REMOVED, object_type="scope",
+                       object_id=target_id, project_id=project_id, details={"target": target})
+    return {"removed": True, "target": target}
+
+
 @router.delete("/projects/{project_id}")
 async def delete_project(project_id: str, db: AsyncSession = Depends(get_db),
                          user: User = Depends(get_current_user),

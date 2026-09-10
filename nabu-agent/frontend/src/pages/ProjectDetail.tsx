@@ -50,6 +50,11 @@ export function ProjectDetail() {
     catch (e) { setErr(String(e)); }
   }
 
+  async function removeScope(id: string) {
+    try { await api(`/projects/${projectId}/scope/${id}`, { method: "DELETE" }); load(); }
+    catch (e) { setErr(String(e)); }
+  }
+
   async function del() {
     if (!confirm("Delete this project? This removes all its runs, findings, and on-disk recon data.")) return;
     try { await api(`/projects/${projectId}`, { method: "DELETE" }); nav("/projects"); }
@@ -78,7 +83,12 @@ export function ProjectDetail() {
           <button className="btn" type="submit">Add to scope</button>
         </form>
         <ul className="list" style={{ marginTop: 10 }}>
-          {scope.map((s) => <li key={s.id} className="row"><span className="pill">{s.kind}</span> <span className="mono">{s.target}</span></li>)}
+          {scope.map((s) => (
+            <li key={s.id} className="row" style={{ justifyContent: "space-between" }}>
+              <span className="row" style={{ gap: 8 }}><span className="pill">{s.kind}</span> <span className="mono">{s.target}</span></span>
+              <button className="btn" title="remove scope target" onClick={() => removeScope(s.id)}>✕</button>
+            </li>
+          ))}
         </ul>
       </div>
 
