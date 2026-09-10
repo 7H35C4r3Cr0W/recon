@@ -32,7 +32,12 @@ async def get_report(project_id: str, db: AsyncSession = Depends(get_db),
     if not scope:
         return {"markdown": "_No recon has run yet — start a run to generate a report._"}
     try:
-        markdown = await asyncio.to_thread(gateway.render_report, project_id, scope, None)
+        # A CIDR/range scope fans out per host, so aggregate every per-host Profile into one
+        # combined report + next steps; a single host renders its own report directly.
+        if "/" in scope:
+            markdown = await asyncio.to_thread(gateway.render_combined_report, project_id)
+        else:
+            markdown = await asyncio.to_thread(gateway.render_report, project_id, scope, None)
     except ProjectNotFound:
         return {"markdown": "_No report yet — the first run will create the project workspace._"}
     return {"markdown": markdown}

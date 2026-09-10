@@ -121,8 +121,13 @@ The per-host fan-out described as missing below has since been implemented for t
   (`services/runs._agent_host` + the `_run_agent` driver), host-scoped
   (`agent-planner-{ip}`, `agent-report-{ip}`, …), under the same host guardrails; a per-host
   crash marks that host red and the run continues. (`test_multihost_agent_run.py`.)
-- **Combined multi-host report** — each host writes its own `report.md`; there is no
-  run-level aggregate report yet (`GET /report` reads the entry scope's Profile).
+- ~~**Combined multi-host report**~~ **DONE** — `GET /report` for a CIDR scope now returns
+  one aggregated report (`gateway.render_combined_report`): cross-host summary table +
+  severity tally + notable next steps + each host's full section. (Also fixed a latent
+  `AgentWorkspace.create()` bug that wrote every target to `<workspace>/<project_id>`
+  instead of the per-target subfolder `open()` reads — without which the host tier's
+  per-host Profiles silently collapsed into one `findings.json`. Regression:
+  `tests/unit/test_workspace_isolation.py`.)
 - **Hard human approval checkpoint** above N hosts is a log notice, not a blocking
   Checkpoint gate.
 - The **two-pool supervisor / blackboard / admission** remain stubs; a `/24` still runs
