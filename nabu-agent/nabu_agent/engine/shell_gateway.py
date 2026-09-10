@@ -196,7 +196,7 @@ def execute_gated_action(
         spray=spray,
         exploit=exploit,  # the ONE exploit=... site in the whole codebase
     )
-    audit(profile, "spray" if spray else "run-command", actor=checkpoint.approved_by, details={
+    audit(profile, "spray" if spray else "run-command", actor=checkpoint.approved_by or "system", details={
         "shell_line": _redact(shell_line),
         "kind": kind,
         "exit_code": result.exit_code,

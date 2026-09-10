@@ -75,9 +75,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
     # Dispose the async DB engine on shutdown.
     try:
-        from nabu_agent.db.session import engine
+        from nabu_agent.db.session import dispose
 
-        await engine.dispose()
+        await dispose()
     except Exception:  # pragma: no cover
         pass
     try:

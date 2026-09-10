@@ -30,6 +30,7 @@ async def reap_stale_runs(threshold_s: int | None = None) -> list[str]:
     threshold = threshold_s if threshold_s is not None else get_settings().run_stale_after_s
     cutoff = datetime.now(UTC) - timedelta(seconds=threshold)
     reaped: list[str] = []
+    reaped_pids: dict[str, str] = {}
     try:
         async with sessionmaker()() as db:
             rows = (await db.execute(select(Run).where(
@@ -40,6 +41,8 @@ async def reap_stale_runs(threshold_s: int | None = None) -> list[str]:
                 run.error = "reaped: worker heartbeat stale — the worker running this run likely died"
                 run.finished_at = datetime.now(UTC)
                 reaped.append(run.id)
+                if run.project_id:
+                    reaped_pids[run.id] = run.project_id
             if reaped:
                 await db.commit()
     except Exception:
@@ -48,10 +51,19 @@ async def reap_stale_runs(threshold_s: int | None = None) -> list[str]:
 
     if reaped:
         _log.warning("runs-reaped", count=len(reaped), run_ids=reaped, threshold_s=threshold)
-        # emit a terminal event per reaped run so any connected live view stops waiting
+        # a dead worker never ran execute_run's finally, so its admission slot (Redis project mutex +
+        # global-active counter) was never released — reconcile it here, or the project stays locked
+        # (up to the mutex TTL) and the global ceiling leaks a permanent +1 per crash.
+        from nabu_agent.engine.workspace import project_root
         from nabu_agent.events.schema import RunEventType
+        from nabu_agent.orchestration import admission
         from nabu_agent.services.runs import _emit
         for rid in reaped:
+            pid = reaped_pids.get(rid)
+            if pid:
+                with contextlib.suppress(Exception):
+                    await admission.release_run_slot(pid, str(project_root(pid)))
+            # emit a terminal event so any connected live view stops waiting
             with contextlib.suppress(Exception):
                 await _emit(rid, RunEventType.ERROR, {"message": "run reaped: worker died"})
                 await _emit(rid, RunEventType.DONE, {"state": "failed", "reaped": True})

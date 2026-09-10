@@ -74,3 +74,39 @@ async def test_admin_endpoints_require_admin(app_ctx):
     assert (await b.get("/api/admin/storage")).status_code == 403
     assert (await b.post("/api/admin/retention")).status_code == 403
     await a.aclose(); await b.aclose()
+
+
+async def test_prune_deletes_all_fk_children(app_ctx):
+    """Regression: a pruned run's findings_index / artifacts / llm_call rows must be deleted too.
+    They FK runs.id with no ON DELETE CASCADE, so if the prune skips them the delete(Run) rolls back
+    (Postgres) and the cap never applies; here (sqlite, FKs off) we assert no orphaned children."""
+    from nabu_agent.db.models import Artifact, FindingIndex, LLMCall, Run, RunEvent
+    from nabu_agent.db.session import sessionmaker
+    from nabu_agent.orchestration.retention import run_retention
+    from sqlalchemy import func, select
+
+    base = datetime.now(UTC)
+    pid = "fkproj"
+    async with sessionmaker()() as db:
+        runs = []
+        for i in range(3):
+            r = Run(project_id=pid, kind="scan", target=f"10.0.0.{i}", state="done",
+                    started_at=base - timedelta(minutes=3 - i))  # runs[0] oldest → pruned at cap=2
+            db.add(r); runs.append(r)
+        await db.flush()
+        old = runs[0]
+        db.add(RunEvent(run_id=old.id, seq=1, type="log.line", payload={}))
+        db.add(FindingIndex(project_id=pid, run_id=old.id, engine_key="smb-signing"))
+        db.add(Artifact(project_id=pid, run_id=old.id, kind="report_md", path="/x", filename="report.md"))
+        db.add(LLMCall(run_id=old.id, total_tokens=42))
+        await db.commit(); oldid = old.id
+
+    out = await run_retention(run_events_days=9999, max_runs_per_project=2)
+    assert out.get("error") is None       # the prune did NOT roll back on an FK child
+    assert out["runs_pruned"] == 1
+    async with sessionmaker()() as db:
+        assert await db.get(Run, oldid) is None
+        for model in (FindingIndex, Artifact, LLMCall):
+            n = (await db.execute(select(func.count()).select_from(model)
+                                  .where(model.run_id == oldid))).scalar()
+            assert n == 0, f"{model.__name__} child orphaned after prune"

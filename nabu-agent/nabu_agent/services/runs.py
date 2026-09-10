@@ -110,8 +110,9 @@ async def replay_events(db, run_id: str, after: int = 0) -> list[dict[str, Any]]
 async def _emit(run_id: str, type_: RunEventType, data: dict[str, Any]) -> None:
     """Assign a seq, persist a run_events row, and publish to Redis — atomically per run so publish
     order matches seq order (the WS tail dedups by strictly-increasing seq)."""
-    lock = _EMIT_LOCKS.setdefault(run_id, asyncio.Lock())
-    async with lock:
+    if run_id not in _EMIT_LOCKS:
+        _EMIT_LOCKS[run_id] = asyncio.Lock()
+    async with _EMIT_LOCKS[run_id]:
         seq = await bus.next_seq(run_id)
         ev = make_event(type_, run_id, seq, time.time(), data=data, task_id=data.get("node_id"))
         async with sessionmaker()() as db:
@@ -130,10 +131,13 @@ async def _touch_heartbeat(run_id: str) -> None:
             await db.commit()
 
 
-async def _heartbeat_loop(run_id: str, cancel_event: threading.Event, period_s: float = 10.0) -> None:
-    """Beat every ~10s while the run executes; stops when the run ends (cancel_event set)."""
+async def _heartbeat_loop(run_id: str, ending: threading.Event, period_s: float = 10.0) -> None:
+    """Beat every ~10s until the run actually ENDS (the driver's finally sets `ending`). Deliberately
+    NOT tied to the cancel signal: a cancel can take a while to unwind (in-flight engine calls, an
+    awaited host job), and the beat must continue through it so the reaper never declares a still-live
+    run dead — which would emit a SECOND terminal event and race the run's own final state."""
     try:
-        while not cancel_event.is_set():
+        while not ending.is_set():
             await _touch_heartbeat(run_id)
             await asyncio.sleep(period_s)
     except asyncio.CancelledError:
@@ -315,6 +319,8 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
 
     # a threading.Event fed by the Redis cancel flag, handed to the (blocking) engine calls
     cancel_event = threading.Event()
+    # a SEPARATE signal set only in the finally — keeps the heartbeat beating through cancel unwind
+    ending = threading.Event()
 
     async def watch_cancel() -> None:
         try:
@@ -337,14 +343,17 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
         _profile_dir = str(project_root(project_id))
         _admitted = await admission.acquire_run_slot(project_id, _profile_dir)
         if not _admitted:
-            await _set_state(run_id, "failed")
             with contextlib.suppress(Exception):
-                await _emit(run_id, RunEventType.ERROR,
-                            {"message": "another run is already active for this project"})
-            await _emit(run_id, RunEventType.DONE, {"state": "failed"})
+                await _set_state(run_id, "failed")
+            with contextlib.suppress(Exception):
+                await _emit(run_id, RunEventType.ERROR, {"message": "run not admitted — another run "
+                            "is already active for this project, or the global run limit is reached"})
+            with contextlib.suppress(Exception):
+                await _emit(run_id, RunEventType.DONE, {"state": "failed"})
+            _EMIT_LOCKS.pop(run_id, None)
             return
     watcher = asyncio.create_task(watch_cancel())
-    heart = asyncio.create_task(_heartbeat_loop(run_id, cancel_event))
+    heart = asyncio.create_task(_heartbeat_loop(run_id, ending))
     pump = LogPump(run_id, publish)
     pump_task = asyncio.create_task(pump.drain())
     final = "failed"
@@ -374,6 +383,7 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
             await _set_state(run_id, final)
         with contextlib.suppress(Exception):
             await _emit(run_id, RunEventType.DONE, {"state": final})
+        ending.set()          # stop the heartbeat only now that the terminal event is out
         cancel_event.set()
         watcher.cancel()
         heart.cancel()
@@ -600,13 +610,13 @@ async def _agent_host(run_id: str, host: str, publish, *, project_id: str, cance
     def _svc_node(s: dict) -> str:
         return f"svc-{host}-{s['port']}-{s.get('proto', 'tcp')}"
 
-    def _svc_ctx(s: dict) -> dict:
+    def _svc_ctx(s) -> dict:
         return {**base_ctx, "host": host, "port": s["port"],
                 "service": {"port": s["port"], "service": s.get("service", ""),
                             "product": s.get("product", "")}}
 
     # --- enum agents (one per service, concurrent) ---
-    async def _enum(s: dict) -> dict | None:
+    async def _enum(s) -> dict | None:
         async with sem:
             return await run_role("enum_writer", f"agent-enum-{host}-{s['port']}",
                                   f"enum {s.get('service') or s['port']}", _svc_node(s), _svc_ctx(s),
@@ -632,7 +642,7 @@ async def _agent_host(run_id: str, host: str, publish, *, project_id: str, cance
     # --- research agents (one per service, concurrent; proposals only) ---
     research_ctx = await ContextAssembler(project_id, host).build()
 
-    async def _research(s: dict) -> dict | None:
+    async def _research(s) -> dict | None:
         ctx = {**research_ctx, "host": host, "port": s["port"],
                "finding": {"service": s.get("service", ""), "port": s["port"],
                            "product": s.get("product", "")}}

@@ -30,7 +30,7 @@ _DEMO_SERVICES = [
     {"port": 80, "proto": "tcp", "service": "http", "product": "nginx 1.18"},
     {"port": 445, "proto": "tcp", "service": "smb", "product": "Samba 4.15"},
 ]
-_DEMO_FINDINGS = [
+_DEMO_FINDINGS: list[dict[str, Any]] = [
     {"engine_key": "smb-signing", "value": "SMB signing not required", "port": 445, "category": "exposure"},
     {"engine_key": "http-title", "value": "Apache default page", "port": 80, "category": "info"},
 ]

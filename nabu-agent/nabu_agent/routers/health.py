@@ -24,7 +24,7 @@ async def ready() -> dict[str, object]:
 
     try:
         from nabu_agent.db.session import engine
-        async with engine.connect() as conn:
+        async with engine().connect() as conn:
             await conn.execute(text("SELECT 1"))
         checks["database"] = True
     except Exception:
