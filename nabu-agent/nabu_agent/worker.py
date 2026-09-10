@@ -11,7 +11,7 @@ from typing import Any
 
 from arq import cron
 
-from nabu_agent.orchestration import reaper, tasks
+from nabu_agent.orchestration import reaper, retention, tasks
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
@@ -45,7 +45,10 @@ def _redis_settings() -> Any:
 class WorkerSettings:
     functions = [tasks.supervise_run]
     # reap stale/killed runs every 30s so a dead worker's run doesn't stay stuck
-    cron_jobs = [cron(reaper.reap_job, second={0, 30}, run_at_startup=True)]
+    cron_jobs = [
+        cron(reaper.reap_job, second={0, 30}, run_at_startup=True),
+        cron(retention.retention_job, minute={0}, run_at_startup=True),  # hourly housekeeping
+    ]
     on_startup = on_startup
     on_shutdown = on_shutdown
     max_jobs = 16          # concurrent runs; per-run fan-out is bounded separately (RunLimits)

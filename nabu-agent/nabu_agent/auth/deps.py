@@ -58,3 +58,10 @@ async def require_run_access(run_id: str = Path(...), db: AsyncSession = Depends
     if run is None or not await _is_member(db, user, run.project_id):
         raise HTTPException(status_code=404, detail="run not found")
     return run
+
+
+async def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Global-admin-only guard for platform admin endpoints."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="admin only")
+    return user

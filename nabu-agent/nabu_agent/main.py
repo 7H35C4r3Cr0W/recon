@@ -135,6 +135,7 @@ def create_app() -> FastAPI:
 
     # Routers under /api. auth/projects/scope/runs are wired (Phase 2); the rest are scaffolded.
     from nabu_agent.routers import (
+        admin,
         audit,
         auth,
         catalog,
@@ -152,7 +153,9 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router, prefix="/api")
-    for module in (auth, projects, scope, runs, reports, findings, catalog, creds, feed, users, audit, settings_router):
+    _routers = (auth, projects, scope, runs, reports, findings, catalog, creds, feed, admin,
+                users, audit, settings_router)
+    for module in _routers:
         app.include_router(module.router, prefix="/api")
 
     # WebSocket hub under /ws.

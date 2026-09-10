@@ -233,4 +233,5 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
 - Frontend builds clean (tsc strict + vite + theme). 40 backend tests.
 - FE tests ✅ Vitest + React Testing Library: 12 tests; CI runs `npm test`.
 - Richer map edges ✅ labeled hand-off edges (planner→enum, enum→finding/research, agents→report).
-- Log backpressure ✅ LogPump: engine on_line lines buffered in a bounded deque (cap 2000) + drained in ~250ms batches as one log.line event with a 'suppressed' overflow count (no per-line coroutine flood). Frontend renders batched lines + a suppressed notice. Unit-tested. 42 backend + 12 FE tests.
+- Log backpressure ✅ LogPump (bounded deque + coalesced batches + suppressed count).
+- Retention/quotas ✅ orchestration/retention.py: event-TTL (prune terminal runs' events > N days) + per-project run cap (keep newest N + cascade delete children); Arq cron (hourly + startup) on the worker; admin endpoints GET /api/admin/storage + POST /api/admin/retention (admin-only). Unit + endpoint tests. 45 backend + 12 FE tests. **All Phase-5 items + all optional polish complete.**
