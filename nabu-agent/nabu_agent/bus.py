@@ -10,6 +10,7 @@ Keys:
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import AsyncIterator
 from typing import Any
@@ -111,3 +112,12 @@ async def enqueue_run(run_id: str, target: str, kind: str, project_id: str) -> N
     """Enqueue the supervisor job for a run onto the Arq worker pool."""
     pool = await get_arq_pool()
     await pool.enqueue_job("supervise_run", run_id, target, kind, project_id, _job_id=f"run:{run_id}")
+
+
+async def close_arq_pool() -> None:
+    """Close the cached Arq pool on shutdown (avoids a leaked connection)."""
+    global _arq_pool
+    if _arq_pool is not None:
+        with contextlib.suppress(Exception):
+            await _arq_pool.aclose()
+        _arq_pool = None

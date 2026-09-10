@@ -6,6 +6,7 @@ BloodHound-style map + log behave identically whether the recon is simulated or 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import threading
 import time
 from typing import Any
@@ -79,24 +80,33 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
 
     await _set_state(run_id, "scanning")
     watcher = asyncio.create_task(watch_cancel())
+    final = "failed"
     try:
-        if kind == "demo":
-            final = await run_demo(run_id, target, publish)
-        elif kind == "agent":
-            final = await _run_agent(run_id, target, publish, project_id=project_id or "unknown",
-                                     cancel_event=cancel_event)
-        else:
-            final = await _run_real(run_id, target, publish, project_id=project_id or "unknown",
-                                    cancel_event=cancel_event)
-        await _set_state(run_id, final)
-    except Exception as exc:  # never leave a run wedged; surface + persist the error live
-        await publish(RunEventType.ERROR, {"message": str(exc)})
-        await _set_state(run_id, "failed")
+        try:
+            if kind == "demo":
+                final = await run_demo(run_id, target, publish)
+            elif kind == "agent":
+                final = await _run_agent(run_id, target, publish, project_id=project_id or "unknown",
+                                         cancel_event=cancel_event)
+            else:
+                final = await _run_real(run_id, target, publish, project_id=project_id or "unknown",
+                                        cancel_event=cancel_event)
+        except asyncio.CancelledError:
+            final = "cancelled"
+            raise
+        except Exception as exc:  # surface + persist the error live; never leave a run wedged
+            await publish(RunEventType.ERROR, {"message": str(exc)})
+            final = "failed"
     finally:
+        # exactly ONE terminal event on EVERY path (success/error/cancel/no-LLM) so the live WS
+        # tail always unblocks; best-effort so a hard cancel can't mask the state write.
+        with contextlib.suppress(Exception):
+            await _set_state(run_id, final)
+        with contextlib.suppress(Exception):
+            await _emit(run_id, RunEventType.DONE, {"state": final})
         cancel_event.set()
         watcher.cancel()
         _EMIT_LOCKS.pop(run_id, None)
-
 
 async def _run_real(run_id: str, target: str, publish, *, project_id: str,
                     cancel_event: threading.Event) -> str:
@@ -148,7 +158,8 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
     # worker threads; the per-run _emit lock keeps the event stream ordered.
     from nabu_agent.orchestration.limits import RunLimits
 
-    limits = RunLimits.from_settings(len(services) or 1)
+    limits = RunLimits()  # conservative defaults; not driven by the number of services
+    services = services[: limits.max_total_tasks]  # hard cap the fan-out width
     sem = asyncio.Semaphore(max(1, limits.max_concurrent_service_agents))
     partial_flags: list[bool] = []
 
@@ -171,10 +182,9 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
                 await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.STUCK.value})
                 await publish(RunEventType.LOG_LINE, {"line": f"[enum] {service_name}:{s['port']} — {exc}"})
 
-    await asyncio.gather(*[_enum_one(s) for s in services])
+    await asyncio.gather(*[_enum_one(s) for s in services], return_exceptions=True)
     partial = bool(partial_flags)
     if cancel_event.is_set():
-        await publish(RunEventType.DONE, {"state": "cancelled"})
         return "cancelled"
 
     # findings → map
@@ -192,7 +202,6 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
     await publish(RunEventType.TASK_UPDATED, {"node_id": report_node, "node_state": NodeState.DONE.value})
     await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.DONE.value,
                   "state": "report_ready"})
-    await publish(RunEventType.DONE, {"state": "partial" if partial else "done"})
     return "partial" if partial else "done"
 
 
@@ -287,5 +296,4 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
     await publish(RunEventType.TASK_UPDATED, {"node_id": report_node, "node_state": NodeState.DONE.value})
     await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.DONE.value,
                   "state": "report_ready"})
-    await publish(RunEventType.DONE, {"state": "done"})
     return "done"

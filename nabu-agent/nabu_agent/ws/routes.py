@@ -57,11 +57,23 @@ async def ws_run(websocket: WebSocket, run_id: str) -> None:
 
     last_seq = 0
     try:
-        # 2) replay the durable backlog
+        # 2) replay the durable backlog + check whether the run already finished
+        _TERMINAL = {"done", "failed", "partial", "cancelled"}
+        run_state = None
         async with sessionmaker()() as db:
             for ev in await runs_svc.replay_events(db, run_id, after=0):
                 await websocket.send_json(ev)
                 last_seq = max(last_seq, ev["seq"])
+            run_row = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one_or_none()
+            run_state = run_row.state if run_row else None
+
+        # a run that already reached a terminal state won't publish anything live — close now so a
+        # reconnect to a finished run doesn't hang waiting for a 'done' that already happened.
+        if run_state in _TERMINAL:
+            with contextlib.suppress(Exception):
+                await websocket.send_json({"type": "done", "run_id": run_id, "seq": last_seq + 1,
+                                           "ts": 0, "data": {"state": run_state}})
+            return
 
         # 3) flush anything that arrived during replay (dedup by seq), then tail live
         heartbeat = asyncio.create_task(_heartbeat(websocket, run_id))

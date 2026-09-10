@@ -53,7 +53,13 @@ async def start_run(project_id: str, body: RunBody, db: AsyncSession = Depends(g
               requested_by=user.id)
     db.add(run)
     await db.commit()
-    await runs_svc.start(run.id, body.target, body.kind, project_id=project_id)
+    try:
+        await runs_svc.start(run.id, body.target, body.kind, project_id=project_id)
+    except Exception as exc:  # enqueue failed (e.g. worker/redis down) — don't leave it stuck 'queued'
+        run.state = "failed"
+        run.error = f"failed to start: {exc}"
+        await db.commit()
+        raise HTTPException(status_code=503, detail="could not start run (worker/queue unavailable)") from exc
     return {"run_id": run.id, "state": "queued", "target": body.target, "kind": body.kind}
 
 
