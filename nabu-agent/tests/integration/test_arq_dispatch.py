@@ -40,8 +40,8 @@ async def test_start_runs_in_process_when_disabled(monkeypatch):
 
 
 async def test_supervise_run_delegates_to_driver(monkeypatch):
-    from nabu_agent.orchestration import tasks
     import nabu_agent.services.runs as runs
+    from nabu_agent.orchestration import tasks
 
     calls = []
     async def fake_execute(run_id, target, kind, *, project_id=None):
