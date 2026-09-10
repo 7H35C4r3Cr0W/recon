@@ -38,7 +38,7 @@ async def test_runner_dispatches_then_finishes(monkeypatch):
     # mock the engine dispatch so no real Profile/tools are needed
     from nabu_agent.agents.tools import dispatch as td
 
-    async def fake_dispatch(name, args, *, project_id, target, on_line=None):
+    async def fake_dispatch(name, args, *, project_id, target, on_line=None, cancel=None):
         return {"tool": name, "args": args, "ok": True}
     monkeypatch.setattr(td, "dispatch", fake_dispatch)
 

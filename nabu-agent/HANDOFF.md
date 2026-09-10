@@ -24,16 +24,24 @@
 
 ```
 DATE:        2026-09-09
-BRANCH:      main   (PR #1 scaffold + PR #2 Phase-2 MVP both MERGED)
-PHASE:       2 — MVP thin slice: demo path WORKING + TESTED + MERGED
-DOING NOW:   (paused at a clean, tested checkpoint)
-VERIFIED:    16/16 tests pass on merged main incl. MVP integration (login→project→scope→demo run→
-             live events→done). Frontend builds clean (tsc strict + vite + cytoscape). Headless.
-DONE:        Phases 0,1,4; Phase 2 sub-steps 2.1–2.5, 2.7, 2.9, 2.10 (demo path). Live BloodHound-
-             style map + colour-coded node states + live log working. Preview: docs/live-map-demo.html.
-NEXT UP (resume here): 2.6 wire `_run_real` (executor) to engine.tools via the chokepoint for REAL
-             single-target recon; 2.8 reports/findings router bodies (gateway funcs exist); then
-             Phase 3 — move executor onto the Arq worker + agent fan-out + LLM loop; RBAC/OIDC.
+BRANCH:      nabu-agent-realrecon  (branched off main; PRs #1,#2,#3 already merged to main)
+PHASE:       2 DONE (real recon + views) · Phase 3 CORE DONE (LLM agent loop) — the body is
+             ready to attach the brain
+DOING NOW:   final stopping-point bug review of the Phase 2-3 code (workflow), then merge to main
+VERIFIED:    22/22 tests pass (order-independent), ruff clean, frontend builds. Includes: MVP
+             integration, REAL-recon choreography (engine mocked), and LLM-driven AGENT run (fake
+             provider + mocked engine) → live map. Headless holds.
+DONE:        Phases 0,1,4; Phase 2 fully (2.1–2.10 incl. 2.6 real recon `_run_real`, 2.8 reports/
+             findings/services/graph views); Phase 3 CORE: AgentRunner tool-loop + ToolDispatcher
+             (recon-only; any tool failure → ToolError, never a crash) + ToolRegistry + Context
+             Assembler + SafetyGate wired; run kind "agent" drives LLM recon; GET /api/llm/health;
+             UI run-kind selector (demo|scan|agent).
+BRAIN HOOK:  set NABU_LLM_BASE_URL (+ NABU_LLM_API_KEY, NABU_LLM_MODEL) to your internal
+             OpenAI-compatible endpoint → kind="agent" runs let the LLM drive recon. No code change.
+NEXT UP:     Phase 3 remainder — move the executor onto the Arq worker for multi-run scale + true
+             per-service agent fan-out (currently in-process, single writer); richer per-agent nodes
+             from LLM tool calls; then hardening: per-project RBAC enforcement, OIDC, cancel of a
+             real scan's process group, artifact retention.
 HOW TO TEST: cd nabu-agent && PYTHONPATH=. .venv-agent/bin/python -m pytest -q -o asyncio_mode=auto
              (sqlite+fakeredis, no docker). Full stack: docker compose up (needs Postgres/Redis).
 ```

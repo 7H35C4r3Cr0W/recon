@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nabu_agent.auth.deps import get_current_user
+from nabu_agent.auth.deps import get_current_user, require_project_member
 from nabu_agent.db.models import ScopeTarget, User
 from nabu_agent.db.session import get_db
 from nabu_agent.engine import gateway
@@ -32,7 +32,8 @@ async def _scope_for(db: AsyncSession, project_id: str) -> str | None:
 
 @router.get("/projects/{project_id}/findings")
 async def get_findings(project_id: str, db: AsyncSession = Depends(get_db),
-                       user: User = Depends(get_current_user)) -> dict:
+                       user: User = Depends(get_current_user),
+                     _auth: str = Depends(require_project_member)) -> dict:
     scope = await _scope_for(db, project_id)
     if not scope:
         return {"findings": []}
@@ -45,7 +46,8 @@ async def get_findings(project_id: str, db: AsyncSession = Depends(get_db),
 
 @router.get("/projects/{project_id}/services")
 async def get_services(project_id: str, db: AsyncSession = Depends(get_db),
-                       user: User = Depends(get_current_user)) -> dict:
+                       user: User = Depends(get_current_user),
+                     _auth: str = Depends(require_project_member)) -> dict:
     scope = await _scope_for(db, project_id)
     if not scope:
         return {"services": []}
@@ -58,7 +60,8 @@ async def get_services(project_id: str, db: AsyncSession = Depends(get_db),
 
 @router.get("/projects/{project_id}/graph")
 async def get_graph(project_id: str, db: AsyncSession = Depends(get_db),
-                    user: User = Depends(get_current_user)) -> dict:
+                    user: User = Depends(get_current_user),
+                     _auth: str = Depends(require_project_member)) -> dict:
     scope = await _scope_for(db, project_id)
     if not scope:
         return {"nodes": [], "edges": []}

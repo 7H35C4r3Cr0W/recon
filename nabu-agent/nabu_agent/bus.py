@@ -53,15 +53,28 @@ async def publish_event(run_id: str, event: dict[str, Any]) -> None:
     await get_redis().publish(events_channel(run_id), json.dumps(event))
 
 
-async def subscribe(run_id: str) -> AsyncIterator[dict[str, Any]]:
-    """Yield live events published to the run channel (JSON-decoded)."""
+async def open_subscription(run_id: str) -> Any:
+    """Create a pubsub and eagerly complete the Redis SUBSCRIBE, so no event published after this
+    returns can be missed. Pair with :func:`listen` (and close the returned pubsub when done)."""
     pubsub = get_redis().pubsub()
     await pubsub.subscribe(events_channel(run_id))
+    return pubsub
+
+
+async def listen(pubsub: Any) -> AsyncIterator[dict[str, Any]]:
+    """Yield JSON-decoded events from an already-subscribed pubsub."""
+    async for message in pubsub.listen():
+        if message.get("type") == "message":
+            data = message["data"]
+            yield json.loads(data if isinstance(data, str) else data.decode())
+
+
+async def subscribe(run_id: str) -> AsyncIterator[dict[str, Any]]:
+    """Convenience: open a subscription and yield live events (lazy SUBSCRIBE on first iteration)."""
+    pubsub = await open_subscription(run_id)
     try:
-        async for message in pubsub.listen():
-            if message.get("type") == "message":
-                data = message["data"]
-                yield json.loads(data if isinstance(data, str) else data.decode())
+        async for ev in listen(pubsub):
+            yield ev
     finally:
         await pubsub.unsubscribe(events_channel(run_id))
         await pubsub.aclose()

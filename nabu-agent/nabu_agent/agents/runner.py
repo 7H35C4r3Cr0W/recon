@@ -13,6 +13,7 @@ the SafetyGate blocks gate-flag arguments, and tool output is labelled as data, 
 from __future__ import annotations
 
 import json
+import threading
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -29,7 +30,7 @@ Emit = Callable[[str, dict[str, Any]], Awaitable[None]] | None
 
 class AgentRunner:
     def __init__(self, role: str, provider: LLMProvider, *, project_id: str, target: str,
-                 run_id: str = "", emit: Emit = None) -> None:
+                 run_id: str = "", emit: Emit = None, cancel: threading.Event | None = None) -> None:
         self.roledef = ROLES[role]
         self.role = role
         self.provider = provider
@@ -37,6 +38,7 @@ class AgentRunner:
         self.target = target
         self.run_id = run_id
         self.emit = emit
+        self.cancel = cancel
         self.gate = SafetyGate(self.roledef.allowed_tools)
 
     async def _log(self, line: str) -> None:
@@ -52,6 +54,9 @@ class AgentRunner:
         ]
         tokens = 0
         for step in range(self.roledef.max_steps):
+            if self.cancel is not None and self.cancel.is_set():
+                return {"content": "(cancelled)", "steps": step, "tokens": tokens,
+                        "stopped_reason": "cancelled"}
             resp = await self.provider.chat(ChatRequest(messages=messages, tools=tools))
             tokens += resp.usage.total_tokens or self.provider.count_tokens(messages, tools)
             if tokens > self.roledef.max_tokens:
@@ -81,6 +86,6 @@ class AgentRunner:
         await self._log(f"[{self.role}] → {name}({', '.join(f'{k}={v}' for k, v in args.items())})")
         try:
             return await tool_dispatch.dispatch(name, args, project_id=self.project_id, target=self.target,
-                                                on_line=None)
+                                                on_line=None, cancel=self.cancel)
         except tool_dispatch.ToolError as exc:
             return {"error": str(exc)}

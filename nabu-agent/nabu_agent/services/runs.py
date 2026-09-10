@@ -18,6 +18,13 @@ from nabu_agent.db.session import sessionmaker
 from nabu_agent.events.schema import NodeState, RunEventType, make_event
 from nabu_agent.orchestration.executor import run_demo
 
+# Strong refs to in-flight driver tasks so the event loop can't GC/cancel a run mid-execution
+# (a bare create_task is only weakly referenced — caught in review).
+_RUNNING: set[asyncio.Task] = set()
+# Per-run lock so seq-assign + persist + publish happen atomically and in seq order (the WS live
+# tail dedups by strictly-increasing seq, so out-of-order publishes would drop events).
+_EMIT_LOCKS: dict[str, asyncio.Lock] = {}
+
 
 async def replay_events(db, run_id: str, after: int = 0) -> list[dict[str, Any]]:
     rows = (await db.execute(
@@ -29,14 +36,17 @@ async def replay_events(db, run_id: str, after: int = 0) -> list[dict[str, Any]]
 
 
 async def _emit(run_id: str, type_: RunEventType, data: dict[str, Any]) -> None:
-    """Assign a seq, persist a run_events row, and publish to Redis for live subscribers."""
-    seq = await bus.next_seq(run_id)
-    ev = make_event(type_, run_id, seq, time.time(), data=data, task_id=data.get("node_id"))
-    async with sessionmaker()() as db:
-        db.add(RunEvent(run_id=run_id, seq=seq, type=type_.value, task_id=data.get("node_id"),
-                        payload=dict(data)))
-        await db.commit()
-    await bus.publish_event(run_id, ev.to_json())
+    """Assign a seq, persist a run_events row, and publish to Redis — atomically per run so publish
+    order matches seq order (the WS tail dedups by strictly-increasing seq)."""
+    lock = _EMIT_LOCKS.setdefault(run_id, asyncio.Lock())
+    async with lock:
+        seq = await bus.next_seq(run_id)
+        ev = make_event(type_, run_id, seq, time.time(), data=data, task_id=data.get("node_id"))
+        async with sessionmaker()() as db:
+            db.add(RunEvent(run_id=run_id, seq=seq, type=type_.value, task_id=data.get("node_id"),
+                            payload=dict(data)))
+            await db.commit()
+        await bus.publish_event(run_id, ev.to_json())
 
 
 async def _set_state(run_id: str, state: str) -> None:
@@ -85,6 +95,7 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
     finally:
         cancel_event.set()
         watcher.cancel()
+        _EMIT_LOCKS.pop(run_id, None)
 
 
 async def _run_real(run_id: str, target: str, publish, *, project_id: str,
@@ -173,7 +184,9 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
 def launch(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
     """Fire-and-forget the executor as an asyncio task in the api process (MVP). Phase 3 moves this
     onto the Arq worker pool for multi-run scale + fan-out."""
-    asyncio.create_task(execute_run(run_id, target, kind, project_id=project_id))
+    task = asyncio.create_task(execute_run(run_id, target, kind, project_id=project_id))
+    _RUNNING.add(task)
+    task.add_done_callback(_RUNNING.discard)
 
 
 async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
@@ -228,7 +241,7 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
     provider = build_provider(settings.llm)
     context = await ContextAssembler(project_id, target).build()
     runner = AgentRunner("enum_writer", provider, project_id=project_id, target=target,
-                         run_id=run_id, emit=emit)
+                         run_id=run_id, emit=emit, cancel=cancel_event)
     try:
         result = await runner.run(context)
         await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.DONE.value})

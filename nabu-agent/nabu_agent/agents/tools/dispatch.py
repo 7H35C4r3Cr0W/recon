@@ -9,6 +9,7 @@ Blocking engine calls run in a threadpool.
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Callable
 from typing import Any
 
@@ -24,7 +25,7 @@ class ToolError(Exception):
 
 
 async def dispatch(tool_name: str, arguments: dict[str, Any], *, project_id: str, target: str,
-                   on_line: OnLine = None) -> dict[str, Any]:
+                   on_line: OnLine = None, cancel: threading.Event | None = None) -> dict[str, Any]:
     args = arguments or {}
     try:
         if tool_name == "catalog_actions_for":
@@ -50,7 +51,7 @@ async def dispatch(tool_name: str, arguments: dict[str, Any], *, project_id: str
                 raise ToolError("enum_service requires a 'service' name")
             return await asyncio.to_thread(
                 etools.enum_service, profile, service, "full",
-                port=int(args.get("port", 0)), on_line=on_line)
+                port=int(args.get("port", 0)), on_line=on_line, cancel=cancel)
         if tool_name == "research_finding":
             return await asyncio.to_thread(etools.research_finding, profile, dict(args.get("finding", {})),
                                            on_line=on_line)
