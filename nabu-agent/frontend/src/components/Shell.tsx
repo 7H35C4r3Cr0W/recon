@@ -51,6 +51,7 @@ export function Shell() {
           <>
             <div className="navlabel">Admin</div>
             <Link to="/admin/llm" className={on("/admin/llm") ? "on" : ""}><span className="ic">⚡</span> LLM setup</Link>
+            <Link to="/admin/users" className={on("/admin/users") ? "on" : ""}><span className="ic">◔</span> Users</Link>
           </>
         )}
         <div className="grow" />
