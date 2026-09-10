@@ -231,3 +231,4 @@ Roles live in `nabu_agent/agents/roles.py` (planner / enum_writer / research / r
 - 5.5 ✅ Feed page = the front '/' (live auto-refresh, click → run live view).
 - 5.6 ✅ Help guide page (what it is, getting started, run kinds, map colours, LLM attach, SSO, safety).
 - Frontend builds clean (tsc strict + vite + theme). 40 backend tests.
+- FE tests ✅ Vitest + React Testing Library: 12 tests (api client, ws client, nodeColors, Feed, Login, Shell, Help). CI runs `npm test`.
