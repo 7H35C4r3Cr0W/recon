@@ -1,18 +1,27 @@
-"""ContextAssembler — builds the read-only prompt context from the engine (Phase 3).
+"""ContextAssembler — builds the read-only prompt-context bundle from the engine (never re-derived).
 
-Pulls discovered_services, findings ranked by finding_severity, exploit.services_present /
-suggested_action_ids, references.match — never re-derived. Research fans out over NOTABLE findings
-only (finding_severity.is_notable); nmap_scripts_output is summarised, not dumped; ``budget_fit``
-truncates by severity/score to the role's token budget.
+For the MVP this is a compact JSON summary the role prompt renders; Phase 3+ adds notable-only
+research fan-out and severity/score-based budget truncation.
 """
 
 from __future__ import annotations
 
+import asyncio
+from typing import Any
+
+from nabu_agent.engine import gateway
+from nabu_agent.engine.errors import ProjectNotFound
+
 
 class ContextAssembler:
-    def __init__(self, project_id: str, scope: str) -> None:
+    def __init__(self, project_id: str, target: str) -> None:
         self.project_id = project_id
-        self.scope = scope
+        self.target = target
 
-    def build(self, role: str, budget_tokens: int) -> dict:
-        raise NotImplementedError
+    async def build(self) -> dict[str, Any]:
+        try:
+            services = await asyncio.to_thread(gateway.list_services, self.project_id, self.target, None)
+            findings = await asyncio.to_thread(gateway.list_findings, self.project_id, self.target, None)
+        except ProjectNotFound:
+            services, findings = [], []
+        return {"target": self.target, "services": services, "findings": findings}

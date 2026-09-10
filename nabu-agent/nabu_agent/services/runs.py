@@ -72,6 +72,9 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
     try:
         if kind == "demo":
             final = await run_demo(run_id, target, publish)
+        elif kind == "agent":
+            final = await _run_agent(run_id, target, publish, project_id=project_id or "unknown",
+                                     cancel_event=cancel_event)
         else:
             final = await _run_real(run_id, target, publish, project_id=project_id or "unknown",
                                     cancel_event=cancel_event)
@@ -171,3 +174,76 @@ def launch(run_id: str, target: str, kind: str = "demo", *, project_id: str | No
     """Fire-and-forget the executor as an asyncio task in the api process (MVP). Phase 3 moves this
     onto the Arq worker pool for multi-run scale + fan-out."""
     asyncio.create_task(execute_run(run_id, target, kind, project_id=project_id))
+
+
+async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
+                     cancel_event: threading.Event) -> str:
+    """LLM-DRIVEN recon: run the deterministic scan, then let the attached brain (the owner's
+    OpenAI-compatible endpoint) decide + drive the per-service enumeration via the AgentRunner
+    tool-calling loop, streaming its reasoning/tool-calls onto the live map + log. Requires
+    NABU_LLM_BASE_URL to be configured; otherwise it fails cleanly with a clear message."""
+    from nabu_agent.agents.context import ContextAssembler
+    from nabu_agent.agents.runner import AgentRunner
+    from nabu_agent.engine import tools as etools
+    from nabu_agent.engine.workspace import workspace_for
+    from nabu_agent.llm.factory import build_provider
+    from nabu_agent.settings import get_settings
+
+    run_node = f"run-{run_id}"
+    await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.ACTIVE.value,
+                  "state": "scanning", "label": "recon run"})
+
+    settings = get_settings()
+    if not settings.llm.base_url:
+        await publish(RunEventType.ERROR, {"message": "no LLM configured — set NABU_LLM_BASE_URL to "
+                      "your internal OpenAI-compatible endpoint (kind='demo' needs no brain)."})
+        return "failed"
+
+    # deterministic scan first (real engine; on the internal network this runs nmap through the chokepoint)
+    loop = asyncio.get_running_loop()
+
+    def on_line(line: str) -> None:
+        asyncio.run_coroutine_threadsafe(publish(RunEventType.LOG_LINE, {"line": line}), loop)
+
+    host_node = f"host-{target}"
+    await publish(RunEventType.TASK_CREATED, {"node_id": host_node, "node_state": NodeState.ACTIVE.value,
+                  "kind": "host", "label": target})
+    profile = await asyncio.to_thread(workspace_for(project_id, target).open_or_create)
+    await asyncio.to_thread(etools.run_scan, profile, "default", on_line=on_line, cancel=cancel_event)
+    await publish(RunEventType.TASK_UPDATED, {"node_id": host_node, "node_state": NodeState.DONE.value})
+    for s in etools.list_discovered_services(profile)["services"]:
+        nid = f"svc-{target}-{s['port']}-{s.get('proto', 'tcp')}"
+        await publish(RunEventType.TASK_CREATED, {"node_id": nid, "node_state": NodeState.DONE.value,
+                      "kind": "service", "label": f"{s['port']}/{s.get('service') or s.get('proto')}",
+                      "parent": host_node})
+
+    # the LLM agent drives enumeration decisions
+    agent_node = f"agent-llm-{run_id}"
+    await publish(RunEventType.TASK_CREATED, {"node_id": agent_node, "node_state": NodeState.ACTIVE.value,
+                  "kind": "agent", "role": "enum_writer", "label": "LLM enum agent", "parent": run_node})
+
+    async def emit(kind_: str, data: dict) -> None:
+        await publish(RunEventType.LOG_LINE, data if kind_ == "log.line" else {"line": str(data)})
+
+    provider = build_provider(settings.llm)
+    context = await ContextAssembler(project_id, target).build()
+    runner = AgentRunner("enum_writer", provider, project_id=project_id, target=target,
+                         run_id=run_id, emit=emit)
+    try:
+        result = await runner.run(context)
+        await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.DONE.value})
+        await publish(RunEventType.LOG_LINE, {"line": f"[agent] {result.get('content', '')[:200]}"})
+    except Exception as exc:
+        await publish(RunEventType.TASK_UPDATED, {"node_id": agent_node, "node_state": NodeState.ERROR.value})
+        await publish(RunEventType.LOG_LINE, {"line": f"[agent] error: {exc}"})
+        return "partial"
+
+    report_node = f"report-{run_id}"
+    await publish(RunEventType.TASK_CREATED, {"node_id": report_node, "node_state": NodeState.ACTIVE.value,
+                  "kind": "report", "label": "report", "parent": run_node})
+    await asyncio.to_thread(etools.generate_report, profile, persist=True)
+    await publish(RunEventType.TASK_UPDATED, {"node_id": report_node, "node_state": NodeState.DONE.value})
+    await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.DONE.value,
+                  "state": "report_ready"})
+    await publish(RunEventType.DONE, {"state": "done"})
+    return "done"

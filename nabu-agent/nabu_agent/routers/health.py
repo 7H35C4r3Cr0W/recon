@@ -57,3 +57,13 @@ async def ready() -> dict[str, object]:
         checks["workspace"] = False
 
     return {"ready": all(checks.values()), "checks": checks}
+
+
+@router.get("/llm/health")
+async def llm_health() -> dict:
+    """Report the configured brain (no secret). ``configured`` is True once NABU_LLM_BASE_URL is set;
+    the owner attaches the internal OpenAI-compatible endpoint there. A live ping is a Phase-4 add."""
+    from nabu_agent.settings import get_settings
+    s = get_settings().llm
+    return {"provider": s.provider, "model": s.model, "base_url": s.base_url,
+            "configured": bool(s.base_url), "streaming": s.stream}
