@@ -63,3 +63,22 @@ async def test_cidr_findings_are_aggregated_across_hosts(client, monkeypatch, tm
     hosts = {r.get("_host") for r in rows}
     assert {"10.10.30.5", "10.10.30.6"} <= hosts            # each tagged with its host
     assert rows[0]["_category"] == "vulnerable"             # sorted strongest-first
+
+
+async def test_project_export_bundle(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("NABU_AGENT_WORKSPACE_ROOT", str(tmp_path))
+    import oscprecon.findings as ef
+
+    from nabu_agent.engine.workspace import workspace_for
+
+    await client.post("/api/auth/login", json={"email": "admin@nabu.local", "password": "changeme"})
+    pid = (await client.post("/api/projects", json={"display_name": "Exp"})).json()["id"]
+    await client.post(f"/api/projects/{pid}/scope", json={"target": "10.10.40.0/29"})
+    a = workspace_for(pid, "10.10.40.5").open_or_create()
+    ef.add_findings(a.directory, [{"kind": "vuln", "value": "MS17-010", "port": 445, "severity": "vulnerable"}])
+
+    b = (await client.post(f"/api/projects/{pid}/export")).json()
+    assert b["scope"] == "10.10.40.0/29" and b["generated_at"]
+    assert "# Combined Recon Report" in b["report_md"]
+    assert any(f["value"] == "MS17-010" for f in b["findings"])
+    assert "credentials" not in b            # the vault never leaves via export

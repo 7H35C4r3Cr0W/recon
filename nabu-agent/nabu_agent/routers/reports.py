@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,6 +62,29 @@ async def list_artifacts(project_id: str, db: AsyncSession = Depends(get_db),
 
 
 @router.post("/projects/{project_id}/export")
-async def export_project(project_id: str, user: User = Depends(get_current_user),
+async def export_project(project_id: str, db: AsyncSession = Depends(get_db),
+                         user: User = Depends(get_current_user),
                      _auth: str = Depends(require_project_member)) -> dict:
-    raise HTTPException(status_code=501, detail="project export wired in a later phase")
+    """A self-contained export bundle for the engagement: the combined report markdown + findings +
+    services + scope. The client saves it as a file (JSON). Credentials are deliberately NOT
+    included — the vault never leaves the server via export."""
+    from datetime import UTC, datetime
+
+    from nabu_agent import audit
+    scope = await _scope_for(db, project_id)
+    bundle: dict = {"project_id": project_id, "scope": scope,
+                    "generated_at": datetime.now(UTC).isoformat(), "generated_by": user.id,
+                    "report_md": "", "findings": [], "services": []}
+    if scope:
+        with contextlib.suppress(ProjectNotFound):
+            if "/" in scope:
+                bundle["report_md"] = await asyncio.to_thread(gateway.render_combined_report, project_id)
+                bundle["findings"] = await asyncio.to_thread(gateway.list_combined_findings, project_id)
+            else:
+                bundle["report_md"] = await asyncio.to_thread(gateway.render_report, project_id, scope, None)
+                bundle["findings"] = await asyncio.to_thread(gateway.list_findings, project_id, scope, None)
+            with contextlib.suppress(Exception):
+                bundle["services"] = await asyncio.to_thread(gateway.list_services, project_id, scope, None)
+    await audit.record(actor_user_id=user.id, action=audit.ARTIFACT_DOWNLOADED, object_type="export",
+                       object_id=project_id, project_id=project_id, details={"findings": len(bundle["findings"])})
+    return bundle
