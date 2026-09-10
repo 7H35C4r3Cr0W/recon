@@ -10,6 +10,7 @@ export function ProjectDetail() {
   const [scope, setScope] = useState<ScopeT[]>([]);
   const [target, setTarget] = useState("");
   const [runTarget, setRunTarget] = useState("");
+  const [kind, setKind] = useState("demo");
   const [err, setErr] = useState("");
 
   async function load() {
@@ -28,7 +29,7 @@ export function ProjectDetail() {
     e.preventDefault();
     try {
       const r = await api<{ run_id: string }>(`/projects/${projectId}/runs`, {
-        method: "POST", body: JSON.stringify({ target: runTarget, kind: "demo" }),
+        method: "POST", body: JSON.stringify({ target: runTarget, kind }),
       });
       nav(`/projects/${projectId}/runs/${r.run_id}`);
     } catch (e) { setErr(String(e)); }
@@ -50,6 +51,11 @@ export function ProjectDetail() {
         <h3>Run recon</h3>
         <form onSubmit={startRun} style={{ display: "flex", gap: 8 }}>
           <input placeholder="Target in scope (e.g. 10.10.10.5)" value={runTarget} onChange={(e) => setRunTarget(e.target.value)} style={{ flex: 1, padding: 8 }} />
+          <select value={kind} onChange={(e) => setKind(e.target.value)} style={{ padding: 8 }}>
+            <option value="demo">demo (no tools/LLM — animated)</option>
+            <option value="scan">scan (real recon, no LLM)</option>
+            <option value="agent">agent (LLM-driven — needs NABU_LLM_BASE_URL)</option>
+          </select>
           <button type="submit">Start run ▸</button>
         </form>
         <p style={{ color: "#888", fontSize: 13 }}>The run opens the live BloodHound-style map — agents light up green (active), teal (done), yellow (stuck), red (error).</p>

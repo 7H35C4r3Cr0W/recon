@@ -12,7 +12,6 @@ Create Date: 2026-09-09
 from __future__ import annotations
 
 from alembic import op
-
 from nabu_agent.db.models import Base
 
 revision = "0001_init"

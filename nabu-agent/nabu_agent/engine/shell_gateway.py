@@ -31,7 +31,7 @@ from typing import Any, Protocol
 # bare `from oscprecon import audit` would be shadowed by that def (a real bug caught in review).
 from oscprecon import audit as engine_audit
 from oscprecon import shell
-from oscprecon.models import validate_host, validate_host_or_range
+from oscprecon.models import validate_host_or_range
 from oscprecon.profile import Profile
 
 from .errors import (

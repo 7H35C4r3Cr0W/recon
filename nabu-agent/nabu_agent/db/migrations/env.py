@@ -7,10 +7,9 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import create_engine, pool
-
 from nabu_agent.db.models import Base
 from nabu_agent.settings import get_settings
+from sqlalchemy import create_engine, pool
 
 config = context.config
 if config.config_file_name is not None:

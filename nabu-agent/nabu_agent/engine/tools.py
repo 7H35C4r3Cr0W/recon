@@ -24,20 +24,19 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
-from oscprecon import alive, edb, hacktricks, references
-from oscprecon import findings as findings_mod
+from oscprecon import alive, edb, hacktricks, references, service_enum
 from oscprecon import exploit as ex
-from oscprecon.models import DiscoveredService, Port, Proto
+from oscprecon import findings as findings_mod
+from oscprecon.models import DiscoveredService, Proto
 from oscprecon.orchestrator import Orchestrator
 from oscprecon.patterns import engine as patterns_engine
 from oscprecon.profile import Profile
 from oscprecon.recon_auth import ReconAuth
-from oscprecon.references import gtfobins, hashcat, sections
+from oscprecon.references import gtfobins, sections
 from oscprecon.reporter import Reporter
-from oscprecon import service_enum
 
 from . import shell_gateway as gw
-from .schemas import CatalogActionDTO, ServiceDTO, ShellResultDTO, to_service_dto
+from .schemas import CatalogActionDTO, ServiceDTO, to_service_dto
 
 OnLine = Callable[[str], None] | None
 

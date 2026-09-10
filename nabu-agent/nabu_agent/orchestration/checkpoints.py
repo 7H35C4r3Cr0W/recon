@@ -16,6 +16,7 @@ double gate before execute_approved_action may run:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC
 from enum import StrEnum
 
 
@@ -59,7 +60,7 @@ def approve(cp: Checkpoint, *, operator: str, spray_enabled: bool) -> Checkpoint
     ``status == "approved"`` and re-validates the target against scope before any flag is set.
     Raises ``PermissionError`` if a precondition is unmet (the gate stays closed).
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     if cp.status is not CheckpointStatus.PROPOSED:
         raise PermissionError(f"checkpoint {cp.id} is {cp.status}, not proposed")
@@ -69,15 +70,15 @@ def approve(cp: Checkpoint, *, operator: str, spray_enabled: bool) -> Checkpoint
         raise PermissionError("exploit requires an explicit per-action human confirmation")
     cp.status = CheckpointStatus.APPROVED
     cp.approved_by = operator
-    cp.approved_at = datetime.now(timezone.utc).isoformat()
+    cp.approved_at = datetime.now(UTC).isoformat()
     return cp
 
 
 def reject(cp: Checkpoint, *, operator: str) -> Checkpoint:
     """Mark a proposed checkpoint rejected. The run continues without the attack action."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     cp.status = CheckpointStatus.REJECTED
     cp.approved_by = operator
-    cp.approved_at = datetime.now(timezone.utc).isoformat()
+    cp.approved_at = datetime.now(UTC).isoformat()
     return cp

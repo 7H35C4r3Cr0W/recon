@@ -1,14 +1,15 @@
 """Projects + scope router. Creating a project records it in Postgres and reserves an engine Profile
-dir; the Profile itself is created lazily on the first real run. Scope targets are validated with the
-engine's own validator before insert (the authorized-scope allowlist)."""
+dir; the Profile itself is created lazily on the first run. Scope targets are validated with the
+engine's own validator before insert. list_projects returns only the caller's projects; per-project
+reads/writes require membership."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from nabu_agent.auth.deps import get_current_user
+from nabu_agent.auth.deps import get_current_user, require_project_member
 from nabu_agent.db.models import Project, ProjectMember, ScopeTarget, User
 from nabu_agent.db.session import get_db
 from nabu_agent.settings import get_settings
@@ -47,14 +48,20 @@ async def create_project(body: ProjectBody, db: AsyncSession = Depends(get_db),
 
 @router.get("/projects")
 async def list_projects(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
-    rows = (await db.execute(select(Project))).scalars().all()
+    """Only the caller's projects (owned or member); a global admin sees all."""
+    if user.role == "admin":
+        rows = (await db.execute(select(Project))).scalars().all()
+    else:
+        member_ids = select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)
+        rows = (await db.execute(select(Project).where(
+            or_(Project.owner_id == user.id, Project.id.in_(member_ids))))).scalars().all()
     return {"projects": [{"id": p.id, "slug": p.slug, "display_name": p.display_name,
                           "status": p.status} for p in rows]}
 
 
 @router.get("/projects/{project_id}")
 async def get_project(project_id: str, db: AsyncSession = Depends(get_db),
-                      user: User = Depends(get_current_user)) -> dict:
+                      _auth: str = Depends(require_project_member)) -> dict:
     p = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
     if not p:
         raise HTTPException(status_code=404, detail="project not found")
@@ -64,19 +71,20 @@ async def get_project(project_id: str, db: AsyncSession = Depends(get_db),
 
 @router.get("/projects/{project_id}/scope")
 async def list_scope(project_id: str, db: AsyncSession = Depends(get_db),
-                     user: User = Depends(get_current_user)) -> dict:
+                     _auth: str = Depends(require_project_member)) -> dict:
     rows = (await db.execute(select(ScopeTarget).where(ScopeTarget.project_id == project_id))).scalars().all()
     return {"scope": [{"id": s.id, "target": s.target, "kind": s.kind, "is_entry": s.is_entry} for s in rows]}
 
 
 @router.post("/projects/{project_id}/scope")
 async def add_scope(project_id: str, body: ScopeBody, db: AsyncSession = Depends(get_db),
-                    user: User = Depends(get_current_user)) -> dict:
+                    user: User = Depends(get_current_user),
+                    _auth: str = Depends(require_project_member)) -> dict:
     from oscprecon.models import validate_host_or_range  # engine validator (argv-injection guard)
     try:
         target = validate_host_or_range(body.target)
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=f"invalid target: {exc}")
+        raise HTTPException(status_code=422, detail=f"invalid target: {exc}") from exc
     kind = "range" if "/" in target else "host"
     row = ScopeTarget(project_id=project_id, target=target, kind=kind, is_entry=body.is_entry,
                       source="manual", added_by=user.id)

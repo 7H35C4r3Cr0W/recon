@@ -58,7 +58,7 @@ class Project(Base):
     spray_enabled: Mapped[bool] = mapped_column(Boolean, default=False)   # per-project gate; default OFF
     exploit_enabled: Mapped[bool] = mapped_column(Boolean, default=False) # per-project gate; default OFF
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    scope_targets: Mapped[list["ScopeTarget"]] = relationship(back_populates="project")
+    scope_targets: Mapped[list[ScopeTarget]] = relationship(back_populates="project")
 
 
 class ProjectMember(Base):

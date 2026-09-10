@@ -40,6 +40,11 @@ from .errors import InvalidTarget, ProjectNotFound
 from .settings import EngineSettings, load_engine_settings
 
 
+def _slug(target: str) -> str:
+    """Filesystem-safe per-target folder name (CIDR '10.0.0.0/24' -> '10.0.0.0_24')."""
+    return "".join(c if (c.isalnum() or c in ".-") else "_" for c in target)
+
+
 @dataclass(frozen=True)
 class AgentWorkspace:
     """Resolves a project GUID to its on-disk oscprecon Profile folder."""
@@ -51,7 +56,9 @@ class AgentWorkspace:
 
     @property
     def directory(self) -> Path:
-        return self.settings.workspace_root / self.project_id
+        # One Profile per (project, target): a project scanning multiple in-scope hosts must not
+        # collapse them into one Profile whose target is the FIRST one scanned (caught in review).
+        return self.settings.workspace_root / self.project_id / _slug(self.scope_target)
 
     def exists(self) -> bool:
         return (self.directory / "profile.json").is_file()
