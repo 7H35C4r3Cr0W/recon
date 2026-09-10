@@ -77,7 +77,13 @@ class AgentWorkspace:
             target = Target(ip=self.scope_target, hostname=self.hostname)
         except ValueError as exc:  # models.Target.__post_init__ validation
             raise InvalidTarget(str(exc)) from exc
-        return Profile.create(self.settings.workspace_root, self.project_id, target)
+        # Create UNDER the per-(project, target) directory so multiple in-scope hosts each get their
+        # OWN Profile — matching `self.directory` / `open()`. (Profile.create builds `root/name`, so
+        # root=<workspace>/<project_id> and name=_slug(target) => <workspace>/<project_id>/<slug>.)
+        # Without this, create() wrote straight to <workspace>/<project_id> while open()/exists()
+        # looked in the subfolder, so every host collapsed into one findings.json.
+        return Profile.create(self.settings.workspace_root / self.project_id,
+                              _slug(self.scope_target), target)
 
     def open(self) -> Profile:
         """Load the existing Profile. Raises ProjectNotFound if never created."""

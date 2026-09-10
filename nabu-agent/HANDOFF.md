@@ -265,6 +265,21 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   cross-host collision.
 
 ### Phase 6 progress log
+- DONE (follow-up) — **combined multi-host report** + a **workspace isolation fix** (the important
+  one). `gateway.render_combined_report(project_id)` enumerates every per-host Profile under the
+  project (skips the CIDR 'sweep' Profile whose target has '/'), and builds one markdown: cross-host
+  summary table (Host | Services | Findings | Top severity), aggregate severity tally, "Suggested
+  next steps" (notable findings across hosts, strongest first via finding_severity.rank), then each
+  host's full `Reporter(prof).render()` with headings demoted to nest. `routers/reports.get_report`
+  serves it whenever the scope is a CIDR (single host unchanged). **Root-cause fix:**
+  `AgentWorkspace.create()` called `Profile.create(workspace_root, project_id, target)` -> wrote to
+  `<workspace>/<project_id>`, IGNORING the target, while `directory`/`open()`/`exists()` looked in
+  `<workspace>/<project_id>/<slug(target)>`. So every in-scope host collapsed into ONE Profile /
+  findings.json — silently breaking the host tier's per-host isolation (the multihost tests missed
+  it because they fully mock workspace_for). Fixed create() to build under the per-target subdir.
+  Tests: `test_combined_report.py` (2, unit), `test_combined_report_api.py` (2, router gating),
+  `test_workspace_isolation.py` (2, regression). Gate: ruff clean, mypy 10, 60 backend (incl. 9 invariant) + 2 load, frontend unchanged.
+
 - (starting 6.1/6.5)
 - DONE — host tier shipped for the `scan` kind. `services/runs.py`: added `_resolve_hosts`
   (single host -> [t]; CIDR -> `check_alive` sweep -> clamp `max_hosts` -> notice over
