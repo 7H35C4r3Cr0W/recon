@@ -64,6 +64,13 @@ Local dev without Docker: `uv sync` then `make fe-dev` (Vite) + `uvicorn nabu_ag
 
 ## Status
 
-Phase 0 (runnable scaffold) — see [`HANDOFF.md`](HANDOFF.md) for the live step tracker. The engine
-adapter, the single chokepoint, the LLM provider seam, the data model, and the policy-invariant
-tests are in place; agent fan-out + the LLM loop are scaffolded and filled in Phases 1–3.
+**Body feature-complete.** The web platform, orchestration, engine adapter, live map, reports, RBAC +
+team management, audit trail, credentials vault, admin LLM setup + test-fire, and all API endpoints are
+implemented and tested (backend + frontend suites green; ruff + mypy clean). Multi-host (CIDR) recon
+fans out per host with a human approval gate above a host threshold; the distributed (Arq) worker path
+is on in production. See [`HANDOFF.md`](HANDOFF.md) for the full history and [`deploy/RUNBOOK.md`](deploy/RUNBOOK.md)
+to deploy on your internal network.
+
+**Waiting on the brain.** LLM-driven (`agent`) runs and spray/exploit *execution* stay dormant until an
+internally-hosted OpenAI-compatible model is attached (Admin → LLM setup). The deterministic `scan`
+recon, live map, reports, and everything else run today without it.
