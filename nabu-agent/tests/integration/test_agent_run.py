@@ -102,14 +102,14 @@ async def test_agent_run_full_roster(client, brain_and_engine):
             break
     assert "done" in types, f"agent run did not finish; types={types}"
     # every role node appeared on the live map
-    assert f"agent-planner-{run_id}" in node_ids
+    assert "agent-planner-10.10.10.5" in node_ids   # per-host roster (host-scoped)
     assert {"agent-enum-10.10.10.5-445", "agent-enum-10.10.10.5-80"} <= node_ids   # host-scoped, one per service
     assert {"agent-research-10.10.10.5-445", "agent-research-10.10.10.5-80"} <= node_ids  # host-scoped
-    assert f"agent-report-{run_id}" in node_ids
+    assert "agent-report-10.10.10.5" in node_ids     # per-host reporter (host-scoped)
     assert {"active", "done"} <= states
     # richer per-agent hand-off edges: planner→enum (dispatch), enum→research (feeds), *→report (feeds)
-    assert ("agent-planner-" + run_id, "agent-enum-10.10.10.5-445") in edges
+    assert ("agent-planner-10.10.10.5", "agent-enum-10.10.10.5-445") in edges
     assert ("agent-enum-10.10.10.5-445", "agent-research-10.10.10.5-445") in edges
-    assert ("agent-enum-10.10.10.5-445", "agent-report-" + run_id) in edges
+    assert ("agent-enum-10.10.10.5-445", "agent-report-10.10.10.5") in edges
     assert {"dispatch", "feeds"} <= edge_labels
     assert (await client.get(f"/api/runs/{run_id}")).json()["state"] in {"done", "partial"}

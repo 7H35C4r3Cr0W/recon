@@ -358,47 +358,33 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
     return "partial" if partial else "done"
 
 
-async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
-                     cancel_event: threading.Event, on_line=None) -> str:
-    """LLM-DRIVEN recon with the FULL agent roster: scan → planner → per-service enum agents
-    (concurrent) → per-service research agents (concurrent) → reporter. Each LLM agent is an
-    AgentRunner (role prompt + allow-listed tools + SafetyGate + budget) and shows as its own node on
-    the live map. Requires NABU_LLM_BASE_URL; otherwise fails cleanly. Attack actions are never an
-    agent — only a human-gated checkpoint."""
+async def _agent_host(run_id: str, host: str, publish, *, project_id: str, cancel_event, on_line,
+                      run_node: str, provider, limits, service_budget: int) -> str:
+    """FULL LLM roster for ONE host: scan -> planner -> per-service enum agents (concurrent) ->
+    per-service research agents (concurrent) -> reporter. Every node is host-scoped and the host has
+    its OWN Profile, so a CIDR run fans this whole subtree out per live host. Attack actions are never
+    an agent -- only a human-gated checkpoint."""
+    import oscprecon.findings as ef
+
     from nabu_agent.agents.context import ContextAssembler
     from nabu_agent.agents.runner import AgentRunner
     from nabu_agent.engine import tools as etools
     from nabu_agent.engine.workspace import workspace_for
-    from nabu_agent.llm.factory import build_provider
-    from nabu_agent.orchestration.limits import RunLimits
-    from nabu_agent.settings import get_settings
 
-    run_node = f"run-{run_id}"
-    host_node = f"host-{target}"
-    await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.ACTIVE.value,
-                  "state": "scanning", "label": "recon run"})
-
-    settings = get_settings()
-    if not settings.llm.base_url:
-        await publish(RunEventType.ERROR, {"message": "no LLM configured — set NABU_LLM_BASE_URL to "
-                      "your internal OpenAI-compatible endpoint (kind='demo' needs no brain)."})
-        return "failed"
+    host_node = f"host-{host}"
+    partial = False
 
     async def emit(kind_: str, data: dict) -> None:
         await publish(RunEventType.LOG_LINE, data if kind_ == "log.line" else {"line": str(data)})
 
-    provider = build_provider(settings.llm)
-    limits = RunLimits()
-    partial = False
-
     async def run_role(role: str, node_id: str, label: str, parent: str, context: dict,
                        edges: list | None = None) -> dict | None:
-        """Run one LLM agent role with its own live map node (active → done / error)."""
+        """Run one LLM agent role with its own live map node (active -> done / error)."""
         if cancel_event.is_set():
             return None
         await publish(RunEventType.TASK_CREATED, {"node_id": node_id, "node_state": NodeState.ACTIVE.value,
                       "kind": "agent", "role": role, "label": label, "parent": parent, "edges": edges or []})
-        runner = AgentRunner(role, provider, project_id=project_id, target=target, run_id=run_id,
+        runner = AgentRunner(role, provider, project_id=project_id, target=host, run_id=run_id,
                              emit=emit, cancel=cancel_event)
         try:
             res = await runner.run(context)
@@ -414,40 +400,40 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
 
     # --- scan (deterministic; real nmap on the internal network) ---
     await publish(RunEventType.TASK_CREATED, {"node_id": host_node, "node_state": NodeState.ACTIVE.value,
-                  "kind": "host", "label": target})
-    profile = await asyncio.to_thread(workspace_for(project_id, target).open_or_create)
+                  "kind": "host", "label": host, "parent": run_node})
+    profile = await asyncio.to_thread(workspace_for(project_id, host).open_or_create)
     await asyncio.to_thread(etools.run_scan, profile, "default", on_line=on_line, cancel=cancel_event)
     await publish(RunEventType.TASK_UPDATED, {"node_id": host_node, "node_state": NodeState.DONE.value})
-    services = etools.list_discovered_services(profile)["services"][: limits.max_total_tasks]
+    services = etools.list_discovered_services(profile)["services"][:service_budget]
     for s in services:
-        nid = f"svc-{target}-{s['port']}-{s.get('proto', 'tcp')}"
+        nid = f"svc-{host}-{s['port']}-{s.get('proto', 'tcp')}"
         await publish(RunEventType.TASK_CREATED, {"node_id": nid, "node_state": NodeState.DONE.value,
                       "kind": "service", "label": f"{s['port']}/{s.get('service') or s.get('proto')}",
                       "parent": host_node})
-    svc_by_port = {int(s["port"]): f"svc-{target}-{s['port']}-{s.get('proto', 'tcp')}" for s in services}
-    planner_node = f"agent-planner-{run_id}"
+    svc_by_port = {int(s["port"]): f"svc-{host}-{s['port']}-{s.get('proto', 'tcp')}" for s in services}
+    planner_node = f"agent-planner-{host}"
 
     # --- planner ---
-    base_ctx = await ContextAssembler(project_id, target).build()
-    if await run_role("planner", planner_node, "planner", run_node, base_ctx) is None:
+    base_ctx = await ContextAssembler(project_id, host).build()
+    if await run_role("planner", planner_node, "planner", host_node, base_ctx) is None:
         partial = True
 
-    sem = asyncio.Semaphore(max(1, limits.max_concurrent_service_agents))
+    sem = asyncio.Semaphore(max(1, limits.max_enum_per_host))
 
     def _svc_node(s: dict) -> str:
-        return f"svc-{target}-{s['port']}-{s.get('proto', 'tcp')}"
+        return f"svc-{host}-{s['port']}-{s.get('proto', 'tcp')}"
 
     def _svc_ctx(s: dict) -> dict:
-        return {**base_ctx, "host": target, "port": s["port"],
+        return {**base_ctx, "host": host, "port": s["port"],
                 "service": {"port": s["port"], "service": s.get("service", ""),
                             "product": s.get("product", "")}}
 
     # --- enum agents (one per service, concurrent) ---
     async def _enum(s: dict) -> dict | None:
         async with sem:
-            return await run_role("enum_writer", f"agent-enum-{target}-{s['port']}",
+            return await run_role("enum_writer", f"agent-enum-{host}-{s['port']}",
                                   f"enum {s.get('service') or s['port']}", _svc_node(s), _svc_ctx(s),
-                                  edges=[{"source": planner_node, "target": f"agent-enum-{target}-{s['port']}",
+                                  edges=[{"source": planner_node, "target": f"agent-enum-{host}-{s['port']}",
                                           "label": "dispatch"}])
     enum_res = await asyncio.gather(*[_enum(s) for s in services], return_exceptions=True)
     if any(r is None or isinstance(r, Exception) for r in enum_res):
@@ -455,44 +441,97 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
     if cancel_event.is_set():
         return "cancelled"
 
-    # --- surface findings the enum agents produced onto the map (edge from the producing agent) ---
-    from nabu_agent.engine import gateway as _gw
+    # --- surface findings the enum agents produced onto the map (per-host Profile) ---
     with contextlib.suppress(Exception):
-        for i, f in enumerate(await asyncio.to_thread(_gw.list_findings, project_id, target, None)):
+        for i, f in enumerate(await asyncio.to_thread(ef.load_findings, profile.directory)):
             port = int(f.get("port") or 0)
-            fid = f"finding-{port}-{i}"
+            fid = f"finding-{host}-{port}-{i}"
             await publish(RunEventType.FINDING_ADDED, {
                 "node_id": fid, "node_state": NodeState.DONE.value, "kind": "finding",
                 "label": str(f.get("value", "finding"))[:40],
                 "parent": svc_by_port.get(port, host_node),
-                "edges": [{"source": f"agent-enum-{target}-{port}", "target": fid, "label": "found"}]})
+                "edges": [{"source": f"agent-enum-{host}-{port}", "target": fid, "label": "found"}]})
 
     # --- research agents (one per service, concurrent; proposals only) ---
-    research_ctx = await ContextAssembler(project_id, target).build()
+    research_ctx = await ContextAssembler(project_id, host).build()
 
     async def _research(s: dict) -> dict | None:
-        ctx = {**research_ctx, "host": target, "port": s["port"],
+        ctx = {**research_ctx, "host": host, "port": s["port"],
                "finding": {"service": s.get("service", ""), "port": s["port"],
                            "product": s.get("product", "")}}
         async with sem:
-            return await run_role("research", f"agent-research-{target}-{s['port']}",
+            return await run_role("research", f"agent-research-{host}-{s['port']}",
                                   f"research {s.get('service') or s['port']}", _svc_node(s), ctx,
-                                  edges=[{"source": f"agent-enum-{target}-{s['port']}",
-                                          "target": f"agent-research-{target}-{s['port']}", "label": "feeds"}])
+                                  edges=[{"source": f"agent-enum-{host}-{s['port']}",
+                                          "target": f"agent-research-{host}-{s['port']}", "label": "feeds"}])
     await asyncio.gather(*[_research(s) for s in services], return_exceptions=True)
     if cancel_event.is_set():
         return "cancelled"
 
-    # --- reporter (all agents converge -> report) ---
-    report_node = f"agent-report-{run_id}"
+    # --- reporter (this host's agents converge -> per-host report) ---
+    report_node = f"agent-report-{host}"
     report_edges = [{"source": planner_node, "target": report_node, "label": "feeds"}]
     for s in services:
-        report_edges.append({"source": f"agent-enum-{target}-{s['port']}", "target": report_node, "label": "feeds"})
-        report_edges.append({"source": f"agent-research-{target}-{s['port']}", "target": report_node, "label": "feeds"})
-    report_ctx = await ContextAssembler(project_id, target).build()
-    await run_role("reporter", report_node, "report writer", run_node, report_ctx, edges=report_edges)
+        report_edges.append({"source": f"agent-enum-{host}-{s['port']}", "target": report_node, "label": "feeds"})
+        report_edges.append({"source": f"agent-research-{host}-{s['port']}", "target": report_node, "label": "feeds"})
+    report_ctx = await ContextAssembler(project_id, host).build()
+    await run_role("reporter", report_node, "report writer", host_node, report_ctx, edges=report_edges)
     with contextlib.suppress(Exception):
         await asyncio.to_thread(etools.generate_report, profile, persist=True)
+    return "partial" if partial else "done"
+
+
+async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
+                     cancel_event: threading.Event, on_line=None) -> str:
+    """Multi-host LLM roster. Single host -> one _agent_host; a CIDR -> alive-sweep -> per-host roster
+    fanned out under the same host guardrails as the deterministic scan path. Requires
+    NABU_LLM_BASE_URL; otherwise fails cleanly (kind='demo' needs no brain)."""
+    from nabu_agent.llm.factory import build_provider
+    from nabu_agent.orchestration.limits import RunLimits
+    from nabu_agent.settings import get_settings
+
+    run_node = f"run-{run_id}"
+    await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.ACTIVE.value,
+                  "state": "scanning", "label": "recon run"})
+
+    settings = get_settings()
+    if not settings.llm.base_url:
+        await publish(RunEventType.ERROR, {"message": "no LLM configured — set NABU_LLM_BASE_URL to "
+                      "your internal OpenAI-compatible endpoint (kind='demo' needs no brain)."})
+        return "failed"
+
+    provider = build_provider(settings.llm)
+    limits = RunLimits()
+    hosts = await _resolve_hosts(run_id, target, publish, project_id=project_id,
+                                 cancel_event=cancel_event, on_line=on_line, limits=limits)
+    if not hosts:
+        await publish(RunEventType.LOG_LINE, {"line": "[scan] no live hosts to recon"})
+        return "failed"
+
+    per_host_budget = max(1, limits.max_total_tasks // len(hosts))
+    host_sem = asyncio.Semaphore(max(1, limits.max_concurrent_hosts))
+
+    async def _one(host: str):
+        async with host_sem:
+            if cancel_event.is_set():
+                return "cancelled"
+            try:
+                return await _agent_host(run_id, host, publish, project_id=project_id,
+                                         cancel_event=cancel_event, on_line=on_line, run_node=run_node,
+                                         provider=provider, limits=limits, service_budget=per_host_budget)
+            except Exception as exc:  # one host crashing must not sink the whole run
+                await publish(RunEventType.TASK_UPDATED,
+                              {"node_id": f"host-{host}", "node_state": NodeState.ERROR.value})
+                await publish(RunEventType.LOG_LINE, {"line": f"[host] {host} failed: {exc}"})
+                return exc
+
+    results = await asyncio.gather(*[_one(h) for h in hosts])
+    if cancel_event.is_set():
+        return "cancelled"
+    errors = [r for r in results if isinstance(r, Exception)]
+    if errors and len(errors) == len(hosts):
+        raise errors[0]  # every host failed -> surface as a driver failure (ERROR event + state=failed)
+    partial = bool(errors) or any(r in (None, "partial", "cancelled") for r in results)
 
     await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.DONE.value,
                   "state": "report_ready"})
