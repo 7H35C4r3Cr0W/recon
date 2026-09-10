@@ -265,6 +265,17 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   cross-host collision.
 
 ### Phase 6 progress log
+- WAVE 1 (deploy readiness). Found + fixed a REAL deploy blocker: `alembic upgrade head` on a fresh DB
+  failed with "duplicate column heartbeat_at" — 0001 uses Base.metadata.create_all (reflects the full
+  current model, incl. heartbeat_at) so 0002's blind add_column double-added it. Made 0002 idempotent
+  (guard the column via inspector); verified `upgrade head` now creates all 15 tables + `downgrade base`
+  works on a fresh sqlite. `docker-compose config` validates (6 services, env resolves, no undefaulted
+  refs). Dockerfiles (Kali headless api/worker + nginx frontend) + Makefile reviewed — solid. Added
+  NABU_ADMIN_EMAIL/PASSWORD to .env.example; corrected the stale README "Phase 0 scaffold" Status to
+  feature-complete; wrote `deploy/RUNBOOK.md` (prereqs → configure → up → verify → wire LLM/OIDC → team
+  → operate → upgrades/backups/troubleshooting/security). NOTE for Wave 2 hardening: bootstrap defaults
+  NABU_ADMIN_PASSWORD='changeme' — enforce non-default in production.
+
 - DONE (full code review + fixes — 4-dimension review: roster / runs+orchestration / org+dead-code /
   security). Verdict: the load-bearing SAFETY invariants HOLD (single shell chokepoint; exploit/spray
   only in execute_gated_action; attacks never an agent — no attack role/tool, SafetyGate hard-blocks;
