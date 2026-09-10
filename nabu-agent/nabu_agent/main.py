@@ -133,7 +133,7 @@ def create_app() -> FastAPI:
                      "request_id": request.headers.get("x-request-id", ""), "details": {}},
         )
 
-    # Routers under /api. auth/projects/scope/runs are wired (Phase 2); the rest are scaffolded.
+    # Routers under /api. auth/projects/runs/reports/findings/audit are wired; the rest are scaffolds.
     from nabu_agent.routers import (
         admin,
         audit,
@@ -145,7 +145,6 @@ def create_app() -> FastAPI:
         projects,
         reports,
         runs,
-        scope,
         users,
     )
     from nabu_agent.routers import (
@@ -153,7 +152,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router, prefix="/api")
-    _routers = (auth, projects, scope, runs, reports, findings, catalog, creds, feed, admin,
+    _routers = (auth, projects, runs, reports, findings, catalog, creds, feed, admin,
                 users, audit, settings_router)
     for module in _routers:
         app.include_router(module.router, prefix="/api")
