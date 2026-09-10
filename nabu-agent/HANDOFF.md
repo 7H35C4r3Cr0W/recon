@@ -265,6 +265,16 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   cross-host collision.
 
 ### Phase 6 progress log
+- DONE (design pass — demo-ready UI). Rewrote `frontend/src/theme.css` into a cohesive dark design
+  system: soft teal/green accent glow (radial backdrops), display/mono type scale, cards with hover
+  lift + accent, status pills with animated live dots, refined inputs/buttons/nav (active glow bar),
+  custom scrollbars, selection. Login is now a centered hero (brand + tagline + glowing card).
+  RunLive (the showpiece) uses polished classes — glowing legend dots, a pulsing "live" recording
+  indicator, cleaner map/log panels + approval bar. RunGraph nodes/edges upgraded (bigger, text
+  outline for contrast, teal glow on active / blue on done / red-error / gold-stuck, kind shapes,
+  radial map backdrop). Feed/Projects/ProjectDetail/Report inherit the system. All text preserved →
+  18 frontend tests + build still green.
+
 - DONE (UX completion) — the frontend had orphaned/stub pages; closed the real gaps the owner flagged:
   * **Report & outputs page** (`frontend/src/pages/Report.tsx`, was a stub + unrouted) — now routed at
     `/projects/:projectId/report`: a severity-coloured findings table + the full report rendered from
