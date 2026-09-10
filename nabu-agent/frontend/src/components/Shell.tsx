@@ -8,10 +8,13 @@ export function Shell() {
   const loc = useLocation();
   const nav = useNavigate();
   const [email, setEmail] = useState<string>("");
+  const [role, setRole] = useState<string>("");
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
-    api<{ email: string }>("/auth/me").then((u) => setEmail(u.email)).catch(() => nav("/login"));
+    api<{ email: string; role: string }>("/auth/me")
+      .then((u) => { setEmail(u.email); setRole(u.role); })
+      .catch(() => nav("/login"));
   }, [nav]);
 
   useEffect(() => {
@@ -44,6 +47,12 @@ export function Shell() {
         <Link to="/projects" className={on("/projects") ? "on" : ""}><span className="ic">▤</span> Projects</Link>
         <Link to="/help" className={on("/help") ? "on" : ""}><span className="ic">?</span> Help</Link>
         <Link to="/health" className={on("/health") ? "on" : ""}><span className="ic">✧</span> Health</Link>
+        {role === "admin" && (
+          <>
+            <div className="navlabel">Admin</div>
+            <Link to="/admin/llm" className={on("/admin/llm") ? "on" : ""}><span className="ic">⚡</span> LLM setup</Link>
+          </>
+        )}
         <div className="grow" />
         <div className="navlabel" style={{ opacity: .7 }}>v0.1 · dark</div>
       </nav>
