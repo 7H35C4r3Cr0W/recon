@@ -90,23 +90,19 @@ def create_app() -> FastAPI:
             },
         )
 
-    # Routers under /api. health is fully implemented; the rest are scaffolded (see routers/).
+    # Routers under /api. auth/projects/scope/runs are wired (Phase 2); the rest are scaffolded.
+    from nabu_agent.routers import (
+        audit, auth, catalog, creds, findings, projects, reports, runs, scope, settings as settings_router, users,
+    )
+
     app.include_router(health.router, prefix="/api")
-    for name in ("auth", "projects", "scope", "runs", "reports", "findings",
-                 "catalog", "creds", "users", "audit", "settings"):
-        try:
-            module = __import__(f"nabu_agent.routers.{name}", fromlist=["router"])
-            app.include_router(module.router, prefix="/api")
-        except Exception:  # pragma: no cover - stub router may not be import-complete yet
-            pass
+    for module in (auth, projects, scope, runs, reports, findings, catalog, creds, users, audit, settings_router):
+        app.include_router(module.router, prefix="/api")
 
     # WebSocket hub under /ws.
-    try:
-        from nabu_agent.ws import routes as ws_routes
+    from nabu_agent.ws import routes as ws_routes
 
-        app.include_router(ws_routes.router)
-    except Exception:  # pragma: no cover
-        pass
+    app.include_router(ws_routes.router)
 
     _ = settings  # reserved for middleware wiring (Phase 2)
     return app

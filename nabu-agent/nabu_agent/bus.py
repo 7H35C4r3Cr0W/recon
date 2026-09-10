@@ -1,19 +1,36 @@
-"""The single Redis interaction surface: Arq enqueue, run cancel-flag, and pub/sub for live events.
+"""The single Redis interaction surface: live event pub/sub, per-run cancel flag, and the per-run
+monotonic seq counter that drives WebSocket replay-by-seq. Keeping all Redis access here makes the
+key namespace auditable in one place.
 
-Keeping all Redis access here (rather than scattered ``redis`` calls) makes the event contract and
-key namespace auditable in one place. Keys:
-
-    nabu:run:{run_id}:events      pub/sub channel — engine on_line lines + state deltas → WebSocket
-    nabu:run:{run_id}:cancel      cancel flag — set by /runs/{id}/cancel, polled by tasks
-    nabu:run:{run_id}:fanin       DECR counter — the re-trigger-on-last-finisher barrier
-    nabu:run:project-mutex:{dir}  per-project single-writer mutex (see admission.py)
-
-Bodies are wired to redis-py asyncio in Phase 1; signatures are the contract.
+Keys:
+    nabu:run:{id}:events   pub/sub channel — node-state + log events → WebSocket
+    nabu:run:{id}:cancel   cancel flag — set by /runs/{id}/cancel, polled by the executor
+    nabu:run:{id}:seq      INCR counter — the per-run monotonic event seq
 """
 
 from __future__ import annotations
 
+import json
+from collections.abc import AsyncIterator
 from typing import Any
+
+from nabu_agent.settings import get_settings
+
+_client: Any = None
+
+
+def set_client(client: Any) -> None:
+    """Inject a client (tests pass fakeredis; app lifespan sets the real one)."""
+    global _client
+    _client = client
+
+
+def get_redis() -> Any:
+    global _client
+    if _client is None:
+        import redis.asyncio as aioredis
+        _client = aioredis.from_url(get_settings().redis_url, decode_responses=True)
+    return _client
 
 
 def events_channel(run_id: str) -> str:
@@ -24,19 +41,35 @@ def cancel_key(run_id: str) -> str:
     return f"nabu:run:{run_id}:cancel"
 
 
-def fanin_key(run_id: str) -> str:
-    return f"nabu:run:{run_id}:fanin"
+def seq_key(run_id: str) -> str:
+    return f"nabu:run:{run_id}:seq"
+
+
+async def next_seq(run_id: str) -> int:
+    return int(await get_redis().incr(seq_key(run_id)))
 
 
 async def publish_event(run_id: str, event: dict[str, Any]) -> None:
-    """Publish one canonical Event (see events/schema.py) to the run channel."""
-    raise NotImplementedError
+    await get_redis().publish(events_channel(run_id), json.dumps(event))
+
+
+async def subscribe(run_id: str) -> AsyncIterator[dict[str, Any]]:
+    """Yield live events published to the run channel (JSON-decoded)."""
+    pubsub = get_redis().pubsub()
+    await pubsub.subscribe(events_channel(run_id))
+    try:
+        async for message in pubsub.listen():
+            if message.get("type") == "message":
+                data = message["data"]
+                yield json.loads(data if isinstance(data, str) else data.decode())
+    finally:
+        await pubsub.unsubscribe(events_channel(run_id))
+        await pubsub.aclose()
 
 
 async def request_cancel(run_id: str) -> None:
-    """Set the run's cancel flag; tasks derive a threading.Event from it for shell.run(cancel=)."""
-    raise NotImplementedError
+    await get_redis().set(cancel_key(run_id), "1")
 
 
 async def is_cancelled(run_id: str) -> bool:
-    raise NotImplementedError
+    return bool(await get_redis().get(cancel_key(run_id)))

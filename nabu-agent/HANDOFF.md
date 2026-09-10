@@ -24,17 +24,37 @@
 
 ```
 DATE:        2026-09-09
-BRANCH:      nabu-agent-scaffold
-PHASE:       Phases 0, 1, 4 DONE — scaffold committed + pushed + PR open
-DOING NOW:   (idle) — awaiting review
-NEXT UP:     Phase 2 (MVP thin slice) in a later session — resume at step 2.1
-PR:          https://github.com/7H35C4r3Cr0W/recon/pull/1  (commit b551866, 123 files)
-BLOCKERS:    none
-VERIFIED:    122 files; 71 backend .py compile clean; engine seam imports against REAL oscprecon
-             with PySide6 NOT loaded (headless holds); 12/12 policy-invariant + unit tests PASS;
-             docker-compose + seccomp + CI YAML valid.
-NOT DONE:    manager HTML, GitHub push; then MVP wiring (Phase 2) + hardening (Phase 3) later.
+BRANCH:      nabu-agent-phase2   (Phase 0/1/4 on main via PR #1)
+PHASE:       2 — MVP thin slice  (VERTICAL SLICE WORKING + TESTED)
+DOING NOW:   demo-mode end-to-end done; wrapping the visual preview + commit
+VERIFIED:    16/16 tests pass incl. MVP integration (login→project→scope→demo run→live events→done)
+             + 3 review bugs fixed (regression-locked). Frontend builds clean (tsc strict + vite +
+             Cytoscape). Engine seam headless. sqlite+fakeredis, no docker needed for tests.
+DONE:        Phases 0,1,4; Phase 2 sub-steps 2.1–2.5, 2.7, 2.9, 2.10 (demo path).
+DEFERRED:    2.6 REAL single-target recon (_run_real is stubbed; demo path proves the pipeline+viz),
+             2.8 reports/findings router bodies (gateway funcs exist), full per-project RBAC
+             enforcement + OIDC (Phase 3/4). Cancel is best-effort in demo (real path wires the
+             engine cancel Event).
+NEXT UP:     wire _run_real via engine.tools through the chokepoint (2.6); reports/findings routers
+             (2.8); move executor onto Arq worker (Phase 3 fan-out); RBAC/OIDC hardening.
 ```
+
+### Live-visualization requirements (owner, 2026-09-09) — build into Phase 2
+The run view is a **BloodHound-style flow-chart map** (like the classic Nabu graph), showing the
+**agents in motion**, with a **live action log** and **color-coded node states** updated in real time
+and persisted onto the map so anyone watching sees it live:
+- **glowing green** = active / where the run currently is · **yellow** = stuck/blocked/needs-approval
+  · **red** = error/failed · (plus: grey = queued, blue/teal = done).
+- Nodes = the run graph: target → discovered services → per-service agents → findings → report; edges
+  show hand-offs. As agents transition (`task.updated`, `finding.added`, `run.status`), the map
+  re-colours the node live and the log pane appends the action line.
+- Implemented with **Cytoscape.js** in the SPA (same library the desktop GUI vendored), driven by the
+  canonical WebSocket `Event` envelope. The state colour is carried in `event.data.node_state`; the
+  frontend keeps a node-state map keyed by `task_id`/`node_id` and restyles on each event.
+- Login → **project page** is where all the work happens (create/scope/run/watch/report on one page).
+This extends sub-steps **2.5–2.9** (event model carries node state; `ws/hub` streams it; the frontend
+RunLive page renders the Cytoscape map + live log). See DESIGN §6.1 (event envelope) — add
+`node_state` to `task.*`/`run.status` `data`.
 
 **How to resume:** read this file → check the last ✅ step → continue at the first ☐. Design inputs
 are in `docs/` (`ENGINE_INTEGRATION.md` is authoritative for how to call the engine; `DESIGN.md` for
@@ -80,38 +100,38 @@ policy-invariant gate green and `../src/oscprecon` untouched.
 
 **How to build it (ordered sub-steps — do in order, test each, tick as you go):**
 
-- [ ] **2.1 Test harness** — `tests/conftest.py`: async in-memory SQLite (`aiosqlite`) engine +
+- [x] **2.1 Test harness** — `tests/conftest.py`: async in-memory SQLite (`aiosqlite`) engine +
   `Base.metadata.create_all` fixture; `fakeredis.aioredis` fixture; a FastAPI `TestClient`/`httpx`
   fixture with dependency overrides (`get_db`, redis, and the engine adapter mocked). Deps already in
   the test venv (`.venv-agent`): `pytest-asyncio`, `aiosqlite`, `fakeredis`.
-- [ ] **2.2 DB session wiring** — make `db/session.py` build the engine from `Settings.database_url`
+- [x] **2.2 DB session wiring** — make `db/session.py` build the engine from `Settings.database_url`
   lazily (not at import) so tests can point it at sqlite; add `create_all()` helper for dev/test;
   keep `get_db` the injected dependency.
-- [ ] **2.3 Auth (local first)** — implement `auth/providers.LocalProvider` (argon2 verify),
+- [x] **2.3 Auth (local first)** — implement `auth/providers.LocalProvider` (argon2 verify),
   `auth/sessions` (redis-backed opaque session in the httpOnly cookie), `auth/deps`
   (`get_current_user`, `require_role`, `require_project_role`, `csrf_protect`), and
   `bootstrap.seed_admin`. Wire `routers/auth.py` login/logout/me. OIDC stays scaffolded.
-- [ ] **2.4 Projects + scope** — `routers/projects.py` create → `engine.gateway.create_project_profile`
+- [x] **2.4 Projects + scope** — `routers/projects.py` create → `engine.gateway.create_project_profile`
   (`Profile.create`), list/get/patch, members, settings (spray/exploit gates, admin only);
   `routers/scope.py` allowlist CRUD with `models.validate_host_or_range` + human-gated promote. RBAC
   via `auth/deps`. Platform-audit each mutation (`nabu_agent.audit`).
-- [ ] **2.5 Runs API** — `routers/runs.py`: `POST /projects/{id}/runs` → `assert_in_scope` +
+- [x] **2.5 Runs API** — `routers/runs.py`: `POST /projects/{id}/runs` → `assert_in_scope` +
   RBAC + gating + `admission.acquire_run_slot` + enqueue `supervise_run`; `GET /runs/{id}` (+ tasks),
   `POST /runs/{id}/cancel`. Persist `runs`/`agent_tasks`/`run_events` (monotonic `seq`).
-- [ ] **2.6 Orchestration (single target, no fan-out)** — implement `bus.py` (redis enqueue /
+- [~] **2.6 (demo path done; REAL recon `_run_real` deferred)**  —— original: **2.6 Orchestration (single target, no fan-out)** — implement `bus.py` (redis enqueue /
   cancel-flag / publish-subscribe), `orchestration/admission.py`, the single-writer `blackboard.py`,
   and `orchestration/tasks.supervise_run` for ONE host: validating → alive_check (`check_alive`) →
   scanning (`run_scan`) → enriching (one `enum_service` per discovered service, still serial) →
   synthesizing (`generate_report`) → report_ready. Engine calls run in a worker thread; cancel flag →
   `threading.Event`; idempotency key; blocked/missing_tool recorded, never retried → `partial`.
-- [ ] **2.7 WebSocket** — `ws/hub.py`: cookie-auth handshake, replay `run_events` by `seq` then tail
+- [x] **2.7 WebSocket** — `ws/hub.py`: cookie-auth handshake, replay `run_events` by `seq` then tail
   the redis `run:{id}` channel, ~20s heartbeat, ~250ms coalescing of `task.updated`/`log.line`.
-- [ ] **2.8 Reports/findings** — `routers/reports.py` (`gateway.render_report`, artifacts) +
+- [~] **2.8 (gateway funcs exist; router bodies deferred)**  —— original: **2.8 Reports/findings** — `routers/reports.py` (`gateway.render_report`, artifacts) +
   `routers/findings.py` (`gateway.list_findings/list_services/build_graph`); apply
   `agents/report_grounding.validate_claims` and delimit AI-narrative.
-- [ ] **2.9 Frontend** — finish `api/client.ts` + `ws/client.ts`; build the pages: Login, Projects
+- [x] **2.9 Frontend** — finish `api/client.ts` + `ws/client.ts`; build the pages: Login, Projects
   (list + create + scope), RunLive (task tree + streamed log via WS), Report. Route guards on auth.
-- [ ] **2.10 Integration tests** — happy path: login → create project (mock `Profile.create`) →
+- [x] **2.10 Integration tests** — happy path: login → create project (mock `Profile.create`) →
   start run (mocked engine tools) → receive `run_events` → fetch rendered report; error-contract
   mapping (out-of-scope → 403 `scope_violation`); WS replay-by-seq reconnect; grounding validator
   rejects an injected unbacked claim. Keep the invariant gate green.

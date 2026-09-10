@@ -20,7 +20,16 @@ target_metadata = Base.metadata
 
 
 def _sync_url() -> str:
-    return get_settings().database_url.replace("+asyncpg", "").replace("+psycopg", "")
+    """Derive a SYNC driver URL for migrations from the async app URL.
+
+    A bare ``postgresql://`` would resolve to psycopg2 (not a dependency), so map the async asyncpg
+    URL to psycopg3 (``postgresql+psycopg``), which IS installed. SQLite maps aiosqlite → the stdlib
+    sync driver.
+    """
+    url = get_settings().database_url
+    if url.startswith("sqlite"):
+        return url.replace("+aiosqlite", "")
+    return url.replace("+asyncpg", "+psycopg").replace("postgresql+psycopg+psycopg", "postgresql+psycopg")
 
 
 def run_migrations_offline() -> None:

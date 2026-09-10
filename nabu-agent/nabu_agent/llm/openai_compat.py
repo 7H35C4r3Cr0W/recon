@@ -119,6 +119,10 @@ class OpenAICompatibleProvider(LLMProvider):
         body = _body(request, self._settings, stream=True)
         try:
             async with self._client.stream("POST", self._url, json=body) as resp:
+                if resp.status_code >= 400:
+                    # body isn't read yet on a streamed response; read it so _raise_for_status can
+                    # safely inspect resp.text for the 4xx branch (caught in review).
+                    await resp.aread()
                 self._raise_for_status(resp)
                 async for line in resp.aiter_lines():
                     if not line or not line.startswith("data:"):

@@ -27,7 +27,10 @@ from pathlib import Path
 from typing import Any, Protocol
 
 # --- read-only imports from the classic engine (never edited from here) ---
-from oscprecon import audit, shell
+# NOTE: import the audit MODULE under an alias — the public helper below is named `audit`, and a
+# bare `from oscprecon import audit` would be shadowed by that def (a real bug caught in review).
+from oscprecon import audit as engine_audit
+from oscprecon import shell
 from oscprecon.models import validate_host, validate_host_or_range
 from oscprecon.profile import Profile
 
@@ -208,8 +211,8 @@ def execute_gated_action(
 
 def audit(profile: Profile, action: str, *, details: dict[str, Any] | None = None, actor: str = "system") -> None:
     """Record a state-changing / executed action with the engine's kebab slugs (best-effort;
-    ``audit.record`` swallows all exceptions — never gate logic on it)."""
-    audit.record(profile.directory, profile.profile_name, action, actor=actor, details=details or {})
+    ``engine_audit.record`` swallows all exceptions — never gate logic on it)."""
+    engine_audit.record(profile.directory, profile.profile_name, action, actor=actor, details=details or {})
 
 
 def _redact(shell_line: str) -> str:

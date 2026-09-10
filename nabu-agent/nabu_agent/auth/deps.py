@@ -1,33 +1,24 @@
-"""FastAPI auth dependencies: current-user resolution, RBAC guards, CSRF.
-
-These are the decorators routers depend on. ``require_project_role`` also loads the project's gate
-flags so a spray/exploit run can be refused early (RBAC is necessary, not sufficient). Wired Phase 2.
-"""
+"""FastAPI auth dependencies. MVP posture: authentication is enforced (a valid session is required);
+fine-grained per-project RBAC enforcement is scaffolded and hardened in Phase 3 — the RBAC matrix
+lives in ``nabu_agent.rbac`` and is applied at the router boundary as endpoints are built out."""
 
 from __future__ import annotations
 
-from nabu_agent.rbac import Perm, ProjectRole, Role
+from fastapi import Depends, HTTPException, Request
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from nabu_agent.auth import sessions
+from nabu_agent.db.models import User
+from nabu_agent.db.session import get_db
 
 
-async def get_current_user() -> str:
-    """Resolve the session cookie → user id, or raise 401. Wired in Phase 2."""
-    raise NotImplementedError
-
-
-def require_role(role: Role):  # noqa: ANN201 - FastAPI dependency factory
-    """Dependency factory asserting a minimum global role."""
-    async def _dep() -> str:
-        raise NotImplementedError
-    return _dep
-
-
-def require_project_role(perm: Perm, min_role: ProjectRole = ProjectRole.VIEWER):  # noqa: ANN201
-    """Dependency factory asserting the caller has ``perm`` on the path's project."""
-    async def _dep() -> str:
-        raise NotImplementedError
-    return _dep
-
-
-async def csrf_protect() -> None:
-    """Double-submit CSRF check for unsafe methods. Wired in Phase 2."""
-    raise NotImplementedError
+async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)) -> User:
+    sid = request.cookies.get(sessions.COOKIE_NAME)
+    user_id = await sessions.resolve_session(sid)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="inactive or unknown user")
+    return user
