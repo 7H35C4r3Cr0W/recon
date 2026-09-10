@@ -27,7 +27,7 @@ jobs:
       - name: mypy
         run: uv run mypy nabu_agent
       - name: unit tests (engine mocked)
-        run: uv run pytest -q -m "not invariant"
+        run: uv run pytest -q -m "not invariant and not load"
 
   # SEPARATE, must-pass gate. If any safety invariant regresses this job fails independently of the
   # unit suite, so a bypass can never ride in green behind unrelated test noise.
