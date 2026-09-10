@@ -23,8 +23,8 @@ async def test_llm_config_and_test_when_unconfigured(client):
 
 
 async def test_llm_test_fire_reports_metrics_with_a_fake_brain(client, monkeypatch):
-    from nabu_agent.llm.base import ChatResponse, Usage
     from nabu_agent.llm import factory
+    from nabu_agent.llm.base import ChatResponse, Usage
 
     class _Fake:
         model = "gpt-5.1"
