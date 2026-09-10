@@ -115,9 +115,12 @@ The per-host fan-out described as missing below has since been implemented for t
   `approval_required_above_hosts` emits a notice. Verified by
   `tests/integration/test_multihost_run.py` (per-host subtrees + no collision + clamp).
 
-**Still open after the host tier** (follow-ups, not blockers for a scan `/24`):
-- The **`agent` (LLM) kind** still runs single-target; the roster does not yet fan out
-  per host. Multi-host applies to the deterministic `scan` kind.
+**Still open after the host tier** (follow-ups):
+- ~~The **`agent` (LLM) kind** still runs single-target.~~ **DONE** — the LLM roster
+  (planner -> enum -> research -> reporter) now also fans out per host
+  (`services/runs._agent_host` + the `_run_agent` driver), host-scoped
+  (`agent-planner-{ip}`, `agent-report-{ip}`, …), under the same host guardrails; a per-host
+  crash marks that host red and the run continues. (`test_multihost_agent_run.py`.)
 - **Combined multi-host report** — each host writes its own `report.md`; there is no
   run-level aggregate report yet (`GET /report` reads the entry scope's Profile).
 - **Hard human approval checkpoint** above N hosts is a log notice, not a blocking

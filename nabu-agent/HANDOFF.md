@@ -281,6 +281,15 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   wide-fanout cap now asserts `max_enum_per_host` (measured peak 4/4). Full local gate green:
   ruff clean, mypy 10 (down from 11; new code clean), 53 backend + 2 load + 9 invariant + 7
   unit + 12 frontend tests pass, frontend build OK.
+- DONE (follow-up) — **agent-kind multi-host**. Extracted `_agent_host` (full LLM roster for ONE
+  host into its own Profile: scan -> planner -> per-service enum -> per-service research ->
+  reporter, all host-scoped incl. `agent-planner-{ip}`/`agent-report-{ip}`, per-host enum semaphore
+  = `max_enum_per_host`, per-host report) and rewrote `_run_agent` as the multi-host driver reusing
+  `_resolve_hosts` + `max_concurrent_hosts` + `max_total_tasks` product cap + the same per-host-crash
+  / all-hosts-fail-surfaces-as-driver-failure handling as `_run_real`. LLM-config check stays at the
+  driver. Test: `tests/integration/test_multihost_agent_run.py` (CIDR -> per-host roster, no
+  collision). Updated single-host `test_agent_run` planner/reporter ids to host-scoped. Gate green:
+  ruff, mypy 10, 54 backend + 2 load + 9 invariant, frontend unchanged.
 - Doc: `docs/LOAD_TEST.md` updated — gap now largely closed for `scan`; guardrail table +
   verdict revised; remaining follow-ups (agent-kind multi-host, combined report, hard
   approval checkpoint, distributed supervisor) listed honestly.
