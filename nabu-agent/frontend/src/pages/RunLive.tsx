@@ -27,8 +27,12 @@ export function RunLive() {
 
   function apply(e: RunEvent) {
     const d = e.data || {};
-    if (e.type === "log.line" && d.line) {
-      setLogs((l) => [...l, String(d.line)]);
+    if (e.type === "log.line") {
+      const add: string[] = [];
+      if (Array.isArray(d.lines)) add.push(...(d.lines as unknown[]).map(String));
+      else if (d.line) add.push(String(d.line));
+      if (d.suppressed) add.push(`\u2026 ${d.suppressed} lines suppressed (rate-limited)`);
+      if (add.length) setLogs((l) => [...l, ...add]);
     }
     if (e.type === "done") setStatus("done");
     const nodeId = d.node_id as string | undefined;

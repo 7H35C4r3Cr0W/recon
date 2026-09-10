@@ -6,6 +6,7 @@ BloodHound-style map + log behave identically whether the recon is simulated or 
 from __future__ import annotations
 
 import asyncio
+import collections
 import contextlib
 import threading
 import time
@@ -22,6 +23,72 @@ from nabu_agent.events.schema import NodeState, RunEventType, make_event
 from nabu_agent.orchestration.executor import run_demo
 
 _log = structlog.get_logger("nabu_agent.runs")
+
+
+class LogPump:
+    """Backpressure for high-volume engine log lines.
+
+    The blocking engine calls ``on_line(line)`` from a worker thread for EVERY line of tool output; a
+    chatty scan could otherwise schedule thousands of per-line coroutines (each a DB write + Redis
+    publish) and flood the loop. Instead ``feed`` appends to a BOUNDED in-memory deque (O(1), drops
+    the oldest when full and counts the overflow), and one async ``drain`` task flushes batches every
+    ~250ms as a single ``log.line`` event carrying ``lines: [...]`` (+ ``suppressed`` count). This
+    bounds both memory and the publish rate regardless of how fast the engine emits.
+    """
+
+    def __init__(self, run_id: str, publish, *, cap: int = 2000, batch: int = 200,
+                 interval: float = 0.25) -> None:
+        self.run_id = run_id
+        self._publish = publish
+        self.cap = cap
+        self.batch = batch
+        self.interval = interval
+        self._buf: collections.deque[str] = collections.deque(maxlen=cap)
+        self._lock = threading.Lock()
+        self._dropped = 0
+        self._stop = False
+
+    def feed(self, line: str) -> None:
+        """Called from the engine worker thread — thread-safe, non-blocking, bounded."""
+        with self._lock:
+            if len(self._buf) >= self.cap:
+                self._dropped += 1  # deque(maxlen) evicts the oldest line
+            self._buf.append(line)
+
+    def _take(self) -> tuple[list[str], int]:
+        with self._lock:
+            lines = list(self._buf)
+            self._buf.clear()
+            dropped, self._dropped = self._dropped, 0
+        return lines, dropped
+
+    async def _flush(self) -> None:
+        lines, dropped = self._take()
+        if not lines and not dropped:
+            return
+        for i in range(0, len(lines) or 1, self.batch):
+            chunk = lines[i:i + self.batch]
+            data: dict[str, Any] = {"lines": chunk}
+            if dropped and i == 0:
+                data["suppressed"] = dropped
+            with contextlib.suppress(Exception):
+                await self._publish(RunEventType.LOG_LINE, data)
+
+    async def drain(self) -> None:
+        try:
+            while not self._stop:
+                await asyncio.sleep(self.interval)
+                await self._flush()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await self._flush()  # final flush of anything buffered at shutdown
+
+    async def flush(self) -> None:
+        await self._flush()
+
+    def stop(self) -> None:
+        self._stop = True
 
 # Strong refs to in-flight driver tasks so the event loop can't GC/cancel a run mid-execution
 # (a bare create_task is only weakly referenced — caught in review).
@@ -107,6 +174,8 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
     await _touch_heartbeat(run_id)
     watcher = asyncio.create_task(watch_cancel())
     heart = asyncio.create_task(_heartbeat_loop(run_id, cancel_event))
+    pump = LogPump(run_id, publish)
+    pump_task = asyncio.create_task(pump.drain())
     final = "failed"
     try:
         try:
@@ -114,10 +183,10 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
                 final = await run_demo(run_id, target, publish)
             elif kind == "agent":
                 final = await _run_agent(run_id, target, publish, project_id=project_id or "unknown",
-                                         cancel_event=cancel_event)
+                                         cancel_event=cancel_event, on_line=pump.feed)
             else:
                 final = await _run_real(run_id, target, publish, project_id=project_id or "unknown",
-                                        cancel_event=cancel_event)
+                                        cancel_event=cancel_event, on_line=pump.feed)
         except asyncio.CancelledError:
             final = "cancelled"
             _log.warning("run-cancelled", run_id=run_id, kind=kind)
@@ -137,10 +206,14 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
         cancel_event.set()
         watcher.cancel()
         heart.cancel()
+        pump.stop()
+        with contextlib.suppress(Exception):
+            await pump.flush()
+        pump_task.cancel()
         _EMIT_LOCKS.pop(run_id, None)
 
 async def _run_real(run_id: str, target: str, publish, *, project_id: str,
-                    cancel_event: threading.Event) -> str:
+                    cancel_event: threading.Event, on_line=None) -> str:
     """REAL single-target recon via the engine tools, through the shell.run chokepoint.
 
     Emits the SAME node ids/events as the demo (run/host/svc-*/agent-enum-*/finding-*/report) so the
@@ -151,12 +224,6 @@ async def _run_real(run_id: str, target: str, publish, *, project_id: str,
 
     from nabu_agent.engine import tools as etools
     from nabu_agent.engine.workspace import workspace_for
-
-    loop = asyncio.get_running_loop()
-
-    def on_line(line: str) -> None:
-        # called from the engine worker thread — schedule the async publish on the loop
-        asyncio.run_coroutine_threadsafe(publish(RunEventType.LOG_LINE, {"line": line}), loop)
 
     run_node, host_node = f"run-{run_id}", f"host-{target}"
     await publish(RunEventType.RUN_STATUS, {"node_id": run_node, "node_state": NodeState.ACTIVE.value,
@@ -259,7 +326,7 @@ def launch(run_id: str, target: str, kind: str = "demo", *, project_id: str | No
 
 
 async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
-                     cancel_event: threading.Event) -> str:
+                     cancel_event: threading.Event, on_line=None) -> str:
     """LLM-DRIVEN recon with the FULL agent roster: scan → planner → per-service enum agents
     (concurrent) → per-service research agents (concurrent) → reporter. Each LLM agent is an
     AgentRunner (role prompt + allow-listed tools + SafetyGate + budget) and shows as its own node on
@@ -283,11 +350,6 @@ async def _run_agent(run_id: str, target: str, publish, *, project_id: str,
         await publish(RunEventType.ERROR, {"message": "no LLM configured — set NABU_LLM_BASE_URL to "
                       "your internal OpenAI-compatible endpoint (kind='demo' needs no brain)."})
         return "failed"
-
-    loop = asyncio.get_running_loop()
-
-    def on_line(line: str) -> None:
-        asyncio.run_coroutine_threadsafe(publish(RunEventType.LOG_LINE, {"line": line}), loop)
 
     async def emit(kind_: str, data: dict) -> None:
         await publish(RunEventType.LOG_LINE, data if kind_ == "log.line" else {"line": str(data)})
