@@ -18,9 +18,20 @@ from typing import Any
 
 async def supervise_run(ctx: dict[str, Any], run_id: str, target: str, kind: str,
                         project_id: str) -> str:
-    """Arq entrypoint for one run. Returns the terminal run state."""
+    """Arq entrypoint for one run — the lightweight SUPERVISOR. Delegates to execute_run, which does
+    admission + alive-sweep + the approval gate, then (in production) fans out one recon_host_job per
+    host onto the pool and awaits their results, owning the single terminal DONE. Returns a summary."""
     from nabu_agent.services.runs import execute_run
 
     await execute_run(run_id, target, kind, project_id=project_id)
     # execute_run persists the terminal state; return a small summary for arq's result store.
     return f"{run_id}:{kind}"
+
+
+async def recon_host_job(ctx: dict[str, Any], run_id: str, host: str, kind: str,
+                         project_id: str, service_budget: int) -> str:
+    """Per-host WORKER job: recon ONE host of a run on the pool (two-pool fan-out). The supervisor
+    enqueues one of these per live host and awaits its result. Returns the host's terminal string."""
+    from nabu_agent.services.runs import run_host_in_worker
+
+    return await run_host_in_worker(run_id, host, kind, project_id, int(service_budget))
