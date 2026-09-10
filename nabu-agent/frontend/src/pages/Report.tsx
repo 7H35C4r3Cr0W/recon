@@ -86,11 +86,25 @@ export function Report() {
     return () => { alive = false; };
   }, [projectId]);
 
+  async function downloadExport() {
+    try {
+      const bundle = await api(`/projects/${projectId}/export`, { method: "POST" });
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `nabu-export-${projectId}.json`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setErr(String(e)); }
+  }
+
   return (
     <div style={{ maxWidth: 900 }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <h1>Report &amp; outputs</h1>
-        <Link className="btn" to={`/projects/${projectId}`}>← project</Link>
+        <span className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={downloadExport}>⬇ Export</button>
+          <Link className="btn" to={`/projects/${projectId}`}>← project</Link>
+        </span>
       </div>
       {err && <p className="err">{err}</p>}
       {loading && <p className="muted">Loading…</p>}
