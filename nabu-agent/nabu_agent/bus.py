@@ -158,6 +158,15 @@ async def enqueue_run(run_id: str, target: str, kind: str, project_id: str) -> N
     await pool.enqueue_job("supervise_run", run_id, target, kind, project_id, _job_id=f"run:{run_id}")
 
 
+async def close_client() -> None:
+    """Close the module-global Redis pub/sub client on shutdown (symmetric with set_client)."""
+    global _client
+    if _client is not None:
+        with contextlib.suppress(Exception):
+            await _client.aclose()
+        _client = None
+
+
 async def close_arq_pool() -> None:
     """Close the cached Arq pool on shutdown (avoids a leaked connection)."""
     global _arq_pool

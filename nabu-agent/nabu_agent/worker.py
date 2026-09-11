@@ -29,9 +29,18 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 async def on_shutdown(ctx: dict[str, Any]) -> None:
+    import contextlib
+
+    from nabu_agent import bus
     from nabu_agent.db import session as db_session
 
     await db_session.dispose()
+    # release Redis resources symmetrically with the API lifespan (the pub/sub client set in
+    # on_startup + the cached Arq enqueue pool a fan-out may have opened on this worker).
+    with contextlib.suppress(Exception):
+        await bus.close_arq_pool()
+    with contextlib.suppress(Exception):
+        await bus.close_client()
 
 
 def _redis_settings() -> Any:

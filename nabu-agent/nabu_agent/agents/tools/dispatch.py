@@ -13,9 +13,13 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
+import structlog
+
 from nabu_agent.engine import tools as etools
 from nabu_agent.engine.errors import EngineAdapterError
 from nabu_agent.engine.workspace import workspace_for
+
+_slog = structlog.get_logger("nabu_agent.agents.dispatch")
 
 OnLine = Callable[[str], None] | None
 
@@ -62,6 +66,7 @@ async def dispatch(tool_name: str, arguments: dict[str, Any], *, project_id: str
         raise ToolError(f"{getattr(exc, 'code', 'engine_error')}: {exc}") from exc
     except Exception as exc:  # noqa: BLE001 - any tool/engine/IO failure is DATA fed back to the model,
         # never a crash that kills the whole run (e.g. a missing tool, unwritable workspace, parse error).
+        _slog.warning("tool-unexpected-error", tool=tool_name, exc_info=True)  # operator-visible, not model-only
         raise ToolError(f"tool {tool_name} failed: {exc}") from exc
 
 

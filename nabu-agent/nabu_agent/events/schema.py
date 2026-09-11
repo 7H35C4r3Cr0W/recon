@@ -66,8 +66,6 @@ class Event:
         return d
 
 
-CLIENT_OPS = frozenset({"ping", "approve", "reject"})
-
 
 def make_event(
     type_: RunEventType, run_id: str, seq: int, ts: float, *,
@@ -76,14 +74,3 @@ def make_event(
     return Event(type=type_, run_id=run_id, seq=seq, ts=ts, data=data or {},
                  agent_id=agent_id, task_id=task_id)
 
-
-def node_update(run_id: str, seq: int, ts: float, node_id: str, state: NodeState, *,
-                label: str | None = None, task_id: str | None = None,
-                extra: dict[str, Any] | None = None) -> Event:
-    """Build a task.updated event that re-colours one map node."""
-    data: dict[str, Any] = {"node_id": node_id, "node_state": state.value}
-    if label is not None:
-        data["label"] = label
-    if extra:
-        data.update(extra)
-    return make_event(RunEventType.TASK_UPDATED, run_id, seq, ts, data=data, task_id=task_id or node_id)

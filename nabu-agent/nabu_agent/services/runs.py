@@ -10,6 +10,7 @@ import collections
 import contextlib
 import threading
 import time
+import weakref
 from datetime import UTC, datetime
 from typing import Any
 
@@ -20,6 +21,7 @@ from nabu_agent import bus
 from nabu_agent.db.models import Run, RunEvent
 from nabu_agent.db.session import sessionmaker
 from nabu_agent.events.schema import NodeState, RunEventType, make_event
+from nabu_agent.obs import logging as obs_logging
 from nabu_agent.orchestration.executor import run_demo
 
 _log = structlog.get_logger("nabu_agent.runs")
@@ -94,8 +96,18 @@ class LogPump:
 # (a bare create_task is only weakly referenced — caught in review).
 _RUNNING: set[asyncio.Task] = set()
 # Per-run lock so seq-assign + persist + publish happen atomically and in seq order (the WS live
-# tail dedups by strictly-increasing seq, so out-of-order publishes would drop events).
-_EMIT_LOCKS: dict[str, asyncio.Lock] = {}
+# tail dedups by strictly-increasing seq, so out-of-order publishes would drop events). WEAK values:
+# a lock is GC'd once its run has no in-flight holder, so a long-lived worker never accumulates one
+# lock per run_id (concurrent emitters each keep a local strong ref, so they share the same lock).
+_EMIT_LOCKS: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
+
+
+def _run_lock(run_id: str) -> asyncio.Lock:
+    lock = _EMIT_LOCKS.get(run_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _EMIT_LOCKS[run_id] = lock
+    return lock
 
 
 async def replay_events(db, run_id: str, after: int = 0) -> list[dict[str, Any]]:
@@ -110,9 +122,8 @@ async def replay_events(db, run_id: str, after: int = 0) -> list[dict[str, Any]]
 async def _emit(run_id: str, type_: RunEventType, data: dict[str, Any]) -> None:
     """Assign a seq, persist a run_events row, and publish to Redis — atomically per run so publish
     order matches seq order (the WS tail dedups by strictly-increasing seq)."""
-    if run_id not in _EMIT_LOCKS:
-        _EMIT_LOCKS[run_id] = asyncio.Lock()
-    async with _EMIT_LOCKS[run_id]:
+    lock = _run_lock(run_id)   # local strong ref keeps the weak-dict entry alive for this block
+    async with lock:
         seq = await bus.next_seq(run_id)
         ev = make_event(type_, run_id, seq, time.time(), data=data, task_id=data.get("node_id"))
         async with sessionmaker()() as db:
@@ -283,7 +294,7 @@ def _make_cancel_watcher(run_id: str, cancel_event: threading.Event):
                     return
                 await asyncio.sleep(1.0)
         except Exception:  # a Redis blip must not crash the run; log so a persistent outage is visible
-            _log.debug("cancel-watch-error", run_id=run_id, exc_info=True)
+            _log.warning("cancel-watch-error", run_id=run_id, exc_info=True)
     return _watch
 
 
@@ -299,6 +310,7 @@ async def run_host_in_worker(run_id: str, host: str, kind: str, project_id: str,
     async def publish(type_: RunEventType, data: dict[str, Any]) -> None:
         await _emit(run_id, type_, data)
 
+    obs_logging.bind_run(run_id, agent_id=f"host:{host}")
     cancel_event = threading.Event()
 
     watcher = asyncio.create_task(_make_cancel_watcher(run_id, cancel_event)())
@@ -306,6 +318,7 @@ async def run_host_in_worker(run_id: str, host: str, kind: str, project_id: str,
     pump_task = asyncio.create_task(pump.drain())
     await _touch_heartbeat(run_id)
     run_node, limits = f"run-{run_id}", RunLimits()
+    provider = None
     try:
         if kind == "agent":
             provider = build_provider(get_settings().llm)
@@ -321,6 +334,10 @@ async def run_host_in_worker(run_id: str, host: str, kind: str, project_id: str,
         with contextlib.suppress(Exception):
             await pump.flush()
         pump_task.cancel()
+        if provider is not None:  # close the per-run LLM client's connection pool (no leak on the worker)
+            with contextlib.suppress(Exception):
+                await provider.aclose()
+        obs_logging.clear_run()
 
 
 async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_id: str | None = None) -> None:
@@ -328,6 +345,7 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
     async def publish(type_: RunEventType, data: dict[str, Any]) -> None:
         await _emit(run_id, type_, data)
 
+    obs_logging.bind_run(run_id)   # every log line during this run carries run_id (api + workers)
     # a threading.Event fed by the Redis cancel flag, handed to the (blocking) engine calls
     cancel_event = threading.Event()
     # a SEPARATE signal set only in the finally — keeps the heartbeat beating through cancel unwind
@@ -397,6 +415,7 @@ async def execute_run(run_id: str, target: str, kind: str = "demo", *, project_i
             with contextlib.suppress(Exception):
                 await admission.release_run_slot(project_id, _profile_dir)
         _EMIT_LOCKS.pop(run_id, None)
+        obs_logging.clear_run()
 
 async def _resolve_hosts(run_id: str, target: str, publish, *, project_id: str,
                          cancel_event, on_line, limits) -> list[str]:
@@ -651,16 +670,23 @@ async def _run_multi(run_id: str, target: str, kind: str, publish, *, project_id
             return "failed"
         provider = build_provider(settings.llm)
 
+    async def _close_provider() -> None:  # release the per-run LLM client's connection pool
+        if provider is not None:
+            with contextlib.suppress(Exception):
+                await provider.aclose()
+
     limits = RunLimits()
     hosts = await _resolve_hosts(run_id, target, publish, project_id=project_id,
                                  cancel_event=cancel_event, on_line=on_line, limits=limits)
     if not hosts:
         await publish(RunEventType.LOG_LINE, {"line": "[scan] no live hosts to recon"})
+        await _close_provider()
         return "failed"
 
     stop = await _gate_host_fanout(run_id, target, hosts, publish, project_id=project_id,
                                    cancel_event=cancel_event)
     if stop:
+        await _close_provider()
         return stop
 
     per_host_budget = max(1, limits.max_total_tasks // len(hosts))  # global hosts x services cap
@@ -681,6 +707,7 @@ async def _run_multi(run_id: str, target: str, kind: str, publish, *, project_id
                 return exc
 
     results = await asyncio.gather(*[_one(h) for h in hosts])
+    await _close_provider()   # all per-host work is done — the LLM client is no longer needed
     if cancel_event.is_set():
         return "cancelled"
     errors = [r for r in results if isinstance(r, Exception)]
@@ -730,6 +757,11 @@ def launch(run_id: str, target: str, kind: str = "demo", *, project_id: str | No
 # which action (service + action_id), NEVER a command string — the command is re-derived here from
 # the catalog, so a forged/edited command can't reach the executor.
 
+# Placeholder names that denote the TARGET host — always pinned to the profile's authorized target,
+# never fillable from operator params (would otherwise bypass the scope-lock).
+_TARGET_ALIASES = ("target", "host", "rhost", "rhosts", "ip", "ipaddress", "rip", "rhost_ip")
+
+
 def _gated_values(profile: Any, service: str, *, params: dict | None = None,
                   credential: Any = None, redact_secret: bool = False) -> dict[str, str]:
     """The template fill values for a gated action: the profile's target, the discovered service's
@@ -745,9 +777,20 @@ def _gated_values(profile: Any, service: str, *, params: dict | None = None,
             values["port"] = str(s.port)
             break
     if params:
-        values.update({str(k): str(v) for k, v in params.items() if str(v)})
+        # operator params fill NON-target placeholders only. The scope-locked host can never be set
+        # from the client: a params {target}/{rhost}/{ip} would otherwise aim an approved attack
+        # off-scope, since the door's assert_in_scope only re-checks the profile's own host.
+        values.update({str(k): str(v) for k, v in params.items()
+                       if str(v) and str(k).lower() not in _TARGET_ALIASES})
     if credential is not None:
         values.update(credential_values(credential, redact=redact_secret))
+    # Re-pin every host-aliased placeholder to this profile's authorized target, last, so nothing
+    # above (params or a stray evidence value) can point the command at another host. Setting keys
+    # the template doesn't use is harmless — fill_template only substitutes placeholders present.
+    pinned = str(getattr(getattr(profile, "target", None), "ip", "") or values.get("target", ""))
+    if pinned:
+        for alias in _TARGET_ALIASES:
+            values[alias] = pinned
     return values
 
 
@@ -822,10 +865,26 @@ async def _set_checkpoint_status(cp_id: str, status: str) -> None:
             await db.commit()
 
 
+async def _claim_checkpoint(cp_id: str) -> bool:
+    """Atomically move a checkpoint approved → executing. Returns True only if THIS caller won the
+    flip — guards against a double-execute when two approvals race on the in-process path (the Arq
+    path is already deduped by the per-checkpoint job id)."""
+    from sqlalchemy import update
+
+    from nabu_agent.db.models import Checkpoint
+    async with sessionmaker()() as db:
+        res = await db.execute(update(Checkpoint).where(
+            Checkpoint.id == cp_id, Checkpoint.status == "approved").values(status="executing"))
+        await db.commit()
+        return getattr(res, "rowcount", 0) == 1
+
+
 async def _record_attack_summary(run_id: str, entry: dict[str, Any]) -> None:
-    """Append one executed gated action to the run's summary (a durable record beside the events)."""
+    """Append one executed gated action to the run's summary (a durable record beside the events).
+    Serialised on the per-run lock so two concurrent executors on the same run can't lost-update each
+    other's entries (read-modify-write on a JSON column)."""
     with contextlib.suppress(Exception):
-        async with sessionmaker()() as db:
+        async with _run_lock(run_id), sessionmaker()() as db:
             run = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one_or_none()
             if run is None:
                 return
@@ -884,6 +943,22 @@ async def execute_approved_action(checkpoint_id: str) -> str:
     async def publish(type_: RunEventType, data: dict[str, Any]) -> None:
         await _emit(run_id, type_, data)
 
+    async def _audit_executed(outcome_: str) -> None:
+        # Written BEFORE the checkpoint's terminal status is set, so the durable audit row is
+        # guaranteed persisted by the time anyone observes the run as finished (best-effort).
+        with contextlib.suppress(Exception):
+            from nabu_agent import audit as app_audit
+            await app_audit.record(
+                actor_user_id=approved_by, action=app_audit.ATTACK_EXECUTED, object_type="checkpoint",
+                object_id=checkpoint_id, project_id=project_id,
+                details={"kind": kind, "target": target, "action_id": action_id, "outcome": outcome_})
+
+    # Atomically claim it (approved -> executing) BEFORE any machinery; a loser (a raced second
+    # approval) bows out here so the action runs exactly once.
+    if not await _claim_checkpoint(checkpoint_id):
+        return f"{checkpoint_id}:already-claimed"
+
+    obs_logging.bind_run(run_id, agent_id=f"attack:{checkpoint_id}")
     cancel_event = threading.Event()
     ending = threading.Event()
     watcher = asyncio.create_task(_make_cancel_watcher(run_id, cancel_event)())
@@ -892,7 +967,6 @@ async def execute_approved_action(checkpoint_id: str) -> str:
     hb = asyncio.create_task(_heartbeat_loop(run_id, ending))
     await _touch_heartbeat(run_id)
 
-    await _set_checkpoint_status(checkpoint_id, "executing")
     await _try_set_state(run_id, "executing_approved")
     await publish(RunEventType.TASK_CREATED, {"node_id": node, "node_state": NodeState.ACTIVE.value,
                   "label": f"{kind}: {action_id}", "attack": True, "kind": kind, "target": target})
@@ -931,6 +1005,7 @@ async def execute_approved_action(checkpoint_id: str) -> str:
                           "attack": True, "dry_run": True})
             await _record_attack_summary(run_id, {"checkpoint_id": checkpoint_id, "kind": kind,
                                          "target": target, "action_id": action_id, "outcome": "dry-run"})
+            await _audit_executed("dry-run")
             await _set_checkpoint_status(checkpoint_id, "dry-run")
             await _try_set_state(run_id, "report_ready")
             outcome = "dry-run"
@@ -960,6 +1035,7 @@ async def execute_approved_action(checkpoint_id: str) -> str:
         await publish(RunEventType.TASK_UPDATED, {"node_id": node, "node_state": node_state.value,
                       "attack": True, "exit_code": exit_code, "blocked": blocked})
         await publish(RunEventType.LOG_LINE, {"lines": [f"[{kind}] finished: exit={exit_code} blocked={blocked}"]})
+        await _audit_executed(outcome)
         await _set_checkpoint_status(checkpoint_id, "executed")
         await _try_set_state(run_id, "report_ready")
     except Exception as exc:  # noqa: BLE001 - a gate/derive/door failure must fail the action safely, not crash the worker
@@ -968,6 +1044,7 @@ async def execute_approved_action(checkpoint_id: str) -> str:
             await pump.flush()
         await publish(RunEventType.ERROR, {"node_id": node, "node_state": NodeState.ERROR.value,
                       "attack": True, "message": f"{kind} gate closed: {exc}"})
+        await _audit_executed("failed")
         await _set_checkpoint_status(checkpoint_id, "failed")
         await _try_set_state(run_id, "partial")
         _log.warning("attack-execute-failed", checkpoint_id=checkpoint_id, kind=kind, exc_info=True)
@@ -975,14 +1052,11 @@ async def execute_approved_action(checkpoint_id: str) -> str:
         ending.set()
         cancel_event.set()
         watcher.cancel()
+        hb.cancel()          # wake the heartbeat immediately — don't wait out its ~10s sleep
         pump.stop()
         pump_task.cancel()
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(Exception, asyncio.CancelledError):
             await hb
+        obs_logging.clear_run()
 
-    with contextlib.suppress(Exception):  # app-level audit (the gated shell is engine-audited in the door)
-        from nabu_agent import audit as app_audit
-        await app_audit.record(actor_user_id=approved_by, action=app_audit.ATTACK_EXECUTED,
-                               object_type="checkpoint", object_id=checkpoint_id, project_id=project_id,
-                               details={"kind": kind, "target": target, "action_id": action_id, "outcome": outcome})
     return f"{checkpoint_id}:{outcome}"

@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 
+import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
@@ -14,6 +15,8 @@ from nabu_agent.auth import sessions
 from nabu_agent.db.models import Project, ProjectMember, Run, User
 from nabu_agent.db.session import sessionmaker
 from nabu_agent.services import runs as runs_svc
+
+_log = structlog.get_logger("nabu_agent.ws")
 
 router = APIRouter()
 
@@ -49,9 +52,11 @@ async def ws_run(websocket: WebSocket, run_id: str) -> None:
     buffered: list[dict] = []
 
     async def _spool() -> None:
-        with contextlib.suppress(Exception):
+        try:
             async for ev in bus.listen(pubsub):
                 buffered.append(ev)
+        except Exception:  # a dropped Redis subscription must be visible, not a silently frozen live tail
+            _log.warning("ws-spool-error", run_id=run_id, exc_info=True)
 
     spool = asyncio.create_task(_spool())
 

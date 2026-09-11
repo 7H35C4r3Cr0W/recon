@@ -23,26 +23,72 @@
 ## Current position
 
 ```
-DATE:        2026-09-09
-BRANCH:      nabu-agent-arq (off main; PRs #1-#5 merged). This branch = Arq worker + fan-out + fixes.
-PHASE:       Body done + on the Arq worker with concurrent per-service fan-out.
-STATUS:      Login → project → scope → run (demo|scan|agent) → live BloodHound map (multiple agents
-             green at once) + logs → report. Runs execute on the Arq worker pool in prod
-             (NABU_USE_ARQ=true); in-process for dev/tests. LLM seam wired (kind=agent).
-             28/28 tests pass (incl. fan-out concurrency, arq dispatch gate, run-failure reliability,
-             authz, invariants); ruff clean; frontend builds; engine headless + untouched.
-             THREE adversarial review rounds; all confirmed findings fixed. Heartbeat + stale-run REAPER
-             added (killed runs are marked failed + emit a terminal event); app-wide error handler +
-             structured error logs added. OIDC/SSO login wired (Authlib authorization-code + JIT
-             provisioning; local login still works; SSO button on the login page).
-ATTACH BRAIN: set NABU_LLM_BASE_URL (+ API_KEY, MODEL) → kind="agent". No code change.
-KNOWN LIMITATIONS (documented, not blockers):
-  - the engine on_line→WS log bridge has no backpressure under an extremely chatty scan.
-  - real-scan process-group cancel + Reporter.write atomicity live in the read-only engine.
-NEXT UP (optional hardening): WS-path integration test; per-agent map
-  nodes from LLM tool calls; artifact retention/quotas.
-HOW TO TEST: cd nabu-agent && PYTHONPATH=. .venv-agent/bin/python -m pytest -q -o asyncio_mode=auto
+DATE:        2026-09-11
+BRANCH:      main @ f5ab774+ (PRs #1–#50 merged).
+STATUS:      DEV SIDE DONE (per docs/DEFINITION_OF_DONE.md). Full recon (single + CIDR fan-out on the
+             Arq worker pool), live BloodHound map, reports + triage, RBAC/audit/creds vault, admin
+             LLM setup + test-fire, AND the human-gated attack EXECUTION gate (propose → double-gated
+             approve → run via the one door; dry-run + four-eyes + rate-limit; credential injected only
+             at execute, previews/logs redacted). Interactive demo:
+             https://claude.ai/code/artifact/68d8ab3a-2351-4d06-8bb6-742190d69846
+GATE:        ruff + mypy clean; 112 backend + 10 policy-invariant + 27 frontend tests; vite build OK;
+             alembic upgrade head verified; src/oscprecon untouched.
+REMAINING:   Tier 2 only (LLM-gated, blocked on legal): attach the model → `agent` runs; Phase B
+             (agents PROPOSE into the built gate); run-level LLM budgets; live agent-run validation.
+ATTACH BRAIN: set NABU_LLM_BASE_URL (+ API_KEY, MODEL) via Admin → LLM setup → test-fire. No code change.
+OPS NOTE:    the hourly git-autosync crontab line is PAUSED during active dev (kept local; uncomment to
+             restore) so WIP stops landing on main.
+HOW TO TEST: cd nabu-agent && uv sync --group dev && uv run pytest -q -m "not load"   (+ -m invariant);
+             frontend: cd frontend && npx vitest run && npx vite build
 ```
+
+---
+
+## System structure & processes (orientation)
+
+*Read this to understand HOW the system is built and how work flows; the dated log further down is the
+blow-by-blow history.*
+
+**Two products, one repo.** `src/oscprecon` = the classic desktop recon engine (READ-ONLY, never
+edited). `nabu-agent/` = this offshoot: the web/agent "body" that drives the engine as a library.
+
+**Runtime processes (docker-compose):**
+- `api` (FastAPI, async) — HTTP + WebSocket; drops Linux caps and **runs no tools** (reads engine
+  state only). `postgres` — projects/runs/events/checkpoints/findings/audit. `redis` — event pub/sub +
+  the Arq job queue + cancel flags + rate-limit keys. `worker` (Arq) — where runs actually execute
+  (blocking engine calls in threads). `frontend` (nginx) — the built React SPA + TLS.
+- Dev/tests run the worker path **in-process** (`NABU_USE_ARQ=false`, aiosqlite + fakeredis).
+
+**The one chokepoint.** `engine/shell_gateway.py` is the ONLY module that calls `oscprecon.shell.run`.
+`run_recon_tool` hard-wires `spray=exploit=False`; `execute_gated_action` is the SOLE place those flags
+can be True, and it refuses anything but a human-approved checkpoint. A policy-invariant AST test
+enforces this structurally.
+
+**Run lifecycle** (`orchestration/states.py`): queued → validating → alive_check → scanning → fan_out →
+enriching → researching → synthesizing → report_ready → (done|partial). The ONLY human branch is
+awaiting_approval → executing_approved, entered by an attack/host-count gate. Terminal: done/partial/
+failed/cancelled. Two-pool fan-out: the supervisor enqueues one `recon_host_job` per live host and
+awaits them (`services/runs.py`), each host writing its own per-host engine Profile.
+
+**The attack gate** (Phases A/C/D/E — the human-gated attack path):
+`POST /runs/{id}/attack-proposals` (operator+) → `proposed` Checkpoint (stores service+action_id +
+params, NOT a command) → `approve_checkpoint` enforces the double gate (platform switch + per-project
+toggle + exploit_confirmed / credential + optional four-eyes + rate-limit) → enqueues
+`execute_approved_action`, which re-derives the command from the catalog, resolves the credential
+server-side (secret redacted in previews/events), and calls the one door. Design: `docs/SPRAY_EXPLOIT_GATE.md`.
+
+**Module map:** `routers/` (HTTP), `services/runs.py` (the run driver + attack executor), `orchestration/`
+(states, limits, checkpoints, reaper, retention, tasks, admission), `engine/` (the read-only adapter:
+gateway, shell_gateway, tools, workspace, creds_ref), `agents/` (LLM roster: roles, safety, dispatch —
+dormant until the model is attached), `auth/` + `rbac.py` (sessions, OIDC, per-project RBAC/IDOR),
+`bus.py` (Redis/Arq), `events/schema.py` (the canonical WS event envelope). Frontend: `pages/` +
+`components/RunGraph.tsx` (Cytoscape map) + `ws/` + `theme.css`.
+
+**Working agreement (how every change ships):** one PR per feature off `main`; the gate (ruff + mypy +
+backend/invariant/frontend tests + `vite build`) must be green before merge; NEVER touch `src/oscprecon`;
+keep `docs/DEFINITION_OF_DONE.md` (the fixed finish line) + this file current. Key docs: DESIGN.md,
+DEFINITION_OF_DONE.md, SPRAY_EXPLOIT_GATE.md, deploy/RUNBOOK.md (+ smoke.sh), docs/OPERATOR_GUIDE.md,
+docs/nabu-agent.html (leadership overview).
 
 ### Live-visualization requirements (owner, 2026-09-09) — build into Phase 2
 The run view is a **BloodHound-style flow-chart map** (like the classic Nabu graph), showing the
@@ -584,3 +630,49 @@ automated; an attack runs only when a human approves a specific action behind th
 - With this, the buildable dev surface is genuinely exhausted: required Tier-1 done (#47/#48), both
   optional attack-hardening + the safe throughput opt done (#49/#50). Everything remaining is Tier 2
   (LLM-gated) — blocked until the model is attached.
+
+---
+
+## 2026-09-11 (cont.) — full code review + fixes (31 findings, 30 fixed)
+
+Ran a 6-dimension adversarial code review (bugs, error-handling/logging, safety, async/lifecycle,
+organization, tests). 31 findings confirmed; **30 fixed**, 1 documented-as-intended. Highlights:
+
+**Safety (high):**
+- **Scope-lock bypass** — operator `params` could override `{target}` and send an approved attack
+  off-scope. `_gated_values` now drops host-alias params and re-pins every host placeholder to the
+  profile's authorized target (regression test added).
+- **Credential in audit.jsonl** — the engine's redactor ships OFF, so the gated door was persisting
+  the plaintext secret. Added a nabu-owned `_redact` mask (scrubs `-p`/`-H`/`--password`… tokens)
+  independent of the engine flag.
+- **Double-execute** — `execute_approved_action` now atomically claims a checkpoint (approved→executing)
+  so a raced approval can't run it twice.
+
+**Error handling / logging (owner priority):** run_id now bound (`bind_run`) into contextvars at every
+run entrypoint so all log lines carry it; request_id added to the 500/engine-error log lines;
+`verify_password` no longer swallows backend errors silently; the SafetyGate autonomy-block, WS
+spool drops, dispatch tool failures, gateway profile-skip, OIDC login failures, and the cancel-watch
+Redis outage are all now logged (several were silent); cancel-watch bumped debug→warning. The
+ATTACK_EXECUTED audit is now written BEFORE the terminal state (was racing test teardown → the
+"no such table" noise is gone) and is asserted by a test.
+
+**Leaks/lifecycle:** per-run LLM client now closed on all paths (`provider.aclose()`); `_EMIT_LOCKS`
+is a WeakValueDictionary (no unbounded growth on a long-lived worker); the attack heartbeat is
+cancelled (no ~10s slot hold); worker on_shutdown closes the bus Redis client + Arq pool.
+
+**Organization:** deleted 4 dead modules (`orchestration/checkpoints.py`, `orchestration/runmap.py`,
+`ws/hub.py`, `llm/retry.py`) + 4 unused helpers; de-duplicated `_scope_for` into `routers/_common.py`;
+renamed a shadowed loop var in RunLive.tsx.
+
+**Tests:** +4 (params scope-pin regression, ATTACK_EXECUTED audit assertion, project-toggle-off
+refusal, the door's unconfirmed-exploit re-gate). Suite: 116 backend + 10 invariant + 27 frontend.
+
+**Documented as intended (not a bug):** the executed command is re-derived from live profile state at
+execute time (not bound to the approval-time preview). This is the deliberate safety property (the
+checkpoint stores an action id, never a command); the scope-pin fix above closes the only way a
+re-derivation could have gone off-target. A stricter "pin the exact approved command" is a possible
+future hardening but is not required.
+
+Gate: ruff + mypy clean (76 source files); `vite build` OK; `src/oscprecon` untouched. Demo refreshed
+(attack gate) at https://claude.ai/code/artifact/68d8ab3a-2351-4d06-8bb6-742190d69846 ; leadership doc
+`docs/nabu-agent.html` updated (Phase 5 + demo link).

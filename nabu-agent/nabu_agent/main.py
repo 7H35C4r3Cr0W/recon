@@ -119,15 +119,16 @@ def create_app() -> FastAPI:
     @app.exception_handler(EngineAdapterError)
     async def _engine_error_handler(request: Request, exc: EngineAdapterError) -> JSONResponse:
         status = _ERROR_STATUS.get(getattr(exc, "code", "engine_error"), 500)
+        rid = getattr(request.state, "request_id", "") or request.headers.get("x-request-id", "")
         if status >= 500:
-            _errlog().error("engine-error", code=getattr(exc, "code", "engine_error"),
+            _errlog().error("engine-error", code=getattr(exc, "code", "engine_error"), request_id=rid,
                             path=str(request.url.path), error=str(exc), exc_info=True)
         return JSONResponse(
             status_code=status,
             content={
                 "code": getattr(exc, "code", "engine_error"),
                 "message": str(exc),
-                "request_id": getattr(request.state, "request_id", "") or request.headers.get("x-request-id", ""),
+                "request_id": rid,
                 "details": {},
             },
         )
@@ -136,9 +137,9 @@ def create_app() -> FastAPI:
     async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
         """Log every unhandled exception with context and return the standard error envelope (500)
         instead of a bare stack trace, so failures are traceable and clients get a consistent shape."""
-        _errlog().error("unhandled-error", path=str(request.url.path), method=request.method,
-                        error=str(exc), exc_info=True)
         rid = getattr(request.state, "request_id", "") or request.headers.get("x-request-id", "")
+        _errlog().error("unhandled-error", path=str(request.url.path), method=request.method,
+                        request_id=rid, error=str(exc), exc_info=True)
         return JSONResponse(
             status_code=500,
             content={"code": "internal_error", "message": "internal server error",

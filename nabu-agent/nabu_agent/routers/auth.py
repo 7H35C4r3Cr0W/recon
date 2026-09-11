@@ -1,6 +1,9 @@
 """Auth router — local login/logout/me (+ OIDC scaffolded)."""
 from __future__ import annotations
 
+import contextlib
+
+import structlog as _structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
@@ -15,6 +18,8 @@ from nabu_agent.db.models import User
 from nabu_agent.db.session import get_db
 from nabu_agent.db.session import get_db as _get_db
 from nabu_agent.settings import get_settings
+
+_slog = _structlog.get_logger("nabu_agent.auth")
 
 router = APIRouter(tags=["auth"])
 
@@ -96,6 +101,11 @@ async def oidc_callback(request: Request, db: AsyncSession = Depends(_get_db)):
     try:
         token = await oidc.client().authorize_access_token(request)
     except Exception as exc:  # bad state/code/nonce, token exchange failure, etc.
+        _slog.warning("oidc-login-failed", error=str(exc), exc_info=True)
+        with contextlib.suppress(Exception):
+            await audit.record(actor_user_id=None, action=audit.LOGIN_FAILED, result="denied",
+                               actor_ip=request.client.host if request.client else None,
+                               details={"reason": "oidc-exchange-failed"})
         raise HTTPException(status_code=401, detail="OIDC login failed") from exc
     claims = token.get("userinfo") or {}
     issuer = claims.get("iss") or get_settings().oidc_issuer

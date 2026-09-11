@@ -147,6 +147,7 @@
       <span>the owner attaches the LLM "brain" (internal, OpenAI-compatible)</span><span class="sep">·</span>
       <span>this project is the "body"</span>
     </div>
+    <p style="margin:14px 0 0"><a href="https://claude.ai/code/artifact/68d8ab3a-2351-4d06-8bb6-742190d69846" style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--a,#3ad9c0);border:1px solid color-mix(in srgb,currentColor 45%,transparent);border-radius:8px;padding:8px 14px;display:inline-block">▶ Open the interactive demo →</a> <span style="color:var(--ink-2);font-size:12px">dashboard · live map · report · the human-gated attack flow (sample data)</span></p>
     <div class="stats">
       <div class="stat"><b>6</b><small>non-negotiables enforced in code</small></div>
       <div class="stat"><b>8</b><small>engine agent-tools</small></div>
@@ -313,6 +314,8 @@
 
     <div class="phase"><div class="phase-h"><span class="k">Phase 4 — Hardening</span><span class="pill done">Done</span></div>
       <p>OIDC/SSO + back-channel logout, per-project RBAC + team management, the platform audit trail, credentials vault, artifact retention/quotas, brute-force + request-id middleware, a load-tested /24, the admin LLM setup + test-fire, and a deploy runbook. CI is registered (manual).</p></div>
+    <div class="phase"><div class="phase-h"><span class="k">Phase 5 — Human-gated attack execution</span><span class="pill done">Done</span></div>
+      <p>The spray/exploit gate is now executable, not just proposed: an operator <b>proposes</b> an action → a human <b>approves</b> it behind a double gate (platform switch + per-project toggle + an explicit confirm, plus optional <b>four-eyes</b> two-approver sign-off) → it runs through the single gated door, with the command <b>re-derived server-side</b> from the catalog (never stored) and the credential secret injected only at execute time (previews + logs redacted). A <b>dry-run</b> rehearses the exact command without firing; a per-project cooldown rate-limits it. The only remaining attack work — agents <i>proposing</i> into this same gate — is dormant until the model is attached.</p></div>
   </section>
 
   <section>
@@ -331,12 +334,11 @@
         <li>1.8 React + Vite + TS frontend skeleton</li>
         <li>1.9 deploy + CI + policy-invariant tests</li>
       </ul></div>
-      <div class="cardx" style="--cc:var(--brand)"><h3>⏭ Remaining</h3><ul>
+      <div class="cardx" style="--cc:var(--brand)"><h3>⏭ Remaining (all LLM-gated)</h3><ul>
         <li><b>Attach the LLM brain</b> — internal OpenAI-compatible endpoint (Admin → LLM setup + test-fire). This is the only thing gating <code>agent</code> runs.</li>
-        <li>Wire spray/exploit <i>execution</i> behind the existing human checkpoint (a deliberate later phase).</li>
-        <li>Throughput polish + a live-cluster smoke of the distributed worker path.</li>
+        <li>Let agents <i>propose</i> into the (now-built) human attack gate; run-level LLM budgets; a live <code>agent</code>-run validation.</li>
       </ul>
-      <p style="margin-top:10px">The body is feature-complete and deployable today (deterministic <code>scan</code> recon, live map, reports, RBAC, audit). See <span class="mono">deploy/RUNBOOK.md</span>.</p></div>
+      <p style="margin-top:10px">Human-driven attack <b>execution</b> is <b>done</b> (propose → double-gated approve → run, with dry-run + four-eyes + rate-limit). A committed <code>deploy/smoke.sh</code> drives the distributed worker path end to end. The body is feature-complete and deployable today; the only remaining work needs the model. See <span class="mono">deploy/RUNBOOK.md</span> and <span class="mono">docs/DEFINITION_OF_DONE.md</span>.</p></div>
     </div>
   </section>
 </div></div>
@@ -363,7 +365,8 @@
       <li>Single-chokepoint AST invariant: <code>shell.run</code> called only from <code>shell_gateway.py</code></li>
       <li>Exploit-gate invariant: gate flags appear only in <code>execute_gated_action</code>; <code>run_recon_tool</code> has no such parameter</li>
       <li>Scope-lock refuses an out-of-scope target before execution; a gated action refuses an unapproved checkpoint</li>
-      <li>~99 backend + 23 frontend tests pass; ruff + mypy clean; <code>alembic upgrade head</code> verified</li>
+      <li>Attack gate proven end to end: the executed command is the catalog's (never a client string); the credential secret reaches only the door, never a preview/event; every gate refusal + four-eyes + the per-run cap are tested</li>
+      <li>112 backend + 10 policy-invariant + 27 frontend tests pass; ruff + mypy clean; <code>vite build</code> OK; <code>alembic upgrade head</code> verified</li>
     </ul>
   </section>
 </div></div>

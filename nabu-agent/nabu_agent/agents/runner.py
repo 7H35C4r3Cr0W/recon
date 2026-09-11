@@ -17,12 +17,17 @@ import threading
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import structlog
+
 from nabu_agent.agents.roles import ROLES, render_system_prompt
 from nabu_agent.agents.safety import SafetyGate
 from nabu_agent.agents.tools import dispatch as tool_dispatch
 from nabu_agent.agents.tools.registry import schemas_for_role
+from nabu_agent.engine.errors import AutonomyViolation
 from nabu_agent.llm.base import ChatRequest, LLMProvider, Message, Role
 from nabu_agent.llm.errors import LLMBudgetExceeded
+
+_slog = structlog.get_logger("nabu_agent.agents.runner")
 
 # emit(kind, data) -> awaitable ; used to stream reasoning/tool-calls to the live map + log
 Emit = Callable[[str, dict[str, Any]], Awaitable[None]] | None
@@ -80,8 +85,14 @@ class AgentRunner:
             args = json.loads(raw_args) if raw_args else {}
         except json.JSONDecodeError:
             return {"error": "tool arguments were not valid JSON"}
-        gate = self.gate.check(name, args)  # raises AutonomyViolation on an exploit/spray-shaped arg
+        try:
+            gate = self.gate.check(name, args)  # raises AutonomyViolation on an exploit/spray-shaped arg
+        except AutonomyViolation as exc:
+            # the single most security-relevant model behavior — make it durably visible, not just a WS line
+            _slog.warning("safety-gate-blocked", role=self.role, tool=name, exc_info=True)
+            return {"error": f"blocked by safety gate: {exc}"}
         if not gate.allowed:
+            _slog.info("tool-not-allowed", role=self.role, tool=name, reason=gate.reason)
             return {"error": gate.reason}
         await self._log(f"[{self.role}] → {name}({', '.join(f'{k}={v}' for k, v in args.items())})")
         try:

@@ -72,6 +72,9 @@ class SmartProvider:
         return ChatResponse(content="done", tool_calls=[], finish_reason="stop",
                             usage=Usage(total_tokens=5), model=self.model)
 
+    async def aclose(self):
+        return None
+
     def stream(self, request):
         raise NotImplementedError
 

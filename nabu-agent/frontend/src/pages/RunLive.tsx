@@ -79,8 +79,8 @@ export function RunLive() {
     if (Array.isArray(d.edges)) {
       setEdges((prev) => {
         const next = { ...prev };
-        for (const e of d.edges as Array<{ source: string; target: string; label?: string }>) {
-          if (e && e.source && e.target) next[`${e.source}->${e.target}`] = e;
+        for (const edge of d.edges as Array<{ source: string; target: string; label?: string }>) {
+          if (edge && edge.source && edge.target) next[`${edge.source}->${edge.target}`] = edge;
         }
         return next;
       });

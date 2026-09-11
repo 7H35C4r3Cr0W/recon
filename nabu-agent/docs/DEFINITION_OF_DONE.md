@@ -79,6 +79,9 @@ Items that fundamentally need the live model. Not part of "dev-done"; listed so 
 
 ---
 
+## Code review
+- **2026-09-11:** full 6-dimension adversarial review run; 31 findings, **30 fixed** (scope-lock bypass via params, credential-in-audit.jsonl, double-execute, a batch of error-handling/logging gaps, resource leaks, dead-code removal), 1 documented-as-intended (command re-derivation). See HANDOFF.md for the itemised list.
+
 ## Current position
 - **2026-09-11:** ALL Tier-1 items (baseline + Phase A + C + D + smoke) are checked. **THE DEV SIDE IS
   DONE.** Verified: ruff + mypy clean, 110 backend + 10 invariant + 27 frontend tests, `vite build` OK,
