@@ -1,7 +1,8 @@
-// The human-gated spray/exploit panel (Phase A). An operator PROPOSES an executable catalog action;
-// a human APPROVES it behind the double gate (platform switch + per-project toggle + this approval,
-// plus an exploit confirmation / a chosen credential). Approval runs it through the one gated door.
-// Danger-styled on purpose: recon is calm teal; the attack path is amber→red and un-missable.
+// The human-gated spray/exploit panel (Phase A + C). An operator PROPOSES an executable catalog
+// action — filling its placeholders from a chosen vault credential and/or operator params — then a
+// human APPROVES it behind the double gate (platform switch + per-project toggle + this approval,
+// plus an exploit confirmation). Approval runs it through the one gated door. Danger-styled on
+// purpose: recon is calm teal; the attack path is amber→red and un-missable.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 
@@ -15,6 +16,8 @@ interface Checkpoint {
 }
 
 const ACTIVE = new Set(["proposed", "executing"]);
+// placeholders a credential fills; everything else is an operator param
+const CRED_PH = new Set(["user", "username", "password", "pass", "hash", "ntlm", "nthash", "domain", "secret"]);
 // display-only kind inference (the backend enforces the real gate regardless)
 const kindOf = (a: Action) => /spray|password|brute|kerbero|as-?rep|credential/i.test(`${a.category} ${a.title} ${a.tool}`) ? "spray" : "exploit";
 
@@ -25,7 +28,8 @@ export function AttackGate({ projectId }: { projectId: string }) {
   const [creds, setCreds] = useState<Cred[]>([]);
   const [cps, setCps] = useState<Checkpoint[]>([]);
   const [confirm, setConfirm] = useState<Record<string, boolean>>({});
-  const [chosenCred, setChosenCred] = useState<Record<string, string>>({});
+  const [proposeCred, setProposeCred] = useState<Record<string, string>>({});
+  const [params, setParams] = useState<Record<string, Record<string, string>>>({});
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const runRef = useRef<string | null>(null);
@@ -40,7 +44,7 @@ export function AttackGate({ projectId }: { projectId: string }) {
     const entry = (scope.scope || []).find((s) => s.is_entry) || (scope.scope || [])[0];
     setTarget(entry?.target || "");
     const runs = await api<{ runs: { id: string }[] }>(`/projects/${projectId}/runs`).catch(() => ({ runs: [] }));
-    const rid = (runs.runs || [])[0]?.id || null;   // newest run (list is newest-first)
+    const rid = (runs.runs || [])[0]?.id || null;
     runRef.current = rid; setRunId(rid);
     const cat = await api<{ services: ServiceCat[] }>(`/projects/${projectId}/catalog`).catch(() => ({ services: [] }));
     setServices(cat.services || []);
@@ -51,21 +55,23 @@ export function AttackGate({ projectId }: { projectId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // live-poll while any proposal is still proposed/executing
   useEffect(() => {
     if (!runId || !cps.some((c) => ACTIVE.has(c.status))) return;
     const t = setInterval(() => { if (runRef.current) loadCheckpoints(runRef.current); }, 1800);
     return () => clearInterval(t);
   }, [runId, cps, loadCheckpoints]);
 
-  async function propose(service: string, a: Action) {
+  async function propose(service: string, a: Action, key: string) {
     if (!runId) return;
     setErr(""); setBusy(true);
     try {
-      await api(`/runs/${runId}/attack-proposals`, {
-        method: "POST",
-        body: JSON.stringify({ kind: kindOf(a), target, service, action_id: a.id }),
-      });
+      const pn = (a.unfilled || []).filter((p) => !CRED_PH.has(p));
+      const body = {
+        kind: kindOf(a), target, service, action_id: a.id,
+        credential_ref: proposeCred[key] || null,
+        params: Object.fromEntries(pn.map((p) => [p, params[key]?.[p] || ""])),
+      };
+      await api(`/runs/${runId}/attack-proposals`, { method: "POST", body: JSON.stringify(body) });
       await loadCheckpoints(runId);
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
@@ -74,38 +80,33 @@ export function AttackGate({ projectId }: { projectId: string }) {
     if (!runId) return;
     setErr(""); setBusy(true);
     try {
-      const body = action === "approve"
-        ? JSON.stringify({ exploit_confirmed: !!confirm[cp.id], credential_ref: chosenCred[cp.id] || cp.credential_ref || null })
-        : undefined;
+      const body = action === "approve" ? JSON.stringify({ exploit_confirmed: !!confirm[cp.id] }) : undefined;
       await api(`/runs/${runId}/checkpoints/${cp.id}/${action}`, { method: "POST", body });
       await loadCheckpoints(runId);
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
 
-  const runnable = services.flatMap((s) => s.actions.filter((a) => a.executable && (a.unfilled?.length ?? 0) === 0).map((a) => ({ s, a })));
-
   function canApprove(cp: Checkpoint): boolean {
     const g = cp.gate;
     if (!g || !g.platform_enabled || !g.project_enabled) return false;
     if (g.needs_exploit_confirm && !confirm[cp.id]) return false;
-    if (g.needs_credential && !(chosenCred[cp.id] || cp.credential_ref)) return false;
     return true;
   }
+
+  const executable = services.flatMap((s) => s.actions.filter((a) => a.executable).map((a) => ({ s, a })));
 
   return (
     <div>
       <p className="atk-note">
-        Recon is automated; <b>attacks never are</b>. Propose an action below, then a human approves it
-        behind the double gate before it runs through the single gated executor.
+        Recon is automated; <b>attacks never are</b>. Fill an action's inputs, propose it, then a human
+        approves it behind the double gate before it runs through the single gated executor.
         {runId ? <> <span className="atk-run">· attached to the latest run</span></> : null}
       </p>
       {err && <p className="err">{err}</p>}
-
       {!runId && <p className="muted" style={{ fontSize: 13 }}>Run recon on an in-scope target first — then runnable actions appear here.</p>}
 
       {runId && (
         <>
-          {/* proposals awaiting a decision / running / done */}
           {cps.length > 0 && (
             <>
               <div className="atk-sub">gated proposals</div>
@@ -137,15 +138,6 @@ export function AttackGate({ projectId }: { projectId: string }) {
                               onChange={(e) => setConfirm((m) => ({ ...m, [cp.id]: e.target.checked }))} />
                               I confirm this exploit against {cp.target}</label>
                           )}
-                          {g?.needs_credential && (
-                            <label>credential
-                              <select className="select" value={chosenCred[cp.id] || ""}
-                                onChange={(e) => setChosenCred((m) => ({ ...m, [cp.id]: e.target.value }))}>
-                                <option value="">choose…</option>
-                                {creds.map((c) => <option key={c.id} value={c.id}>{c.domain ? `${c.domain}\\` : ""}{c.username} ({c.secret_type})</option>)}
-                              </select>
-                            </label>
-                          )}
                           <button className="btn-danger" disabled={busy || !canApprove(cp)} onClick={() => decide(cp, "approve")}>Approve &amp; run</button>
                           <button className="btn" disabled={busy} onClick={() => decide(cp, "reject")}>Reject</button>
                           {g && (!g.platform_enabled || !g.project_enabled) && (
@@ -163,24 +155,49 @@ export function AttackGate({ projectId }: { projectId: string }) {
             </>
           )}
 
-          {/* the catalog of runnable actions to propose */}
           <div className="atk-sub">runnable actions {target && <span className="atk-run">· {target}</span>}</div>
-          {runnable.length === 0 ? (
+          {executable.length === 0 ? (
             <p className="muted" style={{ fontSize: 13 }}>No runnable actions for the discovered services yet.</p>
           ) : (
             <div className="atk-grid">
-              {runnable.map(({ s, a }) => (
-                <div key={`${s.service}:${a.id}`} className="atk-row">
-                  <div className="atk-top">
-                    <span className="atk-title">{a.title}</span>
-                    <span className="row" style={{ gap: 8 }}>
-                      <span className={`atk-kind ${kindOf(a)}`}>{kindOf(a)}</span>
-                      <button className="btn" disabled={busy} onClick={() => propose(s.service, a)}>Propose</button>
-                    </span>
+              {executable.map(({ s, a }) => {
+                const key = `${s.service}:${a.id}`;
+                const needs = a.unfilled || [];
+                const credNeeds = needs.filter((p) => CRED_PH.has(p));
+                const paramNeeds = needs.filter((p) => !CRED_PH.has(p));
+                const ready = paramNeeds.every((p) => (params[key]?.[p] || "").trim()) && (credNeeds.length === 0 || proposeCred[key]);
+                return (
+                  <div key={key} className="atk-row">
+                    <div className="atk-top">
+                      <span className="atk-title">{a.title}</span>
+                      <span className="row" style={{ gap: 8 }}>
+                        <span className={`atk-kind ${kindOf(a)}`}>{kindOf(a)}</span>
+                        <button className="btn" disabled={busy || !ready} onClick={() => propose(s.service, a, key)}>Propose</button>
+                      </span>
+                    </div>
+                    <div className="atk-cmd">{a.command}</div>
+                    {(credNeeds.length > 0 || paramNeeds.length > 0) && (
+                      <div className="atk-controls">
+                        {credNeeds.length > 0 && (
+                          <label>credential
+                            <select className="select" value={proposeCred[key] || ""}
+                              onChange={(e) => setProposeCred((m) => ({ ...m, [key]: e.target.value }))}>
+                              <option value="">choose…</option>
+                              {creds.map((c) => <option key={c.id} value={c.id}>{c.domain ? `${c.domain}\\` : ""}{c.username} ({c.secret_type})</option>)}
+                            </select>
+                          </label>
+                        )}
+                        {paramNeeds.map((p) => (
+                          <label key={p} className="mono" style={{ fontSize: 11 }}>{p}
+                            <input className="input" style={{ width: 130, marginLeft: 6 }} value={params[key]?.[p] || ""}
+                              onChange={(e) => setParams((m) => ({ ...m, [key]: { ...(m[key] || {}), [p]: e.target.value } }))} />
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="atk-cmd">{a.command}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>

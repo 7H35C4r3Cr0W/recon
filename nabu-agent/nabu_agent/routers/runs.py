@@ -129,7 +129,8 @@ class AttackProposalBody(BaseModel):
     target: str                      # an in-scope host (re-validated at execute)
     service: str                     # the discovered service key (e.g. "smb", "http")
     action_id: str                   # the catalog action id — the ONLY thing that selects the command
-    credential_ref: str | None = None
+    credential_ref: str | None = None  # a vault credential id — fills {user}/{password}/{hash}/{domain}
+    params: dict[str, str] = {}      # operator-supplied fills for the remaining placeholders
     rationale: str = ""
 
 
@@ -150,15 +151,22 @@ def _cp_view(cp: Checkpoint) -> dict[str, Any]:
     return v
 
 
-def _preview_command(project_id: str, target: str, service: str, action_id: str) -> str:
-    """Open the target's profile and re-derive the exact shell line the catalog action resolves to.
-    Same server-side derivation the executor uses — so the preview is truthful and validates that
-    the action is attacker-runnable + fully filled. Raises ProjectNotFound / ValueError otherwise."""
+def _preview_command(project_id: str, target: str, service: str, action_id: str,
+                     params: dict | None = None, credential_ref: str | None = None) -> str:
+    """Open the target's profile and re-derive the exact shell line the catalog action resolves to,
+    with the chosen credential + operator params applied — the SECRET is always redacted here (this
+    feeds previews). Same server-side derivation the executor uses, so the preview is truthful and
+    validates the action is attacker-runnable + fully filled. Raises ProjectNotFound / ValueError."""
+    from nabu_agent.engine.creds_ref import resolve_credential
     from nabu_agent.engine.workspace import workspace_for
     from nabu_agent.services.runs import _resolve_gated_command
 
     prof = workspace_for(project_id, target).open()
-    return _resolve_gated_command(prof, service, action_id)
+    cred = resolve_credential(prof, credential_ref) if credential_ref else None
+    if credential_ref and cred is None:
+        raise ValueError("the chosen credential is not in the vault")
+    return _resolve_gated_command(prof, service, action_id, params=params, credential=cred,
+                                  redact_secret=True)
 
 
 async def _enqueue_execute(cp_id: str) -> None:
@@ -188,7 +196,8 @@ async def list_checkpoints(db: AsyncSession = Depends(get_db),
             # missing/rebuilt profile just yields command=None, never a 500).
             try:
                 v["command"] = await asyncio.to_thread(
-                    _preview_command, run.project_id, c.target, v.get("service", ""), c.action_id)
+                    _preview_command, run.project_id, c.target, v.get("service", ""), c.action_id,
+                    (c.requires or {}).get("params") or {}, c.credential_ref)
             except Exception:
                 v["command"] = None
             platform = (s.spray_enabled if c.kind == "spray" else s.exploit_enabled)
@@ -213,9 +222,18 @@ async def propose_attack(body: AttackProposalBody, db: AsyncSession = Depends(ge
         select(ScopeTarget).where(ScopeTarget.project_id == run.project_id))).scalars().all()]
     if not _in_scope(body.target, scopes):
         raise ScopeViolation(f"{body.target} is outside the project scope")
+    # per-run attack cap — bound how many gated actions one run can accumulate
+    from nabu_agent.orchestration.limits import RunLimits
+    n_attacks = len((await db.execute(select(Checkpoint).where(
+        Checkpoint.run_id == run.id, Checkpoint.kind.in_(tuple(_ATTACK_KINDS))))).scalars().all())
+    cap = RunLimits().max_gated_actions_per_run
+    if n_attacks >= cap:
+        raise HTTPException(status_code=409,
+                            detail=f"attack cap reached ({cap} gated actions per run)")
     try:
         command = await asyncio.to_thread(
-            _preview_command, run.project_id, body.target, body.service, body.action_id)
+            _preview_command, run.project_id, body.target, body.service, body.action_id,
+            body.params, body.credential_ref)
     except ProjectNotFound as exc:
         raise HTTPException(status_code=422,
                             detail="no recon profile for this target yet — run recon before proposing") from exc
@@ -224,7 +242,8 @@ async def propose_attack(body: AttackProposalBody, db: AsyncSession = Depends(ge
 
     cp = Checkpoint(run_id=run.id, kind=body.kind, status="proposed", target=body.target,
                     action_id=body.action_id, rationale=body.rationale or f"operator-proposed {body.kind}",
-                    requires={"service": body.service}, credential_ref=body.credential_ref)
+                    requires={"service": body.service, "params": dict(body.params)},
+                    credential_ref=body.credential_ref)
     db.add(cp)
     await db.commit()
     node = f"attack-{cp.id}"

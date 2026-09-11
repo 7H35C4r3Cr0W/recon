@@ -494,3 +494,39 @@ automated; an attack runs only when a human approves a specific action behind th
 - Gate: ruff + mypy clean (78 files); **107 backend** (was 101) + 10 invariant + **26 frontend** (was
   24); `vite build` OK; `src/oscprecon` untouched. Policy invariants still pass (the new job calls the
   door, never `shell.run`). Phases B–D remain; only Phase B (agent-*proposed* actions) needs the LLM.
+
+---
+
+## 2026-09-11 — Definition of Done written + attack gate Phase C SHIPPED
+
+- **`docs/DEFINITION_OF_DONE.md`** — the fixed completion standard (owner asked for a defined finish
+  line instead of ad-hoc phases). Tier 1 = Dev-Complete (drive to 100% now): baseline + Phase A done;
+  REQUIRED remaining = (1) attack Phase C, (2) attack Phase D dry-run, (3) distributed smoke script.
+  Tier 2 = LLM-gated (parked). Dev-side is "done" when items 1–3 are checked.
+- **Attack gate Phase C (PR #47)** — attacks are now genuinely usable + safe:
+  - Credential injection: a chosen vault credential fills `{user}/{username}/{password}/{hash}/{ntlm}/
+    {domain}`; resolved server-side at execute time from creds.json, NEVER stored on the checkpoint.
+    New shared helper `engine/creds_ref.py` (`credential_cid`/`resolve_credential`/`credential_values`);
+    `routers/creds.py` `_cid` now delegates to it (no drift).
+  - Operator params: the proposal carries a `params` map filling non-credential placeholders
+    (`{wordlist}/{lhost}/{command}` …). An action is proposable only once EVERY placeholder resolves;
+    otherwise 422 "needs: …". `_resolve_gated_command` gained `_gated_values` (target + discovered
+    port + params + credential).
+  - Secret redaction: previews (`_preview_command`, GET checkpoints) and the execute log line use an
+    ALWAYS-ON mask (`credential_values(redact=True)` → `<password:redacted>`), deliberately NOT the
+    engine's `creds.redact` (a no-op unless a report flag is set). Execution passes the real secret only
+    to `execute_gated_action`. Verified: no run event contains the plaintext.
+  - Attack cap: `RunLimits.max_gated_actions_per_run` (25); propose past it → 409.
+  - Result recording: after a non-blocked run the target is appended to the credential's
+    `tested_against` via `profile.replace_credential`; the attempt is appended to `run.summary["attacks"]`.
+  - UI (`pages/AttackGate.tsx`): runnable actions now show a credential picker + a text input per
+    remaining placeholder; Propose is disabled until all are filled; gated-proposal card unchanged
+    (command already redacted by the API).
+- **Tests:** `test_attack_gate.py` → 8 (credential injected at execute but redacted in preview + no
+  event leaks it + tested_against recorded; operator params fill/needs-message; spray needs a credential
+  then runs; per-run cap; + the Phase A gate refusals). `AttackGate.test.tsx` → 3 (cred picker + param
+  input gate the Propose button).
+- Gate: ruff + mypy clean (79 files); **109 backend** + 10 invariant + **27 frontend**; `vite build` OK;
+  `src/oscprecon` untouched. NOTE: audit writes warn "no such table: audit_log" in the TEST env only
+  (conftest create_all doesn't build that table; audit is best-effort so it's swallowed) — pre-existing,
+  cosmetic, not introduced here. Next: item 2 (D1 dry-run), then item 3 (S1 smoke).

@@ -26,12 +26,14 @@ DEFAULT_MAX_LLM_TOKENS_PER_AGENT = 60_000
 DEFAULT_MAX_LLM_TOKENS_PER_RUN = 1_000_000
 DEFAULT_MAX_LLM_STEPS_PER_AGENT = 12    # tool-call/plan loop cap per agent
 DEFAULT_MAX_TOTAL_TASKS = 512           # hard ceiling on hosts x services fan-out for one run
+MAX_GATED_ACTIONS_PER_RUN = 25          # ceiling on human-gated spray/exploit proposals per run
 
 
 @dataclass(frozen=True)
 class RunLimits:
     max_hosts: int = DEFAULT_MAX_HOSTS_PER_RUN
     approval_required_above_hosts: int = APPROVAL_REQUIRED_ABOVE_HOSTS
+    max_gated_actions_per_run: int = MAX_GATED_ACTIONS_PER_RUN
     max_concurrent_service_agents: int = DEFAULT_MAX_CONCURRENT_SERVICE_AGENTS
     max_concurrent_hosts: int = DEFAULT_MAX_CONCURRENT_HOSTS
     host_job_timeout_s: int = DEFAULT_HOST_JOB_TIMEOUT_S
