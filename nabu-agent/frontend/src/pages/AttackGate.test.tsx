@@ -47,6 +47,25 @@ describe("AttackGate", () => {
     await waitFor(() => expect(approve).not.toBeDisabled());
   });
 
+  it("shows a credential picker + param input for an action with placeholders", async () => {
+    const PH = { ...ACTION, command: "smbclient -U {user} //t/C$ -c '{command}'", unfilled: ["user", "command"] };
+    vi.mocked(api).mockImplementation((path: string) => {
+      if (path.includes("/scope")) return Promise.resolve({ scope: [{ target: "10.10.10.5", is_entry: true }] });
+      if (path.endsWith("/runs")) return Promise.resolve({ runs: [{ id: "run1" }] });
+      if (path.includes("/catalog")) return Promise.resolve({ services: [{ service: "smb", label: "SMB", actions: [PH] }] });
+      if (path.includes("/credentials")) return Promise.resolve({ credentials: [{ id: "c1", username: "admin", secret_type: "password", domain: "" }] });
+      if (path.includes("/checkpoints")) return Promise.resolve({ checkpoints: [] });
+      return Promise.resolve({});
+    });
+    render(<AttackGate projectId="p1" />);
+    // Propose is disabled until the credential + the {command} param are supplied
+    const propose = await screen.findByText("Propose");
+    expect(propose).toBeDisabled();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "c1" } });
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "dir" } });
+    await waitFor(() => expect(propose).not.toBeDisabled());
+  });
+
   it("tells the user to run recon first when there is no run", async () => {
     vi.mocked(api).mockImplementation((path: string) => {
       if (path.endsWith("/runs")) return Promise.resolve({ runs: [] });

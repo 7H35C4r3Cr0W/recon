@@ -4,7 +4,6 @@ Creds live in the per-project engine Profile (creds.json)."""
 from __future__ import annotations
 
 import asyncio
-import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -37,9 +36,10 @@ async def _scope_for(db: AsyncSession, project_id: str) -> str | None:
 
 
 def _cid(c) -> str:
-    """Opaque stable id from the engine's credential identity key (never the plaintext alone)."""
-    from oscprecon.creds import cred_key
-    return hashlib.sha1("|".join(cred_key(c)).encode()).hexdigest()[:12]
+    """Opaque stable id from the engine's credential identity key (never the plaintext alone).
+    Delegates to the shared helper so the attack-gate resolver maps the same id back to this cred."""
+    from nabu_agent.engine.creds_ref import credential_cid
+    return credential_cid(c)
 
 
 def _view(c) -> dict:

@@ -730,16 +730,44 @@ def launch(run_id: str, target: str, kind: str = "demo", *, project_id: str | No
 # which action (service + action_id), NEVER a command string — the command is re-derived here from
 # the catalog, so a forged/edited command can't reach the executor.
 
-def _resolve_gated_command(profile: Any, service: str, action_id: str) -> str:
-    """Re-derive the exact shell line for an approved checkpoint FROM THE CATALOG, server-side.
+def _gated_values(profile: Any, service: str, *, params: dict | None = None,
+                  credential: Any = None, redact_secret: bool = False) -> dict[str, str]:
+    """The template fill values for a gated action: the profile's target, the discovered service's
+    port, any operator-supplied ``params``, and — for a chosen credential — its fields mapped onto
+    the ``{user}``/``{password}``/``{hash}``/``{domain}`` placeholders (redacted when
+    ``redact_secret`` so a preview never leaks the plaintext). Later sources win on conflict."""
+    from nabu_agent.agents.tools.dispatch import _evidence_from_profile
+    from nabu_agent.engine.creds_ref import credential_values
 
-    Rebuilds the ranking evidence from the profile's own discovered state, looks the action up by
-    id, and returns its pre-filled command ONLY if it is attacker-runnable and fully filled.
-    Anything else raises ``ValueError`` (the gate stays closed)."""
+    values: dict[str, str] = dict(_evidence_from_profile(profile).get("values") or {})
+    for s in getattr(profile, "discovered_services", []):
+        if str(getattr(s, "service", "")) == service and getattr(s, "port", None):
+            values["port"] = str(s.port)
+            break
+    if params:
+        values.update({str(k): str(v) for k, v in params.items() if str(v)})
+    if credential is not None:
+        values.update(credential_values(credential, redact=redact_secret))
+    return values
+
+
+def _resolve_gated_command(profile: Any, service: str, action_id: str, *,
+                           params: dict | None = None, credential: Any = None,
+                           redact_secret: bool = False) -> str:
+    """Re-derive the exact shell line for a gated action FROM THE CATALOG, server-side.
+
+    Rebuilds the ranking evidence from the profile's own discovered state, fills the action template
+    with :func:`_gated_values` (target + port + operator params + the chosen credential), looks the
+    action up by id, and returns the pre-filled command ONLY if it is attacker-runnable and every
+    placeholder resolved. Anything else raises ``ValueError`` (the gate stays closed). With
+    ``redact_secret`` the returned command carries the secret's redaction marker, not the plaintext
+    — used for previews and log lines; execution passes ``redact_secret=False``."""
     from nabu_agent.agents.tools.dispatch import _evidence_from_profile
     from nabu_agent.engine import tools as etools
 
     evidence = _evidence_from_profile(profile)
+    evidence["values"] = _gated_values(profile, service, params=params, credential=credential,
+                                       redact_secret=redact_secret)
     catalog = etools.catalog_actions_for(service, evidence)
     for a in catalog.get("actions", []):
         if a["id"] != action_id:
@@ -747,12 +775,24 @@ def _resolve_gated_command(profile: Any, service: str, action_id: str) -> str:
         if not a.get("executable"):
             raise ValueError(f"action {action_id!r} is not attacker-runnable")
         if a.get("unfilled"):
-            raise ValueError(f"action {action_id!r} has unresolved placeholders: {a['unfilled']}")
+            raise ValueError(f"needs: {', '.join(a['unfilled'])}")
         cmd = (a.get("command") or "").strip()
         if not cmd:
             raise ValueError(f"action {action_id!r} produced an empty command")
         return cmd
     raise ValueError(f"action {action_id!r} not found in the {service!r} catalog")
+
+
+def _record_credential_tested(profile: Any, credential: Any, target: str) -> None:
+    """Best-effort: append ``target`` to the used credential's ``tested_against`` after a spray/exploit
+    (mirrors what a manual run would record). Never raises."""
+    import contextlib as _cl
+    with _cl.suppress(Exception):
+        if credential is None or target in getattr(credential, "tested_against", []):
+            return
+        from dataclasses import replace
+        updated = replace(credential, tested_against=[*credential.tested_against, target])
+        profile.replace_credential(credential, updated)
 
 
 async def _try_set_state(run_id: str, dst: str) -> None:
@@ -782,6 +822,19 @@ async def _set_checkpoint_status(cp_id: str, status: str) -> None:
             await db.commit()
 
 
+async def _record_attack_summary(run_id: str, entry: dict[str, Any]) -> None:
+    """Append one executed gated action to the run's summary (a durable record beside the events)."""
+    with contextlib.suppress(Exception):
+        async with sessionmaker()() as db:
+            run = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one_or_none()
+            if run is None:
+                return
+            summary = dict(run.summary or {})
+            summary["attacks"] = [*summary.get("attacks", []), entry]
+            run.summary = summary
+            await db.commit()
+
+
 async def execute_approved_action(checkpoint_id: str) -> str:
     """Execute ONE human-approved spray/exploit checkpoint through the single gated door (Phase A of
     the attack gate — human-driven, no LLM). Never raises: a gate/derive/door failure marks the
@@ -807,7 +860,10 @@ async def execute_approved_action(checkpoint_id: str) -> str:
         kind, target, action_id = cp.kind, cp.target, cp.action_id
         status, approved_by = cp.status, cp.approved_by
         exploit_confirmed = bool(cp.exploit_confirmed)
-        service = (cp.requires or {}).get("service", "")
+        requires = cp.requires or {}
+        service = requires.get("service", "")
+        params = requires.get("params") or {}
+        credential_ref = cp.credential_ref
         run_id = cp.run_id
         project_id = run.project_id if run else None
         spray_gate = bool(project.spray_enabled) if project else False
@@ -850,11 +906,22 @@ async def execute_approved_action(checkpoint_id: str) -> str:
         if not project_gate:
             raise AttackGateClosed(f"{kind} is not enabled for this project")
 
-        # Open the target's OWN profile + RE-DERIVE the command from the catalog (never stored).
+        # Open the target's OWN profile, resolve the chosen credential from the vault (server-side,
+        # never from the checkpoint), and RE-DERIVE the command from the catalog. The secret reaches
+        # only shell.run; the log line + events carry the REDACTED command.
+        from nabu_agent.engine.creds_ref import resolve_credential
+
         profile = await asyncio.to_thread(workspace_for(project_id, target).open)
-        shell_line = await asyncio.to_thread(_resolve_gated_command, profile, service, action_id)
+        credential = await asyncio.to_thread(resolve_credential, profile, credential_ref)
+        if credential_ref and credential is None:
+            raise AttackGateClosed("the chosen credential is no longer in the vault")
+        shell_line = await asyncio.to_thread(
+            _resolve_gated_command, profile, service, action_id, params=params, credential=credential)
+        redacted = await asyncio.to_thread(
+            _resolve_gated_command, profile, service, action_id, params=params,
+            credential=credential, redact_secret=True)
         await publish(RunEventType.LOG_LINE, {"lines":
-            [f"[{kind}] approved by {approved_by}; command re-derived from the catalog; scope re-checked"]})
+            [f"[{kind}] approved by {approved_by}; scope re-checked; running: {redacted}"]})
 
         # The ONE gated door: it independently re-verifies the approval, re-validates scope, and is
         # the sole place spray=/exploit=True is set.
@@ -870,6 +937,10 @@ async def execute_approved_action(checkpoint_id: str) -> str:
         outcome = "blocked" if blocked else "executed"
         node_state = NodeState.ERROR if blocked else NodeState.DONE
         await pump.flush()
+        if not blocked and credential is not None:
+            await asyncio.to_thread(_record_credential_tested, profile, credential, target)
+        await _record_attack_summary(run_id, {"checkpoint_id": checkpoint_id, "kind": kind,
+                                     "target": target, "action_id": action_id, "outcome": outcome})
         await publish(RunEventType.TASK_UPDATED, {"node_id": node, "node_state": node_state.value,
                       "attack": True, "exit_code": exit_code, "blocked": blocked})
         await publish(RunEventType.LOG_LINE, {"lines": [f"[{kind}] finished: exit={exit_code} blocked={blocked}"]})
