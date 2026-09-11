@@ -275,7 +275,6 @@
     // click-to-trace attack path: the path pops in gold, everything else dims
     { selector: ".trace-dim", style: { opacity: 0.1 } },
     { selector: "node.trace-hl", style: { "border-color": "#f2b636", "border-width": 5 } },
-    { selector: "edge.trace-hl", style: { "line-color": "#f2b636", "target-arrow-color": "#f2b636", width: 3, opacity: 1 } },
     {
       selector: "edge",
       style: {
@@ -293,19 +292,6 @@
         "font-size": 9,
         color: THEME.edgeLabel,
         "text-rotation": "autorotate",
-      },
-    },
-    // relationship label on the pinned attack path's edges (defined AFTER edge[label] so it wins)
-    {
-      selector: "edge.trace-hl",
-      style: {
-        label: "data(traceRel)",
-        "font-size": 9,
-        color: "#f2b636",
-        "text-rotation": "autorotate",
-        "text-background-color": THEME.canvasBg,
-        "text-background-opacity": 0.85,
-        "text-background-padding": 2,
       },
     },
     {
@@ -339,6 +325,16 @@
     {
       selector: 'edge[type="contains-host"]',
       style: { "line-color": "#9399b2", width: 1.5, opacity: 0.55, "target-arrow-shape": "none" },
+    },
+    // pinned attack path — declared LAST so its gold + relationship label win over every typed-edge rule
+    {
+      selector: "edge.trace-hl",
+      style: {
+        "line-color": "#f2b636", "target-arrow-color": "#f2b636", "target-arrow-shape": "triangle",
+        width: 3, opacity: 1, label: "data(traceRel)", "font-size": 9, color: "#f2b636",
+        "text-rotation": "autorotate", "text-background-color": "#0b1116",
+        "text-background-opacity": 0.85, "text-background-padding": 2,
+      },
     },
     ];
   }
@@ -884,6 +880,9 @@
       prevZoom = cy.zoom();
       cy.destroy();
       cy = null;
+      // the rebuilt instance has no pinned attack path; drop the stale traceId (and restore the hint)
+      // so hover-focus isn't left permanently suppressed by the new cy's mouseover guard.
+      clearTrace();
     }
     var hadPrev = Object.keys(prevPos).length > 0;
     var nodeCount = (elements && elements.nodes ? elements.nodes.length : 0);
