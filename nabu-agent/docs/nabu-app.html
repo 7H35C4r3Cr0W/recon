@@ -191,6 +191,20 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
 .map3.nolog{grid-template-columns:212px 1fr}
 .map3.notree{grid-template-columns:1fr 340px}
 .map3.notree.nolog{grid-template-columns:1fr}
+.map3.nolog .logpane{display:none}
+.map3.notree .svctree{display:none}
+/* command console */
+.console{display:flex;align-items:center;gap:9px;margin:0 18px 14px;background:var(--sunk);border:1px solid var(--line-2);border-radius:10px;padding:8px 10px}
+.console:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
+.console .cprompt{font-family:var(--mono);font-size:12px;color:var(--accent);flex:0 0 auto;user-select:none}
+.cinput{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--ink);font-family:var(--mono);font-size:12.5px}
+.cinput::placeholder{color:var(--muted)}
+.cbtn{font:600 11px/1 var(--sans);border-radius:7px;padding:7px 12px;cursor:pointer;border:1px solid var(--line-2);background:var(--panel);color:var(--ink-2);flex:0 0 auto}
+.cbtn:hover{border-color:var(--accent);color:var(--accent)}
+.cbtn.go{background:linear-gradient(180deg,var(--accent),var(--accent-2));color:var(--accent-ink);border-color:transparent}
+.cbtn.go:hover{color:var(--accent-ink);filter:brightness(1.06)}
+.act .ab button.ed:hover,.cat-act .ced:hover{border-color:var(--accent);color:var(--accent)}
+.cat-act .ced{font:600 10px/1 var(--sans);border-radius:6px;padding:5px 9px;cursor:pointer;border:1px solid var(--line-2);background:var(--panel);color:var(--ink-2)}
 .svctree{overflow-y:auto;background:var(--sunk);border:1px solid var(--line);border-radius:11px;padding:9px 7px}
 .svctree .sh{font:700 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:8px 8px 6px}
 .svctree .hostrow{display:flex;align-items:center;gap:7px;font:600 11.5px/1.3 var(--mono);color:var(--ink);padding:6px 8px;border-radius:7px;cursor:pointer}
@@ -435,6 +449,8 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
             <li><b>Attack gate</b> — agents propose exploitation checkpoints; you Approve / Deny. Nothing runs until you do.</li>
             <li><b>Catalog</b> — the full 3,190-action decision-aid, ranked ★ against what this run found; filter or search it.</li>
             <li><b>Report</b> — the Obsidian-compatible attack-path report, regenerate + export.</li>
+            <li><b>Console</b> (bottom bar) — type or edit <em>any</em> recon command and <b>Run</b> / <b>Dry-run</b> it; you're not locked into presets. Click a node action's <b>✎</b> (in the drawer or catalog) to load its command in for editing. Attacks/spray are refused here and routed to the gate. ↑ recalls history.</li>
+            <li><b>Room to work</b> — <b>Hide tree</b> / <b>Hide log</b> and the <b>«</b> sidebar collapse give the map more space; the Tree layout runs left-to-right so it fills the width. Drag the sidebar's edge to resize it.</li>
           </ul></div>
         <div class="panel" style="max-width:760px;margin-bottom:12px"><h3>Agents</h3><p class="ink2" style="font-size:13px">The <b>Agents</b> tab shows the whole agent hierarchy — orchestrator → phase agents → sub-agents. Search for one or click it in the tree/chart to tweak its role, model, autonomy, techniques, tools and system prompt. Guardrails (scope-checking, the human attack-gate, audit) stay enforced and can't be edited off.</p></div>
         <div class="panel" style="max-width:760px"><h3>Safety</h3><p class="ink2" style="font-size:13px">Recon is automated; <b>attacks are never automatic</b>. Any spray/exploit is only ever <i>proposed</i> and must be approved by a human at the gate. Every target is checked against the project's authorized scope, and every action is audited.</p></div>
@@ -527,6 +543,7 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
           <button class="seg" id="lay-force">Force</button>
           <button class="seg on" id="lay-hier">Tree</button>
           <input class="search" id="search" placeholder="search: dc01 · 445 · svc_" aria-label="search nodes">
+          <button class="seg" id="toggletree">Hide tree</button>
           <button class="seg" id="togglelog">Hide log</button>
           <button class="seg" id="region-mode">▢ Region</button>
           <span style="margin-left:auto" class="hint">click a node → detail + path · shift-click 2 → path A→B · dbl-click → note</span>
@@ -564,6 +581,12 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
           </div>
           <div class="logpane" id="logpane"><div class="lead">live action log</div></div>
         </div>
+        <form class="console" id="console">
+          <span class="cprompt">nabu@corp:~$</span>
+          <input class="cinput" id="cmdinput" autocomplete="off" spellcheck="false" placeholder="run any recon command — nmap -sCV 10.10.10.5 · nxc smb 172.16.5.10 -u '' -p '' --shares … edit freely; attacks stay gated. ↑ history">
+          <button type="button" class="cbtn dry" id="cmddry" title="show the command without running it">Dry-run</button>
+          <button type="submit" class="cbtn go" id="cmdrun">Run ⏎</button>
+        </form>
         </div><!-- /pane-map -->
         <div class="pane scroll" id="pane-findings">
           <h2>Findings</h2><p class="plead">Everything the run has parsed or the operator entered — strongest first. Click a row to open it on the map.</p>
@@ -629,7 +652,7 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
 
   /* collapsible + resizable sidebar */
   (function(){ var app=document.getElementById("app"), tog=document.getElementById("sidetoggle"), rz=document.getElementById("side-resize"), dragging=false, savedW=null;
-    function relayout(){ setTimeout(function(){ if(cy){ cy.resize(); if(typeof positionRegions==="function") positionRegions(); } if(typeof fitOrg==="function") fitOrg(); },70); }
+    function relayout(){ setTimeout(function(){ if(cy){ cy.resize(); cy.fit(cy.elements(),36); if(typeof positionRegions==="function") positionRegions(); } if(typeof fitOrg==="function") fitOrg(); },70); }
     tog.addEventListener("click", function(){
       if(!app.classList.contains("side-collapsed")){ savedW=app.style.getPropertyValue("--side-w")||null; app.style.removeProperty("--side-w"); app.classList.add("side-collapsed"); tog.textContent="»"; tog.title="Expand sidebar"; }
       else { app.classList.remove("side-collapsed"); if(savedW) app.style.setProperty("--side-w",savedW); tog.textContent="«"; tog.title="Collapse sidebar"; }
@@ -888,7 +911,7 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
     if(animate&&!reduce){ ele.style("opacity",0); ele.animate({style:{opacity:1}},{duration:400,easing:"ease-out"}); ele.style("overlay-opacity",0.35);
       ele.animate({style:{"overlay-padding":15}},{duration:500,easing:"ease-out-cubic",complete:function(){ ele.animate({style:{"overlay-opacity":ele.data("state")==="active"?0.18:0,"overlay-padding":6}},{duration:340}); }}); } }
   function setState(map){ if(!map) return; Object.keys(map).forEach(function(id){ var n=cy.getElementById(id); if(n.nonempty()) n.data("state",map[id]); }); }
-  function layout(name){ var opts=name==="hier"?{name:"breadthfirst",directed:true,roots:"#t_dmz",padding:36,spacingFactor:1.15,animate:!reduce,animationDuration:450,fit:true,nodeDimensionsIncludeLabels:true}:{name:"cose",padding:45,animate:!reduce,animationDuration:500,fit:true,nodeDimensionsIncludeLabels:true,nodeRepulsion:22000,idealEdgeLength:95,nodeOverlap:24,gravity:0.25,componentSpacing:130,randomize:false}; cy.layout(opts).run(); }
+  function layout(name){ var opts=name==="hier"?{name:"breadthfirst",directed:true,roots:"#t_dmz",padding:30,spacingFactor:1.05,animate:!reduce,animationDuration:450,fit:true,nodeDimensionsIncludeLabels:true,transform:function(node,pos){ return {x:pos.y,y:pos.x}; }}:{name:"cose",padding:45,animate:!reduce,animationDuration:500,fit:true,nodeDimensionsIncludeLabels:true,nodeRepulsion:22000,idealEdgeLength:95,nodeOverlap:24,gravity:0.25,componentSpacing:130,randomize:false}; cy.layout(opts).run(); }
 
   var STATES=["active","done","stuck","error","queued"];
   function renderLegend(){ var c={}; cy.nodes().forEach(function(n){ var s=n.data("state"); c[s]=(c[s]||0)+1; });
@@ -952,7 +975,9 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
     document.getElementById("lay-force").onclick=function(){ layoutName="force"; this.classList.add("on"); document.getElementById("lay-hier").classList.remove("on"); layout("force"); };
     document.getElementById("lay-hier").onclick=function(){ layoutName="hier"; this.classList.add("on"); document.getElementById("lay-force").classList.remove("on"); layout("hier"); };
     document.getElementById("search").oninput=function(){ applySearch(this.value); };
-    document.getElementById("togglelog").onclick=function(){ var b=document.getElementById("mapbody"); var hid=b.classList.toggle("nolog"); this.textContent=hid?"Show log":"Hide log"; this.classList.toggle("on",!hid); setTimeout(function(){ cy.resize(); cy.fit(cy.elements(),40); },60); };
+    document.getElementById("togglelog").onclick=function(){ var b=document.getElementById("mapbody"); var hid=b.classList.toggle("nolog"); this.textContent=hid?"Show log":"Hide log"; this.classList.toggle("on",!hid); refitMap(); };
+    document.getElementById("toggletree").onclick=function(){ var b=document.getElementById("mapbody"); var hid=b.classList.toggle("notree"); this.textContent=hid?"Show tree":"Hide tree"; this.classList.toggle("on",!hid); refitMap(); };
+    wireConsole();
     document.getElementById("drawerx").onclick=function(){ hideDrawer(); clearPath(); };
     document.getElementById("d-note-save").onclick=function(){ if(!drawerId) return; var v=document.getElementById("d-note").value.trim(); if(v){ NOTES[drawerId]=v; cy.getElementById(drawerId).addClass("noted"); } else { delete NOTES[drawerId]; cy.getElementById(drawerId).removeClass("noted"); } };
     document.getElementById("d-note-del").onclick=function(){ if(!drawerId) return; delete NOTES[drawerId]; cy.getElementById(drawerId).removeClass("noted"); document.getElementById("d-note").value=""; };
@@ -1063,12 +1088,14 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
   function actHtml(a,i){ var run=a.rw==="victim"?'<span class="badge2 copy">copy</span>':'<span class="badge2 run">run</span>';
     var tier=a.t?'<span class="badge2 t'+a.t+'">T'+a.t+'</span>':'', star=a.s?'<span class="badge2 star">★</span>':'', port=a.p?'<span class="badge2 port">:'+escapeHtml(String(a.p))+'</span>':'';
     var btn=a.rw==="victim"?'<button data-copy="'+i+'">Copy</button>':'<button class="go" data-run="'+i+'">Run</button><button data-copy="'+i+'">Copy</button>';
+    btn+='<button class="ed" data-edit="'+i+'" title="load into the console to edit the syntax">✎</button>';
     return '<div class="act"><div class="al">'+star+tier+run+port+'<span class="name">'+escapeHtml(a.l)+'</span></div><div class="cmd">'+escapeHtml(a.c)+'</div><div class="ab">'+btn+'<span class="src">'+escapeHtml(a.src||"")+'</span></div></div>'; }
   function renderDrawerExtras(id){
     var acts=actionsFor(id), ah=document.getElementById("d-actions"); ah.innerHTML="";
     if(acts.length){ ah.innerHTML='<div class="sec-h">⚙ actions<span class="cnt">'+acts.length+' available</span></div>'; acts.forEach(function(a,i){ ah.insertAdjacentHTML("beforeend",actHtml(a,i)); });
       Array.prototype.forEach.call(ah.querySelectorAll("[data-run]"),function(b){ b.onclick=function(){ runAction(acts[+b.getAttribute("data-run")],b); }; });
-      Array.prototype.forEach.call(ah.querySelectorAll("[data-copy]"),function(b){ b.onclick=function(){ copyText(acts[+b.getAttribute("data-copy")].c); }; }); }
+      Array.prototype.forEach.call(ah.querySelectorAll("[data-copy]"),function(b){ b.onclick=function(){ copyText(acts[+b.getAttribute("data-copy")].c); }; });
+      Array.prototype.forEach.call(ah.querySelectorAll("[data-edit]"),function(b){ b.onclick=function(){ loadConsole(acts[+b.getAttribute("data-edit")].c); }; }); }
     var ref=refsFor(id), rh=document.getElementById("d-refs"); rh.innerHTML="";
     if(ref){ var html='<div class="sec-h">📚 references</div>'; if(ref.ht) html+='<a class="ref-link" target="_blank" rel="noopener" href="'+ref.ht[1]+'">📖 HackTricks · '+escapeHtml(ref.ht[0])+'<span class="ext">↗</span></a>'; (ref.edb||[]).forEach(function(e){ html+='<a class="ref-link edb" target="_blank" rel="noopener" href="https://www.exploit-db.com/exploits/'+e[0]+'">🗂 EDB-'+e[0]+' · '+escapeHtml(e[1])+'<span class="ext">↗</span></a>'; }); rh.innerHTML=html; } }
   function pulse(id){ var n=cy.getElementById(id); if(n.empty()||reduce) return; n.style("overlay-color","#f2b636"); n.animate({style:{"overlay-opacity":0.42,"overlay-padding":18}},{duration:420,complete:function(){ n.animate({style:{"overlay-opacity":0,"overlay-padding":6}},{duration:640,complete:function(){ n.style("overlay-color","#39c46a"); }}); }}); }
@@ -1172,10 +1199,11 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
   function renderCatalog(){ var body=document.getElementById("catbody"); if(!body) return; var q=(document.getElementById("cat-filter").value||"").toLowerCase(), starOnly=document.getElementById("cat-star").classList.contains("on"), shownS=0,shownA=0;
     body.innerHTML=CATALOG.map(function(s){ var acts=s.acts.filter(function(a){ if(starOnly&&!a.s) return false; return !q||(s.svc+" "+s.cat+" "+a.l+" "+a.c).toLowerCase().indexOf(q)>=0; }); if(!acts.length) return ""; shownS++; shownA+=acts.length;
       var rows=acts.map(function(a,i){ var b=a.rw==="victim"?'<span class="badge2 copy">copy</span>':'<span class="badge2 run">run</span>',star=a.s?'<span class="badge2 star">★</span>':'';
-        return '<div class="cat-act">'+star+b+'<span class="can">'+escapeHtml(a.l)+'</span><span class="ccmd">'+escapeHtml(a.c)+'</span><button class="cgo" data-cat="'+s.svc+"|"+i+'">'+(a.rw==="victim"?"Copy":"Run")+'</button></div>'; }).join("");
+        return '<div class="cat-act">'+star+b+'<span class="can">'+escapeHtml(a.l)+'</span><span class="ccmd">'+escapeHtml(a.c)+'</span><button class="ced" data-catedit="'+s.svc+"|"+i+'" title="edit in console">✎</button><button class="cgo" data-cat="'+s.svc+"|"+i+'">'+(a.rw==="victim"?"Copy":"Run")+'</button></div>'; }).join("");
       return '<div class="cat-svc"><div class="csh"><b>'+escapeHtml(s.svc)+'</b><span class="cport">'+escapeHtml(s.port)+'</span><span class="ccat">'+escapeHtml(s.cat)+'</span><span class="ccount">'+s.n+' actions</span></div>'+rows+'</div>'; }).join("");
     document.getElementById("cat-shown").textContent="showing "+shownS+" of 183 services · "+shownA+" actions";
     var sugg=0; CATALOG.forEach(function(s){ s.acts.forEach(function(a){ if(a.s) sugg++; }); }); document.getElementById("cat-sugg").textContent=sugg;
+    Array.prototype.forEach.call(body.querySelectorAll("[data-catedit]"),function(btn){ btn.onclick=function(){ var p=btn.getAttribute("data-catedit").split("|"),s=CATALOG.filter(function(x){return x.svc===p[0];})[0]; loadConsole(s.acts[+p[1]].c); }; });
     Array.prototype.forEach.call(body.querySelectorAll("[data-cat]"),function(btn){ btn.onclick=function(){ var p=btn.getAttribute("data-cat").split("|"),s=CATALOG.filter(function(x){return x.svc===p[0];})[0],a=s.acts[+p[1]];
       if(a.rw==="victim"){ copyText(a.c); } else { switchPane("map"); logLine({cls:"cmd",text:"$ "+a.c}); setTimeout(function(){ logLine({cls:"ok",text:"✓ "+a.l}); pop("Action complete",s.svc+" · "+a.l,"ok"); },420); } }; }); }
 
@@ -1235,6 +1263,29 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
     else if(kind==="attack") pop("Attack-gate hit",(m.technique||n.label)+" — needs approval","gate");
     else if(kind==="finding") pop("New finding",n.label,"finding");
     else if(kind==="subnet") pop("Pivot","into "+(m.cidr||n.label),"info"); }
+
+  /* ---- command console (free-form, editable; mirrors the desktop tool's command builder) ---- */
+  function refitMap(){ setTimeout(function(){ if(cy){ cy.resize(); cy.fit(cy.elements(),36); if(typeof positionRegions==="function") positionRegions(); } },70); }
+  function showLog(){ var b=document.getElementById("mapbody"); if(b&&b.classList.contains("nolog")){ b.classList.remove("nolog"); var t=document.getElementById("togglelog"); if(t){ t.textContent="Hide log"; t.classList.remove("on"); } refitMap(); } }
+  var CMD_HIST=[], histIdx=0;
+  function loadConsole(cmd){ switchPane("map"); var ci=document.getElementById("cmdinput"); if(!ci) return; ci.value=cmd; ci.focus(); pop("Loaded into console","edit the syntax, then Run","info"); }
+  function simulateCmd(cmd){ var c=cmd.toLowerCase();
+    if(/\bhydra\b|\bmedusa\b|--continue-on-success|certipy\s+req|secretsdump|ticketer|golden|dcsync|\bpsexec\b|\bwmiexec\b|evil-winrm|\bmimikatz\b/.test(c))
+      return {lines:[{cls:"p",text:"⚑ that's an attack / spray action — routed to the Attack gate for human approval (never run straight from the console)"}],title:"Sent to Attack gate",sub:"attacks are human-gated",kind:"gate"};
+    if(/\bnmap\b/.test(c)) return {lines:[{cls:"",text:"Starting Nmap 7.94 …"},{cls:"",text:"PORT     STATE SERVICE  VERSION"},{cls:"ok",text:"✓ scan complete — versions parsed into discovery"}],title:"nmap complete",sub:"ports + versions parsed",kind:"ok"};
+    if(/feroxbuster|gobuster|ffuf|dirsearch|nikto|whatweb/.test(c)) return {lines:[{cls:"",text:"200  GET  /"},{cls:"f",text:"301  GET  /backup   (autoindex)"},{cls:"ok",text:"✓ web enumeration complete"}],title:"web enum complete",sub:"paths enumerated",kind:"ok"};
+    if(/nxc|netexec|crackmapexec|enum4linux|smbclient|smbmap|rpcclient/.test(c)) return {lines:[{cls:"",text:"SMB  172.16.5.10  [*] enumerated"},{cls:"ok",text:"✓ shares + users listed (read-only)"}],title:"SMB enum complete",sub:"read-only enumeration",kind:"ok"};
+    if(/bloodhound|ldapsearch|getuserspns|getnpusers|getadusers/.test(c)) return {lines:[{cls:"ok",text:"✓ AD objects collected"}],title:"AD enum complete",sub:"",kind:"ok"};
+    if(/searchsploit/.test(c)) return {lines:[{cls:"",text:"Exploit Title                    | Path"},{cls:"ok",text:"✓ searchsploit results (lookup only)"}],title:"searchsploit",sub:"lookup only — never executed",kind:"info"};
+    if(/snmpwalk|onesixtyone/.test(c)) return {lines:[{cls:"ok",text:"✓ SNMP walk complete"}],title:"snmp complete",sub:"",kind:"ok"};
+    return {lines:[{cls:"ok",text:"✓ command completed"}],title:"command completed",sub:cmd,kind:"ok"}; }
+  function runConsole(cmd,dry){ cmd=(cmd||"").trim(); if(!cmd) return; CMD_HIST.push(cmd); histIdx=CMD_HIST.length; showLog();
+    if(dry){ logLine({cls:"cmd",text:"[dry-run] $ "+cmd}); pop("Dry-run","command shown, not executed","info"); return; }
+    logLine({cls:"cmd",text:"$ "+cmd}); setTimeout(function(){ var r=simulateCmd(cmd); (r.lines||[]).forEach(logLine); pop(r.title,r.sub,r.kind); refreshPanes(); },360); }
+  function wireConsole(){ var cf=document.getElementById("console"), ci=document.getElementById("cmdinput"); if(!cf||!ci||cf.__wired) return; cf.__wired=true;
+    cf.addEventListener("submit",function(e){ e.preventDefault(); runConsole(ci.value,false); ci.value=""; histIdx=CMD_HIST.length; });
+    document.getElementById("cmddry").addEventListener("click",function(){ runConsole(ci.value,true); });
+    ci.addEventListener("keydown",function(e){ if(e.key==="ArrowUp"){ if(CMD_HIST.length){ histIdx=Math.max(0,histIdx-1); ci.value=CMD_HIST[histIdx]||""; e.preventDefault(); } } else if(e.key==="ArrowDown"){ if(histIdx<CMD_HIST.length-1){ histIdx++; ci.value=CMD_HIST[histIdx]||""; } else { histIdx=CMD_HIST.length; ci.value=""; } } }); }
 
   /* ============================================================
      AGENTS — hierarchy · search · per-agent editor
