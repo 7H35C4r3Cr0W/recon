@@ -31,10 +31,10 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
   const runLayout = (cy: Core) => {
     const opts = layoutName === "breadthfirst"
       ? { name: "breadthfirst", directed: true, spacingFactor: 1.35, padding: 34, animate: true,
-          animationDuration: 350, nodeDimensionsIncludeLabels: true }
-      : { name: "cose", padding: 50, animate: true, animationDuration: 500, nodeDimensionsIncludeLabels: true,
-          nodeRepulsion: 14000, idealEdgeLength: 130, nodeOverlap: 28, gravity: 0.2,
-          componentSpacing: 150, randomize: false };
+          animationDuration: 350, fit: true, nodeDimensionsIncludeLabels: true }
+      : { name: "cose", padding: 50, animate: true, animationDuration: 500, fit: true,
+          nodeDimensionsIncludeLabels: true, nodeRepulsion: 14000, idealEdgeLength: 130,
+          nodeOverlap: 28, gravity: 0.2, componentSpacing: 150, randomize: false };
     cy.layout(opts as cytoscape.LayoutOptions).run();
   };
 
@@ -74,7 +74,9 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         {
           selector: "edge",
           style: { width: 1.6, "line-color": "#5b6b7d", "target-arrow-color": "#5b6b7d",
-                   "target-arrow-shape": "triangle", "curve-style": "bezier", "arrow-scale": 0.8 },
+                   "target-arrow-shape": "triangle", "curve-style": "unbundled-bezier",
+                   "control-point-distances": "36", "control-point-weights": "0.5",
+                   "arrow-scale": 0.8, opacity: 0.85 } as any,
         },
         { selector: "edge.hl", style: { "line-color": "#3ad9c0", "target-arrow-color": "#3ad9c0", width: 2.4, "line-opacity": 0.95 } as any },
         {
