@@ -30,7 +30,9 @@ export function RunLive() {
   const [layoutName, setLayoutName] = useState<"cose" | "breadthfirst">("cose");
   const [fitNonce, setFitNonce] = useState(0);
   const [showLog, setShowLog] = useState(true);
-  const [selected, setSelected] = useState<{ id: string; label: string; kind: string; state: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [hiddenKinds, setHiddenKinds] = useState<string[]>([]);
+  const [selected, setSelected] = useState<{ id: string; label: string; kind: string; state: string; hops?: number } | null>(null);
   const [pending, setPending] = useState<{ id: string; message: string } | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const lastSeqRef = useRef(0);
@@ -159,6 +161,15 @@ export function RunLive() {
           <button className={`seg ${layoutName === "breadthfirst" ? "on" : ""}`} onClick={() => setLayoutName("breadthfirst")}>Hierarchy</button>
         </span>
         <button className="seg" onClick={() => setFitNonce((n) => n + 1)}>⤢ Fit</button>
+        <input className="input" style={{ maxWidth: 190, padding: "6px 10px", fontSize: 12 }} value={search}
+          onChange={(e) => setSearch(e.target.value)} placeholder="search nodes… (dc01 · 445 · svc_)" aria-label="search nodes" />
+        <span className="grp">
+          <span className="lbl">show</span>
+          {["agent", "service", "finding", "report", "attack"].map((k) => (
+            <button key={k} className={`seg ${hiddenKinds.includes(k) ? "" : "on"}`}
+              onClick={() => setHiddenKinds((h) => (h.includes(k) ? h.filter((x) => x !== k) : [...h, k]))}>{k}</button>
+          ))}
+        </span>
         <button className="seg" onClick={() => setShowLog((v) => !v)}>{showLog ? "Hide log" : "Show log"}</button>
         <span style={{ marginLeft: "auto" }} />
         {!terminal && <button className="seg danger" onClick={cancelRun}>■ Cancel run</button>}
@@ -166,7 +177,7 @@ export function RunLive() {
 
       <div className="map-body" style={{ gridTemplateColumns: showLog ? "1fr 380px" : "1fr" }}>
         <div style={{ position: "relative", minHeight: 0 }}>
-          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} />
+          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} search={search} hiddenKinds={hiddenKinds} />
           {selected && (
             <div className="node-drawer">
               <div className="row" style={{ justifyContent: "space-between" }}>
@@ -176,6 +187,11 @@ export function RunLive() {
               <div className="dv mono">{selected.label}</div>
               <div className="ds"><span className="d" style={{ background: NODE_COLORS[selected.state as NodeState] || "#8394a0" }} />{selected.state}</div>
               <div className="mono muted" style={{ fontSize: 10, marginTop: 6 }}>{selected.id}</div>
+              {typeof selected.hops === "number" && (
+                <div className="mono" style={{ fontSize: 10, marginTop: 6, color: "var(--gold)" }}>
+                  attack path: {selected.hops} hop{selected.hops === 1 ? "" : "s"} from the entry
+                </div>
+              )}
             </div>
           )}
           {/* node-type key — swatch SHAPE mirrors the real node shape (circle/box/diamond/star) so it
@@ -189,7 +205,11 @@ export function RunLive() {
         </div>
         {showLog && (
           <div ref={logRef} className="logpane">
-            <div className="lead">live action log</div>
+            <div className="lead" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>live action log</span>
+              <button className="seg" style={{ padding: "2px 8px", fontSize: 12 }} title="collapse log"
+                onClick={() => setShowLog(false)}>›</button>
+            </div>
             {logs.length === 0 ? <div className="ln muted">waiting for the run to start…</div>
               : logs.map((l, i) => <div key={i} className="ln">{l}</div>)}
           </div>

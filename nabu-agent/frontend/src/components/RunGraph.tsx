@@ -21,9 +21,10 @@ const ICON: Record<string, string> = {
   agent: glyph("<rect x='5' y='7' width='14' height='11' rx='2'/><path d='M12 7V4M9 12h.01M15 12h.01M9 15h6'/>"),
 };
 
-export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect }:
+export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds }:
   { elements: ElementDefinition[]; layoutName?: "cose" | "breadthfirst"; fitNonce?: number;
-    onSelect?: (n: { id: string; label: string; kind: string; state: string } | null) => void }) {
+    onSelect?: (n: { id: string; label: string; kind: string; state: string; hops?: number } | null) => void;
+    search?: string; hiddenKinds?: string[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const layoutTimer = useRef<number | null>(null);
@@ -79,6 +80,10 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         { selector: ".offpath", style: { opacity: 0.1, "text-opacity": 0.1 } as any },
         { selector: "node.onpath", style: { "border-color": "#f2b636", "border-width": 6 } as any },
         { selector: "edge.onpath", style: { "line-color": "#f2b636", "target-arrow-color": "#f2b636", width: 3.2, opacity: 1 } as any },
+        // search highlight + node-type filter
+        { selector: ".search-dim", style: { opacity: 0.12, "text-opacity": 0.12 } as any },
+        { selector: "node.search-hit", style: { "border-color": "#3ad9c0", "border-width": 5 } as any },
+        { selector: ".type-hidden", style: { display: "none" } as any },
         {
           selector: "edge",
           style: { width: 1.6, "line-color": "#5b6b7d", "target-arrow-color": "#5b6b7d",
@@ -114,26 +119,27 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     // click a node → select (parent shows details) AND pin the attack path from the target root to
     // it in gold, everything else dimmed (BloodHound "shortest path" adapted to the rooted recon
     // graph); click blank → clear both.
-    const pinPath = (node: cytoscape.NodeSingular) => {
+    const pinPath = (node: cytoscape.NodeSingular): number | undefined => {
       cy.elements().removeClass("faded hl onpath offpath");
       const root = cy.nodes().filter((n) => {
         const k = n.data("kind") as string; return k === "run" || k === "target"; }).first();
-      if (root.empty()) return;
+      if (root.empty()) return undefined;
       const ids = shortestPath(
         cy.edges().map((ed) => ({ source: ed.source().id(), target: ed.target().id() })),
         root.id(), node.id());
-      if (ids.length === 0) return;
+      if (ids.length === 0) return undefined;
       const onPath = new Set(ids);
       const next = pathNext(ids);
       cy.elements().addClass("offpath");
       cy.nodes().forEach((n) => { if (onPath.has(n.id())) n.removeClass("offpath").addClass("onpath"); });
       cy.edges().forEach((ed) => {
         if (next.get(ed.source().id()) === ed.target().id()) ed.removeClass("offpath").addClass("onpath"); });
+      return ids.length - 1;
     };
     cy.on("tap", "node", (e) => {
-      onSelect?.({ id: e.target.id(), label: e.target.data("label"), kind: e.target.data("kind"), state: e.target.data("state") });
       selectedRef.current = e.target.id();
-      pinPath(e.target);
+      const hops = pinPath(e.target);
+      onSelect?.({ id: e.target.id(), label: e.target.data("label"), kind: e.target.data("kind"), state: e.target.data("state"), hops });
     });
     cy.on("tap", (e) => {
       if (e.target === cy) { onSelect?.(null); selectedRef.current = null; cy.elements().removeClass("faded hl onpath offpath"); }
@@ -178,6 +184,45 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     const cy = cyRef.current;
     if (cy && fitNonce) cy.animate({ fit: { eles: cy.elements(), padding: 45 } }, { duration: 350 });
   }, [fitNonce]);
+
+  // search: highlight matches by label/kind, dim the rest (BloodHound-style)
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const q = search.trim().toLowerCase();
+    cy.nodes().removeClass("search-hit search-dim");
+    if (!q) return;
+    cy.nodes().forEach((n) => {
+      const hay = `${n.data("label")} ${n.data("kind")}`.toLowerCase();
+      n.addClass(hay.includes(q) ? "search-hit" : "search-dim");
+    });
+  }, [search, elements]);
+
+  // node-type filter: hide whole kinds to declutter (an edge is hidden when either end is)
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const hidden = new Set(hiddenKinds ?? []);
+    cy.nodes().forEach((n) => { n.toggleClass("type-hidden", hidden.has(n.data("kind") as string)); });
+    cy.edges().forEach((ed) => {
+      ed.toggleClass("type-hidden", ed.source().hasClass("type-hidden") || ed.target().hasClass("type-hidden"));
+    });
+  }, [hiddenKinds, elements]);
+
+  // Escape clears a pinned attack path / selection
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape") return;
+      const cy = cyRef.current;
+      if (!cy) return;
+      selectedRef.current = null;
+      cy.elements().removeClass("faded hl onpath offpath");
+      onSelect?.(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return <div ref={ref} style={{
     width: "100%", height: "100%", borderRadius: 11, border: "1px solid var(--line)",
