@@ -294,8 +294,8 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
         <div class="map-controls">
           <button class="seg play" id="play">▶ Replay recon</button>
           <button class="seg" id="fit">⤢ Fit</button>
-          <button class="seg on" id="lay-force">Force</button>
-          <button class="seg" id="lay-hier">Tree</button>
+          <button class="seg" id="lay-force">Force</button>
+          <button class="seg on" id="lay-hier">Tree</button>
           <input class="search" id="search" placeholder="search: dc01 · 445 · svc_" aria-label="search nodes">
           <button class="seg" id="togglelog">Hide log</button>
           <button class="seg" id="region-mode">▢ Region</button>
@@ -554,7 +554,7 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
 
   var NODE_BY_ID={}; NODES.forEach(function(n){ NODE_BY_ID[n[0]]={id:n[0],label:n[1],kind:n[2]}; });
   var EDGES_FOR={}; EDGES.forEach(function(e){ (EDGES_FOR[e[1]]=EDGES_FOR[e[1]]||[]).push(e); });
-  var NOTES={}, selId=null, curPhase="Done", running=false, timers=[], logpane, drawerId=null, layoutName="force";
+  var NOTES={}, selId=null, curPhase="Done", running=false, timers=[], logpane, drawerId=null, layoutName="hier";
 
   function escapeHtml(s){ return String(s).replace(/[&<>]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
 
