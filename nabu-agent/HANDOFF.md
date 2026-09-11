@@ -530,3 +530,22 @@ automated; an attack runs only when a human approves a specific action behind th
   `src/oscprecon` untouched. NOTE: audit writes warn "no such table: audit_log" in the TEST env only
   (conftest create_all doesn't build that table; audit is best-effort so it's swallowed) — pre-existing,
   cosmetic, not introduced here. Next: item 2 (D1 dry-run), then item 3 (S1 smoke).
+
+---
+
+## 2026-09-11 (cont.) — Phase D dry-run + distributed smoke script → DEV SIDE DONE
+
+- **Attack gate Phase D — dry-run (PR #48):** `ApproveBody.dry_run`; approving with `dry_run:true`
+  runs the full resolve-and-show path (opens the profile, re-derives the command with creds/params,
+  emits a redacted "would run: …" log + a done attack node, marks the checkpoint `dry-run`, records
+  the attempt in `run.summary`) but **never calls `execute_gated_action`** — a safe rehearsal. New
+  `CheckpointStatus.DRY_RUN`. UI: a **Dry run** button beside Approve (same gate enable). Test asserts
+  the door is never called and the log shows the command (redacted).
+- **Distributed smoke (PR #48):** `deploy/smoke.sh` — waits for `/api/health/ready`, logs in, creates
+  a project + scope, starts a real `scan`, polls to a terminal `done`/`partial` (exercises the Redis +
+  Arq worker fan-out). Env-configurable (BASE/TARGET/ADMIN_*/TIMEOUT/SMOKE_UP); `bash -n` clean;
+  referenced from RUNBOOK §4. (Executed by a human in a real cluster — can't run a live cluster here.)
+- **`docs/DEFINITION_OF_DONE.md`: all three required Tier-1 items now checked → THE DEV SIDE IS DONE.**
+  Gate: ruff + mypy clean; **110 backend** + 10 invariant + **27 frontend**; `vite build` OK; policy
+  invariants hold; `src/oscprecon` untouched. Remaining = Tier 2 (LLM-gated: attach the model, Phase B
+  agent-proposed, run-level budgets, live agent-run validation) + the explicitly-optional polish.

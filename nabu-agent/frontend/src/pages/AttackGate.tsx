@@ -76,11 +76,12 @@ export function AttackGate({ projectId }: { projectId: string }) {
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
 
-  async function decide(cp: Checkpoint, action: "approve" | "reject") {
+  async function decide(cp: Checkpoint, action: "approve" | "reject", dryRun = false) {
     if (!runId) return;
     setErr(""); setBusy(true);
     try {
-      const body = action === "approve" ? JSON.stringify({ exploit_confirmed: !!confirm[cp.id] }) : undefined;
+      const body = action === "approve"
+        ? JSON.stringify({ exploit_confirmed: !!confirm[cp.id], dry_run: dryRun }) : undefined;
       await api(`/runs/${runId}/checkpoints/${cp.id}/${action}`, { method: "POST", body });
       await loadCheckpoints(runId);
     } catch (e) { setErr(String(e)); } finally { setBusy(false); }
@@ -139,6 +140,7 @@ export function AttackGate({ projectId }: { projectId: string }) {
                               I confirm this exploit against {cp.target}</label>
                           )}
                           <button className="btn-danger" disabled={busy || !canApprove(cp)} onClick={() => decide(cp, "approve")}>Approve &amp; run</button>
+                          <button className="btn" disabled={busy || !canApprove(cp)} title="resolve + show the exact command without running it" onClick={() => decide(cp, "approve", true)}>Dry run</button>
                           <button className="btn" disabled={busy} onClick={() => decide(cp, "reject")}>Reject</button>
                           {g && (!g.platform_enabled || !g.project_enabled) && (
                             <span className="muted" style={{ fontSize: 11 }}>

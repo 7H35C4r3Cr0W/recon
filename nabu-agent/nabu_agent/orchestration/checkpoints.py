@@ -32,6 +32,7 @@ class CheckpointStatus(StrEnum):
     REJECTED = "rejected"
     EXECUTING = "executing"   # approved + enqueued; the gated action is running
     EXECUTED = "executed"     # the gated action ran (success or tool-nonzero — the run's events carry the outcome)
+    DRY_RUN = "dry-run"       # approved as a rehearsal — the command was resolved + shown, the door was NOT called
     FAILED = "failed"         # execution could not complete (gate re-check failed, bad action, door refused)
     EXPIRED = "expired"
 

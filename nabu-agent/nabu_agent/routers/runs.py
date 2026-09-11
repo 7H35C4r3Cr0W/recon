@@ -137,6 +137,7 @@ class AttackProposalBody(BaseModel):
 class ApproveBody(BaseModel):
     exploit_confirmed: bool = False   # required for kind="exploit"
     credential_ref: str | None = None # required for kind="spray" (if not already on the proposal)
+    dry_run: bool = False             # rehearse: resolve + show the command, but DON'T call the door
 
 
 def _cp_view(cp: Checkpoint) -> dict[str, Any]:
@@ -299,12 +300,16 @@ async def approve_checkpoint(cp_id: str, body: ApproveBody = ApproveBody(),
         cp.approved_at = datetime.now(UTC)
         cp.exploit_confirmed = bool(body.exploit_confirmed) or cp.exploit_confirmed
         cp.credential_ref = cred
+        if body.dry_run:  # mark the rehearsal so the executor resolves + shows but never calls the door
+            cp.requires = {**(cp.requires or {}), "dry_run": True}
         await db.commit()
         await audit.record(actor_user_id=user.id, action=audit.CHECKPOINT_DECIDED, object_type="checkpoint",
                            object_id=cp.id, project_id=run.project_id,
-                           details={"status": "approved", "kind": cp.kind, "target": cp.target})
+                           details={"status": "approved", "kind": cp.kind, "target": cp.target,
+                                    "dry_run": bool(body.dry_run)})
         await _enqueue_execute(cp.id)
-        return {"ok": True, "status": "approved", "checkpoint_id": cp.id, "enqueued": True}
+        return {"ok": True, "status": "approved", "checkpoint_id": cp.id, "enqueued": True,
+                "dry_run": bool(body.dry_run)}
 
     # kind == "hosts": the recon fan-out gate (the driver coroutine is polling for this flip).
     cp.status = "approved"
