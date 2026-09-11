@@ -8,26 +8,41 @@ import { api } from "../api/client";
 
 interface NodeRec { id: string; label: string; kind: string; state: NodeState; parent?: string; }
 
-// The live run view: a BloodHound-style map whose nodes recolour as agents move, beside a live log.
+// The recon lifecycle as a phase stepper. Each engine run-state maps to one visible phase.
+const PHASES = ["Queued", "Scanning", "Enumerating", "Researching", "Reporting", "Done"] as const;
+const STATE_PHASE: Record<string, number> = {
+  queued: 0, validating: 1, alive_check: 1, scanning: 1,
+  fan_out: 2, enriching: 2, executing_approved: 2,
+  researching: 3, synthesizing: 4, report_ready: 4, awaiting_approval: 4,
+  done: 5, partial: 5, failed: 5, cancelled: 5,
+};
+const TERMINAL = new Set(["done", "partial", "failed", "cancelled"]);
+
+// The live run view: a full-screen BloodHound-style map whose nodes recolour + pulse as agents move,
+// with a phase stepper, view controls, and a live log.
 export function RunLive() {
   const { runId } = useParams();
   const [nodes, setNodes] = useState<Record<string, NodeRec>>({});
   const [edges, setEdges] = useState<Record<string, { source: string; target: string; label?: string }>>({});
   const [logs, setLogs] = useState<string[]>([]);
   const [status, setStatus] = useState<string>("connecting…");
-  // a large fan-out parks the run in awaiting_approval — surface the pending checkpoint for a human
+  const [phase, setPhase] = useState<string>("queued");
+  const [layoutName, setLayoutName] = useState<"cose" | "breadthfirst">("cose");
+  const [fitNonce, setFitNonce] = useState(0);
+  const [showLog, setShowLog] = useState(true);
   const [pending, setPending] = useState<{ id: string; message: string } | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
-  const lastSeqRef = useRef(0);  // dedup by seq so a WS reconnect's backlog replay is idempotent
+  const lastSeqRef = useRef(0);
 
   async function decide(action: "approve" | "reject") {
     if (!pending || !runId) return;
-    try {
-      await api(`/runs/${runId}/checkpoints/${pending.id}/${action}`, { method: "POST" });
-      setPending(null);
-    } catch (err) {
-      setLogs((l) => [...l, `[approval] ${action} failed: ${String(err)}`]);
-    }
+    try { await api(`/runs/${runId}/checkpoints/${pending.id}/${action}`, { method: "POST" }); setPending(null); }
+    catch (err) { setLogs((l) => [...l, `[approval] ${action} failed: ${String(err)}`]); }
+  }
+  async function cancelRun() {
+    if (!runId) return;
+    try { await api(`/runs/${runId}/cancel`, { method: "POST" }); setLogs((l) => [...l, "[run] cancel requested"]); }
+    catch (err) { setLogs((l) => [...l, `[run] cancel failed: ${String(err)}`]); }
   }
 
   useEffect(() => {
@@ -38,19 +53,20 @@ export function RunLive() {
   }, [runId]);
 
   function apply(e: RunEvent) {
-    if (typeof e.seq === "number" && e.seq > 0) {   // skip anything already applied (reconnect replay)
+    if (typeof e.seq === "number" && e.seq > 0) {
       if (e.seq <= lastSeqRef.current) return;
       lastSeqRef.current = e.seq;
     }
     const d = e.data || {};
+    if (typeof d.state === "string") setPhase(d.state);
     if (e.type === "log.line") {
       const add: string[] = [];
       if (Array.isArray(d.lines)) add.push(...(d.lines as unknown[]).map(String));
       else if (d.line) add.push(String(d.line));
-      if (d.suppressed) add.push(`\u2026 ${d.suppressed} lines suppressed (rate-limited)`);
+      if (d.suppressed) add.push(`… ${d.suppressed} lines suppressed (rate-limited)`);
       if (add.length) setLogs((l) => [...l, ...add]);
     }
-    if (e.type === "done") { setStatus("done"); setPending(null); }
+    if (e.type === "done") { setStatus("done"); setPending(null); setPhase((p) => (TERMINAL.has(p) ? p : String(d.state || "done"))); }
     if (e.type === "approval.required" && d.checkpoint_id) {
       setStatus("awaiting approval");
       setPending({ id: String(d.checkpoint_id), message: String(d.message || "approval required") });
@@ -59,23 +75,15 @@ export function RunLive() {
     if (nodeId) {
       setNodes((prev) => {
         const cur = prev[nodeId] || { id: nodeId, label: nodeId, kind: "agent", state: "queued" as NodeState };
-        return {
-          ...prev,
-          [nodeId]: {
-            ...cur,
-            label: (d.label as string) || cur.label,
-            kind: (d.kind as string) || cur.kind,
-            state: (d.node_state as NodeState) || cur.state,
-            parent: (d.parent as string) || cur.parent,
-          },
-        };
+        return { ...prev, [nodeId]: {
+          ...cur, label: (d.label as string) || cur.label, kind: (d.kind as string) || cur.kind,
+          state: (d.node_state as NodeState) || cur.state, parent: (d.parent as string) || cur.parent } };
       });
       if (d.parent) {
         const eid = `${d.parent}->${nodeId}`;
         setEdges((prev) => (prev[eid] ? prev : { ...prev, [eid]: { source: d.parent as string, target: nodeId } }));
       }
     }
-    // richer hand-off edges: planner→enum, enum→finding, enum→research, agents→report, …
     if (Array.isArray(d.edges)) {
       setEdges((prev) => {
         const next = { ...prev };
@@ -91,16 +99,14 @@ export function RunLive() {
 
   const elements: ElementDefinition[] = useMemo(() => {
     const els: ElementDefinition[] = [];
-    for (const n of Object.values(nodes))
-      els.push({ data: { id: n.id, label: n.label, kind: n.kind, state: n.state } });
-    for (const [id, e] of Object.entries(edges))
-      els.push({ data: { id, source: e.source, target: e.target, label: e.label || "" } });
+    for (const n of Object.values(nodes)) els.push({ data: { id: n.id, label: n.label, kind: n.kind, state: n.state } });
+    for (const [id, e] of Object.entries(edges)) els.push({ data: { id, source: e.source, target: e.target, label: e.label || "" } });
     return els;
   }, [nodes, edges]);
 
-  const counts = Object.values(nodes).reduce<Record<string, number>>((a, n) => {
-    a[n.state] = (a[n.state] || 0) + 1; return a;
-  }, {});
+  const counts = Object.values(nodes).reduce<Record<string, number>>((a, n) => { a[n.state] = (a[n.state] || 0) + 1; return a; }, {});
+  const phaseIdx = STATE_PHASE[phase] ?? 0;
+  const terminal = TERMINAL.has(phase);
 
   return (
     <div className="live-wrap">
@@ -118,22 +124,54 @@ export function RunLive() {
           </span>
         </span>
       </header>
+
+      {/* phase stepper — the current phase pulses green ("digging") */}
+      <div className="phases">
+        {PHASES.map((p, i) => {
+          const cls = i < phaseIdx || (terminal && i === phaseIdx) ? "done"
+            : i === phaseIdx ? (terminal ? "done" : "active") : "todo";
+          return (
+            <span key={p} className={`ph ${cls}`}>
+              <span className="pnum">{i < phaseIdx || (terminal && i <= phaseIdx) ? "✓" : i + 1}</span>{p}
+            </span>
+          );
+        })}
+        <span className="phase-tag mono">{phase}</span>
+      </div>
+
       {pending && (
         <div role="alert" className="approve-bar">
           <b>⏸ Approval required</b>
           <span style={{ color: "var(--ink-2)" }}>{pending.message}</span>
           <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <button className="btn-approve" onClick={() => decide("approve")}>Approve fan-out</button>
+            <button className="btn-approve" onClick={() => decide("approve")}>Approve</button>
             <button className="btn-reject" onClick={() => decide("reject")}>Reject</button>
           </span>
         </div>
       )}
-      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 400px", gap: 12, padding: 12, minHeight: 0 }}>
-        <RunGraph elements={elements} />
-        <div ref={logRef} className="logpane">
-          <div className="lead">live action log</div>
-          {logs.map((l, i) => <div key={i} className="ln">{l}</div>)}
-        </div>
+
+      {/* controls toolbar for the recon flow view */}
+      <div className="map-controls">
+        <span className="grp">
+          <span className="lbl">layout</span>
+          <button className={`seg ${layoutName === "cose" ? "on" : ""}`} onClick={() => setLayoutName("cose")}>Force (BloodHound)</button>
+          <button className={`seg ${layoutName === "breadthfirst" ? "on" : ""}`} onClick={() => setLayoutName("breadthfirst")}>Hierarchy</button>
+        </span>
+        <button className="seg" onClick={() => setFitNonce((n) => n + 1)}>⤢ Fit</button>
+        <button className="seg" onClick={() => setShowLog((v) => !v)}>{showLog ? "Hide log" : "Show log"}</button>
+        <span style={{ marginLeft: "auto" }} />
+        {!terminal && <button className="seg danger" onClick={cancelRun}>■ Cancel run</button>}
+      </div>
+
+      <div className="map-body" style={{ gridTemplateColumns: showLog ? "1fr 380px" : "1fr" }}>
+        <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} />
+        {showLog && (
+          <div ref={logRef} className="logpane">
+            <div className="lead">live action log</div>
+            {logs.length === 0 ? <div className="ln muted">waiting for the run to start…</div>
+              : logs.map((l, i) => <div key={i} className="ln">{l}</div>)}
+          </div>
+        )}
       </div>
     </div>
   );
