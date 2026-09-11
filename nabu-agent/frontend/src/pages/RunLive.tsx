@@ -36,6 +36,7 @@ export function RunLive() {
   const [phase, setPhase] = useState<string>("queued");
   const [layoutName, setLayoutName] = useState<"cose" | "breadthfirst">("cose");
   const [fitNonce, setFitNonce] = useState(0);
+  const [exportNonce, setExportNonce] = useState(0);
   const [showLog, setShowLog] = useState(true);
   const [search, setSearch] = useState("");
   const [hiddenKinds, setHiddenKinds] = useState<string[]>([]);
@@ -173,6 +174,7 @@ export function RunLive() {
           <button className={`seg ${layoutName === "breadthfirst" ? "on" : ""}`} onClick={() => setLayoutName("breadthfirst")}>Hierarchy</button>
         </span>
         <button className="seg" onClick={() => setFitNonce((n) => n + 1)}>⤢ Fit</button>
+        <button className="seg" onClick={() => setExportNonce((n) => n + 1)}>⬇ PNG</button>
         <input className="input" style={{ maxWidth: 190, padding: "6px 10px", fontSize: 12 }} value={search}
           onChange={(e) => setSearch(e.target.value)} placeholder="search nodes… (dc01 · 445 · svc_)" aria-label="search nodes" />
         <span className="grp">
@@ -189,7 +191,7 @@ export function RunLive() {
 
       <div className="map-body" style={{ gridTemplateColumns: showLog ? "1fr 380px" : "1fr" }}>
         <div style={{ position: "relative", minHeight: 0 }}>
-          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} search={search} hiddenKinds={hiddenKinds} selectedId={selected?.id ?? null} />
+          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} search={search} hiddenKinds={hiddenKinds} selectedId={selected?.id ?? null} exportNonce={exportNonce} />
           {selected && (
             <div className="node-drawer">
               <div className="row" style={{ justifyContent: "space-between" }}>

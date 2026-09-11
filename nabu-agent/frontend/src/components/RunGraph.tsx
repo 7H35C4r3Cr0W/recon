@@ -21,10 +21,10 @@ const ICON: Record<string, string> = {
   agent: glyph("<rect x='5' y='7' width='14' height='11' rx='2'/><path d='M12 7V4M9 12h.01M15 12h.01M9 15h6'/>"),
 };
 
-export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds, selectedId }:
+export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds, selectedId, exportNonce = 0 }:
   { elements: ElementDefinition[]; layoutName?: "cose" | "breadthfirst"; fitNonce?: number;
     onSelect?: (n: { id: string; label: string; kind: string; state: string; hops?: number } | null) => void;
-    search?: string; hiddenKinds?: string[]; selectedId?: string | null }) {
+    search?: string; hiddenKinds?: string[]; selectedId?: string | null; exportNonce?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const layoutTimer = useRef<number | null>(null);
@@ -268,6 +268,23 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // export the current map as a PNG (parity with the desktop graph's export)
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !exportNonce) return;
+    try {
+      const png = cy.png({ output: "blob", full: true, scale: 2, bg: "#070a0e" }) as Blob;
+      const url = URL.createObjectURL(png);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "nabu-recon-map.png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch { /* export unavailable */ }
+  }, [exportNonce]);
 
   // when the selection is cleared externally (drawer ✕), drop the pinned path + re-enable hover-focus
   useEffect(() => {
