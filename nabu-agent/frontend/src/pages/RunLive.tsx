@@ -183,7 +183,7 @@ export function RunLive() {
           ))}
         </span>
         <button className="seg" onClick={() => setShowLog((v) => !v)}>{showLog ? "Hide log" : "Show log"}</button>
-        <span style={{ marginLeft: "auto" }} />
+        <span className="mono muted" style={{ marginLeft: "auto", fontSize: 10.5 }}>shift-click 2 nodes → path · C copies · Esc clears</span>
         {!terminal && <button className="seg danger" onClick={cancelRun}>■ Cancel run</button>}
       </div>
 

@@ -30,6 +30,8 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
   const layoutTimer = useRef<number | null>(null);
   const pulseTimer = useRef<number | null>(null);
   const selectedRef = useRef<string | null>(null);
+  const pathARef = useRef<string | null>(null);   // first endpoint of a shift-click A→B selection
+  const currentPathRef = useRef<string[]>([]);     // node ids of the pinned path (copy-as-text)
 
   const runLayout = (cy: Core) => {
     const opts = layoutName === "breadthfirst"
@@ -79,6 +81,7 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         // click-to-highlight attack path (target root → clicked node): path pops gold, rest dims
         { selector: ".offpath", style: { opacity: 0.1, "text-opacity": 0.1 } as any },
         { selector: "node.onpath", style: { "border-color": "#f2b636", "border-width": 6 } as any },
+        { selector: "node.path-a", style: { "border-color": "#3ad9c0", "border-width": 6 } as any },
         { selector: "edge.onpath", style: { "line-color": "#f2b636", "target-arrow-color": "#f2b636", width: 3.2, opacity: 1 } as any },
         // search highlight + node-type filter
         { selector: ".search-dim", style: { opacity: 0.12, "text-opacity": 0.12 } as any },
@@ -129,6 +132,7 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         cy.edges(":visible").map((ed) => ({ source: ed.source().id(), target: ed.target().id() })),
         root.id(), node.id());
       if (ids.length === 0) return undefined;
+      currentPathRef.current = ids;
       const onPath = new Set(ids);
       const next = pathNext(ids);
       cy.elements().addClass("offpath");
@@ -137,13 +141,45 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         if (next.get(ed.source().id()) === ed.target().id()) ed.removeClass("offpath").addClass("onpath"); });
       return ids.length - 1;
     };
+    // undirected shortest path between two nodes (visible edges), for the shift-click A→B feature
+    const undirectedPath = (aId: string, bId: string): string[] => {
+      const vis = cy.edges(":visible").map((ed) => ({ source: ed.source().id(), target: ed.target().id() }));
+      const both = vis.flatMap((e) => [e, { source: e.target, target: e.source }]);
+      return shortestPath(both, aId, bId);
+    };
+    // highlight an explicit ordered id list; edges match in either direction (relationship, not arrow)
+    const pinPathIds = (ids: string[]) => {
+      cy.elements().removeClass("faded hl onpath offpath path-a");
+      currentPathRef.current = ids;
+      const onPath = new Set(ids);
+      const pair = new Set<string>();
+      for (let i = 0; i < ids.length - 1; i++) { pair.add(ids[i] + "|" + ids[i + 1]); pair.add(ids[i + 1] + "|" + ids[i]); }
+      cy.elements().addClass("offpath");
+      cy.nodes().forEach((n) => { if (onPath.has(n.id())) n.removeClass("offpath").addClass("onpath"); });
+      cy.edges().forEach((ed) => {
+        if (pair.has(ed.source().id() + "|" + ed.target().id())) ed.removeClass("offpath").addClass("onpath"); });
+    };
     cy.on("tap", "node", (e) => {
+      const oe = e.originalEvent as MouseEvent | undefined;
+      if (oe && oe.shiftKey) {
+        // shift-click two nodes → trace the path between them (BloodHound "path A→B")
+        if (!pathARef.current) {
+          pathARef.current = e.target.id();
+          cy.elements().removeClass("faded hl onpath offpath path-a");
+          e.target.addClass("path-a");
+        } else {
+          const ids = undirectedPath(pathARef.current, e.target.id());
+          if (ids.length >= 2) { pinPathIds(ids); selectedRef.current = e.target.id(); }
+          pathARef.current = null;
+        }
+        return;
+      }
       selectedRef.current = e.target.id();
       const hops = pinPath(e.target);
       onSelect?.({ id: e.target.id(), label: e.target.data("label"), kind: e.target.data("kind"), state: e.target.data("state"), hops });
     });
     cy.on("tap", (e) => {
-      if (e.target === cy) { onSelect?.(null); selectedRef.current = null; cy.elements().removeClass("faded hl onpath offpath"); }
+      if (e.target === cy) { onSelect?.(null); selectedRef.current = null; pathARef.current = null; currentPathRef.current = []; cy.elements().removeClass("faded hl onpath offpath path-a"); }
     });
 
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -213,12 +249,20 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
   // Escape clears a pinned attack path / selection
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key !== "Escape") return;
       const cy = cyRef.current;
       if (!cy) return;
-      selectedRef.current = null;
-      cy.elements().removeClass("faded hl onpath offpath");
-      onSelect?.(null);
+      if (ev.key === "Escape") {
+        selectedRef.current = null; pathARef.current = null; currentPathRef.current = [];
+        cy.elements().removeClass("faded hl onpath offpath path-a");
+        onSelect?.(null);
+      } else if ((ev.key === "c" || ev.key === "C") && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+        const tag = (document.activeElement?.tagName || "").toLowerCase();
+        if (tag === "input" || tag === "textarea") return;
+        const ids = currentPathRef.current;
+        if (ids.length < 2) return;
+        const text = ids.map((id) => (cy.getElementById(id).data("label") as string) || id).join(" -> ");
+        void navigator.clipboard?.writeText(text);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -230,8 +274,8 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     const cy = cyRef.current;
     if (!cy) return;
     if (selectedId == null && selectedRef.current != null) {
-      selectedRef.current = null;
-      cy.elements().removeClass("faded hl onpath offpath");
+      selectedRef.current = null; pathARef.current = null; currentPathRef.current = [];
+      cy.elements().removeClass("faded hl onpath offpath path-a");
     }
   }, [selectedId]);
 
