@@ -178,6 +178,14 @@ export function RunLive() {
               <div className="mono muted" style={{ fontSize: 10, marginTop: 6 }}>{selected.id}</div>
             </div>
           )}
+          {/* node-type key — swatch SHAPE mirrors the real node shape (circle/box/diamond/star) so it
+              teaches the map's visual language, not just its colours. Keep in sync with RunGraph. */}
+          <div className="type-legend">
+            {([["target/host", "#74c7ec", "circle"], ["service", "#89b4fa", "circle"], ["agent", "#fab387", "box"],
+               ["finding", "#f9e2af", "diamond"], ["attack", "#f38ba8", "diamond"], ["report", "#cba6f7", "star"]] as [string, string, string][]).map(([l, c, s]) => (
+              <span key={l} className="tl"><span className={`sw ${s}`} style={{ background: c }} />{l}</span>
+            ))}
+          </div>
         </div>
         {showLog && (
           <div ref={logRef} className="logpane">
