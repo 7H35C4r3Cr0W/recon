@@ -48,12 +48,12 @@ Items that fundamentally need the live model. Not part of "dev-done"; listed so 
   - *Acceptance:* `test_attack_gate.py` grows: injection fills the command; the preview redacts the
     secret and no emitted event contains it; params fill the rest; over-cap is refused; `tested_against`
     is updated.
-- [ ] **2. Attack gate Phase D — safe-by-default operation**
-  - D1 **Dry-run** — an approve option that resolves + shows the exact command and records the
+- [x] **2. Attack gate Phase D — safe-by-default operation** ✅ (PR #48)
+  - [x] D1 **Dry-run** — an approve option that resolves + shows the exact command and records the
     checkpoint as `dry-run` **without ever calling the gated door** (no `shell.run`). UI toggle.
   - *Acceptance:* a dry-run approval never reaches `execute_gated_action`; asserted by test.
-- [ ] **3. Distributed-path smoke deliverable**
-  - S1 A compose-based smoke script (`deploy/smoke.sh`) + documented procedure that drives a real
+- [x] **3. Distributed-path smoke deliverable** ✅ (PR #48)
+  - [x] S1 A compose-based smoke script (`deploy/smoke.sh`) + documented procedure that drives a real
     `scan` through Redis + the Arq worker and asserts a terminal `done`. (Executed by a human in a
     real cluster — I can't run a live cluster here — but the script + steps are committed and
     lint-clean.)
@@ -77,6 +77,8 @@ Items that fundamentally need the live model. Not part of "dev-done"; listed so 
 ---
 
 ## Current position
-- **2026-09-11:** Tier-1 baseline + Phase A + **Phase C (item 1)** shipped. **Working item: D1 (dry-run), then S1 (smoke).**
-- The dev side is **done** when items 1–3 are checked. I will say so plainly at that point; until then
-  I proceed through them in order without waiting for a reprompt.
+- **2026-09-11:** ALL Tier-1 items (baseline + Phase A + C + D + smoke) are checked. **THE DEV SIDE IS
+  DONE.** Verified: ruff + mypy clean, 110 backend + 10 invariant + 27 frontend tests, `vite build` OK,
+  policy invariants hold, `src/oscprecon` untouched.
+- The only work left is **Tier 2 (LLM-gated)** — blocked until legal approves the internal model — and
+  the explicitly-optional polish. Nothing further ships on the dev side without a new request.

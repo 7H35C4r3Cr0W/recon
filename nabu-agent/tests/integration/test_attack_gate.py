@@ -227,3 +227,25 @@ async def test_per_run_attack_cap(client, monkeypatch, tmp_path):
     second = await client.post(f"/api/runs/{run_id}/attack-proposals",
                                json={"kind": "exploit", "target": target, "service": "smb", "action_id": "smb-cme-exec"})
     assert second.status_code == 409 and "cap reached" in second.json()["detail"]
+
+
+async def test_dry_run_shows_command_without_calling_the_door(client, monkeypatch, tmp_path):
+    door: list = []
+    _install(monkeypatch, door, template="crackmapexec smb {target} -u {user} -p {password} -x whoami")
+    from nabu_agent.settings import get_settings
+    monkeypatch.setattr(get_settings(), "exploit_enabled", True)
+    pid, run_id, target = await _seed(client, monkeypatch, tmp_path)
+    await client.patch(f"/api/projects/{pid}/settings", json={"exploit_enabled": True})
+    cid = await _add_cred(client, pid, username="admin", secret="hunter2super")
+    cp_id = (await client.post(f"/api/runs/{run_id}/attack-proposals",
+             json={"kind": "exploit", "target": target, "service": "smb",
+                   "action_id": "smb-cme-exec", "credential_ref": cid})).json()["checkpoint_id"]
+
+    ok = await client.post(f"/api/runs/{run_id}/checkpoints/{cp_id}/approve",
+                           json={"exploit_confirmed": True, "dry_run": True})
+    assert ok.status_code == 200 and ok.json()["dry_run"] is True
+    cp = await _poll_status(client, run_id, cp_id, "dry-run")
+    assert cp is not None, "dry-run checkpoint never settled"
+    assert door == []                                     # the gated door was NEVER called
+    events = (await client.get(f"/api/runs/{run_id}/events")).json()["events"]
+    assert "would run" in str(events) and "hunter2super" not in str(events)   # shown (redacted), not run

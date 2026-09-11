@@ -863,6 +863,7 @@ async def execute_approved_action(checkpoint_id: str) -> str:
         requires = cp.requires or {}
         service = requires.get("service", "")
         params = requires.get("params") or {}
+        dry_run = bool(requires.get("dry_run"))
         credential_ref = cp.credential_ref
         run_id = cp.run_id
         project_id = run.project_id if run else None
@@ -920,6 +921,21 @@ async def execute_approved_action(checkpoint_id: str) -> str:
         redacted = await asyncio.to_thread(
             _resolve_gated_command, profile, service, action_id, params=params,
             credential=credential, redact_secret=True)
+
+        if dry_run:
+            # rehearsal: show exactly what WOULD run; never touch the gated door.
+            await pump.flush()
+            await publish(RunEventType.LOG_LINE, {"lines":
+                [f"[{kind}] DRY RUN approved by {approved_by}; would run: {redacted} (not executed)"]})
+            await publish(RunEventType.TASK_UPDATED, {"node_id": node, "node_state": NodeState.DONE.value,
+                          "attack": True, "dry_run": True})
+            await _record_attack_summary(run_id, {"checkpoint_id": checkpoint_id, "kind": kind,
+                                         "target": target, "action_id": action_id, "outcome": "dry-run"})
+            await _set_checkpoint_status(checkpoint_id, "dry-run")
+            await _try_set_state(run_id, "report_ready")
+            outcome = "dry-run"
+            return f"{checkpoint_id}:dry-run"
+
         await publish(RunEventType.LOG_LINE, {"lines":
             [f"[{kind}] approved by {approved_by}; scope re-checked; running: {redacted}"]})
 

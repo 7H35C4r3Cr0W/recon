@@ -72,6 +72,15 @@ Then open `https://<host>:8443/`, sign in as `NABU_ADMIN_EMAIL`, and confirm the
 Smoke-test recon without the LLM: create a project → add an in-scope target → **Start run → scan** →
 watch the live map recolour → open **Report & outputs**.
 
+Or drive that whole path end to end (exercising the Redis + Arq worker fan-out) with the scripted
+smoke test — point it at an **in-scope** target on your authorized network:
+
+```bash
+BASE=https://<host>:8443 TARGET=<in-scope-ip> ADMIN_PASSWORD=<pw> ./deploy/smoke.sh
+# waits for readiness → logs in → project + scope → starts a scan → polls to done/partial
+# exit 0 = the distributed scan path is healthy; non-zero = failed/timeout (then: docker compose logs worker)
+```
+
 ## 5. Attach the LLM ("brain")
 
 Sign in as an admin → **LLM setup** (sidebar, Admin). It shows the 3 env vars to set on the api +
