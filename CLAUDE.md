@@ -1073,7 +1073,10 @@ Alternate visual interface to the tree view. Toggle: `View → Graph` (Ctrl+G).
 
 ### Interactions
 
-- **Click node** → right pane detail
+- **Click node** → right pane detail **+ pins the attack path** from the entry (target root) to the
+  node in gold, dimming the rest (BloodHound "shortest path", over the visible graph). **BUILT.**
+- **Shift-click two nodes** → traces the undirected shortest path **between** them; **C** copies a
+  pinned path as text; **Esc** / a blank click clears. **BUILT** (`app.js` `pathBetween` / `pinPathIds`).
 - **Double-click service** → drill into artifacts as children
 - **Right-click** → **BUILT.** A native, themed Qt menu (built in `GraphView.build_node_menu`, never
   in JS) carrying every action the node supports: the four status marks (current one ticked, click it
@@ -1083,13 +1086,17 @@ Alternate visual interface to the tree view. Toggle: `View → Graph` (Ctrl+G).
   own menu is suppressed (`NoContextMenu` + a `contextmenu` preventDefault). A read-only profile gets
   a read-only notice instead of the status/note entries. The same menu is on the summary-tree rows
 - **Drag edge between two nodes** → creates `relates-to` user edge
-- **Status badges** (`new` / `investigating` / `done` / `dead-end`) affect color saturation
+- **Status badges** (`new` / `investigating` / `done` / `dead-end` / `owned` / `high-value`) — the last
+  two are BloodHound-style marks (crown / star corner glyphs); all affect the ring + a corner badge
 - **Filter sidebar** — toggle node types, filter by status / tag / port / proto
 - **Layout** — hierarchical (default) + force-directed toggle
+- **Regions** — **BUILT.** Milanote-style: click **Region**, drag to box off an area of the map, then
+  title / note / colour it. Persisted to `graph.json` (a `save_regions` bridge slot; `get_data` serves
+  them back) and re-rendered glued to the camera on every open.
 
 ### Persistence
 
-`<profile>/graph.json` — user-drawn edges, node positions, per-node status/notes.
+`<profile>/graph.json` — user-drawn edges, node positions, per-node status/notes, **and map regions**.
 
 ### Presentation & export — BUILT (Phase 4 reinforcements)
 
