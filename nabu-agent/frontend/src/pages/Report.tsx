@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
+import { AttackGate } from "./AttackGate";
 
 interface Finding {
   value?: string; kind?: string; port?: number | string;
@@ -149,6 +150,13 @@ export function Report() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {!loading && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <h3>⚔ Attack actions <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>— human-gated</span></h3>
+          <AttackGate projectId={projectId!} />
         </div>
       )}
 

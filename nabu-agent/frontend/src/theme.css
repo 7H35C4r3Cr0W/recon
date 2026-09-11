@@ -171,3 +171,41 @@ kbd{font-family:var(--mono);background:var(--sunk);border:1px solid var(--line-2
   50%{ box-shadow:0 0 0 6px transparent; } }
 .pulse{ animation:nabu-pulse 1.9s ease-in-out infinite; }
 @media (prefers-reduced-motion:reduce){ .pulse{ animation:none; } }
+
+/* ============================================================ *
+ *  Attack gate — human-gated spray/exploit (danger-styled)
+ * ============================================================ */
+.atk-note{ font-size:12px; color:var(--ink-2); margin:2px 0 10px; }
+.atk-run{ font-family:var(--mono); font-size:11px; color:var(--muted); }
+.atk-sub{ font:600 11px/1 var(--mono); letter-spacing:.13em; text-transform:uppercase; color:var(--muted);
+  margin:16px 0 8px; display:flex; align-items:center; gap:8px; }
+.atk-grid{ display:flex; flex-direction:column; gap:9px; }
+.atk-row{ border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:var(--panel);
+  display:flex; flex-direction:column; gap:8px; }
+.atk-row.danger{ border-color:color-mix(in srgb,var(--red) 42%,var(--line));
+  background:linear-gradient(180deg,#160e10,var(--panel)); }
+.atk-top{ display:flex; align-items:center; gap:9px; justify-content:space-between; flex-wrap:wrap; }
+.atk-title{ font-size:12.5px; color:var(--ink); font-weight:600; }
+.atk-kind{ font:600 10px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase; padding:3px 7px; border-radius:5px; }
+.atk-kind.exploit{ color:var(--red); border:1px solid color-mix(in srgb,var(--red) 55%,var(--line)); }
+.atk-kind.spray{ color:var(--gold); border:1px solid color-mix(in srgb,var(--gold) 55%,var(--line)); }
+.atk-cmd{ font-family:var(--mono); font-size:11.5px; color:var(--accent); background:var(--sunk);
+  border:1px solid var(--line); border-radius:8px; padding:8px 10px; overflow-x:auto; white-space:pre;
+  box-shadow:inset 0 0 12px rgba(0,0,0,.5); }
+.atk-gatebar{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; font-family:var(--mono); font-size:11px; }
+.atk-gatebar .g{ display:inline-flex; align-items:center; gap:6px; color:var(--muted); }
+.atk-gatebar .lamp{ width:8px; height:8px; border-radius:50%; background:var(--muted); flex:0 0 auto; }
+.atk-gatebar .g.on .lamp{ background:var(--accent-2); box-shadow:0 0 8px color-mix(in srgb,var(--accent-2) 60%,transparent); }
+.atk-gatebar .g.off .lamp{ background:var(--red); }
+.atk-controls{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.atk-controls label{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-2); }
+.btn-danger{ background:linear-gradient(180deg,#c0392b,#9e271b); color:#fff;
+  border:1px solid #d0503f; border-radius:8px; padding:6px 13px; font:600 12px/1 var(--sans); cursor:pointer; }
+.btn-danger:hover:not(:disabled){ box-shadow:0 0 14px color-mix(in srgb,var(--red) 45%,transparent); }
+.btn-danger:disabled{ opacity:.42; cursor:not-allowed; }
+.atk-status{ font:600 10px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; padding:3px 9px;
+  border-radius:999px; border:1px solid var(--line); }
+.atk-status.proposed{ color:var(--gold); border-color:color-mix(in srgb,var(--gold) 50%,var(--line)); }
+.atk-status.executing{ color:var(--accent-2); border-color:color-mix(in srgb,var(--accent-2) 50%,var(--line)); }
+.atk-status.executed{ color:var(--accent); border-color:color-mix(in srgb,var(--accent) 50%,var(--line)); }
+.atk-status.failed,.atk-status.rejected,.atk-status.expired{ color:var(--red); border-color:color-mix(in srgb,var(--red) 50%,var(--line)); }

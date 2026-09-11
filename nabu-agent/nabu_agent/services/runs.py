@@ -122,6 +122,12 @@ async def _emit(run_id: str, type_: RunEventType, data: dict[str, Any]) -> None:
         await bus.publish_event(run_id, ev.to_json())
 
 
+async def emit_event(run_id: str, type_: RunEventType, data: dict[str, Any]) -> None:
+    """Public wrapper so routers can append one seq-ordered event to a run's live stream (e.g. an
+    attack proposal's approval banner + map node)."""
+    await _emit(run_id, type_, data)
+
+
 async def _touch_heartbeat(run_id: str) -> None:
     """Stamp the run's heartbeat so the reaper knows the worker is alive. Best-effort."""
     from sqlalchemy import update
@@ -714,3 +720,182 @@ def launch(run_id: str, target: str, kind: str = "demo", *, project_id: str | No
     task.add_done_callback(_RUNNING.discard)
 
 
+
+
+# --- Phase A: human-gated spray/exploit EXECUTION -----------------------------------------------
+# A proposed spray/exploit becomes a Checkpoint; a human approves it (double gate: platform switch +
+# per-project toggle + operator approval, plus exploit_confirmed / a chosen credential). Approval
+# ENQUEUES this job (no live driver coroutine is holding — the recon run may already be terminal).
+# It re-verifies everything and hands the action to the ONE gated door. The checkpoint stores only
+# which action (service + action_id), NEVER a command string — the command is re-derived here from
+# the catalog, so a forged/edited command can't reach the executor.
+
+def _resolve_gated_command(profile: Any, service: str, action_id: str) -> str:
+    """Re-derive the exact shell line for an approved checkpoint FROM THE CATALOG, server-side.
+
+    Rebuilds the ranking evidence from the profile's own discovered state, looks the action up by
+    id, and returns its pre-filled command ONLY if it is attacker-runnable and fully filled.
+    Anything else raises ``ValueError`` (the gate stays closed)."""
+    from nabu_agent.agents.tools.dispatch import _evidence_from_profile
+    from nabu_agent.engine import tools as etools
+
+    evidence = _evidence_from_profile(profile)
+    catalog = etools.catalog_actions_for(service, evidence)
+    for a in catalog.get("actions", []):
+        if a["id"] != action_id:
+            continue
+        if not a.get("executable"):
+            raise ValueError(f"action {action_id!r} is not attacker-runnable")
+        if a.get("unfilled"):
+            raise ValueError(f"action {action_id!r} has unresolved placeholders: {a['unfilled']}")
+        cmd = (a.get("command") or "").strip()
+        if not cmd:
+            raise ValueError(f"action {action_id!r} produced an empty command")
+        return cmd
+    raise ValueError(f"action {action_id!r} not found in the {service!r} catalog")
+
+
+async def _try_set_state(run_id: str, dst: str) -> None:
+    """Best-effort run-state transition, guarded by the state machine. A terminal run (e.g. a
+    finished recon run the operator is attacking after the fact) is left as-is — the checkpoint and
+    the attack map node carry the attack's own lifecycle."""
+    from nabu_agent.orchestration.states import RunState, can_transition
+    async with sessionmaker()() as db:
+        run = (await db.execute(select(Run).where(Run.id == run_id))).scalar_one_or_none()
+        if not run:
+            return
+        try:
+            src, target_state = RunState(run.state), RunState(dst)
+        except ValueError:
+            return
+        if can_transition(src, target_state):
+            run.state = dst
+            await db.commit()
+
+
+async def _set_checkpoint_status(cp_id: str, status: str) -> None:
+    from nabu_agent.db.models import Checkpoint
+    async with sessionmaker()() as db:
+        cp = (await db.execute(select(Checkpoint).where(Checkpoint.id == cp_id))).scalar_one_or_none()
+        if cp:
+            cp.status = status
+            await db.commit()
+
+
+async def execute_approved_action(checkpoint_id: str) -> str:
+    """Execute ONE human-approved spray/exploit checkpoint through the single gated door (Phase A of
+    the attack gate — human-driven, no LLM). Never raises: a gate/derive/door failure marks the
+    checkpoint FAILED and paints a red attack node. Returns ``"<cp_id>:<outcome>"``."""
+    from types import SimpleNamespace
+
+    from nabu_agent.db.models import Checkpoint, Project
+    from nabu_agent.engine import shell_gateway as sg
+    from nabu_agent.engine.errors import AttackGateClosed
+    from nabu_agent.engine.workspace import workspace_for
+    from nabu_agent.orchestration.limits import RunLimits
+    from nabu_agent.settings import get_settings
+
+    async with sessionmaker()() as db:
+        cp = (await db.execute(select(Checkpoint).where(Checkpoint.id == checkpoint_id))).scalar_one_or_none()
+        if cp is None:
+            return f"{checkpoint_id}:missing"
+        run = (await db.execute(select(Run).where(Run.id == cp.run_id))).scalar_one_or_none()
+        project = None
+        if run is not None:
+            project = (await db.execute(
+                select(Project).where(Project.id == run.project_id))).scalar_one_or_none()
+        kind, target, action_id = cp.kind, cp.target, cp.action_id
+        status, approved_by = cp.status, cp.approved_by
+        exploit_confirmed = bool(cp.exploit_confirmed)
+        service = (cp.requires or {}).get("service", "")
+        run_id = cp.run_id
+        project_id = run.project_id if run else None
+        spray_gate = bool(project.spray_enabled) if project else False
+        exploit_gate = bool(project.exploit_enabled) if project else False
+
+    # Re-verify the approval + linkage (never trust the enqueuer).
+    if status != "approved" or not approved_by:
+        return f"{checkpoint_id}:not-approved"
+    if kind not in ("spray", "exploit"):
+        return f"{checkpoint_id}:bad-kind"
+    if run is None or project is None or not project_id:
+        await _set_checkpoint_status(checkpoint_id, "failed")
+        return f"{checkpoint_id}:orphan"
+
+    node = f"attack-{checkpoint_id}"
+
+    async def publish(type_: RunEventType, data: dict[str, Any]) -> None:
+        await _emit(run_id, type_, data)
+
+    cancel_event = threading.Event()
+    ending = threading.Event()
+    watcher = asyncio.create_task(_make_cancel_watcher(run_id, cancel_event)())
+    pump = LogPump(run_id, publish)
+    pump_task = asyncio.create_task(pump.drain())
+    hb = asyncio.create_task(_heartbeat_loop(run_id, ending))
+    await _touch_heartbeat(run_id)
+
+    await _set_checkpoint_status(checkpoint_id, "executing")
+    await _try_set_state(run_id, "executing_approved")
+    await publish(RunEventType.TASK_CREATED, {"node_id": node, "node_state": NodeState.ACTIVE.value,
+                  "label": f"{kind}: {action_id}", "attack": True, "kind": kind, "target": target})
+
+    outcome = "executed"
+    try:
+        s = get_settings()
+        platform_gate = s.spray_enabled if kind == "spray" else s.exploit_enabled
+        project_gate = spray_gate if kind == "spray" else exploit_gate
+        if not platform_gate:
+            raise AttackGateClosed(f"{kind} is disabled platform-wide (set NABU_{kind.upper()}_ENABLED)")
+        if not project_gate:
+            raise AttackGateClosed(f"{kind} is not enabled for this project")
+
+        # Open the target's OWN profile + RE-DERIVE the command from the catalog (never stored).
+        profile = await asyncio.to_thread(workspace_for(project_id, target).open)
+        shell_line = await asyncio.to_thread(_resolve_gated_command, profile, service, action_id)
+        await publish(RunEventType.LOG_LINE, {"lines":
+            [f"[{kind}] approved by {approved_by}; command re-derived from the catalog; scope re-checked"]})
+
+        # The ONE gated door: it independently re-verifies the approval, re-validates scope, and is
+        # the sole place spray=/exploit=True is set.
+        cp_like = SimpleNamespace(status="approved", approved_by=approved_by, kind=kind,
+                                  target=target, exploit_confirmed=exploit_confirmed)
+        out_file = profile.directory / f"attack-{checkpoint_id}.log"
+        result = await asyncio.to_thread(
+            sg.execute_gated_action, cp_like, profile, shell_line, out_file,
+            on_line=pump.feed, cancel=cancel_event, timeout=float(RunLimits().host_job_timeout_s))
+
+        blocked = bool(result.get("blocked"))
+        exit_code = result.get("exit_code")
+        outcome = "blocked" if blocked else "executed"
+        node_state = NodeState.ERROR if blocked else NodeState.DONE
+        await pump.flush()
+        await publish(RunEventType.TASK_UPDATED, {"node_id": node, "node_state": node_state.value,
+                      "attack": True, "exit_code": exit_code, "blocked": blocked})
+        await publish(RunEventType.LOG_LINE, {"lines": [f"[{kind}] finished: exit={exit_code} blocked={blocked}"]})
+        await _set_checkpoint_status(checkpoint_id, "executed")
+        await _try_set_state(run_id, "report_ready")
+    except Exception as exc:  # noqa: BLE001 - a gate/derive/door failure must fail the action safely, not crash the worker
+        outcome = "failed"
+        with contextlib.suppress(Exception):
+            await pump.flush()
+        await publish(RunEventType.ERROR, {"node_id": node, "node_state": NodeState.ERROR.value,
+                      "attack": True, "message": f"{kind} gate closed: {exc}"})
+        await _set_checkpoint_status(checkpoint_id, "failed")
+        await _try_set_state(run_id, "partial")
+        _log.warning("attack-execute-failed", checkpoint_id=checkpoint_id, kind=kind, exc_info=True)
+    finally:
+        ending.set()
+        cancel_event.set()
+        watcher.cancel()
+        pump.stop()
+        pump_task.cancel()
+        with contextlib.suppress(Exception):
+            await hb
+
+    with contextlib.suppress(Exception):  # app-level audit (the gated shell is engine-audited in the door)
+        from nabu_agent import audit as app_audit
+        await app_audit.record(actor_user_id=approved_by, action=app_audit.ATTACK_EXECUTED,
+                               object_type="checkpoint", object_id=checkpoint_id, project_id=project_id,
+                               details={"kind": kind, "target": target, "action_id": action_id, "outcome": outcome})
+    return f"{checkpoint_id}:{outcome}"
