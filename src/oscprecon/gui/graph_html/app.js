@@ -256,6 +256,10 @@
       style: { "border-width": 6, "border-color": "#f9e2af", "background-blacken": -0.15 },
     },
     { selector: ".search-dim", style: { opacity: 0.12 } },
+    // BloodHound-style hover focus: hovering a node dims everything outside its neighbourhood
+    // and lights the connecting edges.
+    { selector: ".hover-dim", style: { opacity: 0.12 } },
+    { selector: "edge.hover-hl", style: { "line-color": "#94e2d5", "target-arrow-color": "#94e2d5", width: 2.6, opacity: 1 } },
     {
       selector: "edge",
       style: {
@@ -944,8 +948,16 @@
     cy.on("pan zoom resize", updateViewportRect);
     cy.on("mouseover", "node", function (evt) {
       showTip(evt.target);
+      // highlight the hovered node's neighbourhood, dim the rest (BloodHound's signature focus)
+      var nb = evt.target.closedNeighborhood();
+      cy.elements().addClass("hover-dim");
+      nb.removeClass("hover-dim");
+      nb.edges().addClass("hover-hl");
     });
-    cy.on("mouseout", "node", hideTip);
+    cy.on("mouseout", "node", function () {
+      hideTip();
+      cy.elements().removeClass("hover-dim hover-hl");
+    });
     cy.on("pan zoom drag", hideTip);
 
     document.getElementById("zoom-in").onclick = function () {
