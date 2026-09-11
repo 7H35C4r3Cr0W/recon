@@ -21,6 +21,19 @@ const ICON: Record<string, string> = {
   agent: glyph("<rect x='5' y='7' width='14' height='11' rx='2'/><path d='M12 7V4M9 12h.01M15 12h.01M9 15h6'/>"),
 };
 
+// copy text to the clipboard, with an execCommand fallback for non-secure contexts
+function fallbackCopy(text: string) {
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+  } catch { /* clipboard unavailable */ }
+}
+function copyToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  else fallbackCopy(text);
+}
+
 export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds, selectedId, exportNonce = 0, notedIds, onCy }:
   { elements: ElementDefinition[]; layoutName?: "cose" | "breadthfirst"; fitNonce?: number;
     onSelect?: (n: { id: string; label: string; kind: string; state: string; hops?: number } | null) => void;
@@ -173,7 +186,12 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
           e.target.addClass("path-a");
         } else {
           const ids = undirectedPath(pathARef.current, e.target.id());
-          if (ids.length >= 2) { pinPathIds(ids); selectedRef.current = e.target.id(); }
+          if (ids.length >= 2) {
+            pinPathIds(ids);
+            selectedRef.current = e.target.id();
+            // keep the drawer/selectedId in sync with the pinned endpoint
+            onSelect?.({ id: e.target.id(), label: e.target.data("label"), kind: e.target.data("kind"), state: e.target.data("state") });
+          }
           pathARef.current = null;
         }
         return;
@@ -266,7 +284,7 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         const ids = currentPathRef.current;
         if (ids.length < 2) return;
         const text = ids.map((id) => (cy.getElementById(id).data("label") as string) || id).join(" -> ");
-        void navigator.clipboard?.writeText(text);
+        copyToClipboard(text);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -287,7 +305,8 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     const cy = cyRef.current;
     if (!cy || !exportNonce) return;
     try {
-      const png = cy.png({ output: "blob", full: true, scale: 2, bg: "#070a0e" }) as Blob;
+      const bg = getComputedStyle(document.documentElement).getPropertyValue("--sunk").trim() || "#070a0e";
+      const png = cy.png({ output: "blob", full: true, scale: 2, bg }) as Blob;
       const url = URL.createObjectURL(png);
       const a = document.createElement("a");
       a.href = url;
