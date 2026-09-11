@@ -62,7 +62,10 @@ Items that fundamentally need the live model. Not part of "dev-done"; listed so 
 
 ### Optional — explicitly NOT required for dev-done (won't block "done")
 - [x] Attack rate-limiting (per-project cooldown) + four-eyes (second approver) for exploit ✅ (PR #49)
-- [ ] Throughput micro-opts (coalesce `_emit` commits, debounce Cytoscape relayout, WS replay paging)
+- [~] Throughput: **Cytoscape relayout is debounced** ✅ (PR #50). The other two — coalescing `_emit`
+      DB commits and WS-replay paging — are **deliberately de-scoped**: they touch the seq-ordered
+      event pipeline the live-tail dedup depends on, so they carry real correctness risk and there's
+      no measured bottleneck to justify it. Revisit only if a load test shows one.
 
 *(Optional items are done only on explicit request; they do not gate the "done" call.)*
 

@@ -569,3 +569,18 @@ automated; an attack runs only when a human approves a specific action behind th
     cooldown 429). Gate: ruff+mypy clean; 112 backend + 10 invariant + 27 frontend; vite build OK.
 - These were the OPTIONAL items in the DoD; the required Tier-1 set was already done (#47/#48). Remaining
   = Tier 2 (LLM-gated) + the throughput micro-opts (still optional).
+
+---
+
+## 2026-09-11 (cont.) — live-map relayout debounced (PR #50)
+
+- `components/RunGraph.tsx`: the breadthfirst layout used to re-run on EVERY event (a wide fan-out →
+  dozens of relayouts/sec → jank). Element upserts stay immediate (nodes/colours appear at once); the
+  expensive relayout is now **debounced 150ms** so a burst settles into one layout. Timer cleared on
+  unmount. Gate: tsc clean, 27 frontend tests, vite build OK.
+- The other throughput ideas (batching `_emit` DB commits, WS-replay paging) are **deliberately
+  de-scoped** — they touch the seq-ordered event pipeline the WS live-tail dedup relies on, so the
+  correctness risk isn't justified without a measured bottleneck. Recorded in DEFINITION_OF_DONE.md.
+- With this, the buildable dev surface is genuinely exhausted: required Tier-1 done (#47/#48), both
+  optional attack-hardening + the safe throughput opt done (#49/#50). Everything remaining is Tier 2
+  (LLM-gated) — blocked until the model is attached.

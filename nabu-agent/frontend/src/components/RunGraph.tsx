@@ -6,6 +6,7 @@ import { NODE_COLORS } from "../lib/nodeColors";
 export function RunGraph({ elements }: { elements: ElementDefinition[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
+  const layoutTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -91,10 +92,15 @@ export function RunGraph({ elements }: { elements: ElementDefinition[] }) {
       wheelSensitivity: 0.3,
     });
     cyRef.current = cy;
-    return () => cy.destroy();
+    return () => {
+      if (layoutTimer.current !== null) clearTimeout(layoutTimer.current);
+      cy.destroy();
+    };
   }, []);
 
-  // live update: upsert elements into the existing graph + re-run layout
+  // live update: upsert elements immediately (nodes/colours appear at once), but DEBOUNCE the
+  // expensive breadthfirst relayout so a burst of events lays out once after it settles, not once
+  // per event (a wide fan-out used to relayout dozens of times a second → jank).
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -106,7 +112,11 @@ export function RunGraph({ elements }: { elements: ElementDefinition[] }) {
         else cy.add(el);
       }
     });
-    cy.layout({ name: "breadthfirst", directed: true, spacingFactor: 1.25, padding: 20 }).run();
+    if (layoutTimer.current !== null) clearTimeout(layoutTimer.current);
+    layoutTimer.current = window.setTimeout(() => {
+      cy.layout({ name: "breadthfirst", directed: true, spacingFactor: 1.25, padding: 20 }).run();
+      layoutTimer.current = null;
+    }, 150);
   }, [elements]);
 
   return <div ref={ref} style={{
