@@ -177,7 +177,7 @@ export function RunLive() {
 
       <div className="map-body" style={{ gridTemplateColumns: showLog ? "1fr 380px" : "1fr" }}>
         <div style={{ position: "relative", minHeight: 0 }}>
-          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} search={search} hiddenKinds={hiddenKinds} />
+          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} search={search} hiddenKinds={hiddenKinds} selectedId={selected?.id ?? null} />
           {selected && (
             <div className="node-drawer">
               <div className="row" style={{ justifyContent: "space-between" }}>

@@ -21,10 +21,10 @@ const ICON: Record<string, string> = {
   agent: glyph("<rect x='5' y='7' width='14' height='11' rx='2'/><path d='M12 7V4M9 12h.01M15 12h.01M9 15h6'/>"),
 };
 
-export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds }:
+export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds, selectedId }:
   { elements: ElementDefinition[]; layoutName?: "cose" | "breadthfirst"; fitNonce?: number;
     onSelect?: (n: { id: string; label: string; kind: string; state: string; hops?: number } | null) => void;
-    search?: string; hiddenKinds?: string[] }) {
+    search?: string; hiddenKinds?: string[]; selectedId?: string | null }) {
   const ref = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const layoutTimer = useRef<number | null>(null);
@@ -125,7 +125,8 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         const k = n.data("kind") as string; return k === "run" || k === "target"; }).first();
       if (root.empty()) return undefined;
       const ids = shortestPath(
-        cy.edges().map((ed) => ({ source: ed.source().id(), target: ed.target().id() })),
+        // visible edges only, so a path never routes through type-filtered (hidden) nodes/edges
+        cy.edges(":visible").map((ed) => ({ source: ed.source().id(), target: ed.target().id() })),
         root.id(), node.id());
       if (ids.length === 0) return undefined;
       const onPath = new Set(ids);
@@ -193,7 +194,7 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     cy.nodes().removeClass("search-hit search-dim");
     if (!q) return;
     cy.nodes().forEach((n) => {
-      const hay = `${n.data("label")} ${n.data("kind")}`.toLowerCase();
+      const hay = `${n.data("label") ?? ""} ${n.data("kind") ?? ""}`.toLowerCase();
       n.addClass(hay.includes(q) ? "search-hit" : "search-dim");
     });
   }, [search, elements]);
@@ -223,6 +224,16 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // when the selection is cleared externally (drawer ✕), drop the pinned path + re-enable hover-focus
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    if (selectedId == null && selectedRef.current != null) {
+      selectedRef.current = null;
+      cy.elements().removeClass("faded hl onpath offpath");
+    }
+  }, [selectedId]);
 
   return <div ref={ref} style={{
     width: "100%", height: "100%", borderRadius: 11, border: "1px solid var(--line)",
