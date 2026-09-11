@@ -656,6 +656,10 @@
   function clearTrace() {
     traceId = null;
     if (cy) cy.elements().removeClass("trace-dim trace-hl hover-dim hover-hl");
+    if (!linkMode) {
+      var h = document.getElementById("hint");
+      if (h) h.textContent = DEFAULT_HINT;
+    }
   }
 
   function pinTrace(node) {
@@ -666,6 +670,13 @@
     var ids = traceShortestPath(root.id(), node.id());
     if (!ids.length) { traceId = null; return; } // unreachable over visible edges: just select it
     traceId = node.id();
+    var hops = ids.length - 1;
+    var hintEl = document.getElementById("hint");
+    if (hintEl) {
+      hintEl.textContent =
+        "attack path: " + hops + " hop" + (hops === 1 ? "" : "s") +
+        " from the entry · Esc or click empty space to clear";
+    }
     var onNode = {}, nextOf = {};
     for (var i = 0; i < ids.length; i++) {
       onNode[ids[i]] = true;
