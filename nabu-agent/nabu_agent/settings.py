@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     spray_enabled: bool = False
     exploit_enabled: bool = False               # never wired to an agent path regardless
     autonomy: Autonomy = Autonomy.RECON_ONLY
+    # Attack-path hardening (optional; off by default).
+    require_two_approvers: bool = False          # four-eyes: exploit approval needs TWO distinct humans
+    attack_min_interval_s: int = 0               # cooldown (s) between gated executions per project (0=off)
 
     # When True, runs execute on the Arq worker pool (production/docker); when False they run
     # in-process in the api (dev/tests). docker-compose sets NABU_USE_ARQ=true.

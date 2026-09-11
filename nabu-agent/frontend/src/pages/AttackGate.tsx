@@ -9,7 +9,7 @@ import { api } from "../api/client";
 interface Action { id: string; title: string; category: string; command: string; unfilled: string[]; tool: string; runs_on: string; executable: boolean; }
 interface ServiceCat { service: string; label: string; actions: Action[]; }
 interface Cred { id: string; username: string; secret_type: string; domain: string; }
-interface Gate { platform_enabled: boolean; project_enabled: boolean; needs_exploit_confirm: boolean; needs_credential: boolean; }
+interface Gate { platform_enabled: boolean; project_enabled: boolean; needs_exploit_confirm: boolean; needs_credential: boolean; two_person?: boolean; first_approver?: string | null; }
 interface Checkpoint {
   id: string; kind: string; status: string; target: string; action_id: string;
   service?: string; command?: string | null; credential_ref?: string | null; gate?: Gate;
@@ -131,6 +131,12 @@ export function AttackGate({ projectId }: { projectId: string }) {
                           <span className={`g ${g.platform_enabled ? "on" : "off"}`}><span className="lamp" />platform {g.platform_enabled ? "on" : "off"}</span>
                           <span className={`g ${g.project_enabled ? "on" : "off"}`}><span className="lamp" />project {g.project_enabled ? "on" : "off"}</span>
                         </div>
+                      )}
+                      {proposed && g?.two_person && (
+                        <p className="atk-run" style={{ margin: 0 }}>
+                          {g.first_approver ? "✓ approved by 1 — a different second approver must confirm (four-eyes)"
+                                            : "four-eyes: needs two distinct approvers"}
+                        </p>
                       )}
                       {proposed && (
                         <div className="atk-controls">

@@ -205,7 +205,9 @@ async def list_checkpoints(db: AsyncSession = Depends(get_db),
             proj = bool(project and (project.spray_enabled if c.kind == "spray" else project.exploit_enabled))
             v["gate"] = {"platform_enabled": platform, "project_enabled": proj,
                          "needs_exploit_confirm": c.kind == "exploit",
-                         "needs_credential": c.kind == "spray"}
+                         "needs_credential": c.kind == "spray",
+                         "two_person": bool(s.require_two_approvers and c.kind == "exploit"),
+                         "first_approver": (c.requires or {}).get("first_approver")}
         views.append(v)
     return {"checkpoints": views}
 
@@ -295,18 +297,50 @@ async def approve_checkpoint(cp_id: str, body: ApproveBody = ApproveBody(),
         cred = body.credential_ref or cp.credential_ref
         if cp.kind == "spray" and not cred:
             raise HTTPException(status_code=422, detail="spray requires a credential_ref")
+        req = dict(cp.requires or {})
+
+        # four-eyes (optional, platform-wide): a REAL exploit needs TWO distinct approvers. A dry-run
+        # rehearsal is exempt (nothing executes).
+        if s.require_two_approvers and cp.kind == "exploit" and not body.dry_run:
+            first = req.get("first_approver")
+            if not first:
+                req["first_approver"] = user.id           # record approver #1; await a second human
+                cp.requires = req
+                cp.exploit_confirmed = bool(body.exploit_confirmed) or cp.exploit_confirmed
+                cp.credential_ref = cred
+                await db.commit()
+                await audit.record(actor_user_id=user.id, action=audit.CHECKPOINT_DECIDED,
+                                   object_type="checkpoint", object_id=cp.id, project_id=run.project_id,
+                                   details={"status": "first-approval", "kind": cp.kind, "target": cp.target})
+                return {"ok": True, "status": "proposed", "checkpoint_id": cp.id,
+                        "awaiting": "second_approver", "first_approver": user.id}
+            if first == user.id:
+                raise HTTPException(status_code=409,
+                                    detail="four-eyes: a different second approver is required")
+
+        # rate-limit (optional): a per-project cooldown between gated executions.
+        if s.attack_min_interval_s > 0 and not body.dry_run:
+            ttl = await bus.attack_cooldown_ttl(run.project_id)
+            if ttl > 0:
+                raise HTTPException(status_code=429, headers={"Retry-After": str(ttl)},
+                                    detail=f"attack cooldown active — wait {ttl}s before the next gated action")
+
         cp.status = "approved"
         cp.approved_by = user.id
         cp.approved_at = datetime.now(UTC)
         cp.exploit_confirmed = bool(body.exploit_confirmed) or cp.exploit_confirmed
         cp.credential_ref = cred
         if body.dry_run:  # mark the rehearsal so the executor resolves + shows but never calls the door
-            cp.requires = {**(cp.requires or {}), "dry_run": True}
+            req["dry_run"] = True
+        cp.requires = req
         await db.commit()
+        if s.attack_min_interval_s > 0 and not body.dry_run:
+            await bus.set_attack_cooldown(run.project_id, s.attack_min_interval_s)
         await audit.record(actor_user_id=user.id, action=audit.CHECKPOINT_DECIDED, object_type="checkpoint",
                            object_id=cp.id, project_id=run.project_id,
                            details={"status": "approved", "kind": cp.kind, "target": cp.target,
-                                    "dry_run": bool(body.dry_run)})
+                                    "dry_run": bool(body.dry_run),
+                                    "second_approver": bool(req.get("first_approver"))})
         await _enqueue_execute(cp.id)
         return {"ok": True, "status": "approved", "checkpoint_id": cp.id, "enqueued": True,
                 "dry_run": bool(body.dry_run)}

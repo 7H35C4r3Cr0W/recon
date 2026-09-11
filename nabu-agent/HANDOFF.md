@@ -549,3 +549,23 @@ automated; an attack runs only when a human approves a specific action behind th
   Gate: ruff + mypy clean; **110 backend** + 10 invariant + **27 frontend**; `vite build` OK; policy
   invariants hold; `src/oscprecon` untouched. Remaining = Tier 2 (LLM-gated: attach the model, Phase B
   agent-proposed, run-level budgets, live agent-run validation) + the explicitly-optional polish.
+
+---
+
+## 2026-09-11 (cont.) — autosync cron PAUSED + attack-path hardening (optional, PR #49)
+
+- **Autosync cron PAUSED:** the hourly `git add -A && commit "autosync github" && push github main`
+  crontab line is commented out (crontab backed up locally outside the repo; the
+  3-hourly rsync line left active). Restore by uncommenting that line. No more WIP landing on main.
+- **Attack-path hardening (optional DoD item, PR #49)** — real safety controls for a tool that fires
+  exploits, both default OFF (platform settings, no DB migration):
+  - `NABU_REQUIRE_TWO_APPROVERS` — **four-eyes**: a real exploit approval records approver #1 and stays
+    `proposed` until a SECOND, DISTINCT approver confirms; the same user is refused (409). Dry-run is
+    exempt. The gate view carries `two_person` + `first_approver` so the UI shows "approved by 1 —
+    a different second approver must confirm".
+  - `NABU_ATTACK_MIN_INTERVAL_S` — **cooldown** (Redis, per project) between gated executions; a second
+    approve inside the window → 429 + Retry-After. `bus.attack_cooldown_ttl`/`set_attack_cooldown`.
+  - Tests: `test_attack_gate.py` → 11 (four-eyes: #1 doesn't execute, same user 409, distinct #2 runs;
+    cooldown 429). Gate: ruff+mypy clean; 112 backend + 10 invariant + 27 frontend; vite build OK.
+- These were the OPTIONAL items in the DoD; the required Tier-1 set was already done (#47/#48). Remaining
+  = Tier 2 (LLM-gated) + the throughput micro-opts (still optional).

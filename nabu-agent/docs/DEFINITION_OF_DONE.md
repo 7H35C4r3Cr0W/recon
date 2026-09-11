@@ -61,7 +61,7 @@ Items that fundamentally need the live model. Not part of "dev-done"; listed so 
     (arg parsing, health polling) are sound.
 
 ### Optional — explicitly NOT required for dev-done (won't block "done")
-- [ ] Attack rate-limiting / min-interval per project; four-eyes (second approver) for exploit
+- [x] Attack rate-limiting (per-project cooldown) + four-eyes (second approver) for exploit ✅ (PR #49)
 - [ ] Throughput micro-opts (coalesce `_emit` commits, debounce Cytoscape relayout, WS replay paging)
 
 *(Optional items are done only on explicit request; they do not gate the "done" call.)*
