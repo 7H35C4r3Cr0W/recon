@@ -42,7 +42,7 @@ describe("RunLive approval gate", () => {
     expect(await screen.findByText(/Approval required/)).toBeInTheDocument();
     expect(screen.getByText(/20 live hosts exceed/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText(/Approve fan-out/));
+    fireEvent.click(screen.getByText(/^Approve$/));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/runs/r1/checkpoints/cp1/approve", { method: "POST" }));
   });

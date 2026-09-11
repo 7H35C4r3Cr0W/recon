@@ -2,11 +2,28 @@ import { useEffect, useRef } from "react";
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import { NODE_COLORS } from "../lib/nodeColors";
 
-// Renders the run graph and animates node colour by data.state. `active` nodes glow green.
-export function RunGraph({ elements }: { elements: ElementDefinition[] }) {
+// BloodHound-style run graph (mirrors the classic Nabu GUI's cytoscape view): a force-directed
+// layout of coloured discs by node KIND, with a live STATE ring — active nodes pulse green while the
+// run is "digging". Node/edge palette follows the GUI (Catppuccin dark).
+const KIND_COLOR: Record<string, string> = {
+  run: "#1e3a8a", target: "#1e3a8a", host: "#74c7ec", service: "#89b4fa",
+  finding: "#f9e2af", report: "#cba6f7", agent: "#89b4fa", attack: "#f38ba8",
+};
+
+export function RunGraph({ elements, layoutName = "cose", fitNonce = 0 }:
+  { elements: ElementDefinition[]; layoutName?: "cose" | "breadthfirst"; fitNonce?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const layoutTimer = useRef<number | null>(null);
+  const pulseTimer = useRef<number | null>(null);
+
+  const runLayout = (cy: Core) => {
+    const opts = layoutName === "breadthfirst"
+      ? { name: "breadthfirst", directed: true, spacingFactor: 1.3, padding: 30, animate: true, animationDuration: 350 }
+      : { name: "cose", padding: 40, animate: true, animationDuration: 500, nodeRepulsion: 9000,
+          idealEdgeLength: 95, nodeOverlap: 16, gravity: 0.25, componentSpacing: 110 };
+    cy.layout(opts as cytoscape.LayoutOptions).run();
+  };
 
   useEffect(() => {
     if (!ref.current) return;
@@ -17,110 +34,91 @@ export function RunGraph({ elements }: { elements: ElementDefinition[] }) {
         {
           selector: "node",
           style: {
-            "background-color": ((n: any) =>
-              NODE_COLORS[(n.data("state") || "queued") as keyof typeof NODE_COLORS] || "#8394a0") as any,
-            label: "data(label)",
-            color: "#cddbe3",
-            "font-size": 10,
-            "font-family": "monospace",
-            "text-valign": "bottom",
-            "text-margin-y": 5,
-            "text-outline-color": "#070a0e",
-            "text-outline-width": 2,
-            width: 38,
-            height: 38,
-            "border-width": 2,
-            "border-color": "#070a0e",
-            "transition-property": "background-color border-color shadow-blur",
-            "transition-duration": "0.25s",
+            "background-color": ((n: cytoscape.NodeSingular) => KIND_COLOR[(n.data("kind") as string) || "agent"] || "#89b4fa") as any,
+            label: "data(label)", color: "#cdd6f4", "font-size": 10, "font-family": "monospace",
+            "text-valign": "bottom", "text-margin-y": 6, "text-max-width": "120px",
+            "text-outline-color": "#0b1116", "text-outline-width": 2,
+            width: 36, height: 36, "border-width": 2, "border-color": "#0b1116",
+            "overlay-color": "#39c46a", "overlay-opacity": 0, "overlay-padding": 6,
+            "transition-property": "border-color border-width", "transition-duration": "0.25s",
           } as any,
         },
-        { selector: 'node[kind="run"]', style: { shape: "round-rectangle", width: 52, height: 34, "font-size": 11 } },
-        { selector: 'node[kind="host"]', style: { shape: "hexagon", width: 48, height: 48, "font-size": 11 } },
-        { selector: 'node[kind="service"]', style: { shape: "round-rectangle" } },
+        { selector: 'node[kind="run"], node[kind="target"]', style: { width: 54, height: 54, "font-size": 12, shape: "round-rectangle" } },
+        { selector: 'node[kind="host"]', style: { shape: "hexagon", width: 46, height: 46, "font-size": 11 } },
+        { selector: 'node[kind="service"]', style: { shape: "ellipse" } },
         { selector: 'node[kind="finding"]', style: { shape: "diamond", width: 30, height: 30 } },
         { selector: 'node[kind="report"]', style: { shape: "star", width: 46, height: 46 } },
-        {
-          selector: 'node[state="active"]',
-          style: {
-            "border-color": "#3ad9c0", "border-width": 4,
-            "shadow-blur": 30, "shadow-color": "#3ad9c0", "shadow-opacity": 0.95,
-          } as any,
-        },
-        {
-          selector: 'node[state="done"]',
-          style: { "shadow-blur": 14, "shadow-color": "#54b9f2", "shadow-opacity": 0.4 } as any,
-        },
-        {
-          selector: 'node[state="error"]',
-          style: { "border-color": "#f27a7a", "border-width": 3,
-                   "shadow-blur": 20, "shadow-color": "#f27a7a", "shadow-opacity": 0.7 } as any,
-        },
-        {
-          selector: 'node[state="stuck"]',
-          style: { "border-color": "#f2b636", "border-width": 3,
-                   "shadow-blur": 20, "shadow-color": "#f2b636", "shadow-opacity": 0.7 } as any,
-        },
+        { selector: 'node[kind="attack"]', style: { shape: "diamond", width: 40, height: 40 } },
+        // live STATE ring (thick so it reads when zoomed out) — the GUI's status-ring idea
+        { selector: 'node[state="done"]', style: { "border-color": NODE_COLORS.done, "border-width": 5 } as any },
+        { selector: 'node[state="active"]', style: { "border-color": "#39c46a", "border-width": 5, "overlay-opacity": 0.18 } as any },
+        { selector: 'node[state="stuck"]', style: { "border-color": NODE_COLORS.stuck, "border-width": 5 } as any },
+        { selector: 'node[state="error"]', style: { "border-color": NODE_COLORS.error, "border-width": 5 } as any },
         {
           selector: "edge",
-          style: {
-            width: 1.4,
-            "line-color": "#2e3d48",
-            "target-arrow-color": "#2e3d48",
-            "target-arrow-shape": "triangle",
-            "curve-style": "bezier",
-          },
+          style: { width: 1.6, "line-color": "#5b6b7d", "target-arrow-color": "#5b6b7d",
+                   "target-arrow-shape": "triangle", "curve-style": "bezier", "arrow-scale": 0.8 },
         },
         {
-          // labeled hand-off edges (planner→enum, enum→finding/research, agents→report) stand out
           selector: "edge[label]",
           style: {
-            label: "data(label)",
-            "font-size": 8,
-            "font-family": "monospace",
-            color: "#6b7d88",
-            "text-rotation": "autorotate",
-            "text-background-color": "#0c1116",
-            "text-background-opacity": 0.85,
-            "text-background-padding": "1px",
-            "line-color": "#35d0ba",
-            "target-arrow-color": "#35d0ba",
-            "line-opacity": 0.6,
+            label: "data(label)", "font-size": 8, "font-family": "monospace", color: "#8598ac",
+            "text-rotation": "autorotate", "text-background-color": "#0b1116",
+            "text-background-opacity": 0.85, "text-background-padding": "1px",
+            "line-color": "#3ad9c0", "target-arrow-color": "#3ad9c0", "line-opacity": 0.55,
           } as any,
         },
       ],
       wheelSensitivity: 0.3,
     });
     cyRef.current = cy;
+
+    // pulsating-green "digging" halo: ping-pong the active nodes' green overlay so they visibly
+    // throb where the run is currently working. Honours reduced-motion.
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!reduce) {
+      let grow = true;
+      pulseTimer.current = window.setInterval(() => {
+        const active = cy.$('node[state="active"]');
+        if (active.length === 0) return;
+        grow = !grow;
+        active.animate({ style: { "overlay-padding": grow ? 17 : 6, "overlay-opacity": grow ? 0.32 : 0.12 } },
+                       { duration: 780, easing: "ease-in-out-sine" });
+      }, 820);
+    }
     return () => {
       if (layoutTimer.current !== null) clearTimeout(layoutTimer.current);
+      if (pulseTimer.current !== null) clearInterval(pulseTimer.current);
       cy.destroy();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // live update: upsert elements immediately (nodes/colours appear at once), but DEBOUNCE the
-  // expensive breadthfirst relayout so a burst of events lays out once after it settles, not once
-  // per event (a wide fan-out used to relayout dozens of times a second → jank).
+  // live update: upsert immediately, debounce the (expensive) relayout so a burst settles into one.
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
     cy.batch(() => {
       for (const el of elements) {
-        const id = (el.data as any).id;
-        const existing = cy.getElementById(id);
-        if (existing.nonempty()) existing.data(el.data as any);
+        const id = (el.data as { id?: string }).id;
+        const existing = cy.getElementById(id as string);
+        if (existing.nonempty()) existing.data(el.data);
         else cy.add(el);
       }
     });
     if (layoutTimer.current !== null) clearTimeout(layoutTimer.current);
-    layoutTimer.current = window.setTimeout(() => {
-      cy.layout({ name: "breadthfirst", directed: true, spacingFactor: 1.25, padding: 20 }).run();
-      layoutTimer.current = null;
-    }, 150);
-  }, [elements]);
+    layoutTimer.current = window.setTimeout(() => runLayout(cy), 160);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elements, layoutName]);
+
+  // parent-driven "fit to screen"
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (cy && fitNonce) cy.animate({ fit: { eles: cy.elements(), padding: 40 } }, { duration: 350 });
+  }, [fitNonce]);
 
   return <div ref={ref} style={{
     width: "100%", height: "100%", borderRadius: 11, border: "1px solid var(--line)",
-    background: "radial-gradient(700px 420px at 30% 15%, #10201f 0%, transparent 60%), var(--sunk)",
+    background: "radial-gradient(900px 520px at 32% 12%, #10201f 0%, transparent 60%), var(--sunk)",
   }} />;
 }

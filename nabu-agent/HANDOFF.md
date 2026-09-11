@@ -700,3 +700,23 @@ saves the config to the DB and applies it at runtime — no editing env files, n
   non-admin 403; test-before-save). 119 backend + 28 frontend; ruff + mypy clean; `cryptography` added
   to deps. **L1 mechanism is now fully built — attaching a real endpoint is still legal-gated, but the
   admin does it in the UI, not by editing env.**
+
+---
+
+## 2026-09-11 (cont.) — recon map overhauled to BloodHound-style (full-screen + phases + pulse)
+
+The live run view now looks like the classic Nabu GUI's BloodHound graph (owner request), drawing on
+`src/oscprecon/gui/graph_html` for the palette + force layout.
+- `components/RunGraph.tsx`: force-directed **cose** layout (BloodHound feel; Hierarchy = breadthfirst),
+  coloured discs by node KIND using the GUI's Catppuccin palette (target #1e3a8a, host #74c7ec,
+  service #89b4fa, finding #f9e2af diamond, report #cba6f7 star, attack #f38ba8), thick live STATE
+  rings, and a **pulsating-green "digging" halo** on active nodes (a ping-pong overlay animation;
+  honours prefers-reduced-motion). New `layoutName` + `fitNonce` props.
+- `pages/RunLive.tsx`: full-screen layout with a **phase stepper** (Queued → Scanning → Enumerating →
+  Researching → Reporting → Done) driven by the run's live state — the current phase pulses green — a
+  **controls toolbar** (Force/Hierarchy toggle, Fit, Hide log, Cancel run), and the log/approval banner.
+- `theme.css`: `.phases`, `.map-controls`, `.map-body` (full-height grid).
+- Demo (`68d8ab3a…`): the Live-map tab rebuilt to match — big BloodHound spider, phase stepper,
+  pulsing-green nodes, layout toggle + Fit + Cancel, a node-type legend + a **run-config panel**, and
+  the live log. Verified via headless-chromium screenshot.
+- Gate: tsc clean; 28 frontend tests; `vite build` OK. Backend untouched.
