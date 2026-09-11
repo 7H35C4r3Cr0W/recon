@@ -209,3 +209,16 @@ kbd{font-family:var(--mono);background:var(--sunk);border:1px solid var(--line-2
 .atk-status.executing{ color:var(--accent-2); border-color:color-mix(in srgb,var(--accent-2) 50%,var(--line)); }
 .atk-status.executed{ color:var(--accent); border-color:color-mix(in srgb,var(--accent) 50%,var(--line)); }
 .atk-status.failed,.atk-status.rejected,.atk-status.expired{ color:var(--red); border-color:color-mix(in srgb,var(--red) 50%,var(--line)); }
+
+/* ---- LLM setup form ---- */
+.psub{color:var(--ink-2);margin:2px 0 18px;max-width:64ch}
+.fld{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink-2)}
+.fld > span{display:flex;align-items:center;gap:8px}
+.fld .req{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);
+  border:1px solid color-mix(in srgb,var(--gold) 45%,var(--line));border-radius:5px;padding:1px 5px}
+.fld .opt{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.linkish{background:none;border:0;color:var(--accent);font:500 12px/1 var(--sans);cursor:pointer;text-align:left;padding:2px 0}
+.linkish:hover{text-decoration:underline}
+.btn.primary{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 92%,#000),var(--accent-2));
+  color:var(--accent-ink,#04120f);border-color:var(--accent)}
+.btn.primary:hover:not(:disabled){box-shadow:var(--glow)}

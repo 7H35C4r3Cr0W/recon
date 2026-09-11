@@ -676,3 +676,27 @@ future hardening but is not required.
 Gate: ruff + mypy clean (76 source files); `vite build` OK; `src/oscprecon` untouched. Demo refreshed
 (attack gate) at https://claude.ai/code/artifact/68d8ab3a-2351-4d06-8bb6-742190d69846 ; leadership doc
 `docs/nabu-agent.html` updated (Phase 5 + demo link).
+
+---
+
+## 2026-09-11 (cont.) — admin LLM setup is now a real FORM (attach from the UI, no restart)
+
+The admin "Connect the LLM brain" page went from view-status + env-directions to a guided **form** that
+saves the config to the DB and applies it at runtime — no editing env files, no container restart.
+- `config_store.py` — Fernet encrypt/decrypt keyed off `NABU_SESSION_SECRET`; the api key is stored
+  ENCRYPTED and never returned by the API.
+- `db.models.AppSetting` (key/value; covered by the 0001 create_all baseline) holds the saved override.
+- `services/llm_config.py` — `save` / `clear` / `status` / `effective_llm_settings(overrides?)`: env
+  defaults + saved DB override merged on top (+ an ephemeral override for test-before-save).
+- `routers/admin.py` — `GET /admin/llm/config` (status incl. source env|saved|none), `PUT` (save),
+  `DELETE` (revert to env), `POST /admin/llm/test` (test-fire; accepts inline values to validate
+  BEFORE saving). Admin-only; audited.
+- The run driver (`run_host_in_worker`, `_run_multi`) + `/llm/health` now build the provider from
+  `effective_llm_settings()`, so a UI-saved config drives agent runs live.
+- `pages/LlmSetup.tsx` — a step-by-step guided form: Base URL / Model / API key (write-only) /
+  Organization / Advanced (temp, tokens, context, timeout, TLS) + **Test connection** (latency +
+  token metrics) + **Save & attach** + **Clear saved**. Keeps the env-var alternative in a details block.
+- Tests: `test_llm_config.py` (save/test/effective roundtrip + key encrypted-at-rest + never returned +
+  non-admin 403; test-before-save). 119 backend + 28 frontend; ruff + mypy clean; `cryptography` added
+  to deps. **L1 mechanism is now fully built — attaching a real endpoint is still legal-gated, but the
+  admin does it in the UI, not by editing env.**

@@ -305,7 +305,6 @@ async def run_host_in_worker(run_id: str, host: str, kind: str, project_id: str,
     while its host jobs run on the pool), and returns the host's terminal string to the supervisor."""
     from nabu_agent.llm.factory import build_provider
     from nabu_agent.orchestration.limits import RunLimits
-    from nabu_agent.settings import get_settings
 
     async def publish(type_: RunEventType, data: dict[str, Any]) -> None:
         await _emit(run_id, type_, data)
@@ -321,7 +320,8 @@ async def run_host_in_worker(run_id: str, host: str, kind: str, project_id: str,
     provider = None
     try:
         if kind == "agent":
-            provider = build_provider(get_settings().llm)
+            from nabu_agent.services import llm_config as _llmcfg
+            provider = build_provider(await _llmcfg.effective_llm_settings())
             return await _agent_host(run_id, host, publish, project_id=project_id, cancel_event=cancel_event,
                                      on_line=pump.feed, run_node=run_node, provider=provider, limits=limits,
                                      service_budget=service_budget)
@@ -662,13 +662,13 @@ async def _run_multi(run_id: str, target: str, kind: str, publish, *, project_id
     provider = None
     if kind == "agent":
         from nabu_agent.llm.factory import build_provider
-        from nabu_agent.settings import get_settings
-        settings = get_settings()
-        if not settings.llm.base_url:
-            await publish(RunEventType.ERROR, {"message": "no LLM configured — set NABU_LLM_BASE_URL to "
-                          "your internal OpenAI-compatible endpoint (kind='demo' needs no brain)."})
+        from nabu_agent.services import llm_config as _llmcfg
+        eff = await _llmcfg.effective_llm_settings()
+        if not eff.base_url:
+            await publish(RunEventType.ERROR, {"message": "no LLM configured — attach it in Admin → LLM "
+                          "setup (or set NABU_LLM_BASE_URL). kind='demo' needs no brain."})
             return "failed"
-        provider = build_provider(settings.llm)
+        provider = build_provider(eff)
 
     async def _close_provider() -> None:  # release the per-run LLM client's connection pool
         if provider is not None:

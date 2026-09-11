@@ -32,6 +32,7 @@ dependencies = [
     "authlib>=1.3",
     "argon2-cffi>=23",
     "pyjwt>=2.8",
+    "cryptography>=42",   # encrypt admin-entered secrets (the LLM api key) at rest in the DB
 
     # Data stores
     "sqlalchemy[asyncio]>=2.0",
