@@ -139,7 +139,7 @@ Two layers: an **engine** (modules, parsers, patterns, reporter) and a **GUI** (
 | Deps | [uv](https://docs.astral.sh/uv/) | latest | dep management |
 | Types | [mypy](https://mypy.readthedocs.io/) | strict | type gate |
 | Lint / format | [ruff](https://docs.astral.sh/ruff/) | latest | style gate |
-| Graph JS | [Cytoscape.js](https://js.cytoscape.org/) | vendored offline | Bloodhound-style graph view |
+| Graph JS | [Cytoscape.js](https://js.cytoscape.org/) | vendored offline | Bloodhound-style graph view (icon nodes, glyph badges, fcose layout, status rings, hover-focus dim) |
 
 **No alternatives** — do not propose Rust, Go, Electron, web UI, Tkinter, Kivy, or rewriting to another framework. Decision is locked.
 

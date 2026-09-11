@@ -65,6 +65,16 @@ file records *why* the relevant sections read as they do. Concise by design — 
   `config.Settings.redact_secrets`, default `False`). Secrets stay **excluded from graph search** only
   to keep the search index clean, not to hide them.
 
+## Graph view — BloodHound-style (owner, 2026-09-11)
+
+- The graph already renders BloodHound-style icon nodes (per-type colours + corner glyph badges),
+  fcose force layout, and status rings. Added BloodHound's signature **hover focus**: hovering a node
+  highlights it + its immediate neighbourhood and **dims everything else** (`hover-dim` / `edge.hover-hl`
+  in `gui/graph_html/app.js`), so a busy graph reads one host at a time. Presentation-only; the engine,
+  the Qt bridge, and the graph data are unchanged.
+- NOTE: this was an explicit owner-authorized edit to `src/oscprecon` (the sibling Nabu-Agent product
+  otherwise treats the engine as strictly read-only). Scope was the graph-view assets only.
+
 ## Process
 
 - Finish one major implementation chunk before starting another.
