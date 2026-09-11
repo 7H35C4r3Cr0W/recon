@@ -19,9 +19,10 @@
   // profile (so a streamed host doesn't re-expand what you folded) but is RESET on a profile switch —
   // node ids like "target" / "subnet-<cidr>" collide across profiles, so lastProfileKey guards that.
   var collapseState = {};
+  var traceId = null; // id of the node whose attack path is currently pinned (click-to-trace)
   var lastProfileKey = "";
 
-  var DEFAULT_HINT = "double-click the entry to expand (again to fold all) · double-click a /24 for its hosts · a host for its services · single-click selects · drag canvas to pan";
+  var DEFAULT_HINT = "double-click the entry to expand (again to fold all) · double-click a /24 for its hosts · a host for its services · single-click a node for detail + its attack path · click empty space to clear · drag canvas to pan";
 
   // BloodHound-style icon nodes: a coloured disc with a white/dark glyph and the label below. Icons
   // are inline SVGs (no network) encoded as data URIs. `#c` is the placeholder colour so one template
@@ -260,6 +261,10 @@
     // and lights the connecting edges.
     { selector: ".hover-dim", style: { opacity: 0.12 } },
     { selector: "edge.hover-hl", style: { "line-color": "#94e2d5", "target-arrow-color": "#94e2d5", width: 2.6, opacity: 1 } },
+    // click-to-trace attack path: the path pops in gold, everything else dims
+    { selector: ".trace-dim", style: { opacity: 0.1 } },
+    { selector: "node.trace-hl", style: { "border-color": "#f2b636", "border-width": 5 } },
+    { selector: "edge.trace-hl", style: { "line-color": "#f2b636", "target-arrow-color": "#f2b636", width: 3, opacity: 1 } },
     {
       selector: "edge",
       style: {
@@ -617,6 +622,62 @@
     }
   }
 
+  // ---- click-to-trace attack path: BloodHound-style shortest path from the target root to the
+  // clicked node, over the currently-VISIBLE graph, pinned in gold with the rest dimmed. Directed
+  // (downstream from the entry), so it reads as "how the run reached this asset". ----
+  function traceShortestPath(rootId, targetId) {
+    if (rootId === targetId) return [rootId];
+    var adj = {};
+    cy.edges(":visible").forEach(function (e) {
+      var s = e.source().id();
+      (adj[s] = adj[s] || []).push(e.target().id());
+    });
+    var prev = {}, seen = {}, q = [rootId];
+    seen[rootId] = true;
+    while (q.length) {
+      var cur = q.shift(), outs = adj[cur] || [];
+      for (var i = 0; i < outs.length; i++) {
+        var nx = outs[i];
+        if (seen[nx]) continue;
+        seen[nx] = true;
+        prev[nx] = cur;
+        if (nx === targetId) {
+          var path = [nx], at = cur;
+          while (at !== rootId) { path.unshift(at); at = prev[at]; }
+          path.unshift(rootId);
+          return path;
+        }
+        q.push(nx);
+      }
+    }
+    return [];
+  }
+
+  function clearTrace() {
+    traceId = null;
+    if (cy) cy.elements().removeClass("trace-dim trace-hl hover-dim hover-hl");
+  }
+
+  function pinTrace(node) {
+    if (!cy) return;
+    cy.elements().removeClass("trace-dim trace-hl hover-dim hover-hl");
+    var root = cy.nodes('[type="target"]').first();
+    if (root.empty()) { traceId = null; return; }
+    var ids = traceShortestPath(root.id(), node.id());
+    if (!ids.length) { traceId = null; return; } // unreachable over visible edges: just select it
+    traceId = node.id();
+    var onNode = {}, nextOf = {};
+    for (var i = 0; i < ids.length; i++) {
+      onNode[ids[i]] = true;
+      if (i < ids.length - 1) nextOf[ids[i]] = ids[i + 1];
+    }
+    cy.elements(":visible").addClass("trace-dim");
+    cy.nodes().forEach(function (n) { if (onNode[n.id()]) n.removeClass("trace-dim").addClass("trace-hl"); });
+    cy.edges().forEach(function (e) {
+      if (nextOf[e.source().id()] === e.target().id()) e.removeClass("trace-dim").addClass("trace-hl");
+    });
+  }
+
   function updateViewportRect() {
     var rect = document.getElementById("minimap-viewport");
     if (!mini || !rect || !cy) return;
@@ -895,9 +956,16 @@
         }
         return; // link mode swallows the tap — no detail sidebar
       }
-      // single click = SELECT (show detail). Expand/collapse is a DOUBLE-click (see below) so
-      // clicking to inspect a node never also folds it, and BloodHound muscle memory works.
+      // single click = SELECT (show detail) + pin the attack path from the entry to this node
+      // (BloodHound "shortest path", adapted to the recon graph rooted at the target). Expand/
+      // collapse is a DOUBLE-click, so inspecting never folds; clicking empty space clears.
+      pinTrace(evt.target);
       if (bridge) bridge.node_clicked(id, JSON.stringify(evt.target.data()));
+    });
+
+    // click empty canvas -> clear a pinned attack path (and any stray hover focus)
+    cy.on("tap", function (evt) {
+      if (evt.target === cy) clearTrace();
     });
 
     // right-click a node -> hand the id, its data and the page position to Qt, which pops the NATIVE
@@ -948,6 +1016,7 @@
     cy.on("pan zoom resize", updateViewportRect);
     cy.on("mouseover", "node", function (evt) {
       showTip(evt.target);
+      if (traceId) return; // a pinned attack path takes precedence over transient hover-focus
       // highlight the hovered node's neighbourhood, dim the rest (BloodHound's signature focus)
       var nb = evt.target.closedNeighborhood();
       cy.elements().addClass("hover-dim");
@@ -956,9 +1025,14 @@
     });
     cy.on("mouseout", "node", function () {
       hideTip();
-      cy.elements().removeClass("hover-dim hover-hl");
+      if (!traceId) cy.elements().removeClass("hover-dim hover-hl");
     });
-    cy.on("pan zoom drag", hideTip);
+    // clear the tooltip AND any hover-focus on camera moves: mouseout can be missed mid-pan, which
+    // would otherwise leave hover-dim stuck. A pinned attack path is intentional and survives.
+    cy.on("pan zoom drag", function () {
+      hideTip();
+      if (!traceId) cy.elements().removeClass("hover-dim hover-hl");
+    });
 
     document.getElementById("zoom-in").onclick = function () {
       zoomBy(1.3);
@@ -1048,6 +1122,14 @@
   // see Chromium's "Reload / View source" menu over the canvas.
   document.addEventListener("contextmenu", function (e) {
     e.preventDefault();
+  });
+
+  // Escape clears a pinned attack path (and exits link mode) — quick way back to the full graph.
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      if (linkMode) setLinkMode(false);
+      clearTrace();
+    }
   });
 
   if (window.qt && window.qt.webChannelTransport) boot(0);
