@@ -69,17 +69,20 @@ async def put_map_region(project_id: str, region_id: str, body: RegionBody,
                          db: AsyncSession = Depends(get_db),
                          user: User = Depends(get_current_user),
                          _auth: str = Depends(require_project_perm(Perm.RUN_START))) -> dict:
-    members = [str(m) for m in body.members][:500]  # bound the member list
+    # bound to the column widths so an over-long value can't 500 (Postgres) or silently truncate
+    title = body.title[:200]
+    color = body.color[:16]
+    members = [str(m)[:200] for m in body.members][:500]
     row = (await db.execute(select(MapRegion).where(
         MapRegion.project_id == project_id, MapRegion.id == region_id))).scalar_one_or_none()
     if row is None:
-        db.add(MapRegion(id=region_id, project_id=project_id, title=body.title, note=body.note,
-                         color=body.color, members=members, updated_by=user.id))
+        db.add(MapRegion(id=region_id, project_id=project_id, title=title, note=body.note,
+                         color=color, members=members, updated_by=user.id))
     else:
-        row.title, row.note, row.color, row.members = body.title, body.note, body.color, members
+        row.title, row.note, row.color, row.members = title, body.note, color, members
         row.updated_by = user.id
     await db.commit()
-    return {"id": region_id, "title": body.title, "note": body.note, "color": body.color, "members": members}
+    return {"id": region_id, "title": title, "note": body.note, "color": color, "members": members}
 
 
 @router.delete("/projects/{project_id}/map-regions/{region_id}")

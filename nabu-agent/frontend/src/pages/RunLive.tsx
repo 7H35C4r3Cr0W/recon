@@ -75,22 +75,23 @@ export function RunLive() {
   }
   // regions: group-anchored boxes over a set of member nodes, persisted per project
   async function saveRegion(r: Region) {
-    setRegions((rs) => {
-      const i = rs.findIndex((x) => x.id === r.id);
-      if (i >= 0) { const c = rs.slice(); c[i] = r; return c; }
-      return [...rs, r];
-    });
     if (!projectId) return;
     try {
       await api(`/projects/${projectId}/map-regions/${encodeURIComponent(r.id)}`,
                 { method: "PUT", body: JSON.stringify({ title: r.title, note: r.note, color: r.color, members: r.members }) });
+      setRegions((rs) => {  // API-first, so a failed save never leaves an unpersisted region on the map
+        const i = rs.findIndex((x) => x.id === r.id);
+        if (i >= 0) { const c = rs.slice(); c[i] = r; return c; }
+        return [...rs, r];
+      });
     } catch (err) { setLogs((l) => [...l, `[region] save failed: ${String(err)}`]); }
   }
   async function deleteRegion(id: string) {
-    setRegions((rs) => rs.filter((r) => r.id !== id));
     if (!projectId) return;
-    try { await api(`/projects/${projectId}/map-regions/${encodeURIComponent(id)}`, { method: "DELETE" }); }
-    catch (err) { setLogs((l) => [...l, `[region] delete failed: ${String(err)}`]); }
+    try {
+      await api(`/projects/${projectId}/map-regions/${encodeURIComponent(id)}`, { method: "DELETE" });
+      setRegions((rs) => rs.filter((r) => r.id !== id));
+    } catch (err) { setLogs((l) => [...l, `[region] delete failed: ${String(err)}`]); }
   }
   function addRegionFromSearch() {
     const q = search.trim().toLowerCase();
