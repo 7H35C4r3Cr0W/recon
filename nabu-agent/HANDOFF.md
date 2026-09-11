@@ -42,8 +42,8 @@ GATE:        ruff + mypy clean; 113 backend + 10 policy-invariant + 36 frontend 
 REMAINING:   Tier 2 only (LLM-gated, blocked on legal): attach the model → `agent` runs; Phase B
              (agents PROPOSE into the built gate); run-level LLM budgets; live agent-run validation.
 ATTACH BRAIN: set NABU_LLM_BASE_URL (+ API_KEY, MODEL) via Admin → LLM setup → test-fire. No code change.
-OPS NOTE:    the hourly git-autosync crontab line is PAUSED during active dev (kept local; uncomment to
-             restore) so WIP stops landing on main.
+OPS NOTE:    the hourly git-autosync crontab line is RE-ENABLED (2026-09-11) — pointed at `origin`
+             (there was no `github` remote); it does `git add -A` + commit + push to main hourly.
 HOW TO TEST: cd nabu-agent && uv sync --group dev && uv run pytest -q -m "not load"   (+ -m invariant);
              frontend: cd frontend && npx vitest run && npx vite build
 ```
