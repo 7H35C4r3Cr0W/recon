@@ -8,7 +8,7 @@ import { NODE_COLORS } from "../lib/nodeColors";
 // (everything else dims) + click-to-select. Palette follows the GUI (Catppuccin dark).
 const KIND_COLOR: Record<string, string> = {
   run: "#1e3a8a", target: "#1e3a8a", host: "#74c7ec", service: "#89b4fa",
-  finding: "#f9e2af", report: "#cba6f7", agent: "#89b4fa", attack: "#f38ba8",
+  finding: "#f9e2af", report: "#cba6f7", agent: "#fab387", attack: "#f38ba8",  // agents: distinct peach + a box shape
 };
 const glyph = (inner: string) =>
   "data:image/svg+xml;utf8," + encodeURIComponent(
@@ -60,7 +60,9 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         { selector: 'node[kind="run"], node[kind="target"]', style: { width: 56, height: 56, "font-size": 12, "background-image": ICON.target } as any },
         { selector: 'node[kind="host"]', style: { width: 48, height: 48, "font-size": 11, "background-image": ICON.host } as any },
         { selector: 'node[kind="service"]', style: { "background-image": ICON.service } as any },
-        { selector: 'node[kind="agent"]', style: { "background-image": ICON.agent } as any },
+        // agents get their OWN shape (round-rectangle "worker box") + peach fill so they're never
+        // confused with circular blue services — plus the agent glyph.
+        { selector: 'node[kind="agent"]', style: { shape: "round-rectangle", width: 42, height: 30, "background-image": ICON.agent } as any },
         { selector: 'node[kind="finding"]', style: { shape: "diamond", width: 32, height: 32 } },
         { selector: 'node[kind="report"]', style: { shape: "star", width: 48, height: 48 } },
         { selector: 'node[kind="attack"]', style: { shape: "diamond", width: 42, height: 42 } },

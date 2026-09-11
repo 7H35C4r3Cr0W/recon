@@ -259,3 +259,15 @@ kbd{font-family:var(--mono);background:var(--sunk);border:1px solid var(--line-2
 .node-drawer .dv{font-size:14px;color:var(--ink);margin:6px 0 4px;word-break:break-word}
 .node-drawer .ds{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
 .node-drawer .ds .d{width:9px;height:9px;border-radius:50%;box-shadow:0 0 8px currentColor}
+
+/* ---- recon map: node-type legend (bottom-left, over the graph) ---- */
+.type-legend{position:absolute;bottom:12px;left:12px;display:flex;flex-wrap:wrap;gap:12px;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:9px;
+  padding:8px 11px;backdrop-filter:blur(6px);z-index:4}
+.type-legend .tl{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10.5px;color:var(--ink-2)}
+.type-legend .sw{width:12px;height:12px;flex:0 0 auto}
+.type-legend .sw.circle,.type-legend .sw.box{border:1px solid #0b1116}
+.type-legend .sw.circle{border-radius:50%}
+.type-legend .sw.box{border-radius:3px}
+.type-legend .sw.diamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.type-legend .sw.star{clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
