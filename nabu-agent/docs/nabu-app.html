@@ -193,6 +193,11 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
 .map3.notree.nolog{grid-template-columns:1fr}
 .map3.nolog .logpane{display:none}
 .map3.notree .svctree{display:none}
+/* fullscreen map — fills the entire page */
+#view-run.mapfull #pane-map{position:fixed;inset:0;z-index:130;background:var(--bg);padding:8px 6px 0}
+#view-run.mapfull .map-controls{padding:8px 14px}
+#view-run.mapfull #cy{border-radius:8px}
+.seg.full-on{background:linear-gradient(180deg,var(--gold),#e0a52e);color:#1a1206;border-color:transparent;font-weight:700}
 /* command console */
 .console{display:flex;align-items:center;gap:9px;margin:0 18px 14px;background:var(--sunk);border:1px solid var(--line-2);border-radius:10px;padding:8px 10px}
 .console:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
@@ -539,6 +544,7 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
         <div class="pane on" id="pane-map">
         <div class="map-controls">
           <button class="seg play" id="play">▶ Replay recon</button>
+          <button class="seg" id="fullscreen" title="Expand the map to fill the whole page (Esc to exit)">⛶ Fullscreen</button>
           <button class="seg" id="fit">⤢ Fit</button>
           <button class="seg" id="lay-force">Force</button>
           <button class="seg on" id="lay-hier">Tree</button>
@@ -971,7 +977,8 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
 
   function wireControls(){
     document.getElementById("play").onclick=play;
-    document.getElementById("fit").onclick=function(){ cy.animate({fit:{eles:cy.elements(),padding:40}},{duration:350}); };
+    document.getElementById("fit").onclick=function(){ fitNodes(40); };
+    document.getElementById("fullscreen").onclick=function(){ setFull(!document.getElementById("view-run").classList.contains("mapfull")); };
     document.getElementById("lay-force").onclick=function(){ layoutName="force"; this.classList.add("on"); document.getElementById("lay-hier").classList.remove("on"); layout("force"); };
     document.getElementById("lay-hier").onclick=function(){ layoutName="hier"; this.classList.add("on"); document.getElementById("lay-force").classList.remove("on"); layout("hier"); };
     document.getElementById("search").oninput=function(){ applySearch(this.value); };
@@ -989,7 +996,7 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
       if(rw>26&&rh>26&&cy){ var z=cy.zoom(),pan=cy.pan(); var col=RC[regionOrd%RC.length]; var r={id:"rg-"+(regionOrd++)+"-"+Math.floor(clock*7),title:"Region",note:"",color:col,mx:(rx-pan.x)/z,my:(ry-pan.y)/z,mw:rw/z,mh:rh/z}; REGIONS.push(r); buildRegionDom(r); positionRegions(); } setRegionMode(false); });
   }
 
-  document.addEventListener("keydown",function(e){ if(!cy||CUR!=="run") return; if(e.key==="Escape"){ if(regionMode) setRegionMode(false); hideDrawer(); clearPath(); }
+  document.addEventListener("keydown",function(e){ if(!cy||CUR!=="run") return; if(e.key==="Escape"){ if(document.getElementById("view-run").classList.contains("mapfull")){ setFull(false); return; } if(regionMode) setRegionMode(false); hideDrawer(); clearPath(); }
     else if((e.key==="c"||e.key==="C")&&!e.ctrlKey&&!e.metaKey){ var tag=(document.activeElement&&document.activeElement.tagName||"").toLowerCase(); if(tag==="input"||tag==="textarea") return; var on=cy.nodes(".onpath"); if(on.length<2) return; var text=on.map(function(n){ return n.data("label"); }).join(" -> "); if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text); toast("path copied"); } });
 
   /* ============================================================
@@ -1265,7 +1272,18 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
     else if(kind==="subnet") pop("Pivot","into "+(m.cidr||n.label),"info"); }
 
   /* ---- command console (free-form, editable; mirrors the desktop tool's command builder) ---- */
-  function refitMap(){ setTimeout(function(){ if(cy){ cy.resize(); cy.fit(cy.elements(),36); if(typeof positionRegions==="function") positionRegions(); } },70); }
+  function fitNodes(pad){ if(!cy) return; pad=(pad==null?36:pad); var ns=cy.nodes(); if(!ns.length) return;
+    var bb=ns.boundingBox({includeLabels:false}); if(!bb.w||!bb.h){ cy.fit(cy.elements(),pad); return; }
+    var z=Math.min((cy.width()-2*pad)/bb.w,(cy.height()-2*pad)/bb.h); z=Math.max(cy.minZoom(),Math.min(2.0,z)); cy.zoom(z); cy.center(ns); if(typeof positionRegions==="function") positionRegions(); }
+  function refitMap(){ setTimeout(function(){ if(cy){ cy.resize(); fitNodes(34); } },70); }
+  function setPaneHidden(cls,hide){ var mb=document.getElementById("mapbody"); if(!mb) return; mb.classList.toggle(cls,!!hide);
+    var id=cls==="nolog"?"togglelog":"toggletree", label=cls==="nolog"?"log":"tree", t=document.getElementById(id);
+    if(t){ t.textContent=(hide?"Show ":"Hide ")+label; t.classList.toggle("on",!hide); } }
+  function setFull(on){ var v=document.getElementById("view-run"), b=document.getElementById("fullscreen"), mb=document.getElementById("mapbody"); if(!v||!mb) return;
+    if(on){ v.__pNolog=mb.classList.contains("nolog"); v.__pNotree=mb.classList.contains("notree"); setPaneHidden("nolog",true); setPaneHidden("notree",true); }
+    else { setPaneHidden("nolog",v.__pNolog); setPaneHidden("notree",v.__pNotree); }
+    v.classList.toggle("mapfull",!!on); if(b){ b.textContent=on?"⛶ Exit fullscreen":"⛶ Fullscreen"; b.classList.toggle("full-on",!!on); }
+    setTimeout(function(){ if(!cy) return; cy.resize(); layout(layoutName); setTimeout(function(){ if(cy){ cy.resize(); fitNodes(46); } },540); },120); }
   function showLog(){ var b=document.getElementById("mapbody"); if(b&&b.classList.contains("nolog")){ b.classList.remove("nolog"); var t=document.getElementById("togglelog"); if(t){ t.textContent="Hide log"; t.classList.remove("on"); } refitMap(); } }
   var CMD_HIST=[], histIdx=0;
   function loadConsole(cmd){ switchPane("map"); var ci=document.getElementById("cmdinput"); if(!ci) return; ci.value=cmd; ci.focus(); pop("Loaded into console","edit the syntax, then Run","info"); }
