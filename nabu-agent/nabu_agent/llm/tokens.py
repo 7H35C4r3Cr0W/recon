@@ -35,18 +35,3 @@ def count_messages(messages: Sequence[Message], tools: Sequence[ToolSpec] = ()) 
     return total
 
 
-def fit_context(messages: list[Message], budget_tokens: int, tools: Sequence[ToolSpec] = ()) -> list[Message]:
-    """Trim from the OLDEST non-system message until the estimate fits the budget.
-
-    System messages (role guidance + safety preamble) are never dropped. Returns a new list.
-    """
-    kept = list(messages)
-    while count_messages(kept, tools) > budget_tokens and len(kept) > 1:
-        # drop the first non-system message
-        for i, m in enumerate(kept):
-            if m.role.value != "system":
-                del kept[i]
-                break
-        else:
-            break
-    return kept

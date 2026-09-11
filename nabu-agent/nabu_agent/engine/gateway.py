@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+import structlog
 from oscprecon import audit as engine_audit
 from oscprecon import findings as findings_mod
 from oscprecon import graph_data
@@ -25,6 +26,8 @@ from .errors import ProjectNotFound
 from .schemas import ServiceDTO, to_service_dto
 from .settings import EngineSettings, load_engine_settings
 from .workspace import AgentWorkspace, project_root, workspace_for
+
+_log = structlog.get_logger("nabu_agent.engine.gateway")
 
 
 def _workspace(project_id: str, scope: str, hostname: str | None,
@@ -76,6 +79,7 @@ def list_combined_findings(project_id: str) -> list[dict[str, Any]]:
         try:
             prof = Profile.load(d)
         except Exception:
+            _log.warning("profile-load-skipped", dir=str(d), exc_info=True)
             continue
         host = getattr(prof.target, "ip", "") or ""
         if "/" in host:  # the CIDR/range sweep Profile, not a host
@@ -107,6 +111,7 @@ def render_combined_report(project_id: str) -> str:
         try:
             prof = Profile.load(d)
         except Exception:  # a half-written or foreign dir must not sink the whole report
+            _log.warning("profile-load-skipped", dir=str(d), exc_info=True)
             continue
         if "/" in (getattr(prof.target, "ip", "") or ""):  # the CIDR/range sweep Profile, not a host
             continue

@@ -32,4 +32,12 @@ def configure(level: str = "INFO", fmt: str = "json") -> None:
 
 
 def bind_run(run_id: str, agent_id: str | None = None, **kw: str) -> None:
+    """Bind run_id/agent_id into the contextvars so EVERY structlog line emitted while a run executes
+    carries them — a run reads as one story across the api + N workers. Call at each worker/driver
+    entrypoint; pair with :func:`clear_run` in a finally."""
     structlog.contextvars.bind_contextvars(run_id=run_id, agent_id=agent_id or "-", **kw)
+
+
+def clear_run() -> None:
+    """Drop the per-run contextvars bound by :func:`bind_run` (call in a finally at task exit)."""
+    structlog.contextvars.clear_contextvars()

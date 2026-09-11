@@ -78,6 +78,11 @@ class OpenAICompatibleProvider(LLMProvider):
     def model(self) -> str:
         return self._settings.model
 
+    async def aclose(self) -> None:
+        """Close the underlying httpx client's connection pool. Callers that build a provider per run
+        MUST call this (a long-lived worker would otherwise leak a pool per run)."""
+        await self._client.aclose()
+
     def count_tokens(self, messages: Sequence[Message], tools: Sequence[ToolSpec] = ()) -> int:
         return tokens.count_messages(messages, tools)
 
@@ -167,25 +172,3 @@ class OpenAICompatibleProvider(LLMProvider):
         if resp.status_code >= 400:
             raise LLMBadResponse(f"client error {resp.status_code}: {resp.text[:200]}")
 
-
-def reassemble_tool_calls(chunks: list[ChatChunk]) -> list[ToolCall]:
-    """Fold streamed ``tool_call_delta`` fragments (accumulated by index) into whole ToolCalls.
-
-    Defensive against servers that send the id/name only on the first fragment and arguments as a
-    stream of partial JSON strings. Validate ``arguments`` as JSON at the dispatch boundary.
-    """
-    by_index: dict[int, dict] = {}
-    for ch in chunks:
-        d = ch.tool_call_delta
-        if not d:
-            continue
-        slot = by_index.setdefault(d["index"], {"id": None, "name": None, "arguments": ""})
-        if d.get("id"):
-            slot["id"] = d["id"]
-        if d.get("name"):
-            slot["name"] = d["name"]
-        slot["arguments"] += d.get("arguments_fragment") or ""
-    return [
-        ToolCall(id=s["id"] or f"call_{i}", name=s["name"] or "", arguments=s["arguments"])
-        for i, s in sorted(by_index.items())
-    ]

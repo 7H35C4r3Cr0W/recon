@@ -9,20 +9,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nabu_agent.auth.deps import get_current_user, require_project_member
-from nabu_agent.db.models import Artifact, ScopeTarget, User
+from nabu_agent.db.models import Artifact, User
 from nabu_agent.db.session import get_db
 from nabu_agent.engine import gateway
 from nabu_agent.engine.errors import ProjectNotFound
+from nabu_agent.routers._common import entry_scope as _scope_for
 
 router = APIRouter(tags=["reports"])
 
 
-async def _scope_for(db: AsyncSession, project_id: str) -> str | None:
-    rows = (await db.execute(select(ScopeTarget).where(ScopeTarget.project_id == project_id))).scalars().all()
-    if not rows:
-        return None
-    entry = next((s for s in rows if s.is_entry), rows[0])
-    return entry.target
 
 
 @router.get("/projects/{project_id}/report")

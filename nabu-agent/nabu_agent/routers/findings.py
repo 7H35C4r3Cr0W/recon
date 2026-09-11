@@ -16,11 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nabu_agent import audit
 from nabu_agent.auth.deps import get_current_user, require_project_member, require_project_perm
-from nabu_agent.db.models import FindingTriage, ScopeTarget, User
+from nabu_agent.db.models import FindingTriage, User
 from nabu_agent.db.session import get_db
 from nabu_agent.engine import gateway
 from nabu_agent.engine.errors import ProjectNotFound
 from nabu_agent.rbac import Perm
+from nabu_agent.routers._common import entry_scope as _scope_for
 
 router = APIRouter(tags=["findings"])
 
@@ -33,13 +34,6 @@ def _finding_key(f: dict) -> str:
     return hashlib.sha1(raw.encode()).hexdigest()[:16]
 
 
-async def _scope_for(db: AsyncSession, project_id: str) -> str | None:
-    """The project's entry scope target (the Profile's target); None if no scope defined yet."""
-    rows = (await db.execute(select(ScopeTarget).where(ScopeTarget.project_id == project_id))).scalars().all()
-    if not rows:
-        return None
-    entry = next((s for s in rows if s.is_entry), rows[0])
-    return entry.target
 
 
 async def _merge_triage(db: AsyncSession, project_id: str, rows: list[dict]) -> list[dict]:

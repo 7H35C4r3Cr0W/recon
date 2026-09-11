@@ -7,15 +7,14 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nabu_agent.auth.deps import require_project_perm
-from nabu_agent.db.models import ScopeTarget
 from nabu_agent.db.session import get_db
 from nabu_agent.engine import gateway
 from nabu_agent.engine.errors import ProjectNotFound
 from nabu_agent.rbac import Perm
+from nabu_agent.routers._common import entry_scope as _scope_for
 
 router = APIRouter(tags=["creds"])
 
@@ -28,11 +27,6 @@ class CredBody(BaseModel):
     source: str = "manual"
 
 
-async def _scope_for(db: AsyncSession, project_id: str) -> str | None:
-    rows = (await db.execute(select(ScopeTarget).where(ScopeTarget.project_id == project_id))).scalars().all()
-    if not rows:
-        return None
-    return next((s.target for s in rows if s.is_entry), rows[0].target)
 
 
 def _cid(c) -> str:

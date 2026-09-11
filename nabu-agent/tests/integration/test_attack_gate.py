@@ -320,3 +320,80 @@ async def test_attack_rate_limit_cooldown(client, monkeypatch, tmp_path):
     second = await propose_spray()
     blocked = await client.post(f"/api/runs/{run_id}/checkpoints/{second}/approve", json={})
     assert blocked.status_code == 429 and blocked.headers.get("Retry-After")
+
+
+# --------------------------------------------------------------------------- review-driven coverage
+
+async def _audit_rows(action: str):
+    from nabu_agent.db.models import AuditLog
+    from nabu_agent.db.session import sessionmaker
+    from sqlalchemy import select
+    async with sessionmaker()() as db:
+        return (await db.execute(select(AuditLog).where(AuditLog.action == action))).scalars().all()
+
+
+async def test_params_cannot_override_scope_locked_target(client, monkeypatch, tmp_path):
+    """Regression: operator params must NOT be able to point an approved attack off-scope by
+    overriding {target}. The executed command stays pinned to the in-scope host."""
+    door: list = []
+    _install(monkeypatch, door, template="crackmapexec smb {target} -u {user} -p {password} -x whoami")
+    from nabu_agent.settings import get_settings
+    monkeypatch.setattr(get_settings(), "exploit_enabled", True)
+    pid, run_id, target = await _seed(client, monkeypatch, tmp_path)          # target = 10.10.60.7
+    await client.patch(f"/api/projects/{pid}/settings", json={"exploit_enabled": True})
+    cid = await _add_cred(client, pid, username="admin", secret="hunter2super")
+
+    r = await client.post(f"/api/runs/{run_id}/attack-proposals",
+                          json={"kind": "exploit", "target": target, "service": "smb", "action_id": "smb-cme-exec",
+                                "credential_ref": cid, "params": {"target": "10.10.99.99"}})
+    assert r.status_code == 200, r.text
+    assert "10.10.99.99" not in r.json()["command"] and target in r.json()["command"]
+    cp_id = r.json()["checkpoint_id"]
+    await client.post(f"/api/runs/{run_id}/checkpoints/{cp_id}/approve", json={"exploit_confirmed": True})
+    assert await _poll_status(client, run_id, cp_id, "executed") is not None
+    assert door and target in door[0]["shell_line"] and "10.10.99.99" not in door[0]["shell_line"]
+
+
+async def test_attack_executed_is_audited(client, monkeypatch, tmp_path):
+    door: list = []
+    _install(monkeypatch, door, template="crackmapexec smb {target} -u {user} -p {password}")
+    from nabu_agent.settings import get_settings
+    monkeypatch.setattr(get_settings(), "exploit_enabled", True)
+    pid, run_id, target = await _seed(client, monkeypatch, tmp_path)
+    await client.patch(f"/api/projects/{pid}/settings", json={"exploit_enabled": True})
+    cid = await _add_cred(client, pid, username="admin", secret="hunter2super")
+    cp_id = (await client.post(f"/api/runs/{run_id}/attack-proposals",
+             json={"kind": "exploit", "target": target, "service": "smb", "action_id": "smb-cme-exec",
+                   "credential_ref": cid})).json()["checkpoint_id"]
+    await client.post(f"/api/runs/{run_id}/checkpoints/{cp_id}/approve", json={"exploit_confirmed": True})
+    assert await _poll_status(client, run_id, cp_id, "executed") is not None
+    rows = await _audit_rows("attack-executed")                              # the durable audit row exists
+    assert any(r.object_id == cp_id and (r.details or {}).get("outcome") == "executed" for r in rows)
+
+
+async def test_project_toggle_off_blocks_approval(client, monkeypatch, tmp_path):
+    door: list = []
+    _install(monkeypatch, door)
+    from nabu_agent.settings import get_settings
+    monkeypatch.setattr(get_settings(), "exploit_enabled", True)                # platform ON
+    pid, run_id, target = await _seed(client, monkeypatch, tmp_path)            # project toggle left OFF
+    cp_id = (await client.post(f"/api/runs/{run_id}/attack-proposals",
+             json={"kind": "exploit", "target": target, "service": "smb", "action_id": "smb-cme-exec"})).json()["checkpoint_id"]
+    r = await client.post(f"/api/runs/{run_id}/checkpoints/{cp_id}/approve", json={"exploit_confirmed": True})
+    assert r.status_code == 409 and "project" in r.json()["detail"].lower()
+    assert door == []
+
+
+async def test_gated_door_refuses_unconfirmed_exploit(tmp_path):
+    """The door's OWN last-line re-gate: exploit=True is refused without exploit_confirmed, even if
+    handed an 'approved' checkpoint."""
+    from types import SimpleNamespace
+
+    import pytest as _pytest
+    from nabu_agent.engine import shell_gateway as sg
+    from nabu_agent.engine.errors import AttackGateClosed
+    cp = SimpleNamespace(status="approved", approved_by="u1", kind="exploit",
+                         target="10.10.60.7", exploit_confirmed=False)
+    with _pytest.raises(AttackGateClosed):
+        sg.execute_gated_action(cp, SimpleNamespace(directory=tmp_path, target=SimpleNamespace(ip="10.10.60.7")),
+                                "crackmapexec smb 10.10.60.7", tmp_path / "o.log")

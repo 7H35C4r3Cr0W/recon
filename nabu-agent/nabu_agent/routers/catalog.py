@@ -6,24 +6,19 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nabu_agent.auth.deps import get_current_user, require_project_member
-from nabu_agent.db.models import ScopeTarget, User
+from nabu_agent.db.models import User
 from nabu_agent.db.session import get_db
 from nabu_agent.engine import gateway
 from nabu_agent.engine import tools as etools
 from nabu_agent.engine.errors import ProjectNotFound
+from nabu_agent.routers._common import entry_scope as _scope_for
 
 router = APIRouter(tags=["catalog"])
 
 
-async def _scope_for(db: AsyncSession, project_id: str) -> str | None:
-    rows = (await db.execute(select(ScopeTarget).where(ScopeTarget.project_id == project_id))).scalars().all()
-    if not rows:
-        return None
-    return next((s.target for s in rows if s.is_entry), rows[0].target)
 
 
 @router.get("/catalog/services/{key}")

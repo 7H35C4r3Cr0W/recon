@@ -109,3 +109,8 @@ class LLMProvider(Protocol):
     def count_tokens(self, messages: Sequence[Message], tools: Sequence[ToolSpec] = ()) -> int:
         """Best-effort local token estimate (for budgeting when the server omits usage)."""
         ...
+
+    async def aclose(self) -> None:
+        """Release any held resources (e.g. an HTTP connection pool). A caller that builds a provider
+        per run must call this. Implementations with nothing to close may no-op."""
+        ...

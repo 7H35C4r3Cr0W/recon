@@ -21,6 +21,7 @@ It layers three carried-over invariants ON TOP of the engine's own ``policy_viol
 from __future__ import annotations
 
 import ipaddress
+import re
 import threading
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -215,8 +216,20 @@ def audit(profile: Profile, action: str, *, details: dict[str, Any] | None = Non
     engine_audit.record(profile.directory, profile.profile_name, action, actor=actor, details=details or {})
 
 
+# Credential-bearing CLI flags whose following token is a secret (password / NT hash). Masked before
+# anything is written to the audit trail — the engine's own redactor ships OFF (single-tenant owner
+# policy), so we must NOT depend on it to keep a plaintext secret out of audit.jsonl.
+# Case-sensitive on purpose: -p/-H are the real password/hash flags (crackmapexec/netexec/hydra),
+# while -P (uppercase) is a wordlist PATH and must NOT be masked away.
+_SECRET_FLAG_RE = re.compile(
+    r"(?P<flag>-p|--password|--pass|-H|--hash|--nthash|--ntlm)(?P<sep>[= ]+)(?P<val>\S+)")
+
+
 def _redact(shell_line: str) -> str:
-    """Use the engine's own command redactor when present (ships OFF by owner policy, but the hook
-    exists); fall back to the raw line."""
+    """Mask credential-bearing tokens in a command before it is audited/logged. This is a
+    nabu_agent-owned mask that runs regardless of the engine's (default-off) redactor, so a
+    password/hash never reaches audit.jsonl even in the shipped configuration. The engine redactor,
+    if enabled, is then layered on top."""
+    masked = _SECRET_FLAG_RE.sub(lambda m: f"{m.group('flag')}{m.group('sep')}<redacted>", shell_line)
     redactor = getattr(shell, "redact_command", None)
-    return redactor(shell_line) if callable(redactor) else shell_line
+    return redactor(masked) if callable(redactor) else masked
