@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import { NODE_COLORS } from "../lib/nodeColors";
+import { shortestPath, pathNext } from "../lib/graphPath";
 
 // BloodHound-style run graph (mirrors the classic Nabu GUI + SpecterOps BloodHound's Sigma view):
 // a force-directed spread of coloured discs with a TYPE GLYPH, a live STATE ring, a pulsating-green
@@ -27,6 +28,7 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
   const cyRef = useRef<Core | null>(null);
   const layoutTimer = useRef<number | null>(null);
   const pulseTimer = useRef<number | null>(null);
+  const selectedRef = useRef<string | null>(null);
 
   const runLayout = (cy: Core) => {
     const opts = layoutName === "breadthfirst"
@@ -73,6 +75,10 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         // BloodHound-style focus: fade everything not in the hovered/selected node's neighbourhood
         { selector: ".faded", style: { opacity: 0.12, "text-opacity": 0.12 } as any },
         { selector: "node.hl", style: { "border-color": "#3ad9c0", "border-width": 5 } as any },
+        // click-to-highlight attack path (target root → clicked node): path pops gold, rest dims
+        { selector: ".offpath", style: { opacity: 0.1, "text-opacity": 0.1 } as any },
+        { selector: "node.onpath", style: { "border-color": "#f2b636", "border-width": 6 } as any },
+        { selector: "edge.onpath", style: { "line-color": "#f2b636", "target-arrow-color": "#f2b636", width: 3.2, opacity: 1 } as any },
         {
           selector: "edge",
           style: { width: 1.6, "line-color": "#5b6b7d", "target-arrow-color": "#5b6b7d",
@@ -95,17 +101,43 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     });
     cyRef.current = cy;
 
-    // hover → highlight the node + its neighbourhood, dim the rest (BloodHound's signature)
+    // hover → highlight the node + its neighbourhood, dim the rest (BloodHound's signature).
+    // Suppressed while an attack path is pinned by a click, so the two don't fight.
     cy.on("mouseover", "node", (e) => {
+      if (selectedRef.current) return;
       const nb = e.target.closedNeighborhood();
       cy.elements().addClass("faded");
       nb.removeClass("faded").addClass("hl");
     });
-    cy.on("mouseout", "node", () => cy.elements().removeClass("faded hl"));
-    // click a node → select (parent shows details); click blank → clear
-    cy.on("tap", "node", (e) => onSelect?.({
-      id: e.target.id(), label: e.target.data("label"), kind: e.target.data("kind"), state: e.target.data("state") }));
-    cy.on("tap", (e) => { if (e.target === cy) onSelect?.(null); });
+    cy.on("mouseout", "node", () => { if (!selectedRef.current) cy.elements().removeClass("faded hl"); });
+
+    // click a node → select (parent shows details) AND pin the attack path from the target root to
+    // it in gold, everything else dimmed (BloodHound "shortest path" adapted to the rooted recon
+    // graph); click blank → clear both.
+    const pinPath = (node: cytoscape.NodeSingular) => {
+      cy.elements().removeClass("faded hl onpath offpath");
+      const root = cy.nodes().filter((n) => {
+        const k = n.data("kind") as string; return k === "run" || k === "target"; }).first();
+      if (root.empty()) return;
+      const ids = shortestPath(
+        cy.edges().map((ed) => ({ source: ed.source().id(), target: ed.target().id() })),
+        root.id(), node.id());
+      if (ids.length === 0) return;
+      const onPath = new Set(ids);
+      const next = pathNext(ids);
+      cy.elements().addClass("offpath");
+      cy.nodes().forEach((n) => { if (onPath.has(n.id())) n.removeClass("offpath").addClass("onpath"); });
+      cy.edges().forEach((ed) => {
+        if (next.get(ed.source().id()) === ed.target().id()) ed.removeClass("offpath").addClass("onpath"); });
+    };
+    cy.on("tap", "node", (e) => {
+      onSelect?.({ id: e.target.id(), label: e.target.data("label"), kind: e.target.data("kind"), state: e.target.data("state") });
+      selectedRef.current = e.target.id();
+      pinPath(e.target);
+    });
+    cy.on("tap", (e) => {
+      if (e.target === cy) { onSelect?.(null); selectedRef.current = null; cy.elements().removeClass("faded hl onpath offpath"); }
+    });
 
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (!reduce) {
