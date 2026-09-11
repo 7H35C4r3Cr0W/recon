@@ -280,3 +280,16 @@ class AppSetting(Base):
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(),
                                                         server_default=func.now())
+
+
+class MapNote(Base):
+    """An operator's free-text note pinned to a node on the live recon map, per project. The node id
+    is the map's stable id (``host-<host>`` / ``service-<host>-<port>`` / ``finding-…``), so a note
+    survives across runs of the same project. Empty text deletes the row."""
+    __tablename__ = "map_notes"
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), primary_key=True)
+    node_id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    text: Mapped[str] = mapped_column(Text, default="")
+    updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+                                                 server_default=func.now(), onupdate=func.now())

@@ -21,10 +21,10 @@ const ICON: Record<string, string> = {
   agent: glyph("<rect x='5' y='7' width='14' height='11' rx='2'/><path d='M12 7V4M9 12h.01M15 12h.01M9 15h6'/>"),
 };
 
-export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds, selectedId, exportNonce = 0 }:
+export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds, selectedId, exportNonce = 0, notedIds }:
   { elements: ElementDefinition[]; layoutName?: "cose" | "breadthfirst"; fitNonce?: number;
     onSelect?: (n: { id: string; label: string; kind: string; state: string; hops?: number } | null) => void;
-    search?: string; hiddenKinds?: string[]; selectedId?: string | null; exportNonce?: number }) {
+    search?: string; hiddenKinds?: string[]; selectedId?: string | null; exportNonce?: number; notedIds?: string[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const layoutTimer = useRef<number | null>(null);
@@ -82,6 +82,8 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         { selector: ".offpath", style: { opacity: 0.1, "text-opacity": 0.1 } as any },
         { selector: "node.onpath", style: { "border-color": "#f2b636", "border-width": 6 } as any },
         { selector: "node.path-a", style: { "border-color": "#3ad9c0", "border-width": 6 } as any },
+        // a node with an operator note: dashed gold ring so it's spotted at a glance
+        { selector: "node.noted", style: { "border-color": "#f9e2af", "border-width": 4, "border-style": "dashed" } as any },
         { selector: "edge.onpath", style: { "line-color": "#f2b636", "target-arrow-color": "#f2b636", width: 3.2, opacity: 1 } as any },
         // search highlight + node-type filter
         { selector: ".search-dim", style: { opacity: 0.12, "text-opacity": 0.12 } as any },
@@ -268,6 +270,14 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // mark nodes that carry an operator note (dashed gold ring)
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const noted = new Set(notedIds ?? []);
+    cy.nodes().forEach((n) => { n.toggleClass("noted", noted.has(n.id())); });
+  }, [notedIds, elements]);
 
   // export the current map as a PNG (parity with the desktop graph's export)
   useEffect(() => {

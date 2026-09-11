@@ -28,7 +28,7 @@ const TERMINAL = new Set(["done", "partial", "failed", "cancelled"]);
 // The live run view: a full-screen BloodHound-style map whose nodes recolour + pulse as agents move,
 // with a phase stepper, view controls, and a live log.
 export function RunLive() {
-  const { runId } = useParams();
+  const { runId, projectId } = useParams();
   const [nodes, setNodes] = useState<Record<string, NodeRec>>({});
   const [edges, setEdges] = useState<Record<string, { source: string; target: string; label?: string }>>({});
   const [logs, setLogs] = useState<string[]>([]);
@@ -42,6 +42,8 @@ export function RunLive() {
   const [hiddenKinds, setHiddenKinds] = useState<string[]>([]);
   const [selected, setSelected] = useState<{ id: string; label: string; kind: string; state: string; hops?: number } | null>(null);
   const [pending, setPending] = useState<{ id: string; message: string } | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [noteDraft, setNoteDraft] = useState("");
   const logRef = useRef<HTMLDivElement>(null);
   const lastSeqRef = useRef(0);
 
@@ -54,6 +56,19 @@ export function RunLive() {
     if (!runId) return;
     try { await api(`/runs/${runId}/cancel`, { method: "POST" }); setLogs((l) => [...l, "[run] cancel requested"]); }
     catch (err) { setLogs((l) => [...l, `[run] cancel failed: ${String(err)}`]); }
+  }
+  // persist an operator note on a map node (empty text clears it); keyed by the stable node id
+  async function saveNote(nodeId: string, text: string) {
+    if (!projectId) return;
+    try {
+      await api(`/projects/${projectId}/map-notes/${encodeURIComponent(nodeId)}`,
+                { method: "PUT", body: JSON.stringify({ text }) });
+      setNotes((n) => {
+        const next = { ...n };
+        if (text.trim()) next[nodeId] = text.trim(); else delete next[nodeId];
+        return next;
+      });
+    } catch (err) { setLogs((l) => [...l, `[note] save failed: ${String(err)}`]); }
   }
 
   useEffect(() => {
@@ -112,6 +127,13 @@ export function RunLive() {
   }
 
   useEffect(() => { logRef.current?.scrollTo(0, logRef.current.scrollHeight); }, [logs]);
+
+  // load persisted node notes for this project, and keep the drawer's editor synced to the selection
+  useEffect(() => {
+    if (!projectId) return;
+    api<Record<string, string>>(`/projects/${projectId}/map-notes`).then(setNotes).catch(() => {});
+  }, [projectId]);
+  useEffect(() => { setNoteDraft(selected ? notes[selected.id] || "" : ""); }, [selected, notes]);
 
   const elements: ElementDefinition[] = useMemo(() => {
     const els: ElementDefinition[] = [];
@@ -191,7 +213,7 @@ export function RunLive() {
 
       <div className="map-body" style={{ gridTemplateColumns: showLog ? "1fr 380px" : "1fr" }}>
         <div style={{ position: "relative", minHeight: 0 }}>
-          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} search={search} hiddenKinds={hiddenKinds} selectedId={selected?.id ?? null} exportNonce={exportNonce} />
+          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} search={search} hiddenKinds={hiddenKinds} selectedId={selected?.id ?? null} exportNonce={exportNonce} notedIds={Object.keys(notes)} />
           {selected && (
             <div className="node-drawer">
               <div className="row" style={{ justifyContent: "space-between" }}>
@@ -221,6 +243,15 @@ export function RunLive() {
                   attack path: {selected.hops} hop{selected.hops === 1 ? "" : "s"} from the entry
                 </div>
               )}
+              <div style={{ marginTop: 10, borderTop: "1px solid var(--line)", paddingTop: 9 }}>
+                <div className="mono muted" style={{ fontSize: 9.5, letterSpacing: ".12em", textTransform: "uppercase", marginBottom: 5 }}>📌 note</div>
+                <textarea className="input" style={{ width: "100%", minHeight: 46, fontSize: 11, resize: "vertical" }}
+                  value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="add a note on this node…" />
+                <div style={{ display: "flex", gap: 7, marginTop: 6 }}>
+                  <button className="seg on" style={{ flex: 1 }} onClick={() => saveNote(selected.id, noteDraft)}>Save</button>
+                  <button className="seg" style={{ flex: 1 }} onClick={() => { setNoteDraft(""); saveNote(selected.id, ""); }}>Clear</button>
+                </div>
+              </div>
             </div>
           )}
           {/* node-type key — swatch SHAPE mirrors the real node shape (circle/box/diamond/star) so it
