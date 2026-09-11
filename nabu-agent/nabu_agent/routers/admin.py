@@ -12,7 +12,6 @@ from pydantic import BaseModel
 from nabu_agent.auth.deps import require_admin
 from nabu_agent.db.models import User
 from nabu_agent.orchestration.retention import run_retention, storage_stats
-from nabu_agent.settings import get_settings
 
 router = APIRouter(tags=["admin"])
 
@@ -31,42 +30,82 @@ async def trigger_retention(_: User = Depends(require_admin)) -> dict:
 
 @router.get("/admin/llm/config")
 async def llm_config(_: User = Depends(require_admin)) -> dict:
-    """Current brain configuration STATUS (never the api key). Drives the admin LLM setup page."""
-    s = get_settings().llm
-    return {
-        "provider": s.provider,
-        "configured": bool(s.base_url),           # base_url is the one required field
-        "base_url": s.base_url,                   # not a secret; shown so the admin can confirm it
-        "model": s.model,
-        "organization": s.organization or None,
-        "has_api_key": bool(s.api_key.get_secret_value()),   # bool only — the key is never returned
-        "temperature": s.temperature,
-        "max_output_tokens": s.max_output_tokens,
-        "context_window": s.context_window,
-        "timeout_read_s": s.timeout_read_s,
-        "tls_verify": s.tls_verify,
-        "env_prefix": "NABU_LLM_",
-        "required_env": ["NABU_LLM_BASE_URL", "NABU_LLM_API_KEY", "NABU_LLM_MODEL"],
-    }
+    """Current brain configuration STATUS (never the api key). Drives the admin LLM setup page.
+    ``source`` = 'saved' (admin set it in the UI), 'env' (only NABU_LLM_* set), or 'none'."""
+    from nabu_agent.services import llm_config as cfg
+    return {**await cfg.status(),
+            "env_prefix": "NABU_LLM_",
+            "required_env": ["NABU_LLM_BASE_URL", "NABU_LLM_API_KEY", "NABU_LLM_MODEL"]}
+
+
+class LLMConfigBody(BaseModel):
+    base_url: str
+    model: str = "gpt-5.1"
+    api_key: str | None = None            # blank/omitted → keep the currently-saved key
+    provider: str = "openai_compatible"
+    organization: str = ""
+    temperature: float = 0.2
+    max_output_tokens: int = 4096
+    context_window: int = 128_000
+    timeout_read_s: float = 120.0
+    tls_verify: bool = True
+
+
+@router.put("/admin/llm/config")
+async def save_llm_config(body: LLMConfigBody, user: User = Depends(require_admin)) -> dict:
+    """Save the brain config from the UI — applied on the next provider build, no restart. The api
+    key is stored ENCRYPTED and never returned. Leave api_key blank to keep the existing one."""
+    from fastapi import HTTPException
+
+    from nabu_agent.services import llm_config as cfg
+    if not body.base_url.strip():
+        raise HTTPException(status_code=422, detail="base_url is required (your internal endpoint)")
+    values = body.model_dump(exclude={"api_key"})
+    await cfg.save(values, api_key=body.api_key, updated_by=user.id)
+    from nabu_agent import audit
+    await audit.record(actor_user_id=user.id, action=audit.SETTINGS_CHANGED, object_type="llm-config",
+                       object_id="llm", details={"base_url": body.base_url, "model": body.model,
+                                                  "key_set": bool(body.api_key)})
+    return {"ok": True, **await cfg.status()}
+
+
+@router.delete("/admin/llm/config")
+async def clear_llm_config(user: User = Depends(require_admin)) -> dict:
+    """Delete the saved override and fall back to the NABU_LLM_* env config."""
+    from nabu_agent.services import llm_config as cfg
+    await cfg.clear()
+    from nabu_agent import audit
+    await audit.record(actor_user_id=user.id, action=audit.SETTINGS_CHANGED, object_type="llm-config",
+                       object_id="llm", details={"cleared": True})
+    return {"ok": True, **await cfg.status()}
 
 
 class LLMTestBody(BaseModel):
     prompt: str = "Reply with the single word: OK"
+    # optional inline values to TEST BEFORE SAVING (blank → test the saved/effective config)
+    base_url: str | None = None
+    api_key: str | None = None
+    model: str | None = None
+    organization: str | None = None
+    tls_verify: bool | None = None
 
 
 @router.post("/admin/llm/test")
 async def llm_test(body: LLMTestBody, _: User = Depends(require_admin)) -> dict:
-    """Test-fire the configured brain: send one tiny prompt and report success, latency, model, and
-    token usage — or a clean error. Never raises (returns ok:false with the reason), so a
-    misconfiguration is diagnosable from the UI instead of a 500."""
+    """Test-fire the brain: one tiny prompt → success, latency, model, token usage — or a clean
+    error. If inline values are supplied they're tested WITHOUT saving (so the admin can validate
+    before committing). Never raises (returns ok:false with the reason)."""
     from nabu_agent.llm.base import ChatRequest, Message, Role
     from nabu_agent.llm.factory import build_provider
+    from nabu_agent.services import llm_config as cfg
 
-    s = get_settings().llm
+    overrides = {k: v for k, v in {"base_url": body.base_url, "api_key": body.api_key,
+                 "model": body.model, "organization": body.organization,
+                 "tls_verify": body.tls_verify}.items() if v is not None and v != ""}
+    s = await cfg.effective_llm_settings(overrides or None)
     if not s.base_url:
         return {"ok": False, "configured": False,
-                "error": "LLM not configured — set NABU_LLM_BASE_URL (and NABU_LLM_API_KEY / "
-                         "NABU_LLM_MODEL), then restart the api + worker."}
+                "error": "No endpoint yet — enter a Base URL (and API key / model) above, then Test."}
     try:
         provider = build_provider(s)
     except Exception as exc:
@@ -91,7 +130,5 @@ async def llm_test(body: LLMTestBody, _: User = Depends(require_admin)) -> dict:
         return {"ok": False, "configured": True,
                 "latency_ms": round((time.perf_counter() - t0) * 1000), "error": str(exc)[:400]}
     finally:
-        client = getattr(provider, "_client", None)   # factory builds an httpx client per call; close it
-        if client is not None:
-            with contextlib.suppress(Exception):
-                await client.aclose()
+        with contextlib.suppress(Exception):
+            await provider.aclose()

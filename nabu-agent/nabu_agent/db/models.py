@@ -268,3 +268,15 @@ class FindingTriage(Base):
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
                                                  server_default=func.now(), onupdate=func.now())
+
+
+class AppSetting(Base):
+    """Small key/value store for admin-editable platform settings (currently the LLM config), so the
+    brain can be attached from the UI at runtime without editing env + restarting. Secrets inside
+    ``value`` are stored encrypted (see ``nabu_agent.config_store``); the API never returns them."""
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)
+    updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), onupdate=func.now(),
+                                                        server_default=func.now())

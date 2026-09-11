@@ -19,7 +19,7 @@ async def test_llm_config_and_test_when_unconfigured(client):
     r = await client.post("/api/admin/llm/test", json={})
     assert r.status_code == 200
     body = r.json()
-    assert body["ok"] is False and body["configured"] is False and "NABU_LLM_BASE_URL" in body["error"]
+    assert body["ok"] is False and body["configured"] is False and body.get("error")  # clean reason, not a 500
 
 
 async def test_llm_test_fire_reports_metrics_with_a_fake_brain(client, monkeypatch):
