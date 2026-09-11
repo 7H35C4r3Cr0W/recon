@@ -20,6 +20,8 @@
   // node ids like "target" / "subnet-<cidr>" collide across profiles, so lastProfileKey guards that.
   var collapseState = {};
   var traceId = null; // id of the node whose attack path is currently pinned (click-to-trace)
+  var pathA = null;   // first endpoint of a shift-click "path between two nodes" selection
+  var currentPathIds = []; // node ids of the currently-pinned path (for "copy path as text")
   // friendly relationship labels shown on the pinned attack path's edges (reads as a chain)
   var TRACE_REL = {
     "has-service": "runs",
@@ -33,7 +35,7 @@
   };
   var lastProfileKey = "";
 
-  var DEFAULT_HINT = "double-click the entry to expand (again to fold all) · double-click a /24 for its hosts · a host for its services · single-click a node for detail + its attack path · click empty space to clear · drag canvas to pan";
+  var DEFAULT_HINT = "double-click to expand · single-click a node for detail + its attack path · shift-click two nodes for the path between them · C copies a pinned path · click empty space to clear";
 
   // BloodHound-style icon nodes: a coloured disc with a white/dark glyph and the label below. Icons
   // are inline SVGs (no network) encoded as data URIs. `#c` is the placeholder colour so one template
@@ -275,6 +277,7 @@
     // click-to-trace attack path: the path pops in gold, everything else dims
     { selector: ".trace-dim", style: { opacity: 0.1 } },
     { selector: "node.trace-hl", style: { "border-color": "#f2b636", "border-width": 5 } },
+    { selector: "node.path-a", style: { "border-color": "#94e2d5", "border-width": 6, "border-style": "double" } },
     {
       selector: "edge",
       style: {
@@ -675,7 +678,9 @@
 
   function clearTrace() {
     traceId = null;
-    if (cy) cy.elements().removeClass("trace-dim trace-hl hover-dim hover-hl");
+    pathA = null;
+    currentPathIds = [];
+    if (cy) cy.elements().removeClass("trace-dim trace-hl hover-dim hover-hl path-a");
     if (!linkMode) {
       var h = document.getElementById("hint");
       if (h) h.textContent = DEFAULT_HINT;
@@ -690,6 +695,7 @@
     var ids = traceShortestPath(root.id(), node.id());
     if (!ids.length) { traceId = null; return; } // unreachable over visible edges: just select it
     traceId = node.id();
+    currentPathIds = ids;
     var hops = ids.length - 1;
     var hintEl = document.getElementById("hint");
     if (hintEl) {
@@ -710,6 +716,78 @@
         e.removeClass("trace-dim").addClass("trace-hl");
       }
     });
+  }
+
+  // undirected shortest path between two nodes over the VISIBLE graph — "how are A and B related"
+  function pathBetween(aId, bId) {
+    if (aId === bId) return [aId];
+    var adj = {};
+    cy.edges(":visible").forEach(function (e) {
+      var s = e.source().id(), t = e.target().id();
+      (adj[s] = adj[s] || []).push(t);
+      (adj[t] = adj[t] || []).push(s);
+    });
+    var prev = {}, seen = {}, q = [aId];
+    seen[aId] = true;
+    while (q.length) {
+      var cur = q.shift(), outs = adj[cur] || [];
+      for (var i = 0; i < outs.length; i++) {
+        var nx = outs[i];
+        if (seen[nx]) continue;
+        seen[nx] = true; prev[nx] = cur;
+        if (nx === bId) {
+          var path = [nx], at = cur;
+          while (at !== aId) { path.unshift(at); at = prev[at]; }
+          path.unshift(aId);
+          return path;
+        }
+        q.push(nx);
+      }
+    }
+    return [];
+  }
+
+  // highlight a path given as an ordered id list (the A→B selection); edges are matched in either
+  // direction since the relationship, not the arrow, is the point here.
+  function pinPathIds(ids, label) {
+    if (!cy || ids.length < 2) return;
+    cy.elements().removeClass("trace-dim trace-hl hover-dim hover-hl path-a");
+    traceId = ids[ids.length - 1];
+    currentPathIds = ids;
+    var onNode = {}, pair = {};
+    for (var i = 0; i < ids.length; i++) {
+      onNode[ids[i]] = true;
+      if (i < ids.length - 1) { pair[ids[i] + "|" + ids[i + 1]] = true; pair[ids[i + 1] + "|" + ids[i]] = true; }
+    }
+    cy.elements(":visible").addClass("trace-dim");
+    cy.nodes().forEach(function (n) { if (onNode[n.id()]) n.removeClass("trace-dim").addClass("trace-hl"); });
+    cy.edges().forEach(function (e) {
+      if (pair[e.source().id() + "|" + e.target().id()]) {
+        e.data("traceRel", TRACE_REL[e.data("type")] || String(e.data("type") || "").replace(/-/g, " "));
+        e.removeClass("trace-dim").addClass("trace-hl");
+      }
+    });
+    var h = document.getElementById("hint");
+    if (h) h.textContent = label + " · " + (ids.length - 1) + " hop" + (ids.length === 2 ? "" : "s") + " · press C to copy · Esc to clear";
+  }
+
+  function fallbackCopy(text) {
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+    } catch (err) { /* clipboard unavailable */ }
+  }
+  // copy the currently-pinned path as text (labels joined by →) to the clipboard
+  function copyPath() {
+    if (!cy || currentPathIds.length < 2) return;
+    var text = currentPathIds.map(function (id) {
+      var n = cy.getElementById(id); return n.nonempty() ? n.data("label") : id;
+    }).join(" -> ");
+    var done = function () { var h = document.getElementById("hint"); if (h) h.textContent = "path copied to clipboard ✓"; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+    } else { fallbackCopy(text); done(); }
   }
 
   function updateViewportRect() {
@@ -993,6 +1071,24 @@
         }
         return; // link mode swallows the tap — no detail sidebar
       }
+      // shift-click selects two endpoints and traces the path BETWEEN them (BloodHound "path A→B").
+      if (evt.originalEvent && evt.originalEvent.shiftKey) {
+        if (!pathA) {
+          pathA = id;
+          cy.elements().removeClass("trace-dim trace-hl path-a offpath");
+          evt.target.addClass("path-a");
+          var hp = document.getElementById("hint");
+          if (hp) hp.textContent = "path start: " + evt.target.data("label") + " — shift-click a second node";
+        } else {
+          var pids = pathBetween(pathA, id);
+          if (pids.length >= 2) {
+            pinPathIds(pids, "path " + cy.getElementById(pathA).data("label") + " → " + evt.target.data("label"));
+          }
+          pathA = null;
+        }
+        if (bridge) bridge.node_clicked(id, JSON.stringify(evt.target.data()));
+        return;
+      }
       // single click = SELECT (show detail) + pin the attack path from the entry to this node
       // (BloodHound "shortest path", adapted to the recon graph rooted at the target). Expand/
       // collapse is a DOUBLE-click, so inspecting never folds; clicking empty space clears.
@@ -1166,6 +1262,9 @@
     if (e.key === "Escape") {
       if (linkMode) setLinkMode(false);
       clearTrace();
+    } else if ((e.key === "c" || e.key === "C") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      var tag = ((e.target && e.target.tagName) || "").toLowerCase();
+      if (tag !== "input" && tag !== "textarea") copyPath(); // C copies the pinned path as text
     }
   });
 
