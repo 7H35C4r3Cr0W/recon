@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { ElementDefinition } from "cytoscape";
+import type { Core, ElementDefinition } from "cytoscape";
 import { RunGraph } from "../components/RunGraph";
+import { MapRegions, REGION_COLORS, type Region } from "../components/MapRegions";
 import { connectRun, RunEvent } from "../ws/client";
 import { NODE_COLORS, NodeState } from "../lib/nodeColors";
 import { api } from "../api/client";
@@ -44,6 +45,8 @@ export function RunLive() {
   const [pending, setPending] = useState<{ id: string; message: string } | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [noteDraft, setNoteDraft] = useState("");
+  const [cyInstance, setCyInstance] = useState<Core | null>(null);
+  const [regions, setRegions] = useState<Region[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
   const lastSeqRef = useRef(0);
 
@@ -69,6 +72,33 @@ export function RunLive() {
         return next;
       });
     } catch (err) { setLogs((l) => [...l, `[note] save failed: ${String(err)}`]); }
+  }
+  // regions: group-anchored boxes over a set of member nodes, persisted per project
+  async function saveRegion(r: Region) {
+    setRegions((rs) => {
+      const i = rs.findIndex((x) => x.id === r.id);
+      if (i >= 0) { const c = rs.slice(); c[i] = r; return c; }
+      return [...rs, r];
+    });
+    if (!projectId) return;
+    try {
+      await api(`/projects/${projectId}/map-regions/${encodeURIComponent(r.id)}`,
+                { method: "PUT", body: JSON.stringify({ title: r.title, note: r.note, color: r.color, members: r.members }) });
+    } catch (err) { setLogs((l) => [...l, `[region] save failed: ${String(err)}`]); }
+  }
+  async function deleteRegion(id: string) {
+    setRegions((rs) => rs.filter((r) => r.id !== id));
+    if (!projectId) return;
+    try { await api(`/projects/${projectId}/map-regions/${encodeURIComponent(id)}`, { method: "DELETE" }); }
+    catch (err) { setLogs((l) => [...l, `[region] delete failed: ${String(err)}`]); }
+  }
+  function addRegionFromSearch() {
+    const q = search.trim().toLowerCase();
+    if (!q) { setLogs((l) => [...l, "[region] type a search first — Region groups the matching nodes"]); return; }
+    const members = Object.values(nodes).filter((n) => `${n.label} ${n.kind}`.toLowerCase().includes(q)).map((n) => n.id);
+    if (!members.length) { setLogs((l) => [...l, "[region] no nodes match that search"]); return; }
+    const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `rg-${Date.now()}`;
+    saveRegion({ id, title: search.trim(), note: "", color: REGION_COLORS[regions.length % REGION_COLORS.length], members });
   }
 
   useEffect(() => {
@@ -132,6 +162,7 @@ export function RunLive() {
   useEffect(() => {
     if (!projectId) return;
     api<Record<string, string>>(`/projects/${projectId}/map-notes`).then(setNotes).catch(() => {});
+    api<Region[]>(`/projects/${projectId}/map-regions`).then(setRegions).catch(() => {});
   }, [projectId]);
   useEffect(() => { setNoteDraft(selected ? notes[selected.id] || "" : ""); }, [selected, notes]);
 
@@ -197,6 +228,7 @@ export function RunLive() {
         </span>
         <button className="seg" onClick={() => setFitNonce((n) => n + 1)}>⤢ Fit</button>
         <button className="seg" onClick={() => setExportNonce((n) => n + 1)}>⬇ PNG</button>
+        <button className="seg" onClick={addRegionFromSearch} title="group the current search matches into a region">▢ Region</button>
         <input className="input" style={{ maxWidth: 190, padding: "6px 10px", fontSize: 12 }} value={search}
           onChange={(e) => setSearch(e.target.value)} placeholder="search nodes… (dc01 · 445 · svc_)" aria-label="search nodes" />
         <span className="grp">
@@ -213,7 +245,8 @@ export function RunLive() {
 
       <div className="map-body" style={{ gridTemplateColumns: showLog ? "1fr 380px" : "1fr" }}>
         <div style={{ position: "relative", minHeight: 0 }}>
-          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} search={search} hiddenKinds={hiddenKinds} selectedId={selected?.id ?? null} exportNonce={exportNonce} notedIds={Object.keys(notes)} />
+          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} search={search} hiddenKinds={hiddenKinds} selectedId={selected?.id ?? null} exportNonce={exportNonce} notedIds={Object.keys(notes)} onCy={setCyInstance} />
+          <MapRegions cy={cyInstance} regions={regions} onSave={saveRegion} onDelete={deleteRegion} />
           {selected && (
             <div className="node-drawer">
               <div className="row" style={{ justifyContent: "space-between" }}>

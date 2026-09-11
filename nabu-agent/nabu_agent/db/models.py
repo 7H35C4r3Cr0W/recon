@@ -293,3 +293,19 @@ class MapNote(Base):
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
                                                  server_default=func.now(), onupdate=func.now())
+
+
+class MapRegion(Base):
+    """A named region on the recon map: the bounding box of a set of MEMBER node ids, plus a note and
+    colour. Group-anchored (stored by member ids, not coordinates), so it follows the nodes as the
+    map re-lays-out and survives across runs. Per project."""
+    __tablename__ = "map_regions"
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), primary_key=True)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    color: Mapped[str] = mapped_column(String(16), default="#89b4fa")
+    members: Mapped[list[str]] = mapped_column(JSON, default=list)
+    updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
+                                                 server_default=func.now(), onupdate=func.now())

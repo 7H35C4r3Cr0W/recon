@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nabu_agent.auth.deps import get_current_user, require_project_member, require_project_perm
-from nabu_agent.db.models import MapNote, User
+from nabu_agent.db.models import MapNote, MapRegion, User
 from nabu_agent.db.session import get_db
 from nabu_agent.rbac import Perm
 
@@ -48,3 +48,46 @@ async def put_map_note(project_id: str, node_id: str, body: NoteBody,
         row.updated_by = user.id
     await db.commit()
     return {"node_id": node_id, "text": text}
+
+
+class RegionBody(BaseModel):
+    title: str = ""
+    note: str = ""
+    color: str = "#89b4fa"
+    members: list[str] = []
+
+
+@router.get("/projects/{project_id}/map-regions")
+async def list_map_regions(project_id: str, db: AsyncSession = Depends(get_db),
+                           _auth: str = Depends(require_project_member)) -> list[dict]:
+    rows = (await db.execute(select(MapRegion).where(MapRegion.project_id == project_id))).scalars().all()
+    return [{"id": r.id, "title": r.title, "note": r.note, "color": r.color, "members": r.members} for r in rows]
+
+
+@router.put("/projects/{project_id}/map-regions/{region_id}")
+async def put_map_region(project_id: str, region_id: str, body: RegionBody,
+                         db: AsyncSession = Depends(get_db),
+                         user: User = Depends(get_current_user),
+                         _auth: str = Depends(require_project_perm(Perm.RUN_START))) -> dict:
+    members = [str(m) for m in body.members][:500]  # bound the member list
+    row = (await db.execute(select(MapRegion).where(
+        MapRegion.project_id == project_id, MapRegion.id == region_id))).scalar_one_or_none()
+    if row is None:
+        db.add(MapRegion(id=region_id, project_id=project_id, title=body.title, note=body.note,
+                         color=body.color, members=members, updated_by=user.id))
+    else:
+        row.title, row.note, row.color, row.members = body.title, body.note, body.color, members
+        row.updated_by = user.id
+    await db.commit()
+    return {"id": region_id, "title": body.title, "note": body.note, "color": body.color, "members": members}
+
+
+@router.delete("/projects/{project_id}/map-regions/{region_id}")
+async def delete_map_region(project_id: str, region_id: str, db: AsyncSession = Depends(get_db),
+                            _auth: str = Depends(require_project_perm(Perm.RUN_START))) -> dict:
+    row = (await db.execute(select(MapRegion).where(
+        MapRegion.project_id == project_id, MapRegion.id == region_id))).scalar_one_or_none()
+    if row is not None:
+        await db.delete(row)
+        await db.commit()
+    return {"deleted": region_id}

@@ -21,10 +21,11 @@ const ICON: Record<string, string> = {
   agent: glyph("<rect x='5' y='7' width='14' height='11' rx='2'/><path d='M12 7V4M9 12h.01M15 12h.01M9 15h6'/>"),
 };
 
-export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds, selectedId, exportNonce = 0, notedIds }:
+export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect, search = "", hiddenKinds, selectedId, exportNonce = 0, notedIds, onCy }:
   { elements: ElementDefinition[]; layoutName?: "cose" | "breadthfirst"; fitNonce?: number;
     onSelect?: (n: { id: string; label: string; kind: string; state: string; hops?: number } | null) => void;
-    search?: string; hiddenKinds?: string[]; selectedId?: string | null; exportNonce?: number; notedIds?: string[] }) {
+    search?: string; hiddenKinds?: string[]; selectedId?: string | null; exportNonce?: number;
+    notedIds?: string[]; onCy?: (cy: Core | null) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const layoutTimer = useRef<number | null>(null);
@@ -110,6 +111,7 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
       wheelSensitivity: 0.3,
     });
     cyRef.current = cy;
+    onCy?.(cy); // hand the instance up so an overlay (regions) can read bboxes + camera
 
     // hover → highlight the node + its neighbourhood, dim the rest (BloodHound's signature).
     // Suppressed while an attack path is pinned by a click, so the two don't fight.
@@ -198,6 +200,7 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     return () => {
       if (layoutTimer.current !== null) clearTimeout(layoutTimer.current);
       if (pulseTimer.current !== null) clearInterval(pulseTimer.current);
+      onCy?.(null);
       cy.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
