@@ -39,7 +39,7 @@ except ImportError:  # pragma: no cover - QtWebEngine ships with PySide6-Addons
     _WEBVIEW_IMPORTED = False
 
 _HTML_INDEX = Path(__file__).parent.parent / "graph_html" / "index.html"
-_STATUSES = ("new", "investigating", "done", "dead-end")
+_STATUSES = ("new", "investigating", "done", "dead-end", "owned", "high-value")
 _VALID_STATUS = frozenset(_STATUSES)
 
 

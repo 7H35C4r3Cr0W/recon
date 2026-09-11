@@ -113,11 +113,21 @@
       "<path d='M8 8 L16 16 M16 8 L8 16' stroke='#11111b' stroke-width='2.6'/>",
       "#9399b2",
     ),
+    owned: badge(
+      "<path d='M5 16 L7 9 L12 13 L17 9 L19 16 Z' fill='#11111b'/>",
+      "#f38ba8",
+    ),
+    "high-value": badge(
+      "<path d='M12 4 l2.2 4.6 5 .5 -3.8 3.3 1.2 4.9 -4.6 -2.7 -4.6 2.7 1.2 -4.9 -3.8 -3.3 5 -.5 z' fill='#11111b'/>",
+      "#f2b636",
+    ),
   };
   var STATUS_BADGE = {
     done: BADGE.done,
     investigating: BADGE.investigating,
     "dead-end": BADGE["dead-end"],
+    owned: BADGE.owned,
+    "high-value": BADGE["high-value"],
   };
 
   // Chrome colours (canvas bg, node label + outline, edges) follow the active Nabu theme via
