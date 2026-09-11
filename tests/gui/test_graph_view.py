@@ -38,6 +38,21 @@ def test_bridge_get_data(qtbot: QtBot, tmp_path: Path) -> None:
     assert "target" in ids and "service-445-tcp" in ids
 
 
+def test_bridge_saves_and_serves_regions(qtbot: QtBot, tmp_path: Path) -> None:
+    prof = _profile(tmp_path)
+    bridge = GraphBridge()
+    bridge.set_profile(prof)
+    bridge.save_regions(json.dumps([
+        {"id": "rg-1", "title": "AD tier", "note": "DCSync path", "color": "#f38ba8",
+         "mx": 10, "my": 20, "mw": 100, "mh": 60},
+        "not-a-dict",  # non-dict entries are filtered on the way in
+    ]))
+    regions = prof.load_graph()["regions"]
+    assert len(regions) == 1 and regions[0]["title"] == "AD tier"
+    served = json.loads(bridge.get_data())["regions"]  # get_data must serve them back to the JS
+    assert served[0]["id"] == "rg-1"
+
+
 def test_bridge_node_clicked_emits_id_and_data(qtbot: QtBot) -> None:
     bridge = GraphBridge()
     got: list[tuple[str, object]] = []

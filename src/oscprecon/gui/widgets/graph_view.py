@@ -106,7 +106,9 @@ class GraphBridge(QObject):
         if self._profile is None:
             return json.dumps({"nodes": [], "edges": []})
         try:
-            return json.dumps(build_elements(self._profile))
+            data = build_elements(self._profile)
+            data["regions"] = self._profile.load_graph().get("regions", [])
+            return json.dumps(data)
         except Exception:  # boundary: a bad/removed profile must return empty, never break the slot
             return json.dumps({"nodes": [], "edges": []})
 
@@ -156,6 +158,22 @@ class GraphBridge(QObject):
                 slot = overrides.setdefault(node_id, {})
                 if isinstance(slot, dict):
                     slot["position"] = [position[0], position[1]]
+        self._profile.save_graph(graph)
+
+    @Slot(str)
+    def save_regions(self, regions_json: str) -> None:
+        # persist the Milanote-style map regions (drawn boxes + notes) to graph.json
+        if not self._writable():
+            return
+        assert self._profile is not None
+        try:
+            regions = json.loads(regions_json)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(regions, list):
+            return
+        graph = self._profile.load_graph()
+        graph["regions"] = [r for r in regions if isinstance(r, dict)]
         self._profile.save_graph(graph)
 
     @Slot(str, str)

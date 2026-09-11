@@ -635,6 +635,8 @@ class Profile:
             data["user_edges"] = []
         if not isinstance(data.get("node_overrides"), dict):
             data["node_overrides"] = {}
+        if not isinstance(data.get("regions"), list):
+            data["regions"] = []
         return data
 
     def save_graph(self, data: dict[str, Any]) -> None:

@@ -22,6 +22,9 @@
   var traceId = null; // id of the node whose attack path is currently pinned (click-to-trace)
   var pathA = null;   // first endpoint of a shift-click "path between two nodes" selection
   var currentPathIds = []; // node ids of the currently-pinned path (for "copy path as text")
+  // milanote-style map regions (drawn boxes + notes), persisted to graph.json via the bridge
+  var REGIONS = [], regionEls = {}, regionMode = false, regionDrawStart = null, regionDraft = null, regionOrd = 0;
+  var REGION_COLORS = ["#89b4fa", "#a6e3a1", "#f9e2af", "#fab387", "#cba6f7", "#f38ba8"];
   // friendly relationship labels shown on the pinned attack path's edges (reads as a chain)
   var TRACE_REL = {
     "has-service": "runs",
@@ -800,6 +803,104 @@
     } else { fallbackCopy(text); done(); }
   }
 
+  // ---- milanote-style regions: draw a box over an area of the map + attach a note ----
+  function persistRegions() {
+    if (bridge && bridge.save_regions) bridge.save_regions(JSON.stringify(REGIONS));
+  }
+  function positionRegions() {
+    if (!cy) return;
+    var z = cy.zoom(), pan = cy.pan();
+    REGIONS.forEach(function (r) {
+      var el = regionEls[r.id]; if (!el) return;
+      el.style.left = (r.mx * z + pan.x) + "px";
+      el.style.top = (r.my * z + pan.y) + "px";
+      el.style.width = (r.mw * z) + "px";
+      el.style.height = (r.mh * z) + "px";
+    });
+  }
+  function removeRegion(id) {
+    REGIONS = REGIONS.filter(function (r) { return r.id !== id; });
+    if (regionEls[id]) { regionEls[id].remove(); delete regionEls[id]; }
+    persistRegions();
+  }
+  function buildRegionDom(r) {
+    var host = document.getElementById("regions"); if (!host) return;
+    var box = document.createElement("div"); box.className = "region"; box.style.setProperty("--rc", r.color || "#89b4fa");
+    var head = document.createElement("div"); head.className = "rhead";
+    var dot = document.createElement("span"); dot.className = "rc-dot"; dot.title = "cycle colour";
+    dot.addEventListener("click", function () {
+      r.color = REGION_COLORS[(REGION_COLORS.indexOf(r.color) + 1) % REGION_COLORS.length];
+      box.style.setProperty("--rc", r.color); persistRegions();
+    });
+    var title = document.createElement("input"); title.className = "rtitle"; title.value = r.title || "";
+    title.spellcheck = false; title.placeholder = "region";
+    title.addEventListener("input", function () { r.title = title.value; });
+    title.addEventListener("change", persistRegions);
+    var x = document.createElement("button"); x.className = "rx"; x.textContent = "✕"; x.title = "remove region";
+    x.addEventListener("click", function () { removeRegion(r.id); });
+    head.appendChild(dot); head.appendChild(title); head.appendChild(x);
+    var note = document.createElement("textarea"); note.className = "rnote"; note.value = r.note || "";
+    note.placeholder = "notes on this area…"; note.spellcheck = false;
+    note.addEventListener("input", function () { r.note = note.value; });
+    note.addEventListener("change", persistRegions);
+    box.appendChild(head); box.appendChild(note);
+    host.appendChild(box);
+    regionEls[r.id] = box;
+  }
+  function rebuildRegions() {
+    Object.keys(regionEls).forEach(function (id) { regionEls[id].remove(); });
+    regionEls = {};
+    REGIONS.forEach(buildRegionDom);
+    positionRegions();
+  }
+  function setRegionMode(on) {
+    regionMode = on;
+    var cap = document.getElementById("region-capture"); if (cap) cap.classList.toggle("on", on);
+    var btn = document.getElementById("region-mode"); if (btn) btn.classList.toggle("active", on);
+    var h = document.getElementById("hint");
+    if (h) h.textContent = on ? "REGION MODE: drag on the map to box off an area" : DEFAULT_HINT;
+  }
+  function initRegionsOnce() {
+    if (initRegionsOnce._done) return; initRegionsOnce._done = true;
+    var cap = document.getElementById("region-capture");
+    var btn = document.getElementById("region-mode");
+    if (btn) btn.addEventListener("click", function () { setRegionMode(!regionMode); });
+    if (cap) {
+      cap.addEventListener("mousedown", function (e) {
+        var rect = cap.getBoundingClientRect();
+        regionDrawStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        regionDraft = document.createElement("div"); regionDraft.className = "region-draft";
+        document.getElementById("regions").appendChild(regionDraft);
+      });
+    }
+    window.addEventListener("mousemove", function (e) {
+      if (!regionDrawStart || !regionDraft || !cap) return;
+      var rect = cap.getBoundingClientRect();
+      var x = e.clientX - rect.left, y = e.clientY - rect.top;
+      regionDraft.style.left = Math.min(x, regionDrawStart.x) + "px";
+      regionDraft.style.top = Math.min(y, regionDrawStart.y) + "px";
+      regionDraft.style.width = Math.abs(x - regionDrawStart.x) + "px";
+      regionDraft.style.height = Math.abs(y - regionDrawStart.y) + "px";
+    });
+    window.addEventListener("mouseup", function (e) {
+      if (!regionDrawStart) return;
+      var rect = cap.getBoundingClientRect();
+      var x = e.clientX - rect.left, y = e.clientY - rect.top;
+      var rx = Math.min(x, regionDrawStart.x), ry = Math.min(y, regionDrawStart.y);
+      var rw = Math.abs(x - regionDrawStart.x), rh = Math.abs(y - regionDrawStart.y);
+      if (regionDraft) { regionDraft.remove(); regionDraft = null; }
+      regionDrawStart = null;
+      if (rw > 26 && rh > 26 && cy) {
+        var z = cy.zoom(), pan = cy.pan();
+        var r = { id: "rg-" + Date.now() + "-" + (regionOrd++), title: "Region", note: "",
+                  color: REGION_COLORS[regionOrd % REGION_COLORS.length],
+                  mx: (rx - pan.x) / z, my: (ry - pan.y) / z, mw: rw / z, mh: rh / z };
+        REGIONS.push(r); buildRegionDom(r); positionRegions(); persistRegions();
+      }
+      setRegionMode(false);
+    });
+  }
+
   function updateViewportRect() {
     var rect = document.getElementById("minimap-viewport");
     if (!mini || !rect || !cy) return;
@@ -1176,6 +1277,13 @@
       hideTip();
       if (!traceId) cy.elements().removeClass("hover-dim hover-hl");
     });
+
+    // milanote-style regions: load from graph.json (via get_data), render the overlay, keep it glued
+    // to the camera, and wire the draw/persist handlers once.
+    cy.on("pan zoom drag", positionRegions);
+    REGIONS = Array.isArray(elements.regions) ? elements.regions.filter(function (r) { return r && r.id; }) : [];
+    rebuildRegions();
+    initRegionsOnce();
 
     document.getElementById("zoom-in").onclick = function () {
       zoomBy(1.3);
