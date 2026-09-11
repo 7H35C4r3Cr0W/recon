@@ -108,6 +108,23 @@ async def clear_login_failures(ip: str, email: str) -> None:
     await get_redis().delete(_login_key(ip, email))
 
 
+async def attack_cooldown_ttl(project_id: str) -> int:
+    """Seconds left on a project's gated-execution cooldown (0 = clear). Best-effort; a Redis blip
+    reads as 'clear' so the gate never wedges on infra."""
+    try:
+        ttl = int(await get_redis().ttl(f"attack:cooldown:{project_id}"))
+    except Exception:
+        return 0
+    return ttl if ttl > 0 else 0
+
+
+async def set_attack_cooldown(project_id: str, seconds: int) -> None:
+    """Start the per-project cooldown after a gated action fires. Best-effort."""
+    if seconds > 0:
+        with contextlib.suppress(Exception):
+            await get_redis().set(f"attack:cooldown:{project_id}", "1", ex=seconds)
+
+
 async def request_cancel(run_id: str) -> None:
     await get_redis().set(cancel_key(run_id), "1")
 

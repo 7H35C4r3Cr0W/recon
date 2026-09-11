@@ -249,3 +249,74 @@ async def test_dry_run_shows_command_without_calling_the_door(client, monkeypatc
     assert door == []                                     # the gated door was NEVER called
     events = (await client.get(f"/api/runs/{run_id}/events")).json()["events"]
     assert "would run" in str(events) and "hunter2super" not in str(events)   # shown (redacted), not run
+
+
+# --------------------------------------------------------------------------- Phase E (optional hardening)
+
+async def _member(client, app_ctx, pid, email, role="operator"):
+    """Create a user + add them to the project, and return a logged-in client for them."""
+    from nabu_agent.auth.providers import hash_password
+    from nabu_agent.db.models import User
+    from nabu_agent.db.session import sessionmaker
+    app, _ = app_ctx
+    async with sessionmaker()() as db:
+        db.add(User(email=email, display_name=email, role="operator", auth_source="local",
+                    password_hash=hash_password("pw")))
+        await db.commit()
+    await client.post(f"/api/projects/{pid}/members", json={"email": email, "role": role})
+    c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
+    await c.post("/api/auth/login", json={"email": email, "password": "pw"})
+    return c
+
+
+async def test_four_eyes_requires_two_distinct_approvers(client, app_ctx, monkeypatch, tmp_path):
+    door: list = []
+    _install(monkeypatch, door, template="crackmapexec smb {target} -u {user} -p {password} -x whoami")
+    from nabu_agent.settings import get_settings
+    monkeypatch.setattr(get_settings(), "exploit_enabled", True)
+    monkeypatch.setattr(get_settings(), "require_two_approvers", True)     # four-eyes ON
+    pid, run_id, target = await _seed(client, monkeypatch, tmp_path)
+    await client.patch(f"/api/projects/{pid}/settings", json={"exploit_enabled": True})
+    cid = await _add_cred(client, pid, username="admin", secret="hunter2super")
+    cp_id = (await client.post(f"/api/runs/{run_id}/attack-proposals",
+             json={"kind": "exploit", "target": target, "service": "smb",
+                   "action_id": "smb-cme-exec", "credential_ref": cid})).json()["checkpoint_id"]
+
+    # approver #1 (admin) — records the first approval, does NOT execute
+    r1 = await client.post(f"/api/runs/{run_id}/checkpoints/{cp_id}/approve", json={"exploit_confirmed": True})
+    assert r1.status_code == 200 and r1.json().get("awaiting") == "second_approver"
+    assert door == []
+    # the SAME approver can't be the second pair of eyes
+    same = await client.post(f"/api/runs/{run_id}/checkpoints/{cp_id}/approve", json={"exploit_confirmed": True})
+    assert same.status_code == 409 and "second approver" in same.json()["detail"]
+
+    # a DIFFERENT operator approves → it executes
+    op = await _member(client, app_ctx, pid, "op2@c.io", role="operator")
+    r2 = await op.post(f"/api/runs/{run_id}/checkpoints/{cp_id}/approve", json={"exploit_confirmed": True})
+    assert r2.status_code == 200 and r2.json().get("enqueued") is True
+    assert await _poll_status(client, run_id, cp_id, "executed") is not None
+    assert door and "hunter2super" in door[0]["shell_line"]
+    await op.aclose()
+
+
+async def test_attack_rate_limit_cooldown(client, monkeypatch, tmp_path):
+    door: list = []
+    _install(monkeypatch, door, template="netexec ssh {target} -u {user} -p {password}")
+    from nabu_agent.settings import get_settings
+    monkeypatch.setattr(get_settings(), "spray_enabled", True)
+    monkeypatch.setattr(get_settings(), "attack_min_interval_s", 60)       # cooldown ON
+    pid, run_id, target = await _seed(client, monkeypatch, tmp_path)
+    await client.patch(f"/api/projects/{pid}/settings", json={"spray_enabled": True})
+    cid = await _add_cred(client, pid, username="svc", secret="Spring2026")
+
+    async def propose_spray():
+        return (await client.post(f"/api/runs/{run_id}/attack-proposals",
+                json={"kind": "spray", "target": target, "service": "ssh",
+                      "action_id": "smb-cme-exec", "credential_ref": cid})).json()["checkpoint_id"]
+
+    first = await propose_spray()
+    ok = await client.post(f"/api/runs/{run_id}/checkpoints/{first}/approve", json={})
+    assert ok.status_code == 200                                            # fires + starts the cooldown
+    second = await propose_spray()
+    blocked = await client.post(f"/api/runs/{run_id}/checkpoints/{second}/approve", json={})
+    assert blocked.status_code == 429 and blocked.headers.get("Retry-After")
