@@ -106,9 +106,7 @@ class GraphBridge(QObject):
         if self._profile is None:
             return json.dumps({"nodes": [], "edges": []})
         try:
-            data = build_elements(self._profile)
-            data["regions"] = self._profile.load_graph().get("regions", [])
-            return json.dumps(data)
+            return json.dumps(build_elements(self._profile))  # includes regions (single load)
         except Exception:  # boundary: a bad/removed profile must return empty, never break the slot
             return json.dumps({"nodes": [], "edges": []})
 

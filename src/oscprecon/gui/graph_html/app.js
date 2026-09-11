@@ -257,6 +257,8 @@
     { selector: "node[status]", style: { "border-width": 6, "border-color": "#f9e2af" } },
     { selector: 'node[status="done"]', style: { "border-color": "#a6e3a1" } },
     { selector: 'node[status="dead-end"]', style: { opacity: 0.45 } },
+    { selector: 'node[status="owned"]', style: { "border-color": "#f38ba8" } },       // compromised: red ring
+    { selector: 'node[status="high-value"]', style: { "border-color": "#f2b636" } },  // high-value: gold ring
     { selector: "node[note]", style: { "border-style": "dashed", "border-color": "#cba6f7" } },
     // notable/vulnerable findings (anon access, writable, weak signing…) stand out with a red ring
     {
@@ -892,8 +894,9 @@
       regionDrawStart = null;
       if (rw > 26 && rh > 26 && cy) {
         var z = cy.zoom(), pan = cy.pan();
+        var rcol = REGION_COLORS[regionOrd % REGION_COLORS.length]; // read colour BEFORE ++ (no off-by-one)
         var r = { id: "rg-" + Date.now() + "-" + (regionOrd++), title: "Region", note: "",
-                  color: REGION_COLORS[regionOrd % REGION_COLORS.length],
+                  color: rcol,
                   mx: (rx - pan.x) / z, my: (ry - pan.y) / z, mw: rw / z, mh: rh / z };
         REGIONS.push(r); buildRegionDom(r); positionRegions(); persistRegions();
       }

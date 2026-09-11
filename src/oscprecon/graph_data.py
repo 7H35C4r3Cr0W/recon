@@ -240,4 +240,5 @@ def build_elements(profile: Profile) -> dict[str, list[dict[str, Any]]]:
                 label = str(user_edge.get("label", ""))
                 edges.append(_edge(src, dst, "relates-to", f"e-user-{index}", label))
 
-    return {"nodes": nodes, "edges": edges}
+    regions = graph.get("regions", [])
+    return {"nodes": nodes, "edges": edges, "regions": regions if isinstance(regions, list) else []}
