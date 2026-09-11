@@ -249,3 +249,13 @@ kbd{font-family:var(--mono);background:var(--sunk);border:1px solid var(--line-2
 .seg.danger{color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,var(--line-2))}
 .seg.danger:hover{background:color-mix(in srgb,var(--red) 14%,var(--panel))}
 .map-body{flex:1;display:grid;gap:12px;padding:12px 18px 16px;min-height:0}
+
+/* ---- recon map: BloodHound-style node details drawer ---- */
+.node-drawer{position:absolute;top:12px;left:12px;width:230px;background:color-mix(in srgb,var(--panel) 94%,transparent);
+  border:1px solid var(--line-2);border-radius:11px;padding:12px 13px;box-shadow:var(--shadow);backdrop-filter:blur(8px);z-index:5}
+.node-drawer .dk{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.node-drawer .x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px}
+.node-drawer .x:hover{color:var(--ink)}
+.node-drawer .dv{font-size:14px;color:var(--ink);margin:6px 0 4px;word-break:break-word}
+.node-drawer .ds{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.node-drawer .ds .d{width:9px;height:9px;border-radius:50%;box-shadow:0 0 8px currentColor}

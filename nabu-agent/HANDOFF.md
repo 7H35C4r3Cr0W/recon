@@ -720,3 +720,18 @@ The live run view now looks like the classic Nabu GUI's BloodHound graph (owner 
   pulsing-green nodes, layout toggle + Fit + Cancel, a node-type legend + a **run-config panel**, and
   the live log. Verified via headless-chromium screenshot.
 - Gate: tsc clean; 28 frontend tests; `vite build` OK. Backend untouched.
+
+---
+
+## 2026-09-11 (cont.) — recon map: verified in the real app + BloodHound augmentation
+
+- **Verified the real app renders** (not just the demo): built a throwaway Vite harness that mounts the
+  real `RunLive`+`RunGraph` (real Cytoscape) with stubbed ws/api, drove it with real run events, and
+  screenshot it over http (file:// blocks ES modules) — the phase stepper, force graph, active-green
+  rings, error node, controls, and log all render. Harness was removed after.
+- **Augmented toward SpecterOps BloodHound** (which uses Sigma.js + a force layout): added TYPE GLYPHS
+  inside the node discs (target crosshair / host / service / agent icons, SVG background-images),
+  widened the cose spread (nodeRepulsion/idealEdgeLength/componentSpacing + nodeDimensionsIncludeLabels
+  so labels stop colliding), and BloodHound's signature **hover-to-highlight-neighbourhood** (dim the
+  rest via a `.faded` class) + **click-to-select a node → a details drawer** (`onSelect` prop +
+  `.node-drawer`). Demo mirrors it (glyphs + hover-dim). tsc clean; 28 frontend tests; vite build OK.
