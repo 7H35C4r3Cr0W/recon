@@ -221,27 +221,34 @@ export function RunLive() {
       )}
 
       {/* controls toolbar for the recon flow view */}
+      {/* controls — grouped + compact so the bar reads cleanly instead of a wall of buttons */}
       <div className="map-controls">
         <span className="grp">
-          <span className="lbl">layout</span>
-          <button className={`seg ${layoutName === "cose" ? "on" : ""}`} onClick={() => setLayoutName("cose")}>Force (BloodHound)</button>
-          <button className={`seg ${layoutName === "breadthfirst" ? "on" : ""}`} onClick={() => setLayoutName("breadthfirst")}>Hierarchy</button>
+          <button className={`seg ${layoutName === "cose" ? "on" : ""}`} onClick={() => setLayoutName("cose")}>Force</button>
+          <button className={`seg ${layoutName === "breadthfirst" ? "on" : ""}`} onClick={() => setLayoutName("breadthfirst")}>Tree</button>
         </span>
-        <button className="seg" onClick={() => setFitNonce((n) => n + 1)}>⤢ Fit</button>
-        <button className="seg" onClick={() => setExportNonce((n) => n + 1)}>⬇ PNG</button>
+        <span className="divider" />
+        <input className="input" style={{ maxWidth: 200, padding: "6px 10px", fontSize: 12 }} value={search}
+          onChange={(e) => setSearch(e.target.value)} placeholder="search nodes…" aria-label="search nodes" />
+        <details className="filterbox">
+          <summary className="seg">☰ Filter{hiddenKinds.length ? ` · ${5 - hiddenKinds.length}/5` : ""}</summary>
+          <div className="filterpop">
+            {["agent", "service", "finding", "report", "attack"].map((k) => (
+              <label key={k}>
+                <input type="checkbox" checked={!hiddenKinds.includes(k)}
+                  onChange={() => setHiddenKinds((h) => (h.includes(k) ? h.filter((x) => x !== k) : [...h, k]))} />
+                {k}
+              </label>
+            ))}
+          </div>
+        </details>
+        <span className="divider" />
+        <button className="seg" onClick={() => setFitNonce((n) => n + 1)} title="fit to view">⤢ Fit</button>
+        <button className="seg" onClick={() => setExportNonce((n) => n + 1)} title="export PNG">⬇ PNG</button>
         <button className="seg" onClick={addRegionFromSearch} title="group the current search matches into a region">▢ Region</button>
-        <input className="input" style={{ maxWidth: 190, padding: "6px 10px", fontSize: 12 }} value={search}
-          onChange={(e) => setSearch(e.target.value)} placeholder="search nodes… (dc01 · 445 · svc_)" aria-label="search nodes" />
-        <span className="grp">
-          <span className="lbl">show</span>
-          {["agent", "service", "finding", "report", "attack"].map((k) => (
-            <button key={k} className={`seg ${hiddenKinds.includes(k) ? "" : "on"}`}
-              onClick={() => setHiddenKinds((h) => (h.includes(k) ? h.filter((x) => x !== k) : [...h, k]))}>{k}</button>
-          ))}
-        </span>
         <button className="seg" onClick={() => setShowLog((v) => !v)}>{showLog ? "Hide log" : "Show log"}</button>
-        <span className="mono muted" style={{ marginLeft: "auto", fontSize: 10.5 }}>shift-click 2 nodes → path · C copies · Esc clears</span>
-        {!terminal && <button className="seg danger" onClick={cancelRun}>■ Cancel run</button>}
+        <span className="mono muted" style={{ marginLeft: "auto", fontSize: 10.5 }} title="shift-click two nodes to trace the path between them · C copies a pinned path · Esc clears">shift-click 2 = path · C copy · Esc clear</span>
+        {!terminal && <button className="seg danger" onClick={cancelRun}>■ Cancel</button>}
       </div>
 
       <div className="map-body" style={{ gridTemplateColumns: showLog ? "1fr 380px" : "1fr" }}>
