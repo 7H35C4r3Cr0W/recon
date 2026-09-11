@@ -30,6 +30,7 @@ export function RunLive() {
   const [layoutName, setLayoutName] = useState<"cose" | "breadthfirst">("cose");
   const [fitNonce, setFitNonce] = useState(0);
   const [showLog, setShowLog] = useState(true);
+  const [selected, setSelected] = useState<{ id: string; label: string; kind: string; state: string } | null>(null);
   const [pending, setPending] = useState<{ id: string; message: string } | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const lastSeqRef = useRef(0);
@@ -164,7 +165,20 @@ export function RunLive() {
       </div>
 
       <div className="map-body" style={{ gridTemplateColumns: showLog ? "1fr 380px" : "1fr" }}>
-        <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} />
+        <div style={{ position: "relative", minHeight: 0 }}>
+          <RunGraph elements={elements} layoutName={layoutName} fitNonce={fitNonce} onSelect={setSelected} />
+          {selected && (
+            <div className="node-drawer">
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span className="dk mono">{selected.kind}</span>
+                <button className="x" onClick={() => setSelected(null)}>✕</button>
+              </div>
+              <div className="dv mono">{selected.label}</div>
+              <div className="ds"><span className="d" style={{ background: NODE_COLORS[selected.state as NodeState] || "#8394a0" }} />{selected.state}</div>
+              <div className="mono muted" style={{ fontSize: 10, marginTop: 6 }}>{selected.id}</div>
+            </div>
+          )}
+        </div>
         {showLog && (
           <div ref={logRef} className="logpane">
             <div className="lead">live action log</div>
