@@ -9,7 +9,9 @@ stays behind an explicit human gate.
 > This is a **separate product** that lives beside the classic desktop tool in the same repo. It
 > **never modifies `src/oscprecon`** — the engine is a read-only dependency. See
 > [`docs/DESIGN.md`](docs/DESIGN.md), [`docs/ROADMAP.md`](docs/ROADMAP.md),
-> [`docs/ENGINE_INTEGRATION.md`](docs/ENGINE_INTEGRATION.md), and the live progress tracker
+> [`docs/ENGINE_INTEGRATION.md`](docs/ENGINE_INTEGRATION.md), the day-to-day
+> [`docs/OPERATOR_GUIDE.md`](docs/OPERATOR_GUIDE.md), the human-gated attack design
+> [`docs/SPRAY_EXPLOIT_GATE.md`](docs/SPRAY_EXPLOIT_GATE.md), and the live progress tracker
 > [`HANDOFF.md`](HANDOFF.md).
 
 ## Brain / body / hands
