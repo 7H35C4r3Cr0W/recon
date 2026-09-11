@@ -20,6 +20,17 @@
   // node ids like "target" / "subnet-<cidr>" collide across profiles, so lastProfileKey guards that.
   var collapseState = {};
   var traceId = null; // id of the node whose attack path is currently pinned (click-to-trace)
+  // friendly relationship labels shown on the pinned attack path's edges (reads as a chain)
+  var TRACE_REL = {
+    "has-service": "runs",
+    "exposes-finding": "exposes",
+    contains: "contains",
+    "references-credential": "→ cred",
+    "next-step": "next",
+    "pivots-into": "pivots to",
+    "contains-host": "host",
+    "relates-to": "related",
+  };
   var lastProfileKey = "";
 
   var DEFAULT_HINT = "double-click the entry to expand (again to fold all) · double-click a /24 for its hosts · a host for its services · single-click a node for detail + its attack path · click empty space to clear · drag canvas to pan";
@@ -282,6 +293,19 @@
         "font-size": 9,
         color: THEME.edgeLabel,
         "text-rotation": "autorotate",
+      },
+    },
+    // relationship label on the pinned attack path's edges (defined AFTER edge[label] so it wins)
+    {
+      selector: "edge.trace-hl",
+      style: {
+        label: "data(traceRel)",
+        "font-size": 9,
+        color: "#f2b636",
+        "text-rotation": "autorotate",
+        "text-background-color": THEME.canvasBg,
+        "text-background-opacity": 0.85,
+        "text-background-padding": 2,
       },
     },
     {
@@ -685,7 +709,10 @@
     cy.elements(":visible").addClass("trace-dim");
     cy.nodes().forEach(function (n) { if (onNode[n.id()]) n.removeClass("trace-dim").addClass("trace-hl"); });
     cy.edges().forEach(function (e) {
-      if (nextOf[e.source().id()] === e.target().id()) e.removeClass("trace-dim").addClass("trace-hl");
+      if (nextOf[e.source().id()] === e.target().id()) {
+        e.data("traceRel", TRACE_REL[e.data("type")] || String(e.data("type") || "").replace(/-/g, " "));
+        e.removeClass("trace-dim").addClass("trace-hl");
+      }
     });
   }
 
