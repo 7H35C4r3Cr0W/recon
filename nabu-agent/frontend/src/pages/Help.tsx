@@ -159,6 +159,24 @@ export function Help() {
       </div>
 
       <div className="card" style={{ marginBottom: 12 }}>
+        <h3>Working the live map</h3>
+        <ul className="ink2">
+          <li><b>Click a node</b> — opens its detail (ports · protocol · product · severity) and pins the
+          <b> attack path</b> from the entry to it in gold, dimming everything else.</li>
+          <li><b>Shift-click two nodes</b> — traces the shortest path <b>between</b> them; press <b>C</b> to
+          copy a pinned path as text (<code>node → node → …</code>).</li>
+          <li><b>Double-click a node</b> — jumps to its note. Notes persist per project and mark the node
+          with a dashed gold ring.</li>
+          <li><b>Search</b> highlights matching nodes and dims the rest; <b>Filter</b> hides whole node
+          kinds to declutter a busy graph.</li>
+          <li><b>▢ Region</b> — groups the current search matches into a labelled, colour-coded region you
+          can annotate. Regions follow their nodes as the map re-lays-out and persist across runs.</li>
+          <li><b>⬇ PNG</b> exports the map · <b>Fit</b> re-frames · <b>Esc</b> or a click on empty canvas
+          clears a pinned path.</li>
+        </ul>
+      </div>
+
+      <div className="card" style={{ marginBottom: 12 }}>
         <h3>Attaching the LLM (admin)</h3>
         <p className="ink2">Point the platform at your internally-hosted, OpenAI-compatible endpoint via
         config: <code>NABU_LLM_BASE_URL</code>, <code>NABU_LLM_API_KEY</code>, <code>NABU_LLM_MODEL</code>.

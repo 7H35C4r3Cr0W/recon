@@ -24,15 +24,21 @@
 
 ```
 DATE:        2026-09-11
-BRANCH:      main @ f5ab774+ (PRs #1–#50 merged).
+BRANCH:      main @ 3667bec+ (PRs #1–#57 merged; recent map/UX work pushed direct to main).
 STATUS:      DEV SIDE DONE (per docs/DEFINITION_OF_DONE.md). Full recon (single + CIDR fan-out on the
              Arq worker pool), live BloodHound map, reports + triage, RBAC/audit/creds vault, admin
              LLM setup + test-fire, AND the human-gated attack EXECUTION gate (propose → double-gated
              approve → run via the one door; dry-run + four-eyes + rate-limit; credential injected only
              at execute, previews/logs redacted). Interactive demo:
-             https://claude.ai/code/artifact/68d8ab3a-2351-4d06-8bb6-742190d69846
-GATE:        ruff + mypy clean; 112 backend + 10 policy-invariant + 27 frontend tests; vite build OK;
-             alembic upgrade head verified; src/oscprecon untouched.
+             https://claude.ai/code/artifact/883d3276-d96a-40df-9cfd-97cfcc23c450 (exec product tour)
+MAP/UX:      BloodHound-grade live map — agents marked (peach worker-box + type legend), click-to-trace
+             attack path, shift-click path A→B, copy-path (C), relationship labels, node search, type
+             filter, rich node detail (ports/proto/product/version/severity), PNG export, per-node NOTES
+             and group-anchored REGIONS (both persisted via the new `annotations` router: map_notes +
+             map_regions tables, migrations 0003/0004). Desktop graph got the same trace/A→B/copy +
+             mark owned/high-value + persisted regions (graph.json). Control bar decluttered.
+GATE:        ruff + mypy clean; 113 backend + 10 policy-invariant + 36 frontend tests; vite build OK;
+             alembic upgrade head verified (migrations through 0004_map_regions); src/oscprecon untouched.
 REMAINING:   Tier 2 only (LLM-gated, blocked on legal): attach the model → `agent` runs; Phase B
              (agents PROPOSE into the built gate); run-level LLM budgets; live agent-run validation.
 ATTACH BRAIN: set NABU_LLM_BASE_URL (+ API_KEY, MODEL) via Admin → LLM setup → test-fire. No code change.
