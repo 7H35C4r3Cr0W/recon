@@ -118,3 +118,56 @@ kbd{font-family:var(--mono);background:var(--sunk);border:1px solid var(--line-2
 .approve-bar{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid color-mix(in srgb,var(--gold) 55%,var(--line));background:color-mix(in srgb,var(--gold) 12%,var(--bg-2));color:var(--gold);font-size:13px}
 .btn-approve{background:linear-gradient(180deg,var(--accent),var(--accent-2));color:var(--accent-ink);border:none;border-radius:8px;padding:6px 13px;cursor:pointer;font-family:var(--mono);font-weight:700}
 .btn-reject{background:transparent;color:var(--red);border:1px solid var(--red);border-radius:8px;padding:6px 13px;cursor:pointer;font-family:var(--mono)}
+
+/* ============================================================ *
+ *  Help visual guide — hacker-artsy diagrams (no external libs)
+ * ============================================================ */
+.diagram{ background:var(--sunk); border:1px solid var(--line); border-radius:var(--radius);
+  padding:18px 16px 14px; margin:12px 0 2px; overflow-x:auto; }
+.diagram-cap{ font:600 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted); margin:0 0 15px; display:flex; align-items:center; gap:9px; }
+.diagram-cap::before{ content:""; width:7px; height:7px; border-radius:2px; background:var(--accent);
+  box-shadow:var(--glow); flex:0 0 auto; }
+
+/* flow graph */
+.flow{ display:flex; align-items:stretch; flex-wrap:wrap; gap:2px 0; font-family:var(--mono); min-width:max-content; }
+.fnode{ min-width:96px; padding:10px 13px; border:1px solid var(--line-2); border-radius:10px;
+  background:linear-gradient(180deg,var(--panel),var(--panel-2)); display:flex; flex-direction:column;
+  gap:3px; justify-content:center; }
+.fnode b{ font-size:12.5px; color:var(--ink); letter-spacing:.02em; }
+.fnode small{ font-size:10.5px; color:var(--muted); line-height:1.35; }
+.fnode.accent{ border-color:color-mix(in srgb,var(--accent) 55%,var(--line-2)); box-shadow:var(--glow); }
+.fnode.accent b{ color:var(--accent); }
+.fnode.danger{ border-color:color-mix(in srgb,var(--red) 60%,var(--line-2));
+  background:linear-gradient(180deg,#1b0f11,#140c0e); }
+.fnode.danger b{ color:var(--red); }
+.fnode.gate{ border-color:color-mix(in srgb,var(--gold) 60%,var(--line-2));
+  background:linear-gradient(180deg,#1b160c,#140f08); }
+.fnode.gate b{ color:var(--gold); }
+.farrow{ align-self:center; padding:0 11px; color:var(--accent-2); font-size:16px; flex:0 0 auto; }
+.farrow.danger{ color:var(--red); }
+.fstack{ border:1px dashed var(--line-2); border-radius:10px; padding:9px; display:flex;
+  flex-direction:column; gap:6px; background:color-mix(in srgb,var(--panel) 45%,transparent); }
+.fstack .lbl{ font-size:9.5px; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); padding:1px 2px; }
+.fstack .fnode{ min-width:128px; padding:6px 10px; }
+
+/* lifecycle rail */
+.life{ display:flex; align-items:center; flex-wrap:wrap; font-family:var(--mono); font-size:12px; min-width:max-content; }
+.life .step{ display:flex; align-items:center; gap:7px; padding:6px 13px; border:1px solid var(--line);
+  border-radius:999px; background:var(--panel); color:var(--ink-2); }
+.life .dot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+.life .sep{ color:var(--muted); padding:0 9px; font-size:15px; }
+
+/* map colour legend */
+.legend{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; font-family:var(--mono); }
+.legend .item{ display:flex; align-items:center; gap:12px; padding:9px 12px; border:1px solid var(--line);
+  border-radius:10px; background:var(--panel); }
+.legend .orb{ width:15px; height:15px; border-radius:50%; flex:0 0 auto; }
+.legend .item b{ font-size:12px; color:var(--ink); text-transform:capitalize; }
+.legend .item small{ display:block; font-size:10.5px; color:var(--muted); margin-top:1px; }
+
+/* pulse for 'active' orbs */
+@keyframes nabu-pulse{ 0%,100%{ box-shadow:0 0 0 0 color-mix(in srgb,var(--accent-2) 60%,transparent); }
+  50%{ box-shadow:0 0 0 6px transparent; } }
+.pulse{ animation:nabu-pulse 1.9s ease-in-out infinite; }
+@media (prefers-reduced-motion:reduce){ .pulse{ animation:none; } }

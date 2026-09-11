@@ -416,3 +416,38 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   root CI is deliberately **manual-only** (`workflow_dispatch`, auto-triggers removed to save
   Actions minutes) — gates run LOCALLY before push. So the nabu-agent CI never auto-ran. Left
   as-is (not silently converted to auto-trigger against that policy); flagged for a decision.
+
+---
+
+## 2026-09-10 — spray/exploit execution gate DESIGN + visual Help + UI aesthetic direction
+
+- **Design doc: `docs/SPRAY_EXPLOIT_GATE.md`** — the plan for how a spray/exploit actually *runs*,
+  the most safety-critical path, written before any code. Grounds itself in what exists
+  (`engine/shell_gateway.execute_gated_action` = the one door; the `Checkpoint` DB row; the host-count
+  approve/reject flow it reuses; project `spray_enabled`/`exploit_enabled` toggles; `catalog_actions_for`
+  proposals with the `executable` flag; `CHECKPOINT_DECIDE` perm). Specifies: the propose→approve→execute
+  state machine; a NEW `orchestration/tasks.execute_approved_action` Arq job; a NEW
+  `POST /runs/{id}/attack-proposals`; lifting the approve endpoint's non-`hosts` refusal behind a double
+  gate. **Key safety decision:** the checkpoint stores `action_id`, NOT a command — the executor
+  re-derives the shell line from the catalog at execute time, so a forged/edited command is impossible.
+  Defence-in-depth stack: Gate 1 project toggle → Gate 2 human approval (+ exploit_confirmed / creds) →
+  server-side command re-derivation → scope re-validation → the one door → `NABU_AUTONOMY` kill-switch.
+  Phase A (human-driven: operator proposes from the catalog → approves → runs) is buildable NOW with no
+  LLM; only agent-*initiated* proposals (Phase B) need the model. New invariant tests spelled out. No
+  code shipped yet — this is the plan; it changes nothing until built and never touches `src/oscprecon`.
+
+- **Visual Help page (`frontend/src/pages/Help.tsx`)** — rebuilt the in-app guide as visual-first for
+  visual learners: four inline HTML/CSS diagrams (no external libs, theme-aware, honour
+  prefers-reduced-motion) — (1) *how a run flows* the agent chain + the human-gated attack branch,
+  (2) *anatomy of a run* the lifecycle rail, (3) *live map colours* glowing-orb legend, (4) *the safety
+  gate* the two-locks diagram. All prose headings preserved. New diagram CSS appended to `theme.css`
+  (`.diagram/.flow/.fnode/.life/.legend/.pulse`, danger=red / gate=gold styling). Help test extended
+  (visual sections asserted). Gate: tsc clean, **24 frontend tests** (was 23) + `vite build` OK.
+
+- **UI aesthetic direction (owner):** standing preference for a **hacker-artsy, aesthetically-pleasing**
+  UI — apply to all new UI work (recorded in memory `ui-aesthetic-hacker-artsy`). The dark teal/green-on-
+  near-black + JetBrains Mono theme is the base; go further with tasteful glow, monospace texture, and
+  restrained motion on live state. The attack-gate UI section of the design doc already reflects this
+  (amber→red danger palette, terminal-panel command preview, glowing live attack node).
+
+- README doc list updated to link `docs/OPERATOR_GUIDE.md` + `docs/SPRAY_EXPLOIT_GATE.md`.
