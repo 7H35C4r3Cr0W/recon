@@ -4,8 +4,10 @@ replay/cancel. Every project-scoped endpoint requires project membership; run-sc
 require membership of the run's project (closes the IDOR gaps)."""
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -20,11 +22,13 @@ from nabu_agent.auth.deps import (
     require_run_access,
     require_run_perm,
 )
-from nabu_agent.db.models import Checkpoint, Run, ScopeTarget, User
+from nabu_agent.db.models import Checkpoint, Project, Run, ScopeTarget, User
 from nabu_agent.db.session import get_db
-from nabu_agent.engine.errors import ScopeViolation
+from nabu_agent.engine.errors import ProjectNotFound, ScopeViolation
+from nabu_agent.events.schema import NodeState, RunEventType
 from nabu_agent.rbac import Perm
 from nabu_agent.services import runs as runs_svc
+from nabu_agent.settings import get_settings
 
 router = APIRouter(tags=["runs"])
 
@@ -107,18 +111,66 @@ async def cancel_run(db: AsyncSession = Depends(get_db),
     return {"ok": True}
 
 
-# --- human-in-the-loop checkpoints (the host-count fan-out gate) ---------------------------------
-# A run parked in `awaiting_approval` has a `proposed` Checkpoint; a project member approves it to
-# resume the fan-out, or rejects it to stop the run before it spends the fan-out. (Spray/exploit
-# checkpoints are proposal-only for now — their execution gate is a later phase.)
-_APPROVABLE_KINDS = {"hosts"}
+# --- human-in-the-loop checkpoints ---------------------------------------------------------------
+# Two gated flows share the Checkpoint table:
+#   * kind="hosts" — the recon fan-out gate: a run parked in `awaiting_approval` resumes when a
+#     member approves, or stops when rejected.
+#   * kind in {spray, exploit} — the ATTACK gate (Phase A). An operator PROPOSES an executable
+#     catalog action; a human APPROVES it behind the DOUBLE GATE (platform switch + per-project
+#     toggle + this approval, plus exploit_confirmed / a chosen credential). Approval enqueues
+#     execute_approved_action, which re-derives the command from the catalog and runs it through the
+#     one gated door. The checkpoint stores only which action (service + action_id), never a command.
+_HOST_KIND = "hosts"
+_ATTACK_KINDS = {"spray", "exploit"}
 
 
-def _cp_view(cp: Checkpoint) -> dict:
-    return {"id": cp.id, "run_id": cp.run_id, "kind": cp.kind, "status": cp.status,
-            "target": cp.target, "action_id": cp.action_id, "rationale": cp.rationale,
-            "approved_by": cp.approved_by,
-            "approved_at": cp.approved_at.isoformat() if cp.approved_at else None}
+class AttackProposalBody(BaseModel):
+    kind: str                        # spray | exploit
+    target: str                      # an in-scope host (re-validated at execute)
+    service: str                     # the discovered service key (e.g. "smb", "http")
+    action_id: str                   # the catalog action id — the ONLY thing that selects the command
+    credential_ref: str | None = None
+    rationale: str = ""
+
+
+class ApproveBody(BaseModel):
+    exploit_confirmed: bool = False   # required for kind="exploit"
+    credential_ref: str | None = None # required for kind="spray" (if not already on the proposal)
+
+
+def _cp_view(cp: Checkpoint) -> dict[str, Any]:
+    v: dict[str, Any] = {"id": cp.id, "run_id": cp.run_id, "kind": cp.kind, "status": cp.status,
+         "target": cp.target, "action_id": cp.action_id, "rationale": cp.rationale,
+         "approved_by": cp.approved_by,
+         "approved_at": cp.approved_at.isoformat() if cp.approved_at else None}
+    if cp.kind in _ATTACK_KINDS:
+        v["service"] = (cp.requires or {}).get("service", "")
+        v["credential_ref"] = cp.credential_ref
+        v["exploit_confirmed"] = cp.exploit_confirmed
+    return v
+
+
+def _preview_command(project_id: str, target: str, service: str, action_id: str) -> str:
+    """Open the target's profile and re-derive the exact shell line the catalog action resolves to.
+    Same server-side derivation the executor uses — so the preview is truthful and validates that
+    the action is attacker-runnable + fully filled. Raises ProjectNotFound / ValueError otherwise."""
+    from nabu_agent.engine.workspace import workspace_for
+    from nabu_agent.services.runs import _resolve_gated_command
+
+    prof = workspace_for(project_id, target).open()
+    return _resolve_gated_command(prof, service, action_id)
+
+
+async def _enqueue_execute(cp_id: str) -> None:
+    """Enqueue the approved attack onto the Arq worker (production) or run it in-process (dev/tests),
+    mirroring the run driver's dispatch."""
+    if get_settings().use_arq:
+        pool = await bus.get_arq_pool()
+        await pool.enqueue_job("execute_approved_action", cp_id, _job_id=f"attack:{cp_id}")
+        return
+    task = asyncio.create_task(runs_svc.execute_approved_action(cp_id))
+    runs_svc._RUNNING.add(task)
+    task.add_done_callback(runs_svc._RUNNING.discard)
 
 
 @router.get("/runs/{run_id}/checkpoints")
@@ -126,38 +178,134 @@ async def list_checkpoints(db: AsyncSession = Depends(get_db),
                            run: Run = Depends(require_run_access)) -> dict:
     rows = (await db.execute(select(Checkpoint).where(Checkpoint.run_id == run.id)
                              .order_by(Checkpoint.id))).scalars().all()
-    return {"checkpoints": [_cp_view(c) for c in rows]}
+    project = (await db.execute(select(Project).where(Project.id == run.project_id))).scalar_one_or_none()
+    s = get_settings()
+    views = []
+    for c in rows:
+        v = _cp_view(c)
+        if c.kind in _ATTACK_KINDS:
+            # a truthful, server-derived command preview + the live gate state (best-effort; a
+            # missing/rebuilt profile just yields command=None, never a 500).
+            try:
+                v["command"] = await asyncio.to_thread(
+                    _preview_command, run.project_id, c.target, v.get("service", ""), c.action_id)
+            except Exception:
+                v["command"] = None
+            platform = (s.spray_enabled if c.kind == "spray" else s.exploit_enabled)
+            proj = bool(project and (project.spray_enabled if c.kind == "spray" else project.exploit_enabled))
+            v["gate"] = {"platform_enabled": platform, "project_enabled": proj,
+                         "needs_exploit_confirm": c.kind == "exploit",
+                         "needs_credential": c.kind == "spray"}
+        views.append(v)
+    return {"checkpoints": views}
 
 
-async def _decide_checkpoint(cp_id: str, run: Run, user: User, db: AsyncSession, status: str) -> dict:
+@router.post("/runs/{run_id}/attack-proposals")
+async def propose_attack(body: AttackProposalBody, db: AsyncSession = Depends(get_db),
+                         user: User = Depends(get_current_user),
+                         run: Run = Depends(require_run_perm(Perm.CHECKPOINT_DECIDE))) -> dict:
+    """PROPOSE a spray/exploit action against a discovered service (operator+; viewers can't). This
+    only creates a `proposed` checkpoint — it NEVER runs anything. Execution still needs the double
+    gate at approve time. The action_id must resolve to an attacker-runnable, fully-filled command."""
+    if body.kind not in _ATTACK_KINDS:
+        raise HTTPException(status_code=422, detail="kind must be 'spray' or 'exploit'")
+    scopes = [s.target for s in (await db.execute(
+        select(ScopeTarget).where(ScopeTarget.project_id == run.project_id))).scalars().all()]
+    if not _in_scope(body.target, scopes):
+        raise ScopeViolation(f"{body.target} is outside the project scope")
+    try:
+        command = await asyncio.to_thread(
+            _preview_command, run.project_id, body.target, body.service, body.action_id)
+    except ProjectNotFound as exc:
+        raise HTTPException(status_code=422,
+                            detail="no recon profile for this target yet — run recon before proposing") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"action not proposable: {exc}") from exc
+
+    cp = Checkpoint(run_id=run.id, kind=body.kind, status="proposed", target=body.target,
+                    action_id=body.action_id, rationale=body.rationale or f"operator-proposed {body.kind}",
+                    requires={"service": body.service}, credential_ref=body.credential_ref)
+    db.add(cp)
+    await db.commit()
+    node = f"attack-{cp.id}"
+    await runs_svc.emit_event(run.id, RunEventType.CHECKPOINT_REQUESTED, {
+        "node_id": node, "node_state": NodeState.STUCK.value, "checkpoint_id": cp.id,
+        "kind": cp.kind, "target": cp.target, "action_id": cp.action_id, "attack": True})
+    await runs_svc.emit_event(run.id, RunEventType.APPROVAL_REQUIRED, {
+        "node_id": node, "node_state": NodeState.STUCK.value, "checkpoint_id": cp.id, "attack": True,
+        "kind": cp.kind, "target": cp.target, "action_id": cp.action_id, "command": command,
+        "message": f"{cp.kind} proposed against {cp.target} — approve (double gate) or reject."})
+    await audit.record(actor_user_id=user.id, action=audit.ATTACK_PROPOSED, object_type="checkpoint",
+                       object_id=cp.id, project_id=run.project_id,
+                       details={"kind": cp.kind, "target": cp.target, "action_id": cp.action_id})
+    return {"checkpoint_id": cp.id, "kind": cp.kind, "status": "proposed", "command": command}
+
+
+async def _load_proposed(cp_id: str, run: Run, db: AsyncSession) -> Checkpoint:
     cp = (await db.execute(select(Checkpoint).where(
         Checkpoint.id == cp_id, Checkpoint.run_id == run.id))).scalar_one_or_none()
     if cp is None:
         raise HTTPException(status_code=404, detail="checkpoint not found")
-    if cp.kind not in _APPROVABLE_KINDS:
-        # spray/exploit approval is gated separately (spray_enabled / per-action confirm) — not here
-        raise HTTPException(status_code=409, detail=f"checkpoint kind '{cp.kind}' is not approvable here")
     if cp.status != "proposed":
         raise HTTPException(status_code=409, detail=f"checkpoint already {cp.status}")
-    cp.status = status
+    return cp
+
+
+@router.post("/runs/{run_id}/checkpoints/{cp_id}/approve")
+async def approve_checkpoint(cp_id: str, body: ApproveBody = ApproveBody(),
+                             db: AsyncSession = Depends(get_db),
+                             user: User = Depends(get_current_user),
+                             run: Run = Depends(require_run_perm(Perm.CHECKPOINT_DECIDE))) -> dict:
+    cp = await _load_proposed(cp_id, run, db)
+
+    if cp.kind in _ATTACK_KINDS:
+        # DOUBLE GATE (RBAC already checked by the dependency).
+        s = get_settings()
+        platform = s.spray_enabled if cp.kind == "spray" else s.exploit_enabled
+        if not platform:
+            raise HTTPException(status_code=409,
+                                detail=f"{cp.kind} is disabled platform-wide (set NABU_{cp.kind.upper()}_ENABLED)")
+        project = (await db.execute(select(Project).where(Project.id == run.project_id))).scalar_one_or_none()
+        proj_on = bool(project and (project.spray_enabled if cp.kind == "spray" else project.exploit_enabled))
+        if not proj_on:
+            raise HTTPException(status_code=409,
+                                detail=f"enable {cp.kind} for this project first (project Settings)")
+        if cp.kind == "exploit" and not body.exploit_confirmed:
+            raise HTTPException(status_code=422, detail="exploit requires exploit_confirmed=true")
+        cred = body.credential_ref or cp.credential_ref
+        if cp.kind == "spray" and not cred:
+            raise HTTPException(status_code=422, detail="spray requires a credential_ref")
+        cp.status = "approved"
+        cp.approved_by = user.id
+        cp.approved_at = datetime.now(UTC)
+        cp.exploit_confirmed = bool(body.exploit_confirmed) or cp.exploit_confirmed
+        cp.credential_ref = cred
+        await db.commit()
+        await audit.record(actor_user_id=user.id, action=audit.CHECKPOINT_DECIDED, object_type="checkpoint",
+                           object_id=cp.id, project_id=run.project_id,
+                           details={"status": "approved", "kind": cp.kind, "target": cp.target})
+        await _enqueue_execute(cp.id)
+        return {"ok": True, "status": "approved", "checkpoint_id": cp.id, "enqueued": True}
+
+    # kind == "hosts": the recon fan-out gate (the driver coroutine is polling for this flip).
+    cp.status = "approved"
     cp.approved_by = user.id
     cp.approved_at = datetime.now(UTC)
     await db.commit()
     await audit.record(actor_user_id=user.id, action=audit.CHECKPOINT_DECIDED, object_type="checkpoint",
-                       object_id=cp.id, project_id=run.project_id,
-                       details={"status": status, "kind": cp.kind})
-    return {"ok": True, "status": status, "checkpoint_id": cp.id}
-
-
-@router.post("/runs/{run_id}/checkpoints/{cp_id}/approve")
-async def approve_checkpoint(cp_id: str, db: AsyncSession = Depends(get_db),
-                             user: User = Depends(get_current_user),
-                             run: Run = Depends(require_run_perm(Perm.CHECKPOINT_DECIDE))) -> dict:
-    return await _decide_checkpoint(cp_id, run, user, db, "approved")
+                       object_id=cp.id, project_id=run.project_id, details={"status": "approved", "kind": cp.kind})
+    return {"ok": True, "status": "approved", "checkpoint_id": cp.id}
 
 
 @router.post("/runs/{run_id}/checkpoints/{cp_id}/reject")
 async def reject_checkpoint(cp_id: str, db: AsyncSession = Depends(get_db),
                             user: User = Depends(get_current_user),
                             run: Run = Depends(require_run_perm(Perm.CHECKPOINT_DECIDE))) -> dict:
-    return await _decide_checkpoint(cp_id, run, user, db, "rejected")
+    cp = await _load_proposed(cp_id, run, db)
+    cp.status = "rejected"
+    cp.approved_by = user.id
+    cp.approved_at = datetime.now(UTC)
+    await db.commit()
+    await audit.record(actor_user_id=user.id, action=audit.CHECKPOINT_DECIDED, object_type="checkpoint",
+                       object_id=cp.id, project_id=run.project_id, details={"status": "rejected", "kind": cp.kind})
+    return {"ok": True, "status": "rejected", "checkpoint_id": cp.id}

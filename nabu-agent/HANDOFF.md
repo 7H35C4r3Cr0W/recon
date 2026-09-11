@@ -451,3 +451,46 @@ guardrails. Closes the critical gap from docs/LOAD_TEST.md (recs 1-3).
   (amber→red danger palette, terminal-panel command preview, glowing live attack node).
 
 - README doc list updated to link `docs/OPERATOR_GUIDE.md` + `docs/SPRAY_EXPLOIT_GATE.md`.
+
+---
+
+## 2026-09-10 — spray/exploit execution gate, Phase A (human-driven) SHIPPED
+
+Built the human-driven attack path from `docs/SPRAY_EXPLOIT_GATE.md` — no LLM required. Recon stays
+automated; an attack runs only when a human approves a specific action behind the double gate.
+
+- **Propose** — `POST /runs/{id}/attack-proposals` (operator+ via `CHECKPOINT_DECIDE`; viewers 403).
+  Validates target ∈ scope + that `action_id` resolves to an attacker-runnable, fully-filled catalog
+  command (the same server-side derivation the executor uses → the response's command preview is
+  truthful). Creates a `proposed` Checkpoint (kind spray|exploit; service stored in `requires`);
+  emits CHECKPOINT_REQUESTED + APPROVAL_REQUIRED (attack map node) + audits `attack-proposed`. Never
+  runs anything.
+- **Approve (double gate)** — the approve endpoint now handles spray/exploit (previously refused): it
+  requires the **platform switch** (`NABU_SPRAY_ENABLED`/`NABU_EXPLOIT_ENABLED`, default off) AND the
+  **per-project toggle** AND, for exploit, `exploit_confirmed=true`, AND, for spray, a `credential_ref`.
+  On success it stamps `approved_by`/`approved_at` and **enqueues** `execute_approved_action` (Arq in
+  prod, in-process task in dev/tests). Reject marks rejected. `GET checkpoints` enriches spray/exploit
+  rows with a live command preview + gate state.
+- **Execute** — `services/runs.execute_approved_action(cp_id)` (registered as the Arq task in
+  `worker.py`): re-verifies the approval, re-checks platform + project gates, opens the target's own
+  profile, **RE-DERIVES the command from the catalog by action_id** (the checkpoint stores no command —
+  a forged command can't reach the executor), then hands it to `shell_gateway.execute_gated_action` —
+  the ONE place spray=/exploit=True is set, which itself re-verifies the approval + re-validates scope.
+  Streams a dedicated `attack-{cp}` node (active→done/error) + log onto the run; marks the checkpoint
+  executing→executed/failed; best-effort run-state EXECUTING_APPROVED→REPORT_READY (guarded by
+  `_try_set_state`, so attacking a finished recon run is fine). App-audits `attack-executed`. Never
+  raises — a gate/derive/door failure marks the checkpoint FAILED + a red node.
+- **UI** — Report page gained a danger-styled "⚔ Attack actions" panel (`pages/AttackGate.tsx` +
+  `theme.css` .atk-*): lists runnable catalog actions with a monospace command preview + Propose;
+  shows gated proposals with the two gate lamps, an exploit-confirm checkbox / credential picker, and
+  a red **Approve & run** (disabled until the gates + requirement are satisfied), then live-polls the
+  status. Honours the hacker-artsy direction.
+- **Enums/audit:** CheckpointStatus += EXECUTING/FAILED; audit slugs += ATTACK_PROPOSED/ATTACK_EXECUTED.
+- **Tests:** `tests/integration/test_attack_gate.py` (6) — happy path (executed command == catalog
+  command, door got a real approval), platform-off blocks approval, spray needs a credential, bad
+  action_id not proposable, out-of-scope 403, viewer can't propose. `frontend/pages/AttackGate.test.tsx`
+  (2). Also **declared the test deps** `fakeredis` + `aiosqlite` in the dev group (they were undeclared
+  — a `uv sync` produced a venv that couldn't run the suite; now `uv sync --group dev` is enough).
+- Gate: ruff + mypy clean (78 files); **107 backend** (was 101) + 10 invariant + **26 frontend** (was
+  24); `vite build` OK; `src/oscprecon` untouched. Policy invariants still pass (the new job calls the
+  door, never `shell.run`). Phases B–D remain; only Phase B (agent-*proposed* actions) needs the LLM.

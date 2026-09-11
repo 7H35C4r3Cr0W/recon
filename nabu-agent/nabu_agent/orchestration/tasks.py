@@ -35,3 +35,12 @@ async def recon_host_job(ctx: dict[str, Any], run_id: str, host: str, kind: str,
     from nabu_agent.services.runs import run_host_in_worker
 
     return await run_host_in_worker(run_id, host, kind, project_id, int(service_budget))
+
+
+async def execute_approved_action(ctx: dict[str, Any], checkpoint_id: str) -> str:
+    """Arq entrypoint for a human-approved spray/exploit checkpoint. Delegates to the driver, which
+    re-verifies the approval + gates, re-derives the command from the catalog, and runs it through
+    the one gated door. Returns a short ``<cp_id>:<outcome>`` summary for arq's result store."""
+    from nabu_agent.services.runs import execute_approved_action as _run
+
+    return await _run(checkpoint_id)

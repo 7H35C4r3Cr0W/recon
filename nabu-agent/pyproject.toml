@@ -63,6 +63,8 @@ dev = [
     "mypy>=1.10",
     "ruff",
     "httpx-ws>=0.6",
+    "fakeredis>=2.20",   # in-memory Redis for the bus in tests (no live redis)
+    "aiosqlite>=0.19",   # async SQLite driver for the tests' temp-file DB
 ]
 
 [tool.uv.sources]

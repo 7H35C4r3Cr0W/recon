@@ -36,6 +36,8 @@ FINDING_TRIAGED = "finding-triaged"
 RUN_STARTED = "run-started"
 RUN_CANCELLED = "run-cancelled"
 CHECKPOINT_DECIDED = "checkpoint-decided"
+ATTACK_PROPOSED = "attack-proposed"        # a human proposed a spray/exploit action (still gated)
+ATTACK_EXECUTED = "attack-executed"        # an approved spray/exploit action was run through the one door
 ARTIFACT_DOWNLOADED = "artifact-downloaded"
 AUTHZ_DENIED = "authz-denied"
 
