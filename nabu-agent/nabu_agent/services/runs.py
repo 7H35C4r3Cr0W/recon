@@ -492,7 +492,10 @@ async def _scan_host(run_id: str, host: str, publish, *, project_id: str, cancel
         svc_by_port[int(s["port"])] = nid
         await publish(RunEventType.TASK_CREATED, {"node_id": nid, "node_state": NodeState.DONE.value,
                       "kind": "service", "label": f"{s['port']}/{s.get('service') or s.get('proto')}",
-                      "parent": host_node})
+                      "parent": host_node,
+                      # meat for the map's node-detail drawer (port / proto / product / version)
+                      "port": s.get("port"), "proto": s.get("proto"), "service": s.get("service"),
+                      "product": s.get("product") or None, "version": s.get("version") or None})
     return profile, services, svc_by_port
 
 
@@ -508,6 +511,9 @@ async def _surface_findings(host: str, profile, publish, svc_by_port: dict[int, 
                 "node_id": fid, "node_state": NodeState.DONE.value, "kind": "finding",
                 "label": str(f.get("value", "finding"))[:40],
                 "parent": svc_by_port.get(port, f"host-{host}"),
+                # meat for the drawer: severity, the finding's own kind, port, and the full value
+                "port": port or None, "severity": f.get("severity") or f.get("_category"),
+                "finding_kind": f.get("kind"), "detail": str(f.get("value", ""))[:300],
                 "edges": [{"source": f"agent-enum-{host}-{port}", "target": fid, "label": "found"}]})
 
 

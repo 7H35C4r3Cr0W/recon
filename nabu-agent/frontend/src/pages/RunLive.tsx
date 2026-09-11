@@ -6,7 +6,14 @@ import { connectRun, RunEvent } from "../ws/client";
 import { NODE_COLORS, NodeState } from "../lib/nodeColors";
 import { api } from "../api/client";
 
-interface NodeRec { id: string; label: string; kind: string; state: NodeState; parent?: string; }
+interface NodeRec { id: string; label: string; kind: string; state: NodeState; parent?: string; meta?: Record<string, string | number>; }
+
+// per-node "meat" surfaced in the detail drawer, in display order
+const DETAIL_ROWS: [string, string][] = [
+  ["port", "Port"], ["proto", "Proto"], ["service", "Service"], ["product", "Product"],
+  ["version", "Version"], ["finding_kind", "Kind"], ["severity", "Severity"], ["detail", "Detail"],
+];
+const META_KEYS = ["port", "proto", "service", "product", "version", "severity", "finding_kind", "detail"];
 
 // The recon lifecycle as a phase stepper. Each engine run-state maps to one visible phase.
 const PHASES = ["Queued", "Scanning", "Enumerating", "Researching", "Reporting", "Done"] as const;
@@ -78,9 +85,14 @@ export function RunLive() {
     if (nodeId) {
       setNodes((prev) => {
         const cur = prev[nodeId] || { id: nodeId, label: nodeId, kind: "agent", state: "queued" as NodeState };
+        const meta = { ...(cur.meta || {}) };
+        for (const k of META_KEYS) {
+          const v = d[k];
+          if (v != null && v !== "") meta[k] = v as string | number;
+        }
         return { ...prev, [nodeId]: {
           ...cur, label: (d.label as string) || cur.label, kind: (d.kind as string) || cur.kind,
-          state: (d.node_state as NodeState) || cur.state, parent: (d.parent as string) || cur.parent } };
+          state: (d.node_state as NodeState) || cur.state, parent: (d.parent as string) || cur.parent, meta } };
       });
       if (d.parent) {
         const eid = `${d.parent}->${nodeId}`;
@@ -187,6 +199,21 @@ export function RunLive() {
               <div className="dv mono">{selected.label}</div>
               <div className="ds"><span className="d" style={{ background: NODE_COLORS[selected.state as NodeState] || "#8394a0" }} />{selected.state}</div>
               <div className="mono muted" style={{ fontSize: 10, marginTop: 6 }}>{selected.id}</div>
+              {(() => {
+                const m = nodes[selected.id]?.meta;
+                const rows = m ? DETAIL_ROWS.filter(([k]) => m[k] != null && m[k] !== "") : [];
+                if (!rows.length) return null;
+                return (
+                  <div style={{ marginTop: 8, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                    {rows.map(([k, label]) => (
+                      <div key={k} style={{ display: "flex", gap: 8, fontFamily: "var(--mono)", fontSize: 11, padding: "3px 0" }}>
+                        <span style={{ color: "var(--muted)", flex: "0 0 62px", textTransform: "uppercase", fontSize: 9.5 }}>{label}</span>
+                        <span style={{ color: k === "severity" ? "var(--gold)" : "var(--ink)", flex: 1, wordBreak: "break-word" }}>{String(m![k])}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               {typeof selected.hops === "number" && (
                 <div className="mono" style={{ fontSize: 10, marginTop: 6, color: "var(--gold)" }}>
                   attack path: {selected.hops} hop{selected.hops === 1 ? "" : "s"} from the entry
