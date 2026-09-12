@@ -46,12 +46,14 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
   const selectedRef = useRef<string | null>(null);
   const pathARef = useRef<string | null>(null);   // first endpoint of a shift-click A→B selection
   const currentPathRef = useRef<string[]>([]);     // node ids of the pinned path (copy-as-text)
+  const laidOutRef = useRef(false);                // fit only on the first layout / layout-name change
+  const layoutNameRef = useRef(layoutName);        // so incremental relayouts keep the operator's pan/zoom
 
-  const runLayout = (cy: Core) => {
+  const runLayout = (cy: Core, fit = true) => {
     const opts = layoutName === "breadthfirst"
       ? { name: "breadthfirst", directed: true, spacingFactor: 1.35, padding: 34, animate: true,
-          animationDuration: 350, fit: true, nodeDimensionsIncludeLabels: true }
-      : { name: "cose", padding: 50, animate: true, animationDuration: 500, fit: true,
+          animationDuration: 350, fit, nodeDimensionsIncludeLabels: true }
+      : { name: "cose", padding: 50, animate: true, animationDuration: 500, fit,
           nodeDimensionsIncludeLabels: true, nodeRepulsion: 14000, idealEdgeLength: 130,
           nodeOverlap: 28, gravity: 0.2, componentSpacing: 150, randomize: false };
     cy.layout(opts as cytoscape.LayoutOptions).run();
@@ -140,7 +142,7 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     // it in gold, everything else dimmed (BloodHound "shortest path" adapted to the rooted recon
     // graph); click blank → clear both.
     const pinPath = (node: cytoscape.NodeSingular): number | undefined => {
-      cy.elements().removeClass("faded hl onpath offpath");
+      cy.elements().removeClass("faded hl onpath offpath path-a");
       const root = cy.nodes().filter((n) => {
         const k = n.data("kind") as string; return k === "run" || k === "target"; }).first();
       if (root.empty()) return undefined;
@@ -196,6 +198,7 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
         }
         return;
       }
+      pathARef.current = null;   // a plain click cancels any in-progress shift-click A→B start
       selectedRef.current = e.target.id();
       const hops = pinPath(e.target);
       onSelect?.({ id: e.target.id(), label: e.target.data("label"), kind: e.target.data("kind"), state: e.target.data("state"), hops });
@@ -229,14 +232,26 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
     if (!cy) return;
     cy.batch(() => {
       for (const el of elements) {
-        const id = (el.data as { id?: string }).id;
-        const existing = cy.getElementById(id as string);
-        if (existing.nonempty()) existing.data(el.data);
-        else cy.add(el);
+        const d = el.data as { id?: string; source?: string; target?: string };
+        const existing = cy.getElementById(d.id as string);
+        if (existing.nonempty()) { existing.data(el.data); continue; }
+        // an edge whose source/target node isn't present yet would make cytoscape throw (and abort
+        // the whole batch, freezing the live map) — skip it; it's retried on the next render once
+        // the endpoint node arrives.
+        if (d.source !== undefined || d.target !== undefined) {
+          if (cy.getElementById(d.source as string).empty() || cy.getElementById(d.target as string).empty()) continue;
+        }
+        cy.add(el);
       }
     });
     if (layoutTimer.current !== null) clearTimeout(layoutTimer.current);
-    layoutTimer.current = window.setTimeout(() => runLayout(cy), 160);
+    // fit only on the first layout or an explicit layout-name switch — never on an incremental
+    // element add, so a mid-run scan doesn't yank the operator's pan/zoom (Fit button / fitNonce
+    // is the explicit way to re-fit).
+    const shouldFit = !laidOutRef.current || layoutNameRef.current !== layoutName;
+    laidOutRef.current = true;
+    layoutNameRef.current = layoutName;
+    layoutTimer.current = window.setTimeout(() => runLayout(cy, shouldFit), 160);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elements, layoutName]);
 
@@ -275,6 +290,10 @@ export function RunGraph({ elements, layoutName = "cose", fitNonce = 0, onSelect
       const cy = cyRef.current;
       if (!cy) return;
       if (ev.key === "Escape") {
+        // don't clear the map / close the drawer while the operator is typing a note (would lose the draft)
+        const el = document.activeElement as HTMLElement | null;
+        const tag = (el?.tagName || "").toLowerCase();
+        if (tag === "input" || tag === "textarea" || el?.isContentEditable) return;
         selectedRef.current = null; pathARef.current = null; currentPathRef.current = [];
         cy.elements().removeClass("faded hl onpath offpath path-a");
         onSelect?.(null);
