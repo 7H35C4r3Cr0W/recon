@@ -137,7 +137,7 @@ def test_read_only_profile_can_still_be_read_and_exported(tmp_path: Path) -> Non
     prof.add_credential(Credential(username="svc", secret="s", source="smb"))  # while writable
     prof.read_only = True
     assert prof.credentials()  # reads still work
-    assert prof.load_graph() == {"user_edges": [], "node_overrides": {}}
+    assert prof.load_graph() == {"user_edges": [], "node_overrides": {}, "regions": []}
     out = vault_export.export_vault(prof, tmp_path / "vault")  # export must remain available
     assert (out / "index.md").exists()
 
