@@ -1238,12 +1238,14 @@
     // double-click the entry / a /24 / a host to drill down (reveal or fold its children). Only in a
     // pivot graph — on a simple box there is nothing to drill, so a dbltap there just does nothing.
     cy.on("dbltap", 'node[type="target"], node[type="subnet"], node[type="host"]', function (evt) {
+      clearTrace();  // the preceding single-tap pinned a path; the drill-down gesture should not leave it dimmed
       if (isPivotGraph()) toggleCollapse(evt.target);
     });
 
     // double-click a service to drill down: collapse/expand its findings & artifacts. Uses its own
     // class (independent of the type-filter's `hidden`) so the two never clobber each other.
     cy.on("dbltap", 'node[type="service"]', function (evt) {
+      clearTrace();  // drop the single-tap's pinned path so the drill-down doesn't leave the graph dimmed
       var svc = evt.target;
       var collapsed = !svc.data("collapsed");
       svc.data("collapsed", collapsed);
@@ -1284,8 +1286,14 @@
     // milanote-style regions: load from graph.json (via get_data), render the overlay, keep it glued
     // to the camera, and wire the draw/persist handlers once.
     cy.on("pan zoom drag", positionRegions);
-    REGIONS = Array.isArray(elements.regions) ? elements.regions.filter(function (r) { return r && r.id; }) : [];
-    rebuildRegions();
+    // a mid-scan refresh must not tear down a region box whose title/note the operator is editing
+    // (it would drop the unsaved keystrokes + focus); skip the reload while a region field has focus.
+    var editingRegion = document.activeElement && document.activeElement.closest &&
+                        document.activeElement.closest(".region");
+    if (!editingRegion) {
+      REGIONS = Array.isArray(elements.regions) ? elements.regions.filter(function (r) { return r && r.id; }) : [];
+      rebuildRegions();
+    }
     initRegionsOnce();
 
     document.getElementById("zoom-in").onclick = function () {

@@ -17,7 +17,8 @@ A red ring marks a *notable* finding (anonymous access, writable share, weak sig
 ## Driving it
 
 - **Single-click** a node → its full detail (IP / OS / service+version / a /24's host count) in the
-  side panel, plus a **status** (`new` / `investigating` / `done` / `dead-end`) and a **note**.
+  side panel, plus a **status** (`new` / `investigating` / `done` / `dead-end`, and the BloodHound-style
+  marks `owned` / `high-value`) and a **note**.
 - **Right-click** a node → every one of those actions in one menu: the four status marks (the current
   one ticked — pick it again to clear it), *Add / Edit note…*, *Select in service tree →* (jumps back
   to that port's tooling), *Copy label / IP / subnet / target:port*, and *Open project folder*. The

@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from oscprecon.graph_data import build_elements
+from oscprecon.graph_data import NODE_STATUSES, build_elements
 from oscprecon.gui.theme import tokens
 from oscprecon.profile import Profile
 
@@ -39,7 +39,8 @@ except ImportError:  # pragma: no cover - QtWebEngine ships with PySide6-Addons
     _WEBVIEW_IMPORTED = False
 
 _HTML_INDEX = Path(__file__).parent.parent / "graph_html" / "index.html"
-_STATUSES = ("new", "investigating", "done", "dead-end", "owned", "high-value")
+# shared with the reader (graph_data.NODE_STATUSES) so writer + reader never drift
+_STATUSES = NODE_STATUSES
 _VALID_STATUS = frozenset(_STATUSES)
 
 
@@ -149,14 +150,17 @@ class GraphBridge(QObject):
             return
         if not isinstance(positions, dict):
             return
-        graph = self._profile.load_graph()
-        overrides = graph["node_overrides"]
-        for node_id, position in positions.items():
-            if isinstance(position, list) and len(position) == 2:
-                slot = overrides.setdefault(node_id, {})
-                if isinstance(slot, dict):
-                    slot["position"] = [position[0], position[1]]
-        self._profile.save_graph(graph)
+        try:
+            graph = self._profile.load_graph()
+            overrides = graph["node_overrides"]
+            for node_id, position in positions.items():
+                if isinstance(position, list) and len(position) == 2:
+                    slot = overrides.setdefault(node_id, {})
+                    if isinstance(slot, dict):
+                        slot["position"] = [position[0], position[1]]
+            self._profile.save_graph(graph)
+        except OSError:  # a failed graph.json read/write must not crash the QWebChannel slot
+            return
 
     @Slot(str)
     def save_regions(self, regions_json: str) -> None:
@@ -170,9 +174,12 @@ class GraphBridge(QObject):
             return
         if not isinstance(regions, list):
             return
-        graph = self._profile.load_graph()
-        graph["regions"] = [r for r in regions if isinstance(r, dict)]
-        self._profile.save_graph(graph)
+        try:
+            graph = self._profile.load_graph()
+            graph["regions"] = [r for r in regions if isinstance(r, dict)]
+            self._profile.save_graph(graph)
+        except OSError:  # a failed graph.json read/write must not crash the QWebChannel slot
+            return
 
     @Slot(str, str)
     def export_image(self, image_format: str, data: str) -> None:
@@ -183,40 +190,46 @@ class GraphBridge(QObject):
         if not self._writable():
             return
         assert self._profile is not None
-        graph = self._profile.load_graph()
-        edges = graph["user_edges"]
-        # dedup: relating the same pair twice must not accumulate overlapping edges. An edge is
-        # directionless for this purpose, so A->B already covers a later B->A request.
-        if any(
-            isinstance(e, dict) and {str(e.get("from")), str(e.get("to"))} == {source, target}
-            for e in edges
-        ):
+        try:
+            graph = self._profile.load_graph()
+            edges = graph["user_edges"]
+            # dedup: relating the same pair twice must not accumulate overlapping edges. An edge is
+            # directionless for this purpose, so A->B already covers a later B->A request.
+            if any(
+                isinstance(e, dict) and {str(e.get("from")), str(e.get("to"))} == {source, target}
+                for e in edges
+            ):
+                return
+            edges.append({"from": source, "to": target, "label": label})
+            self._profile.save_graph(graph)
+        except OSError:  # a failed graph.json read/write must not crash the QWebChannel slot
             return
-        edges.append({"from": source, "to": target, "label": label})
-        self._profile.save_graph(graph)
 
     def _update_override(self, node_id: str, key: str, value: Any) -> None:
         if not self._writable():
             return
         assert self._profile is not None
-        graph = self._profile.load_graph()
-        overrides = graph["node_overrides"]
-        if value is None:
-            # clearing (e.g. status toggle-off): only touch a node that already has an override —
-            # setdefault would otherwise create an empty {} for a never-overridden node, churning
-            # graph.json with a no-op write and leaving orphan {} entries. [#34]
-            slot = overrides.get(node_id)
-            if not isinstance(slot, dict) or key not in slot:
+        try:
+            graph = self._profile.load_graph()
+            overrides = graph["node_overrides"]
+            if value is None:
+                # clearing (e.g. status toggle-off): only touch a node that already has an
+                # override — setdefault would otherwise create an empty {} for a never-overridden
+                # node, churning graph.json and leaving orphan {} entries. [#34]
+                slot = overrides.get(node_id)
+                if not isinstance(slot, dict) or key not in slot:
+                    return
+                slot.pop(key, None)
+                if not slot:  # drop the node entirely once its last override is gone
+                    overrides.pop(node_id, None)
+                self._profile.save_graph(graph)
                 return
-            slot.pop(key, None)
-            if not slot:  # drop the node entirely once its last override is gone
-                overrides.pop(node_id, None)
-            self._profile.save_graph(graph)
+            slot = overrides.setdefault(node_id, {})
+            if isinstance(slot, dict):
+                slot[key] = value
+                self._profile.save_graph(graph)
+        except OSError:  # a failed graph.json read/write must not crash the QWebChannel slot
             return
-        slot = overrides.setdefault(node_id, {})
-        if isinstance(slot, dict):
-            slot[key] = value
-            self._profile.save_graph(graph)
 
 
 class GraphDetail(QWidget):

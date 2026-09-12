@@ -15,7 +15,12 @@ from oscprecon.references import match as ref_match
 # Visual framing (which finding is "notable") comes from the centralized, conservative
 # finding_severity classifier — an open port / version / EDB hit is never framed as a weakness.
 
-_VALID_STATUS = frozenset({"new", "investigating", "done", "dead-end"})
+# The node-status vocabulary — the SINGLE source of truth, imported by the GUI writer
+# (gui/widgets/graph_view.py) so the reader here and the writer can never drift. Includes the
+# BloodHound-style marks (owned / high-value); dropping them here silently discarded those two
+# statuses on every read (canvas ring, summary tag, report column). [review]
+NODE_STATUSES = ("new", "investigating", "done", "dead-end", "owned", "high-value")
+_VALID_STATUS = frozenset(NODE_STATUSES)
 
 
 def _service_id(port: int, proto: str) -> str:

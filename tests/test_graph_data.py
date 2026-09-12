@@ -231,7 +231,8 @@ def test_load_graph_coerces_wrong_typed_fields(tmp_path: Path) -> None:
 
 def test_profile_graph_persistence_roundtrip(tmp_path: Path) -> None:
     prof = Profile.create(tmp_path, "b", Target(ip="10.10.10.5"))
-    assert prof.load_graph() == {"user_edges": [], "node_overrides": {}}  # default when absent
+    # default when absent (regions [] added with the Milanote-style map regions feature)
+    assert prof.load_graph() == {"user_edges": [], "node_overrides": {}, "regions": []}
     prof.save_graph(
         {"user_edges": [{"from": "a", "to": "b"}], "node_overrides": {"a": {"status": "done"}}}
     )
