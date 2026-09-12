@@ -50,6 +50,14 @@ GATE:        ruff + mypy clean; 113 backend + 10 policy-invariant + 36 frontend 
 REMAINING:   Tier 2 only (LLM-gated, blocked on legal): attach the model → `agent` runs; Phase B
              (agents PROPOSE into the built gate); run-level LLM budgets; live agent-run validation.
 ATTACH BRAIN: set NABU_LLM_BASE_URL (+ API_KEY, MODEL) via Admin → LLM setup → test-fire. No code change.
+REVIEW:      2026-09-11 adversarial multi-agent code review (5 dims, each finding verified) across the
+             demo app replica, the SPA live map (RunGraph/RunLive) + map-annotation API, and the desktop
+             GUI graph (app.js + graph_view.py). 20 confirmed findings fixed in three separate commits
+             (app / nabu-agent / src-oscprecon). Notables: SPA live map froze on an edge with a missing
+             endpoint node (now skipped); map-note/region PUT/DELETE now write audit_log (hard-rule #6);
+             desktop 'owned'/'high-value' statuses were dropped on read (shared NODE_STATUSES now); GUI
+             write slots guard graph.json OSError. Also fixed a pre-existing stale roundtrip test
+             (load_graph default gained `regions: []`).
 OPS NOTE:    the hourly git-autosync crontab line is RE-ENABLED (2026-09-11) — pointed at `origin`
              (there was no `github` remote); it does `git add -A` + commit + push to main hourly.
 HOW TO TEST: cd nabu-agent && uv sync --group dev && uv run pytest -q -m "not load"   (+ -m invariant);
