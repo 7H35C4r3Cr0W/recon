@@ -549,12 +549,12 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
           <button class="seg" id="lay-force">Force</button>
           <button class="seg on" id="lay-hier">Tree</button>
           <input class="search" id="search" placeholder="search: dc01 · 445 · svc_" aria-label="search nodes">
-          <button class="seg" id="toggletree">Hide tree</button>
-          <button class="seg" id="togglelog">Hide log</button>
+          <button class="seg" id="toggletree">Show hosts</button>
+          <button class="seg" id="togglelog">Show log</button>
           <button class="seg" id="region-mode">▢ Region</button>
           <span style="margin-left:auto" class="hint">click a node → detail + path · shift-click 2 → path A→B · dbl-click → note</span>
         </div>
-        <div class="map3" id="mapbody">
+        <div class="map3 notree nolog" id="mapbody">
           <aside class="svctree" id="svctree"></aside>
           <div class="mapcol">
             <div id="cy"></div>
@@ -918,7 +918,7 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
       ele.animate({style:{"overlay-padding":15}},{duration:500,easing:"ease-out-cubic",complete:function(){ ele.animate({style:{"overlay-opacity":ele.data("state")==="active"?0.18:0,"overlay-padding":6}},{duration:340}); }}); } }
   function setState(map){ if(!map) return; Object.keys(map).forEach(function(id){ var n=cy.getElementById(id); if(n.nonempty()) n.data("state",map[id]); }); }
   function layout(name){ var opts=name==="hier"?{name:"breadthfirst",directed:true,roots:"#t_dmz",spacingFactor:1.0,animate:false,fit:false,nodeDimensionsIncludeLabels:false,transform:function(node,pos){ return {x:pos.y,y:pos.x}; }}:{name:"cose",animate:false,fit:false,nodeDimensionsIncludeLabels:false,nodeRepulsion:14000,idealEdgeLength:90,nodeOverlap:18,gravity:0.2,componentSpacing:110,randomize:false};
-    var l=cy.layout(opts); l.one("layoutstop",function(){ fitNodes(cy.width()>1100?52:34); }); l.run(); }
+    var l=cy.layout(opts); l.one("layoutstop",function(){ captureBase(); fitNodes(cy.width()>1100?54:30); }); l.run(); }
 
   var STATES=["active","done","stuck","error","queued"];
   function renderLegend(){ var c={}; cy.nodes().forEach(function(n){ var s=n.data("state"); c[s]=(c[s]||0)+1; });
@@ -984,7 +984,7 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
     document.getElementById("lay-hier").onclick=function(){ layoutName="hier"; this.classList.add("on"); document.getElementById("lay-force").classList.remove("on"); layout("hier"); };
     document.getElementById("search").oninput=function(){ applySearch(this.value); };
     document.getElementById("togglelog").onclick=function(){ var b=document.getElementById("mapbody"); var hid=b.classList.toggle("nolog"); this.textContent=hid?"Show log":"Hide log"; this.classList.toggle("on",!hid); refitMap(); };
-    document.getElementById("toggletree").onclick=function(){ var b=document.getElementById("mapbody"); var hid=b.classList.toggle("notree"); this.textContent=hid?"Show tree":"Hide tree"; this.classList.toggle("on",!hid); refitMap(); };
+    document.getElementById("toggletree").onclick=function(){ var b=document.getElementById("mapbody"); var hid=b.classList.toggle("notree"); this.textContent=hid?"Show hosts":"Hide hosts"; this.classList.toggle("on",!hid); refitMap(); };
     wireConsole();
     document.getElementById("drawerx").onclick=function(){ hideDrawer(); clearPath(); };
     document.getElementById("d-note-save").onclick=function(){ if(!drawerId) return; var v=document.getElementById("d-note").value.trim(); if(v){ NOTES[drawerId]=v; cy.getElementById(drawerId).addClass("noted"); } else { delete NOTES[drawerId]; cy.getElementById(drawerId).removeClass("noted"); } };
@@ -1273,19 +1273,22 @@ select.input,textarea.input{width:100%}textarea.input{min-height:74px;resize:ver
     else if(kind==="subnet") pop("Pivot","into "+(m.cidr||n.label),"info"); }
 
   /* ---- command console (free-form, editable; mirrors the desktop tool's command builder) ---- */
-  function fitNodes(pad){ if(!cy) return; pad=(pad==null?48:pad); var ns=cy.nodes(); if(ns.length<2){ if(ns.length) cy.fit(ns,pad); return; }
-    var bb=ns.boundingBox({includeLabels:false}); var W=cy.width(), H=cy.height(); if(!W||!H) return;
-    var tw=W-2*pad, th=H-2*pad; if(bb.w<=0||bb.h<=0||tw<=60||th<=60){ cy.fit(ns,pad); return; }
-    var sx=tw/bb.w, sy=th/bb.h;
-    if(sx>=0.98 && sy>=0.98){ /* room to grow → spread to fill BOTH dimensions (no wasted page) */
-      ns.positions(function(n){ var p=n.position(); return { x: pad+(p.x-bb.x1)*sx, y: pad+(p.y-bb.y1)*sy }; });
-      cy.zoom(1); cy.pan({x:0,y:0}); }
-    else { /* box smaller than graph → uniform zoom, centered, never overlapping */
-      var z=Math.max(cy.minZoom(),Math.min(2.0,Math.min(sx,sy))); cy.zoom(z); cy.center(ns); }
-    if(typeof positionRegions==="function") positionRegions(); }
+  var BASE={};
+  function captureBase(){ BASE={}; if(!cy) return; cy.nodes().forEach(function(n){ var p=n.position(); BASE[n.id()]={x:p.x,y:p.y}; }); }
+  function fitNodes(pad){ if(!cy) return; pad=(pad==null?52:pad); var ns=cy.nodes(); if(ns.length<2){ if(ns.length) cy.fit(ns,pad); return; }
+    /* source positions from the LAST layout (BASE) so repeated fits never compound */
+    var src={},x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
+    ns.forEach(function(n){ var b=BASE[n.id()]||n.position(); src[n.id()]=b; if(b.x<x1)x1=b.x; if(b.x>x2)x2=b.x; if(b.y<y1)y1=b.y; if(b.y>y2)y2=b.y; });
+    var bw=x2-x1, bh=y2-y1, W=cy.width(), H=cy.height(); if(!W||!H) return;
+    var tw=W-2*pad, th=H-2*pad; if(bw<=0||bh<=0||tw<=40||th<=40){ cy.fit(ns,pad); return; }
+    var sx=tw/bw, sy=th/bh, z=Math.min(sx,sy); if(!isFinite(z)||z<=0){ cy.fit(ns,pad); return; }
+    /* stretch positions APART on the roomier axis (fx,fy >= 1 → never overlap), then uniform-zoom to fit */
+    var fx=sx/z, fy=sy/z, cx=(x1+x2)/2, cyy=(y1+y2)/2;
+    ns.positions(function(n){ var b=src[n.id()]; return { x:(b.x-cx)*fx+cx, y:(b.y-cyy)*fy+cyy }; });
+    cy.zoom(Math.max(cy.minZoom(),Math.min(2.2,z))); cy.center(ns); if(typeof positionRegions==="function") positionRegions(); }
   function refitMap(){ setTimeout(function(){ if(cy){ cy.resize(); fitNodes(34); } },70); }
   function setPaneHidden(cls,hide){ var mb=document.getElementById("mapbody"); if(!mb) return; mb.classList.toggle(cls,!!hide);
-    var id=cls==="nolog"?"togglelog":"toggletree", label=cls==="nolog"?"log":"tree", t=document.getElementById(id);
+    var id=cls==="nolog"?"togglelog":"toggletree", label=cls==="nolog"?"log":"hosts", t=document.getElementById(id);
     if(t){ t.textContent=(hide?"Show ":"Hide ")+label; t.classList.toggle("on",!hide); } }
   function setFull(on){ var v=document.getElementById("view-run"), b=document.getElementById("fullscreen"), mb=document.getElementById("mapbody"); if(!v||!mb) return;
     if(on){ v.__pNolog=mb.classList.contains("nolog"); v.__pNotree=mb.classList.contains("notree"); setPaneHidden("nolog",true); setPaneHidden("notree",true); }
